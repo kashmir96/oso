@@ -6,7 +6,7 @@ theme: PaperMod
 params:
 
   homeInfoParams:
-      Title: G'day! I'm Curtis, welcome to my website 
+      Title: G'day! I'm Curtis, welcome to my website.
       Content: Feel free to stick around and read about the projects I'm working on, or check out my latest learns documented in the blog. 
       
   socialIcons:
