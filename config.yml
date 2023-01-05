@@ -1,0 +1,52 @@
+baseURL: "https://www.oso.nz"
+languageCode: en-us
+title: Curtis Fairweather - OSO Marketing NZ
+theme: PaperMod
+
+params:
+
+  homeInfoParams:
+      Title: G'day! I'm Curtis, welcome to my site. 
+      Content: Feel free to stick around and read about the projects I'm working on, or check out my latest learns documented in the blog. 
+      
+  socialIcons:
+  Name: facebook
+  Url: “https://facebook.com/itscurtisf”
+  Name: instagram
+  Url: “https://linkedin.com/
+  Name: linkedin
+  Url: “https://instagram.com/ckfairweather
+
+  ShowBreadCrumbs: true
+
+  ShowReadingTime: true
+
+  ShowShareButtons: true
+
+  ShowPostNavLinks: true
+
+
+menu: 
+  main: 
+    - identifier: projects
+      name: Projects
+      url: /projects/
+      weight: 10
+
+    - identifier: learns
+      name: Learns
+      url: /learns/
+      weight: 20
+
+    - identifier: contact
+      name: Contact
+      url: /contact/
+      weight: 30
+
+
+markup:
+  goldmark:
+    renderer:
+      unsafe: true
+    extensions:
+      linkify: false
