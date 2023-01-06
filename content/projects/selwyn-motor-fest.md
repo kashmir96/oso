@@ -7,6 +7,9 @@ cover:
  alt: a screenshot of selwyn motor fests website
 
 date: "01/11/2019"
+type: projects
+category: "events"
+tags: "car shows", "charity"
 ---
 
 Read more about them here: <a href="http://www.selwynmotorfest.nz">Selwyn Motor Fest - Rolleston Car Show</a>

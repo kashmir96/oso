@@ -6,6 +6,9 @@ cover:
  image: /img/projects/serenity.webp
  alt: a screenshot of serenity yoga studio management software website
 date: "01/11/2022"
+type: projects
+category: "SaaS"
+tags: "health & fitness", "software", "b2b"
 ---
 
 Read more about them here: <a href="https://www.serenitybookings.com">Serenity - Yoga Studio Software</a>

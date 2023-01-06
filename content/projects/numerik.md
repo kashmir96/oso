@@ -6,6 +6,9 @@ cover:
  alt: a screenshot of numerik sales performance app website 
 
 date: "10/10/2022"
+type: projects
+category: "SaaS"
+tags: "sales", "software", "b2b"
 ---
 
 Read more about them here: <a href="https://www.numerik.ly">Numerik - Sales Performance App</a>
