@@ -6,7 +6,7 @@ cover:
  alt: a screenshot of numerik sales performance app website 
 
 date: "10/10/2022"
-type: projects
+type: Projects
 category: "SaaS"
 tags: "sales", "software", "b2b"
 ---

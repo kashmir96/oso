@@ -7,7 +7,7 @@ cover:
  alt: a screenshot of selwyn motor fests website
 
 date: "01/11/2019"
-type: projects
+type: Projects
 category: "events"
 tags: "car shows", "charity"
 ---

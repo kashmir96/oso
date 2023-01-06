@@ -5,7 +5,7 @@ cover:
  image: /img/learns/thesis.webp
  alt: a screenshot of curtis fairweather masters thesis on b2b saas marketing with gamification
 date: "01/01/2020"
-type: learns
+type: Learns
 category: "research"
 tags: "marketing", "saas", "b2b", "gamification", "academic"
 ---

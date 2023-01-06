@@ -6,7 +6,7 @@ cover:
  image: /img/projects/musclecarmadness.webp
  alt: a screenshot of muscle car madness nz website
 date: "01/01/2018"
-type: projects
+type: Projects
 category: "events"
 tags: "car shows", "charity"
 

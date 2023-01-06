@@ -6,7 +6,7 @@ cover:
  image: /img/projects/serenity.webp
  alt: a screenshot of serenity yoga studio management software website
 date: "01/11/2022"
-type: projects
+type: Projects
 category: "SaaS"
 tags: "health & fitness", "software", "b2b"
 ---
