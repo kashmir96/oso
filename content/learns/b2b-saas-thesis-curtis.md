@@ -5,8 +5,8 @@ cover:
  image: /img/learns/thesis.webp
  alt: a screenshot of curtis fairweather masters thesis on b2b saas marketing with gamification
 type: Learns
-category: "research"
-tags: "marketing", "saas", "b2b", "gamification", "academic"
+category: ["research"]
+tags: ["marketing", "saas", "b2b", "gamification", "academic"]
 ---
 ## Abstract
 This research explores the influence that gamification may have upon the behavioural intentions of new business software users towards the adoption of information technology. Many businesses operating within the business to business (B2B) software as a service (SaaS) industry experience a high rate of churn from new customers, particularly during the onboarding process. This is a phenomenon that can be linked to the compatibility of these systems with existing business processes and norms as well as their perceived complexity– many have a wide array of features on offer and a steep learning curve, that can cause anxiety or ineffective use among novice users. As such, the importance of effective customer engagement and interaction for this process is emphasized, but often lacking in practice. This is an issue that is set to worsen, given recent business trends shifting towards more self-directed sales and training practices which have grown in popularity due to their potential for reducing costs and improving scalability.

@@ -3,8 +3,8 @@ title: "Creating thousands of unique seo blog topics quickly"
 date: 2023-01-06T13:48:01+13:00
 draft: false
 type: Learns
-category: "workflow"
-tags: "marketing", "websites", "blogging", "seo"
+category: ["workflow"]
+tags: ["marketing", "websites", "blogging", "seo"]
 
 ---
 ## Introduction

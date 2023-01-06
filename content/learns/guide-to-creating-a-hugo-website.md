@@ -3,8 +3,8 @@ title: "Guide to Creating a Blazing Fast Website + Blog"
 date: 2023-01-06T13:48:01+13:00
 draft: false
 type: Learns
-category: "workflow"
-tags: "marketing", "websites", "blogging", "hugo"
+category: ["workflow"]
+tags: ["marketing", "websites", "blogging", "hugo"]
 
 ---
 
