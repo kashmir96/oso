@@ -4,6 +4,6 @@ description: "Blogging to document knowledge gained thorughout my journey–main
 draft: false
 type: custom
 layout: custom-list
-set_type: learns
+set_type: Learns
 ---
 

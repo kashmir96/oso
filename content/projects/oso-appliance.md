@@ -5,7 +5,6 @@ cover:
  image: /img/projects/osoappliance.webp
  alt: a screenshot of oso appliance repair and parts directory website
 date: "01/01/2023"
-type: Projects
 category: ["blog"]
 tags: ["appliances", "directory"]
 ---

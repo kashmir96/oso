@@ -5,7 +5,6 @@ draft: false
 cover: 
  image: /img/projects/gymmaster.webp
  alt: a screenshot of gymmaster gym management software website
-type: Projects
 category: ["SaaS"]
 tags: ["health & fitness", "software", "b2b"]
 
