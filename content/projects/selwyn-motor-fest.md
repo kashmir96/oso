@@ -6,7 +6,7 @@ cover:
  image: /img/projects/selwynmotorfest.webp
  alt: a screenshot of selwyn motor fests website
 
-date: 01/11/2019
+date: "01/11/2019"
 ---
 
 Read more about them here: <a href="http://www.selwynmotorfest.nz">Selwyn Motor Fest - Rolleston Car Show</a>
