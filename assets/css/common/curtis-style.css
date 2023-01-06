@@ -170,9 +170,9 @@ label.fcf-label {
 
 .fcf-btn-primary:focus, .fcf-btn-primary.focus {
     color: #fff;
-    background-color: #0069d9;
-    border-color: #0062cc;
-    box-shadow: 0 0 0 0.2rem rgba(38, 143, 255, 0.5);
+    background-color: #671ed5;
+    border-color: #671ed5;
+    box-shadow: 0 0 0 0.2rem rgba(78, 28, 204, 0.5);
 }
 
 .fcf-btn-lg, .fcf-btn-group-lg>.fcf-btn {
