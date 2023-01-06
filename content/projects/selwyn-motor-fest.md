@@ -6,7 +6,6 @@ cover:
  image: /img/projects/selwynmotorfest.webp
  alt: a screenshot of selwyn motor fests website
 
-date: "01/11/2019"
 type: Projects
 category: ["events"]
 tags: ["car shows", "charity"]
