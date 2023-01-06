@@ -4,6 +4,7 @@ description: "Business-to-business software as a service - how gamification can 
 cover: 
  image: /img/learns/thesis.webp
  alt: a screenshot of curtis fairweather masters thesis on b2b saas marketing with gamification
+date: 2020-01-01T13:48:01+13:00
 type: Learns
 category: ["research"]
 tags: ["marketing", "saas", "b2b", "gamification", "academic"]

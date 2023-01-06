@@ -7,6 +7,7 @@ cover:
  alt: a screenshot of muscle car madness nz website
 category: ["events"]
 tags: ["car shows", "charity"]
+date: 2018-01-26T13:48:01+13:00
 
 ---
 
