@@ -19,7 +19,7 @@ box-sizing: border-box;
 outline:0;
 }
 
-.form-input:focus { border:2px solid #CC4949; }
+.form-input:focus { border:2px solid #671ed5; }
 
 textarea {
 height: 150px;
@@ -30,7 +30,7 @@ resize:vertical;
 [type="submit"] {
 font-family: 'Montserrat', Arial, Helvetica, sans-serif;
 width: 100%;
-background:#CC6666;
+background:#671ed5;
 border-radius:5px;
 border:0;
 cursor:pointer;
