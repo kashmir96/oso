@@ -4,6 +4,8 @@ description: OSO Appliance is an online directory for all things appliances. Wit
 cover: 
  image: /img/projects/osoappliance.webp
  alt: a screenshot of oso appliance repair and parts directory website
+
+date: 01/01/2023
 ---
 
 Read more about this project here: <a href="https://www.osoappliance.com">OSO Appliance - Appliance Articles & Directories</a>

@@ -5,6 +5,8 @@ draft: false
 cover: 
  image: /img/projects/gymmaster.webp
  alt: a screenshot of gymmaster gym management software website
+date: 06/01/2023
+
 ---
 
 Read more about them here: <a href="https://www.GymMaster.com">GymMaster - Gym Software</a>
