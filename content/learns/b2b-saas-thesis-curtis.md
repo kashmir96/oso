@@ -1,6 +1,6 @@
 ---
 title: "My Master's Thesis"
-description: Business-to-business software as a service - how gamification can be used as an acquisition tool through its influence on engagement
+description: Business-to-business software as a service - how gamification can be used as an acquisition tool through its influence on engagement.
 cover: 
  image: /img/learns/thesis.webp
  alt: a screenshot of curtis fairweather masters thesis on b2b saas marketing with gamification
