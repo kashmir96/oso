@@ -7,8 +7,8 @@ cover:
 
 date: "10/10/2022"
 type: Projects
-category: "SaaS"
-tags: "sales", "software", "b2b"
+category: ["SaaS"]
+tags: ["sales", "software", "b2b"]
 ---
 
 Read more about them here: <a href="https://www.numerik.ly">Numerik - Sales Performance App</a>
