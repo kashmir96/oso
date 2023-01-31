@@ -5,7 +5,9 @@ draft: false
 type: Learns
 category: ["workflow"]
 tags: ["marketing", "websites", "blogging", "hugo"]
-
+cover: 
+ image: /img/learns/6.webp
+ alt: 
 ---
 
 ## Useful resources: 
