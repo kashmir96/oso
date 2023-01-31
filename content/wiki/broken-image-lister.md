@@ -6,7 +6,7 @@ type: Learns
 category: ["Productivity"]
 tags: ["Website Tools", "Markdown Files", "Productivity"]
 cover: 
- image: /img/learns/2.webp
+ image: /img/learns/6.webp
  alt: 
 ---
 
