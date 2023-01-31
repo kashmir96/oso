@@ -33,9 +33,9 @@ menu:
       url: /projects/
       weight: 10
 
-    - identifier: learns
-      name: Learns
-      url: /learns/
+    - identifier: wiki
+      name: Wiki
+      url: /wiki/
       weight: 20
 
     - identifier: contact
