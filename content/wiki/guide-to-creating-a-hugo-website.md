@@ -6,7 +6,7 @@ type: Learns
 category: ["workflow"]
 tags: ["marketing", "websites", "blogging", "hugo"]
 cover: 
- image: /img/learns/6.webp
+ image: /img/learns/3.webp
  alt: 
 ---
 
