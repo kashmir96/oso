@@ -5,7 +5,7 @@ cover:
  image: /img/learns/4.webp
  alt: a screenshot of the Image Processing Script in action
 date: 2023-01-31T13:48:01+13:00
-type: Tool
+type: Learns
 category: ["image processing"]
 tags: ["python", "image conversion", "webp", "resizing"]
 ---

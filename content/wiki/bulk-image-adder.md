@@ -5,7 +5,7 @@ cover:
  image: /img/learns/1.webp
  alt: 
 date: 2020-01-01T13:48:01+13:00
-type: Tools
+type: Learns
 category: ["Productivity"]
 tags: ["Website Tools", "Markdown", "Blog Posts", "Productivity"]
 ---

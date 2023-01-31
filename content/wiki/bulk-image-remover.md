@@ -1,7 +1,7 @@
 ---
 title: Removing Image Information from Markdown Files
 description: This script is used to remove specific lines from all markdown files in a directory. 
-type: Tools
+type: Learns
 category: ["website tools", "md file productivity"]
 tags: ["removing images", "markdown files", "directory"]
 cover: 

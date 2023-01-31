@@ -1,11 +1,8 @@
 ---
 title: Finding Broken Feature Images in Markdown Files with a Script
 description: A script to help you keep track of all the broken feature images in your Markdown files.
-cover: 
- image:
- alt: A broken image with a red X on it
 date: 2020-01-01T13:48:01+13:00
-type: Tools
+type: Learns
 category: ["Productivity"]
 tags: ["Website Tools", "Markdown Files", "Productivity"]
 cover: 
