@@ -2,11 +2,11 @@
 title: Add Hyperlinks to Cells in Google Sheets
 description: This Google Script will add hyperlinks to cells in a Google Sheet based on a mapping of search phrases to links.
 date: 2023-02-05
-type: Learn
+type: Learns
 category: ["Productivity"]
 tags: ["Google Scripts", "Productivity"]
 cover:
- image:
+ image: /img/learns/7.webp
  alt:
 ---
 
