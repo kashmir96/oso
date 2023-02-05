@@ -1,0 +1,32 @@
+function addLinksToCells(spreadsheetId, sheetName, columnNumber, mappingSheetName, searchPhraseColumn, hyperlinkColumn) {
+  // spreadsheetId: ID of the Google Spreadsheet to be modified.
+  // sheetName: Name of the sheet in the Spreadsheet to be modified.
+  // columnNumber: The number of the column in the sheet that contains the cell values to be searched and modified.
+  // mappingSheetName: Name of the sheet in the Spreadsheet that contains the map of the search phrase and associated link.
+  // searchPhraseColumn: The number of the column in the mapping sheet that contains the search phrases.
+  // hyperlinkColumn: The number of the column in the mapping sheet that contains the hyperlinks.
+
+  var sheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName(sheetName);
+  var column = sheet.getRange(1, columnNumber, sheet.getLastRow(), 1).getValues();
+  
+  var mappingSheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName(mappingSheetName);
+  var mappingData = mappingSheet.getDataRange().getValues();
+  
+  var mapping = {};
+  for (var i = 0; i < mappingData.length; i++) {
+    mapping[mappingData[i][searchPhraseColumn - 1]] = mappingData[i][hyperlinkColumn - 1];
+  }
+  
+  for (var i = 0; i < column.length; i++) {
+    var cellValue = column[i][0];
+    for (var searchPhrase in mapping) {
+      while (cellValue.includes(searchPhrase)) {
+        var newValue = cellValue.replace(searchPhrase, '<a href="' + mapping[searchPhrase] + '">' + searchPhrase + '</a>');
+        cellValue = newValue;
+      }
+    }
+    sheet.getRange(i + 1, columnNumber).setValue(cellValue);
+  }
+  
+  SpreadsheetApp.flush();
+}
