@@ -1,32 +1,48 @@
-function addLinksToCells(spreadsheetId, sheetName, columnNumber, mappingSheetName, searchPhraseColumn, hyperlinkColumn) {
-  // spreadsheetId: ID of the Google Spreadsheet to be modified.
-  // sheetName: Name of the sheet in the Spreadsheet to be modified.
-  // columnNumber: The number of the column in the sheet that contains the cell values to be searched and modified.
-  // mappingSheetName: Name of the sheet in the Spreadsheet that contains the map of the search phrase and associated link.
-  // searchPhraseColumn: The number of the column in the mapping sheet that contains the search phrases.
-  // hyperlinkColumn: The number of the column in the mapping sheet that contains the hyperlinks.
+function onEdit(e) {
+  // Get the active spreadsheet and the specified sheets
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet1 = ss.getSheetByName("Sheet1");
+  var sheet2 = ss.getSheetByName("Sheet2");
 
-  var sheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName(sheetName);
-  var column = sheet.getRange(1, columnNumber, sheet.getLastRow(), 1).getValues();
-  
-  var mappingSheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName(mappingSheetName);
-  var mappingData = mappingSheet.getDataRange().getValues();
-  
-  var mapping = {};
-  for (var i = 0; i < mappingData.length; i++) {
-    mapping[mappingData[i][searchPhraseColumn - 1]] = mappingData[i][hyperlinkColumn - 1];
-  }
-  
-  for (var i = 0; i < column.length; i++) {
-    var cellValue = column[i][0];
-    for (var searchPhrase in mapping) {
-      while (cellValue.includes(searchPhrase)) {
-        var newValue = cellValue.replace(searchPhrase, '<a href="' + mapping[searchPhrase] + '">' + searchPhrase + '</a>');
-        cellValue = newValue;
+  // Specify the column to check for changes
+  var triggerColumn = 1;
+
+  // Specify the column to add the links to
+  var linkColumn = 2;
+
+  // Get the range of the edited cell
+  var editedRange = e.range;
+
+  // Get the row and column of the edited cell
+  var editedRow = editedRange.getRow();
+  var editedCol = editedRange.getColumn();
+
+  // Check if the edited cell is in the trigger column
+  if (editedCol == triggerColumn) {
+    // Get the value of the edited cell
+    var editedValue = editedRange.getValue();
+
+    // Check if the edited cell is not empty
+    if (editedValue != "") {
+      // Get the number of rows in Sheet2
+      var numRowsSheet2 = sheet2.getLastRow();
+
+      // Loop through each row in Sheet2
+      for (var i = 1; i <= numRowsSheet2; i++) {
+        // Get the search term and URL from Sheet2, column 1 and column 2, respectively
+        var searchTerm = sheet2.getRange(i, 1).getValue();
+        var url = sheet2.getRange(i, 2).getValue();
+
+        // Get the cell in the link column for the current row
+        var linkCell = sheet1.getRange(editedRow, linkColumn).getValue();
+
+        // Check if the linkCell doesn't contain the <a> tag
+        if (linkCell.indexOf("<a href='" + url + "'>" + searchTerm + "</a>") == -1) {
+          // Replace the search term with the <a> tag
+          var newLinkCell = linkCell.replace(searchTerm, "<a href='" + url + "'>" + searchTerm + "</a>");
+          sheet1.getRange(editedRow, linkColumn).setValue(newLinkCell);
+        }
       }
     }
-    sheet.getRange(i + 1, columnNumber).setValue(cellValue);
   }
-  
-  SpreadsheetApp.flush();
 }
