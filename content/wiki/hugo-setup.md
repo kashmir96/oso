@@ -2,9 +2,8 @@
 title: "Generate a Lightning-Fast Website in Minutes - A Step-by-Step Guide"
 description: Learn how to create a website that is both fast and efficient in just a few minutes. Follow the process of updating your blog generator tool in Google Sheets, generating meta descriptions with chat GPT, and more.
 cover: 
- image: img/learns/11.webp
+ image: /img/learns/11.webp
  alt: Screenshot of website creation process
-
 date: 2020-11-01T00:00:00Z
 category: ["Web Development"]
 tags: ["website", "creation", "process", "tools", "techniques"]
