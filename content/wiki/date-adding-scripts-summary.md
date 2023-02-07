@@ -22,7 +22,7 @@ We present a collection of four Python scripts that automate the process of addi
 
 This script adds a specified number of days to the current date for each file in a directory. This can be useful if you have multiple files and want to have them sorted in a specific order.
 
-[Learn more about this script](../date-adder-increment-step)
+[Learn more about this script](date-adder-increment-step.md)
 
 ### `date-adder-increment.py`
 
