@@ -22,25 +22,25 @@ We present a collection of four Python scripts that automate the process of addi
 
 This script adds a specified number of days to the current date for each file in a directory. This can be useful if you have multiple files and want to have them sorted in a specific order.
 
-[Learn more about this script](./date-adder-increment-step)
+[Learn more about this script](../date-adder-increment-step)
 
 ### `date-adder-increment.py`
 
 This script adds a specified number of days to the current date for each file in a directory. The difference from the first script is that this one increments the date by one day for each file processed, rather than adding a fixed number of days.
 
-[Learn more about this script](./date-adder-increment)
+[Learn more about this script](../date-adder-increment)
 
 ### `date-adder-now.py`
 
 This script adds the current date and time to each file in a directory. This can be useful if you want to have a record of exactly when each file was processed.
 
-[Learn more about this script](./date-adder-now)
+[Learn more about this script](../date-adder-now)
 
 ### `date-adder-set.py`
 
 This script adds a user-specified date to each file in a directory. This can be useful if you want to set a specific date for all files, such as the date of a project deadline.
 
-[Learn more about this script](./date-adder-set)
+[Learn more about this script](../date-adder-set)
 
 ## Wrap Up
 
