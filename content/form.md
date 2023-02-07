@@ -1,5 +1,5 @@
 ---
-title: "GymMaster - Gym Management Software"
+title: "form"
 description: "GymMaster is an all-in-one gym management system, streamlining thousands of clubs across 75+ countries."
 draft: false
 cover: 
