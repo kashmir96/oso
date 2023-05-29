@@ -2,9 +2,6 @@
 title: "Batch Update Frontmatter of Markdown Files with Python"
 description: "Learn how to use a Python script to update the frontmatter of multiple Markdown files at once."
 type: "Learns"
-cover: 
-  image: /img/learns/8.webp
-  alt: "Illustration of a robot using a magnifying glass to look at a sitemap"
 ---
 
 ## Introduction
