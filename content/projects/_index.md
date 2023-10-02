@@ -1,6 +1,6 @@
 ---
 title: "Projects"
-description: "Learn about the projects I've had the pleasure of working on."
+description: "Check out some of the projects I've worked on."
 draft: false
 type: custom
 layout: custom-list
