@@ -7,7 +7,7 @@ cover:
  alt: a screenshot of gymmaster gym management software website
 category: ["SaaS"]
 tags: ["health & fitness", "software", "b2b"]
-date: 2023-01-06T13:48:01+13:00
+date: 2023-10-06T13:48:01+13:00
 
 ---
 
