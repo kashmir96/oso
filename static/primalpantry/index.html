@@ -3099,6 +3099,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
   let waLoaded = false, waChart = null, waRealtimeInterval = null;
   let waSite = '', waDateRange = 'today';
   let waFilters = []; // [{col:'referrer_domain', val:'google.com', label:'Referrer: google.com'}, ...]
+  let waRevMaps = {}; // Revenue lookups by dimension, populated in waLoadDashboard
 
   // Map table container IDs to filter column names
   const waFilterMap = {
@@ -3442,15 +3443,41 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
       // Timeseries chart
       waRenderTimeseries(timeseries || []);
 
+      // Build revenue lookups from order data
+      const revByPage = {}, revBySource = {}, revByMedium = {}, revByCampaign = {};
+      (typeof filteredOrders !== 'undefined' ? filteredOrders : allOrders || []).forEach(o => {
+        const rev = Number(o.total_value || 0);
+        // Landing page → pathname
+        let lp = o.landing_page || '';
+        if (lp) {
+          try { const u = new URL(lp, 'https://primalpantry.co.nz'); if (u.hostname.includes('primalpantry') || u.hostname.includes('reviora') || u.hostname.includes('reviana')) lp = u.pathname; } catch {}
+          revByPage[lp] = (revByPage[lp] || 0) + rev;
+        }
+        // UTM source
+        const src = o.utm_source || (o.thank_you_url ? getUtmFromUrl(o.thank_you_url, 'utm_source') : '') || '';
+        if (src) revBySource[src] = (revBySource[src] || 0) + rev;
+        // UTM medium
+        const med = o.utm_medium || (o.thank_you_url ? getUtmFromUrl(o.thank_you_url, 'utm_medium') : '') || '';
+        if (med) revByMedium[med] = (revByMedium[med] || 0) + rev;
+        // UTM campaign
+        const camp = o.utm_campaign || (o.thank_you_url ? getUtmFromUrl(o.thank_you_url, 'utm_campaign') : '') || '';
+        if (camp) revByCampaign[camp] = (revByCampaign[camp] || 0) + rev;
+      });
+      waRevMaps = { pathname: revByPage, utm_source: revBySource, utm_medium: revByMedium, utm_campaign: revByCampaign };
+
       // Tables
-      const nameCols = [{ key: 'name', label: 'Name' }, { key: 'visitors', label: 'Visitors' }, { key: 'views', label: 'Views' }];
-      waRenderTable('wa-pages-table', pages, [{ key: 'name', label: 'Page' }, { key: 'visitors', label: 'Visitors' }, { key: 'views', label: 'Views' }]);
+      const revCol = { key: '_revenue', label: 'Revenue', fmt: v => v > 0 ? fmt_money(v) : '-' };
+      function waEnrichRev(rows, revMap) {
+        if (!rows) return rows;
+        return rows.map(r => ({ ...r, _revenue: revMap[r.name] || 0 }));
+      }
+      waRenderTable('wa-pages-table', waEnrichRev(pages, revByPage), [{ key: 'name', label: 'Page' }, { key: 'visitors', label: 'Visitors' }, { key: 'views', label: 'Views' }, revCol]);
       waRenderTable('wa-referrers-table', referrers, [{ key: 'name', label: 'Referrer' }, { key: 'visitors', label: 'Visitors' }, { key: 'views', label: 'Views' }]);
       waRenderTable('wa-devices-table', devices, [{ key: 'name', label: 'Device' }, { key: 'visitors', label: 'Visitors' }]);
       waRenderTable('wa-browsers-table', browsers, [{ key: 'name', label: 'Browser' }, { key: 'visitors', label: 'Visitors' }]);
       waRenderTable('wa-countries-table', countries, [{ key: 'name', label: 'Country' }, { key: 'visitors', label: 'Visitors' }]);
       waRenderTable('wa-os-table', os, [{ key: 'name', label: 'OS' }, { key: 'visitors', label: 'Visitors' }]);
-      waRenderTable('wa-campaigns-table', campaigns, nameCols);
+      waRenderTable('wa-campaigns-table', waEnrichRev(campaigns, revByCampaign), [{ key: 'name', label: 'Name' }, { key: 'visitors', label: 'Visitors' }, { key: 'views', label: 'Views' }, revCol]);
 
       // Events table (special columns)
       waRenderTable('wa-events-table', events, [
@@ -3544,8 +3571,14 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
       try {
         const params = { site: waSite, from, to, metric };
         if (col) params.col = col;
-        const data = await waFetch('analytics-dashboard', params);
+        let data = await waFetch('analytics-dashboard', params);
         const cols = [{ key: 'name', label: 'Name' }, { key: 'visitors', label: 'Visitors' }, { key: 'views', label: 'Views' }];
+        // Enrich with revenue if we have a matching revenue map
+        const revMap = waRevMaps[col] || waRevMaps[metric] || null;
+        if (revMap && data) {
+          data = data.map(r => ({ ...r, _revenue: revMap[r.name] || 0 }));
+          cols.push({ key: '_revenue', label: 'Revenue', fmt: v => v > 0 ? fmt_money(v) : '-' });
+        }
         waRenderTable(containerId, data, cols);
       } catch (err) {
         document.getElementById(containerId).innerHTML = '<p style="color:var(--red);">Error loading data</p>';
