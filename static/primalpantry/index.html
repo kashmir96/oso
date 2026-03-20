@@ -119,6 +119,9 @@
 
     /* Shipping tab */
     .shipping-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
+    .shipping-stats .stat-card { cursor: pointer; border: 2px solid transparent; transition: border-color 0.2s; }
+    .shipping-stats .stat-card:hover { border-color: var(--border); }
+    .shipping-stats .stat-card.active-filter { border-color: var(--blue); }
     .ship-status-badge { padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
     .ship-status-badge.waiting-to-print { background: #92400e; color: var(--amber); }
     .ship-status-badge.printed { background: #854d0e; color: #facc15; }
@@ -458,7 +461,17 @@
     </div>
     <div class="orders-card">
       <h3>Shipments</h3>
-      <input type="text" class="search-bar" id="shipment-search" placeholder="Search by name, tracking number, or order...">
+      <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.5rem;">
+        <input type="text" class="search-bar" id="shipment-search" placeholder="Search by name, tracking number, or order..." style="margin-bottom:0;flex:1;">
+        <select id="shipment-status-filter" style="background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.5rem;font-size:0.85rem;">
+          <option value="">All Statuses</option>
+          <option value="Waiting to Print">Waiting to Print</option>
+          <option value="Printed">Printed</option>
+          <option value="In Transit">In Transit</option>
+          <option value="Delivered">Delivered</option>
+          <option value="Exception">Exception</option>
+        </select>
+      </div>
       <table>
         <thead>
           <tr>
@@ -2322,6 +2335,7 @@ document.getElementById('customer-sort').addEventListener('change', () => { cust
 const ESHIP_PROXY = '/.netlify/functions/eship-orders';
 let shippingLoaded = false;
 let allShipments = [];
+let activeShipFilter = '';
 
 async function loadShippingData() {
   const tbody = document.getElementById('shipments-table');
@@ -2338,8 +2352,14 @@ async function loadShippingData() {
     renderShipTimeChart();
     renderShipmentsTable();
 
-    // Attach search handler
+    // Attach search + filter handlers
     document.getElementById('shipment-search').addEventListener('input', () => { shipmentsPage = 1; renderShipmentsTable(); });
+    document.getElementById('shipment-status-filter').addEventListener('change', (e) => {
+      activeShipFilter = e.target.value;
+      shipmentsPage = 1;
+      renderShippingStats({});
+      renderShipmentsTable();
+    });
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="7" class="loading">Error loading shipping data: ${err.message}</td></tr>`;
   }
@@ -2365,20 +2385,29 @@ function renderShippingStats(data) {
   const avgShipDays = shipDays.length > 0 ? (shipDays.reduce((a,b)=>a+b,0) / shipDays.length).toFixed(1) : '-';
 
   const stats = [
-    { label: 'Unshipped', value: unshipped, sub: `${waitingToPrint} waiting \u00b7 ${printed} printed`, color: 'var(--amber)' },
-    { label: 'In Transit', value: inTransit, sub: 'dispatched', color: 'var(--blue)' },
-    { label: 'Delivered', value: delivered, sub: 'completed', color: 'var(--green)' },
-    { label: 'Exception', value: exception, sub: 'needs attention', color: '#fca5a5' },
-    { label: 'Avg Days to Ship', value: avgShipDays === '-' ? '-' : avgShipDays + 'd', sub: 'order to dispatch', color: 'var(--cyan)' },
+    { label: 'Waiting to Print', value: waitingToPrint, sub: 'needs printing', color: 'var(--amber)', filter: 'Waiting to Print' },
+    { label: 'Printed', value: printed, sub: 'ready to ship', color: '#facc15', filter: 'Printed' },
+    { label: 'In Transit', value: inTransit, sub: 'dispatched', color: 'var(--blue)', filter: 'In Transit' },
+    { label: 'Delivered', value: delivered, sub: 'completed', color: 'var(--green)', filter: 'Delivered' },
+    { label: 'Exception', value: exception, sub: 'needs attention', color: '#fca5a5', filter: 'Exception' },
+    { label: 'Avg Days to Ship', value: avgShipDays === '-' ? '-' : avgShipDays + 'd', sub: 'order to dispatch', color: 'var(--cyan)', filter: '' },
   ];
 
   document.getElementById('shipping-stats').innerHTML = stats.map(s => `
-    <div class="stat-card">
+    <div class="stat-card${activeShipFilter === s.filter && s.filter ? ' active-filter' : ''}" ${s.filter ? `onclick="setShipFilter('${s.filter}')"` : ''} style="${s.filter ? 'cursor:pointer' : ''}">
       <div class="label">${s.label}</div>
       <div class="value" style="color:${s.color}">${s.value}</div>
       <div class="sub">${s.sub}</div>
     </div>
   `).join('');
+}
+
+function setShipFilter(status) {
+  activeShipFilter = activeShipFilter === status ? '' : status;
+  document.getElementById('shipment-status-filter').value = activeShipFilter;
+  shipmentsPage = 1;
+  renderShippingStats({});
+  renderShipmentsTable();
 }
 
 function renderShippingStatusChart() {
@@ -2435,6 +2464,9 @@ function renderShipmentsTable() {
   const query = (document.getElementById('shipment-search').value || '').toLowerCase();
 
   let orders = allShipments;
+  if (activeShipFilter) {
+    orders = orders.filter(o => o._shipping_status === activeShipFilter);
+  }
   if (query) {
     orders = orders.filter(o => {
       const fields = [
