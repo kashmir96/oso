@@ -1737,6 +1737,9 @@ function renderStats(orders, lineItems) {
     { label: 'Website Visitors', value: '<span id="wa-visitors-count">-</span>', sub: 'across all sites', color: 'var(--cyan)' },
     { label: 'Avg Items/Order', value: avgJars.toFixed(1), sub: 'line items', prior: fmtDelta(avgJars, priorAvgJars), color: 'var(--pink)' },
     { label: 'Discounts Given', value: fmt_money(sum(orders, 'discount_applied')), sub: `${orders.filter(o => Number(o.discount_applied) > 0).length} orders`, prior: fmtDelta(sum(orders, 'discount_applied'), priorDiscounts, true), color: 'var(--red)' },
+    { label: 'Refunds', value: fmt_money(refundTotal), sub: `${refundedOrders.length} order${refundedOrders.length !== 1 ? 's' : ''} refunded`, color: 'var(--red)' },
+    { label: 'Avg Wait Time', value: avgWait + 'd', sub: `${waitingOrders.length} unshipped`, color: Number(avgWait) >= 2 ? 'var(--amber)' : 'var(--green)' },
+    { label: 'Waiting 2+ Days', value: waitOver2, sub: waitOver2 > 0 ? 'need attention' : 'all on track', color: waitOver2 > 0 ? 'var(--red)' : 'var(--green)' },
   ];
 
   function renderStatCard(s) {
@@ -1751,11 +1754,23 @@ function renderStats(orders, lineItems) {
 
   document.getElementById('stats-grid').innerHTML = stats.map(renderStatCard).join('');
 
-  // Orders tab stats (refund rate)
+  // Wait-time stats (computed from ALL orders, not just filtered period)
+  const waitingOrders = allOrders.filter(o => orderDaysWaiting(o) >= 0);
+  const waitDays = waitingOrders.map(o => orderDaysWaiting(o));
+  const longestWait = waitDays.length > 0 ? Math.max(...waitDays) : 0;
+  const waitOver2 = waitDays.filter(d => d > 2).length;
+  const avgWait = waitDays.length > 0 ? (waitDays.reduce((a, b) => a + b, 0) / waitDays.length).toFixed(1) : '0';
+
+  // Total refund $ value
+  const refundTotal = refundedOrders.reduce((s, o) => s + Number(o.total_value || 0), 0);
+
+  // Orders tab stats
   const ordersTabEl = document.getElementById('orders-stats-grid');
   if (ordersTabEl) {
     ordersTabEl.innerHTML = [
       { label: 'Refund Rate', value: `${refundRate}%`, sub: `${refundedOrders.length} refunded`, prior: fmtDelta(Number(refundRate), Number(priorRefundRate), false, true), color: 'var(--red)' },
+      { label: 'Longest Wait', value: longestWait + 'd', sub: 'unshipped order', color: longestWait >= 4 ? 'var(--red)' : longestWait >= 2 ? 'var(--amber)' : 'var(--green)' },
+      { label: 'Waiting 2+ Days', value: waitOver2, sub: `of ${waitingOrders.length} unshipped`, color: waitOver2 > 0 ? 'var(--red)' : 'var(--green)' },
     ].map(renderStatCard).join('');
   }
 
