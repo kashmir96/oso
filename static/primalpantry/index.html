@@ -286,6 +286,13 @@
     .wa-filter-chip button { background: none; border: none; color: var(--sage); cursor: pointer; font-size: 0.9rem; padding: 0; line-height: 1; }
     .wa-filter-chip button:hover { color: var(--text); }
     .wa-loading { text-align: center; padding: 2rem; color: var(--dim); }
+    .wa-funnel { display: flex; align-items: stretch; gap: 0; width: 100%; min-height: 70px; }
+    .wa-funnel-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.5rem 0.25rem; position: relative; text-align: center; }
+    .wa-funnel-bar { width: 100%; border-radius: 4px; display: flex; align-items: center; justify-content: center; flex-direction: column; padding: 0.6rem 0.25rem; min-height: 50px; transition: all 0.3s; }
+    .wa-funnel-count { font-size: 1.1rem; font-weight: 700; color: #fff; line-height: 1.2; }
+    .wa-funnel-label { font-size: 0.65rem; color: rgba(255,255,255,0.8); text-transform: uppercase; letter-spacing: 0.03em; margin-top: 2px; }
+    .wa-funnel-drop { font-size: 0.65rem; color: var(--dim); margin-top: 0.3rem; }
+    .wa-funnel-arrow { display: flex; align-items: center; justify-content: center; color: var(--dim); font-size: 1rem; padding: 0 0.15rem; flex-shrink: 0; }
     .wa-realtime-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--sage); margin-right: 6px; animation: wa-pulse 1.5s infinite; }
     @keyframes wa-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
     .wa-realtime.active { border: 1px solid var(--sage); }
@@ -772,6 +779,8 @@
       <div class="wa-stat"><div class="wa-val" id="wa-atc-sale">-</div><div class="wa-lbl">ATC &rarr; Sale %</div></div>
       <div class="wa-stat"><div class="wa-val" id="wa-aov">-</div><div class="wa-lbl">AOV</div></div>
     </div>
+
+    <div id="wa-funnel-viz" class="wa-panel" style="margin-bottom:1rem;padding:1rem;"></div>
 
     <div id="wa-realtime-panel" class="wa-panel" style="display:none;margin-bottom:1.5rem;">
       <h3>Active Visitors Right Now</h3>
@@ -4023,6 +4032,38 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
       document.getElementById('wa-lp-sale').textContent = lpSale + '%';
       document.getElementById('wa-atc-sale').textContent = atcSale + '%';
       document.getElementById('wa-aov').textContent = fmt_money(waAov);
+
+      // Funnel visualisation
+      const checkoutEvent = (events || []).find(e => e.event_name === 'proceed to checkout');
+      const checkoutUniques = checkoutEvent ? checkoutEvent.uniques : 0;
+      const funnelStages = [
+        { label: 'Visitors', count: uniqueVisitors, color: '#6B8F5B' },
+        { label: 'Add to Cart', count: atcUniques, color: '#8CB47A' },
+        { label: 'Checkout', count: checkoutUniques, color: '#D4A84B' },
+        { label: 'Purchased', count: saleUniques, color: '#C0955A' },
+      ];
+      const funnelEl = document.getElementById('wa-funnel-viz');
+      if (uniqueVisitors > 0) {
+        let fhtml = '<div class="wa-funnel">';
+        funnelStages.forEach((st, i) => {
+          const widthPct = uniqueVisitors > 0 ? Math.max(15, (st.count / uniqueVisitors) * 100) : 15;
+          const dropPct = i > 0 ? ((1 - st.count / funnelStages[i - 1].count) * 100) : 0;
+          const dropStr = i > 0 && funnelStages[i - 1].count > 0 ? `↓ ${dropPct.toFixed(0)}% drop` : '';
+          if (i > 0) fhtml += '<div class="wa-funnel-arrow">→</div>';
+          fhtml += `<div class="wa-funnel-stage">
+            <div class="wa-funnel-bar" style="background:${st.color};width:${widthPct}%;min-width:60px;">
+              <span class="wa-funnel-count">${st.count}</span>
+              <span class="wa-funnel-label">${st.label}</span>
+            </div>
+            ${dropStr ? `<div class="wa-funnel-drop">${dropStr}</div>` : ''}
+          </div>`;
+        });
+        fhtml += '</div>';
+        funnelEl.innerHTML = fhtml;
+        funnelEl.style.display = '';
+      } else {
+        funnelEl.style.display = 'none';
+      }
 
       // Timeseries chart
       waRenderTimeseries(timeseries || []);
