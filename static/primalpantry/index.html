@@ -59,6 +59,14 @@
     .header-controls button.active { background: var(--sage); color: #141210; border-color: var(--sage); }
     .header-controls input[type="date"] { background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 0.4rem 0.5rem; border-radius: 6px; font-size: 0.8rem; font-family: 'DM Sans', sans-serif; }
 
+    /* Filter bar */
+    .filter-bar { display: flex; gap: 0.75rem; align-items: flex-end; margin-bottom: 1.25rem; flex-wrap: wrap; }
+    .filter-group { display: flex; flex-direction: column; gap: 0.2rem; }
+    .filter-label { font-size: 0.65rem; font-weight: 600; color: var(--dim); text-transform: uppercase; letter-spacing: 0.04em; }
+    .filter-select, .filter-date { background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.8rem; font-family: 'DM Sans', sans-serif; cursor: pointer; transition: border-color 0.15s; min-width: 0; }
+    .filter-select:hover, .filter-date:hover { border-color: var(--sage); }
+    .filter-select:focus, .filter-date:focus { border-color: var(--sage); outline: none; }
+
     /* Stats grid */
     .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
     .stat-card { background: var(--card); border-radius: 10px; padding: 1rem; cursor: pointer; transition: border 0.2s; border: 1px solid var(--border); }
@@ -350,22 +358,37 @@
     <button class="tab-btn" data-tab="website">Website</button>
   </div>
 
-  <div class="filter-row" style="display:flex;gap:0.5rem;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap;">
-    <select id="date-range" style="background:var(--card);border:1px solid var(--border);color:var(--text);padding:0.45rem 0.6rem;border-radius:6px;font-size:0.8rem;font-family:'DM Sans',sans-serif;">
-      <option value="today" selected>Today</option>
-      <option value="yesterday">Yesterday</option>
-      <option value="7d">Last 7 Days</option>
-      <option value="30d">Last 30 Days</option>
-      <option value="month">This Month</option>
-      <option value="all">All Time</option>
-      <option value="custom">Custom Range</option>
-    </select>
-    <input type="date" id="date-from" title="From" style="display:none;background:var(--card);border:1px solid var(--border);color:var(--text);padding:0.4rem 0.5rem;border-radius:6px;font-size:0.8rem;font-family:'DM Sans',sans-serif;">
-    <input type="date" id="date-to" title="To" style="display:none;background:var(--card);border:1px solid var(--border);color:var(--text);padding:0.4rem 0.5rem;border-radius:6px;font-size:0.8rem;font-family:'DM Sans',sans-serif;">
-    <select id="filter-utm" style="background:var(--card);border:1px solid var(--border);color:var(--muted);padding:0.45rem 0.6rem;border-radius:6px;font-size:0.8rem;font-family:'DM Sans',sans-serif;"><option value="">All Sources</option></select>
-    <select id="filter-utm-medium" style="background:var(--card);border:1px solid var(--border);color:var(--muted);padding:0.45rem 0.6rem;border-radius:6px;font-size:0.8rem;font-family:'DM Sans',sans-serif;"><option value="">All Mediums</option></select>
-    <select id="filter-utm-campaign" style="background:var(--card);border:1px solid var(--border);color:var(--muted);padding:0.45rem 0.6rem;border-radius:6px;font-size:0.8rem;font-family:'DM Sans',sans-serif;"><option value="">All Campaigns</option></select>
-    <select id="filter-city" style="background:var(--card);border:1px solid var(--border);color:var(--muted);padding:0.45rem 0.6rem;border-radius:6px;font-size:0.8rem;font-family:'DM Sans',sans-serif;"><option value="">All Cities</option></select>
+  <div class="filter-bar">
+    <div class="filter-group">
+      <label class="filter-label">Period</label>
+      <select id="date-range" class="filter-select">
+        <option value="today" selected>Today</option>
+        <option value="yesterday">Yesterday</option>
+        <option value="7d">Last 7 Days</option>
+        <option value="30d">Last 30 Days</option>
+        <option value="month">This Month</option>
+        <option value="all">All Time</option>
+        <option value="custom">Custom Range</option>
+      </select>
+      <input type="date" id="date-from" class="filter-date" title="From" style="display:none;">
+      <input type="date" id="date-to" class="filter-date" title="To" style="display:none;">
+    </div>
+    <div class="filter-group">
+      <label class="filter-label">Source</label>
+      <select id="filter-utm" class="filter-select"><option value="">All</option></select>
+    </div>
+    <div class="filter-group">
+      <label class="filter-label">Medium</label>
+      <select id="filter-utm-medium" class="filter-select"><option value="">All</option></select>
+    </div>
+    <div class="filter-group">
+      <label class="filter-label">Campaign</label>
+      <select id="filter-utm-campaign" class="filter-select"><option value="">All</option></select>
+    </div>
+    <div class="filter-group">
+      <label class="filter-label">City</label>
+      <select id="filter-city" class="filter-select"><option value="">All</option></select>
+    </div>
   </div>
 
   <div id="tab-sales" class="tab-content active">
@@ -1140,17 +1163,17 @@ function populateFilterDropdowns() {
   // UTM sources
   const utmSelect = document.getElementById('filter-utm');
   const sources = [...new Set(allOrders.map(o => o.utm_source || getUtmFromUrl(o.thank_you_url, 'utm_source') || '').filter(Boolean))].sort();
-  utmSelect.innerHTML = '<option value="">All Sources</option>' + sources.map(s => `<option value="${s}">${s}</option>`).join('');
+  utmSelect.innerHTML = '<option value="">All</option>' + sources.map(s => `<option value="${s}">${s}</option>`).join('');
 
   // UTM mediums
   const mediumSelect = document.getElementById('filter-utm-medium');
   const mediums = [...new Set(allOrders.map(o => o.utm_medium || getUtmFromUrl(o.thank_you_url, 'utm_medium') || '').filter(Boolean))].sort();
-  mediumSelect.innerHTML = '<option value="">All Mediums</option>' + mediums.map(m => `<option value="${m}">${m}</option>`).join('');
+  mediumSelect.innerHTML = '<option value="">All</option>' + mediums.map(m => `<option value="${m}">${m}</option>`).join('');
 
   // UTM campaigns
   const campaignSelect = document.getElementById('filter-utm-campaign');
   const campaigns = [...new Set(allOrders.map(o => o.utm_campaign || getUtmFromUrl(o.thank_you_url, 'utm_campaign') || '').filter(Boolean))].sort();
-  campaignSelect.innerHTML = '<option value="">All Campaigns</option>' + campaigns.map(c => `<option value="${c}">${c}</option>`).join('');
+  campaignSelect.innerHTML = '<option value="">All</option>' + campaigns.map(c => `<option value="${c}">${c}</option>`).join('');
 
   // Cities
   const citySelect = document.getElementById('filter-city');
@@ -1579,6 +1602,28 @@ function shipStatusPill(order) {
   const status = ship._shipping_status || 'Unknown';
   const cls = status.toLowerCase().replace(/\s+/g, '-');
   return `<span class="ship-status-badge ${cls}">${status}</span>`;
+}
+
+// Auto-mark orders as Delivered when shipping shows Delivered
+async function syncDeliveredOrders() {
+  if (!allShipments.length || !allOrders.length) return;
+  const skipStatuses = ['delivered', 'refunded', 'incorrect order', 'cancelled'];
+  const toUpdate = [];
+  allShipments.forEach(ship => {
+    if (ship._shipping_status !== 'Delivered') return;
+    const order = allOrders.find(o => o.stripe_session_id === ship.order_number);
+    if (!order) return;
+    if (skipStatuses.includes((order.status || '').toLowerCase())) return;
+    toUpdate.push(order);
+  });
+  for (const order of toUpdate) {
+    const { error } = await sb.from('orders').update({ status: 'Delivered' }).eq('id', order.id);
+    if (!error) {
+      order.status = 'Delivered';
+      logFrontendActivity('auto_status', `Auto-marked order #${order.id} (${order.customer_name || order.email || '?'}) as Delivered`);
+    }
+  }
+  if (toUpdate.length) renderOrdersTable();
 }
 
 function orderStatusIcon(status) {
@@ -2361,6 +2406,7 @@ function loadActiveTab() {
         allShipments = data.orders || [];
         shippingLoaded = true;
         renderOrdersTable();
+        syncDeliveredOrders();
       }).catch(() => {});
     }
   } else if (activeTab === 'shipping' && !shippingLoaded) {
@@ -2518,6 +2564,7 @@ async function loadShippingData() {
     const data = await res.json();
     allShipments = data.orders || [];
     shippingLoaded = true;
+    syncDeliveredOrders();
     renderShippingStats(data);
     renderShippingStatusChart();
     renderShipTimeChart();
