@@ -433,13 +433,12 @@
             <th>Location</th>
             <th>Total</th>
             <th>Source</th>
-            <th>Magnet</th>
-            <th>Status</th>
+            <th>Items Ordered</th>
             <th>Shipping</th>
           </tr>
         </thead>
         <tbody id="orders-table">
-          <tr><td colspan="9" class="loading">Loading...</td></tr>
+          <tr><td colspan="8" class="loading">Loading...</td></tr>
         </tbody>
       </table>
       <div id="orders-pagination"></div>
@@ -1590,7 +1589,7 @@ function renderOrdersTable() {
   }
 
   if (orders.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="9" class="loading">No orders found</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="loading">No orders found</td></tr>';
     document.getElementById('orders-pagination').innerHTML = '';
     return;
   }
@@ -1599,8 +1598,12 @@ function renderOrdersTable() {
   const page = orders.slice(start, start + PAGE_SIZE);
 
   tbody.innerHTML = page.map(o => {
-    const firstItem = (orderLineItemMap[o.id] || [])[0];
-    const magnet = firstItem ? firstItem.description : '';
+    const items = orderLineItemMap[o.id] || [];
+    const magnet = items.length ? items[0].description : '';
+    const addons = items.slice(1).map(li => li.description).filter(Boolean);
+    const itemsHtml = magnet
+      ? `<span style="color:var(--red);font-weight:600;">${magnet}</span>${addons.length ? ' – ' + addons.join(', ') : ''}`
+      : '-';
     const src = o.analytics_source || o.utm_source || getUtmFromUrl(o.thank_you_url, 'utm_source') || '';
     return `
     <tr class="clickable" data-id="${o.id}">
@@ -1610,8 +1613,7 @@ function renderOrdersTable() {
       <td>${[o.city, o.country_code].filter(Boolean).join(', ') || '-'}</td>
       <td>$${Number(o.total_value || 0).toFixed(2)}</td>
       <td>${sourcePill(src) || '-'}</td>
-      <td>${magnet ? sourcePill(magnet) : '-'}</td>
-      <td><span class="status-badge">${o.status || '-'}</span></td>
+      <td style="font-size:0.82rem;">${itemsHtml}</td>
       <td>${shipStatusPill(o)}</td>
     </tr>`;
   }).join('');
