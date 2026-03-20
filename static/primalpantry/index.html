@@ -97,9 +97,9 @@
     .chart-card h3 { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; display: flex; justify-content: space-between; align-items: center; }
     .chart-card h3::after { content: '⤢'; font-size: 0.7rem; color: var(--dim); transition: transform 0.2s; }
     .chart-card.expanded h3::after { content: '⤡'; }
-    .chart-card .chart-wrap { max-height: 180px; overflow: hidden; transition: max-height 0.3s ease; position: relative; }
-    .chart-card.expanded .chart-wrap { max-height: 500px; }
-    .chart-card .chart-wrap canvas { width: 100% !important; }
+    .chart-card .chart-wrap { height: 180px; overflow: hidden; transition: height 0.3s ease; position: relative; }
+    .chart-card.expanded .chart-wrap { height: 400px; }
+    .chart-card .chart-wrap canvas { width: 100% !important; height: 100% !important; }
 
     /* Heatmap */
     .heatmap-grid { display: grid; grid-template-columns: 40px repeat(24, 1fr); gap: 2px; font-size: 0.65rem; }
