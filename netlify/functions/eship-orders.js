@@ -66,8 +66,10 @@ exports.handler = async (event) => {
     const shippedData = await shippedRes.json();
 
     // StarshipIt unshipped endpoint returns { data: [...] }, shipped returns { orders: [...] }
-    const unshippedList = unshippedData.data || unshippedData.orders || unshippedData.order || [];
-    const shippedList = shippedData.orders || shippedData.order || [];
+    const rawUnshipped = unshippedData.data || unshippedData.orders || unshippedData.order || [];
+    const unshippedList = Array.isArray(rawUnshipped) ? rawUnshipped : [];
+    const rawShipped = shippedData.orders || shippedData.order || [];
+    const shippedList = Array.isArray(rawShipped) ? rawShipped : [];
 
     const unshipped = unshippedList.map(o => ({
       ...o,
