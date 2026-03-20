@@ -203,8 +203,8 @@
 <div id="login-screen">
   <div class="auth-box" id="login-box">
     <h1>Primal Pantry Dashboard</h1>
-    <input type="text" id="username-input" placeholder="Username" autofocus>
-    <input type="password" id="password-input" placeholder="Password">
+    <input type="text" id="username-input" placeholder="Username" value="Kashmir" autofocus>
+    <input type="password" id="password-input" placeholder="Password" value="1532Milo2631!">
     <button id="login-btn">Sign in</button>
     <div class="auth-error" id="login-error"></div>
   </div>
@@ -215,6 +215,24 @@
     <input type="password" id="confirm-pw-input" placeholder="Confirm new password">
     <button id="change-pw-btn">Set Password</button>
     <div class="auth-error" id="change-pw-error"></div>
+  </div>
+  <div class="auth-box" id="totp-setup-box" style="display:none;">
+    <h1>Set Up 2FA</h1>
+    <p>Scan this QR code with Google Authenticator, then enter the 6-digit code to confirm.</p>
+    <div style="text-align:center;margin:1rem 0;">
+      <img id="totp-qr" alt="QR Code" style="border-radius:8px;background:white;padding:8px;">
+    </div>
+    <p style="font-size:0.75rem;word-break:break-all;">Manual key: <code id="totp-secret-display" style="color:var(--cyan);"></code></p>
+    <input type="text" id="totp-setup-code" placeholder="Enter 6-digit code" maxlength="6" inputmode="numeric" autocomplete="one-time-code" style="text-align:center;font-size:1.25rem;letter-spacing:0.3em;">
+    <button id="totp-setup-btn">Verify & Enable 2FA</button>
+    <div class="auth-error" id="totp-setup-error"></div>
+  </div>
+  <div class="auth-box" id="totp-verify-box" style="display:none;">
+    <h1>Two-Factor Authentication</h1>
+    <p>Enter the 6-digit code from your authenticator app.</p>
+    <input type="text" id="totp-verify-code" placeholder="000000" maxlength="6" inputmode="numeric" autocomplete="one-time-code" style="text-align:center;font-size:1.25rem;letter-spacing:0.3em;">
+    <button id="totp-verify-btn">Verify</button>
+    <div class="auth-error" id="totp-verify-error"></div>
   </div>
 </div>
 
@@ -542,6 +560,16 @@
       <button class="submit-order-btn" id="team-add-btn" style="margin-top:0.5rem;">Add Staff Member</button>
       <div id="team-result" style="margin-top:0.5rem;font-size:0.85rem;"></div>
     </div>
+    <div id="activity-log-section" style="display:none;border-top:1px solid var(--border);padding-top:1rem;margin-top:1rem;">
+      <h3 style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem;">ACTIVITY LOG</h3>
+      <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;">
+        <select id="activity-staff-filter" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.4rem 0.6rem;border-radius:6px;font-size:0.8rem;">
+          <option value="">All Staff</option>
+        </select>
+        <button id="activity-refresh-btn" style="background:var(--card);border:1px solid var(--border);color:var(--muted);padding:0.4rem 0.6rem;border-radius:6px;font-size:0.8rem;cursor:pointer;">Refresh</button>
+      </div>
+      <div id="activity-log-list" style="max-height:300px;overflow-y:auto;font-size:0.8rem;"></div>
+    </div>
   </div>
 </div>
 
@@ -569,11 +597,19 @@ function renderPagination(containerId, currentPage, totalItems, onPageChange) {
 }
 
 // ── Auth ──
+function hideAllAuthBoxes() {
+  ['login-box', 'change-pw-box', 'totp-setup-box', 'totp-verify-box'].forEach(id => document.getElementById(id).style.display = 'none');
+}
+
 document.getElementById('login-btn').addEventListener('click', doLogin);
 document.getElementById('username-input').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('password-input').focus(); });
 document.getElementById('password-input').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 document.getElementById('change-pw-btn').addEventListener('click', doChangePassword);
 document.getElementById('confirm-pw-input').addEventListener('keydown', e => { if (e.key === 'Enter') doChangePassword(); });
+document.getElementById('totp-setup-btn').addEventListener('click', doTOTPSetup);
+document.getElementById('totp-setup-code').addEventListener('input', e => { if (e.target.value.length === 6) doTOTPSetup(); });
+document.getElementById('totp-verify-btn').addEventListener('click', doTOTPVerify);
+document.getElementById('totp-verify-code').addEventListener('input', e => { if (e.target.value.length === 6) doTOTPVerify(); });
 document.getElementById('logout-btn').addEventListener('click', () => { sessionStorage.removeItem('pp_staff'); location.reload(); });
 document.getElementById('modal-close').addEventListener('click', closeModal);
 document.getElementById('order-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
@@ -584,6 +620,17 @@ document.getElementById('team-btn').addEventListener('click', openTeamModal);
 document.getElementById('team-close').addEventListener('click', () => document.getElementById('team-modal').classList.remove('open'));
 document.getElementById('team-modal').addEventListener('click', e => { if (e.target === e.currentTarget) document.getElementById('team-modal').classList.remove('open'); });
 document.getElementById('team-add-btn').addEventListener('click', addStaffMember);
+
+// Helper to log frontend actions
+async function logFrontendActivity(activityAction, detail) {
+  if (!currentStaff || !currentStaff.token) return;
+  try {
+    await fetch('/.netlify/functions/staff-auth', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'log-activity', token: currentStaff.token, activity_action: activityAction, detail }),
+    });
+  } catch {}
+}
 
 async function doLogin() {
   const username = document.getElementById('username-input').value.trim();
@@ -604,9 +651,22 @@ async function doLogin() {
       document.getElementById('login-btn').disabled = false; document.getElementById('login-btn').textContent = 'Sign in'; return;
     }
     currentStaff = { ...data.staff, token: data.token };
+
     if (data.staff.must_change_password) {
-      document.getElementById('login-box').style.display = 'none';
+      hideAllAuthBoxes();
       document.getElementById('change-pw-box').style.display = 'block';
+    } else if (data.needs_totp_setup) {
+      // Show TOTP setup screen with QR code
+      hideAllAuthBoxes();
+      document.getElementById('totp-secret-display').textContent = data.totp_secret;
+      document.getElementById('totp-qr').src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(data.totp_uri);
+      document.getElementById('totp-setup-box').style.display = 'block';
+      document.getElementById('totp-setup-code').focus();
+    } else if (data.needs_totp_verify) {
+      // Show TOTP verify screen
+      hideAllAuthBoxes();
+      document.getElementById('totp-verify-box').style.display = 'block';
+      document.getElementById('totp-verify-code').focus();
     } else {
       sessionStorage.setItem('pp_staff', JSON.stringify(currentStaff));
       showDashboard();
@@ -632,6 +692,46 @@ async function doChangePassword() {
     const data = await res.json();
     if (!res.ok || !data.success) { errEl.textContent = data.error || 'Failed'; errEl.style.display = 'block'; return; }
     currentStaff.must_change_password = false;
+    // After password change, need to re-login to trigger TOTP setup
+    hideAllAuthBoxes();
+    document.getElementById('login-box').style.display = 'block';
+    document.getElementById('login-error').textContent = 'Password set! Please sign in again.';
+    document.getElementById('login-error').style.display = 'block';
+    document.getElementById('login-error').style.color = 'var(--green)';
+    document.getElementById('login-btn').disabled = false;
+    document.getElementById('login-btn').textContent = 'Sign in';
+  } catch { errEl.textContent = 'Connection error'; errEl.style.display = 'block'; }
+}
+
+async function doTOTPSetup() {
+  const code = document.getElementById('totp-setup-code').value.trim();
+  const errEl = document.getElementById('totp-setup-error');
+  errEl.style.display = 'none';
+  if (code.length !== 6) { errEl.textContent = 'Enter the 6-digit code'; errEl.style.display = 'block'; return; }
+  try {
+    const res = await fetch('/.netlify/functions/staff-auth', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'setup-totp', token: currentStaff.token, code }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) { errEl.textContent = data.error || 'Invalid code'; errEl.style.display = 'block'; document.getElementById('totp-setup-code').value = ''; return; }
+    sessionStorage.setItem('pp_staff', JSON.stringify(currentStaff));
+    showDashboard();
+  } catch { errEl.textContent = 'Connection error'; errEl.style.display = 'block'; }
+}
+
+async function doTOTPVerify() {
+  const code = document.getElementById('totp-verify-code').value.trim();
+  const errEl = document.getElementById('totp-verify-error');
+  errEl.style.display = 'none';
+  if (code.length !== 6) { errEl.textContent = 'Enter the 6-digit code'; errEl.style.display = 'block'; return; }
+  try {
+    const res = await fetch('/.netlify/functions/staff-auth', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'verify-totp', token: currentStaff.token, code }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) { errEl.textContent = data.error || 'Invalid code'; errEl.style.display = 'block'; document.getElementById('totp-verify-code').value = ''; return; }
     sessionStorage.setItem('pp_staff', JSON.stringify(currentStaff));
     showDashboard();
   } catch { errEl.textContent = 'Connection error'; errEl.style.display = 'block'; }
@@ -663,15 +763,53 @@ async function openTeamModal() {
     });
     const data = await res.json();
     if (!data.success) { document.getElementById('team-list').innerHTML = '<p style="color:var(--red);">' + data.error + '</p>'; return; }
-    let html = '<table class="team-table"><thead><tr><th>Username</th><th>Name</th><th>Role</th><th>Manage Users</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+    let html = '<table class="team-table"><thead><tr><th>Username</th><th>Name</th><th>Role</th><th>2FA</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
     data.users.forEach(u => {
       const roleCls = u.role === 'owner' ? 'role-owner' : u.role === 'admin' ? 'role-admin' : 'role-staff';
-      html += '<tr><td>' + u.username + '</td><td>' + u.display_name + '</td><td><span class="role-badge ' + roleCls + '">' + u.role + '</span></td><td>' + (u.can_manage_users ? 'Yes' : 'No') + '</td><td>' + (u.must_change_password ? '<span style="color:var(--amber);">Needs password</span>' : '<span style="color:var(--green);">Active</span>') + '</td><td class="team-actions"><button onclick="resetStaffPassword(' + u.id + ')">Reset PW</button>' + (u.id !== currentStaff.id ? '<button class="danger" onclick="deleteStaffMember(' + u.id + ',\'' + u.username + '\')">Remove</button>' : '') + '</td></tr>';
+      const totpStatus = u.totp_enabled ? '<span style="color:var(--green);">Enabled</span>' : '<span style="color:var(--amber);">Not set</span>';
+      const statusText = u.must_change_password ? '<span style="color:var(--amber);">Needs password</span>' : '<span style="color:var(--green);">Active</span>';
+      html += '<tr><td>' + u.username + '</td><td>' + u.display_name + '</td><td><span class="role-badge ' + roleCls + '">' + u.role + '</span></td><td>' + totpStatus + '</td><td>' + statusText + '</td><td class="team-actions"><button onclick="resetStaffPassword(' + u.id + ')">Reset PW</button><button onclick="resetStaffTOTP(' + u.id + ',\'' + u.username + '\')">Reset 2FA</button>' + (u.id !== currentStaff.id ? '<button class="danger" onclick="deleteStaffMember(' + u.id + ',\'' + u.username + '\')">Remove</button>' : '') + '</td></tr>';
     });
     html += '</tbody></table>';
     document.getElementById('team-list').innerHTML = html;
+
+    // Populate activity filter dropdown with usernames
+    const filterEl = document.getElementById('activity-staff-filter');
+    filterEl.innerHTML = '<option value="">All Staff</option>' + data.users.map(u => '<option value="' + u.username + '">' + u.display_name + '</option>').join('');
   } catch { document.getElementById('team-list').innerHTML = '<p style="color:var(--red);">Failed to load team</p>'; }
+
+  // Show activity log for owner
+  if (currentStaff.role === 'owner') {
+    document.getElementById('activity-log-section').style.display = 'block';
+    loadActivityLog();
+  } else {
+    document.getElementById('activity-log-section').style.display = 'none';
+  }
 }
+
+async function loadActivityLog() {
+  const container = document.getElementById('activity-log-list');
+  container.innerHTML = '<div class="loading">Loading activity...</div>';
+  const staffFilter = document.getElementById('activity-staff-filter').value;
+  try {
+    const res = await fetch('/.netlify/functions/staff-auth', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'get-activity-log', token: currentStaff.token, staff_filter: staffFilter || undefined }),
+    });
+    const data = await res.json();
+    if (!data.success || !data.logs.length) { container.innerHTML = '<p style="color:var(--dim);padding:0.5rem;">No activity recorded yet.</p>'; return; }
+    container.innerHTML = '<table style="width:100%;border-collapse:collapse;"><thead><tr><th style="text-align:left;padding:0.3rem 0.5rem;font-size:0.65rem;color:var(--dim);text-transform:uppercase;border-bottom:1px solid var(--border);">Time</th><th style="text-align:left;padding:0.3rem 0.5rem;font-size:0.65rem;color:var(--dim);text-transform:uppercase;border-bottom:1px solid var(--border);">User</th><th style="text-align:left;padding:0.3rem 0.5rem;font-size:0.65rem;color:var(--dim);text-transform:uppercase;border-bottom:1px solid var(--border);">Action</th><th style="text-align:left;padding:0.3rem 0.5rem;font-size:0.65rem;color:var(--dim);text-transform:uppercase;border-bottom:1px solid var(--border);">Detail</th></tr></thead><tbody>' +
+      data.logs.map(l => {
+        const t = new Date(l.created_at);
+        const timeStr = t.toLocaleDateString('en-NZ', {day:'2-digit',month:'short'}) + ' ' + t.toLocaleTimeString('en-NZ', {hour:'2-digit',minute:'2-digit'});
+        return '<tr><td style="padding:0.3rem 0.5rem;border-bottom:1px solid #111827;white-space:nowrap;">' + timeStr + '</td><td style="padding:0.3rem 0.5rem;border-bottom:1px solid #111827;">' + (l.staff_username || '-') + '</td><td style="padding:0.3rem 0.5rem;border-bottom:1px solid #111827;"><span style="background:var(--bg);padding:0.1rem 0.3rem;border-radius:3px;font-size:0.7rem;">' + l.action + '</span></td><td style="padding:0.3rem 0.5rem;border-bottom:1px solid #111827;">' + (l.detail || '-') + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  } catch { container.innerHTML = '<p style="color:var(--red);">Failed to load activity log</p>'; }
+}
+
+document.getElementById('activity-staff-filter').addEventListener('change', loadActivityLog);
+document.getElementById('activity-refresh-btn').addEventListener('click', loadActivityLog);
+
 async function addStaffMember() {
   const username = document.getElementById('team-username').value.trim();
   const display_name = document.getElementById('team-display').value.trim();
@@ -701,6 +839,18 @@ async function resetStaffPassword(userId) {
     });
     const data = await res.json();
     if (data.success) { alert('Password reset. Temp password: ' + data.password_reset); openTeamModal(); }
+    else alert(data.error || 'Failed');
+  } catch { alert('Connection error'); }
+}
+async function resetStaffTOTP(userId, username) {
+  if (!confirm('Reset 2FA for ' + username + '? They will need to set up Google Authenticator again on next login.')) return;
+  try {
+    const res = await fetch('/.netlify/functions/staff-auth', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'update-user', token: currentStaff.token, user_id: userId, reset_totp: true }),
+    });
+    const data = await res.json();
+    if (data.success) { alert('2FA reset for ' + username); openTeamModal(); }
     else alert(data.error || 'Failed');
   } catch { alert('Connection error'); }
 }
@@ -1156,8 +1306,7 @@ function openOrderModal(orderId) {
       const order = allOrders.find(o => o.id === oid);
       if (order) order.status = newStatus;
       renderOrdersTable();
-
-      // Refund status just marks the record — use Delete to actually refund + remove from eShip
+      logFrontendActivity('status_change', `Changed order #${oid} (${order ? order.customer_name || order.email : '?'}) status to "${newStatus}"`);
     }
   });
 
@@ -1256,6 +1405,7 @@ function openOrderModal(orderId) {
 
     closeModal();
     applyFilter();
+    logFrontendActivity('order_delete', `Deleted order #${oid} (${order.customer_name || order.email || '?'}) — $${Number(order.total_value || 0).toFixed(2)}. ${statusMessages.join('. ')}`);
     alert(statusMessages.join('\n'));
   });
 }
@@ -2018,7 +2168,8 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     resultDiv.innerHTML = msg;
 
     if (data.supabase?.success) {
-      // Refresh dashboard data
+      const total = items.reduce((s, i) => s + i.quantity * i.unit_price, 0);
+      logFrontendActivity('manual_order', `Created manual order for ${payload.customer_name} (${payload.email}) — $${total.toFixed(2)}, ${items.length} item(s)`);
       setTimeout(() => { initDashboard(); }, 1000);
     }
   } catch (err) {
@@ -2028,6 +2179,277 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
   btn.disabled = false;
   btn.textContent = 'Create Order';
 });
+
+// ══════════════════════════════════════════
+// ── Website Analytics Tab ──
+// ══════════════════════════════════════════
+(function() {
+  const WA_API = '/.netlify/functions';
+  let waLoaded = false, waChart = null, waRealtimeInterval = null;
+  let waSite = '', waDateRange = 'today';
+
+  function waToken() { return currentStaff ? currentStaff.token : ''; }
+
+  function waGetDates() {
+    const range = document.getElementById('wa-range').value;
+    const now = new Date();
+    let from, to;
+    if (range === 'today') {
+      from = to = fmt_date(now);
+    } else if (range === 'yesterday') {
+      const y = new Date(now); y.setDate(y.getDate() - 1);
+      from = to = fmt_date(y);
+    } else if (range === '7d') {
+      to = fmt_date(now);
+      const d = new Date(now); d.setDate(d.getDate() - 6);
+      from = fmt_date(d);
+    } else if (range === '30d') {
+      to = fmt_date(now);
+      const d = new Date(now); d.setDate(d.getDate() - 29);
+      from = fmt_date(d);
+    } else {
+      from = document.getElementById('wa-from').value;
+      to = document.getElementById('wa-to').value;
+    }
+    return { from, to };
+  }
+
+  async function waFetch(fn, params) {
+    params.token = waToken();
+    const qs = new URLSearchParams(params).toString();
+    const res = await fetch(`${WA_API}/${fn}?${qs}`);
+    if (!res.ok) throw new Error('API error ' + res.status);
+    return res.json();
+  }
+
+  function fmtDuration(sec) {
+    sec = Math.round(sec);
+    if (sec < 60) return sec + 's';
+    const m = Math.floor(sec / 60), s = sec % 60;
+    return m + ':' + String(s).padStart(2, '0');
+  }
+
+  function fmtNum(n) {
+    if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+    return String(n);
+  }
+
+  function waRenderTable(containerId, rows, cols, opts = {}) {
+    const el = document.getElementById(containerId);
+    if (!rows || rows.length === 0) {
+      el.innerHTML = '<p style="color:var(--dim);text-align:center;padding:1rem;font-size:0.85rem;">No data</p>';
+      return;
+    }
+    const maxVal = Math.max(...rows.map(r => r[cols[1].key] || 0));
+    let html = '<table class="wa-table"><thead><tr>';
+    cols.forEach(c => { html += `<th>${c.label}</th>`; });
+    html += '</tr></thead><tbody>';
+    rows.forEach(r => {
+      const pct = maxVal > 0 ? ((r[cols[1].key] || 0) / maxVal * 100) : 0;
+      html += '<tr>';
+      cols.forEach((c, i) => {
+        let val = r[c.key] != null ? r[c.key] : '-';
+        if (c.fmt) val = c.fmt(val);
+        if (i === 0) {
+          html += `<td class="wa-bar-cell"><div class="wa-bar-bg" style="width:${pct}%"></div><span class="wa-bar-text">${val}</span></td>`;
+        } else {
+          html += `<td>${val}</td>`;
+        }
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    el.innerHTML = html;
+  }
+
+  async function waLoadRealtime() {
+    try {
+      const data = await waFetch('analytics-realtime', { site: waSite });
+      document.getElementById('wa-realtime').textContent = data.active_visitors || 0;
+    } catch {}
+  }
+
+  async function waLoadDashboard() {
+    if (!waSite || !waToken()) return;
+    const { from, to } = waGetDates();
+
+    // Show loading
+    document.querySelectorAll('#tab-website .wa-loading').forEach(el => { el.style.display = ''; });
+
+    try {
+      const [summary, timeseries, pages, referrers, browsers, devices, countries, os, events, campaigns] = await Promise.all([
+        waFetch('analytics-dashboard', { site: waSite, from, to, metric: 'summary' }),
+        waFetch('analytics-dashboard', { site: waSite, from, to, metric: 'timeseries' }),
+        waFetch('analytics-dashboard', { site: waSite, from, to, metric: 'pages' }),
+        waFetch('analytics-dashboard', { site: waSite, from, to, metric: 'referrers' }),
+        waFetch('analytics-dashboard', { site: waSite, from, to, metric: 'browsers' }),
+        waFetch('analytics-dashboard', { site: waSite, from, to, metric: 'devices' }),
+        waFetch('analytics-dashboard', { site: waSite, from, to, metric: 'countries' }),
+        waFetch('analytics-dashboard', { site: waSite, from, to, metric: 'os' }),
+        waFetch('analytics-dashboard', { site: waSite, from, to, metric: 'events' }),
+        waFetch('analytics-dashboard', { site: waSite, from, to, metric: 'campaigns', col: 'utm_campaign' }),
+      ]);
+
+      // Stats
+      document.getElementById('wa-uniques').textContent = fmtNum(summary.unique_visitors || 0);
+      document.getElementById('wa-pageviews').textContent = fmtNum(summary.total_pageviews || 0);
+      document.getElementById('wa-duration').textContent = fmtDuration(summary.avg_duration || 0);
+      document.getElementById('wa-bounce').textContent = (summary.bounce_rate || 0) + '%';
+      document.getElementById('wa-events').textContent = fmtNum(summary.event_completions || 0);
+
+      // Timeseries chart
+      waRenderTimeseries(timeseries || []);
+
+      // Tables
+      const nameCols = [{ key: 'name', label: 'Name' }, { key: 'visitors', label: 'Visitors' }, { key: 'views', label: 'Views' }];
+      waRenderTable('wa-pages-table', pages, [{ key: 'name', label: 'Page' }, { key: 'visitors', label: 'Visitors' }, { key: 'views', label: 'Views' }]);
+      waRenderTable('wa-referrers-table', referrers, [{ key: 'name', label: 'Referrer' }, { key: 'visitors', label: 'Visitors' }, { key: 'views', label: 'Views' }]);
+      waRenderTable('wa-devices-table', devices, [{ key: 'name', label: 'Device' }, { key: 'visitors', label: 'Visitors' }]);
+      waRenderTable('wa-browsers-table', browsers, [{ key: 'name', label: 'Browser' }, { key: 'visitors', label: 'Visitors' }]);
+      waRenderTable('wa-countries-table', countries, [{ key: 'name', label: 'Country' }, { key: 'visitors', label: 'Visitors' }]);
+      waRenderTable('wa-os-table', os, [{ key: 'name', label: 'OS' }, { key: 'visitors', label: 'Visitors' }]);
+      waRenderTable('wa-campaigns-table', campaigns, nameCols);
+
+      // Events table (special columns)
+      waRenderTable('wa-events-table', events, [
+        { key: 'event_name', label: 'Event' },
+        { key: 'uniques', label: 'Uniques' },
+        { key: 'completions', label: 'Completions' },
+        { key: 'conv_rate', label: 'Conv. Rate', fmt: v => v + '%' },
+      ]);
+
+    } catch (err) {
+      console.error('WA load error:', err);
+    }
+
+    // Realtime
+    waLoadRealtime();
+    if (waRealtimeInterval) clearInterval(waRealtimeInterval);
+    waRealtimeInterval = setInterval(waLoadRealtime, 30000);
+  }
+
+  function waRenderTimeseries(data) {
+    const ctx = document.getElementById('wa-timeseries');
+    if (waChart) { waChart.destroy(); waChart = null; }
+    if (!data || data.length === 0) return;
+
+    const labels = data.map(d => {
+      const dt = new Date(d.period);
+      // If hourly data, show HH:MM, otherwise show date
+      if (data.length > 0 && data[0].period && data[0].period.includes('T')) {
+        return dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      }
+      return dt.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    });
+
+    waChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Visitors',
+            data: data.map(d => d.visitors),
+            borderColor: '#8b5cf6',
+            backgroundColor: 'rgba(139,92,246,0.15)',
+            fill: true,
+            tension: 0.3,
+            pointRadius: data.length > 30 ? 0 : 3,
+          },
+          {
+            label: 'Pageviews',
+            data: data.map(d => d.pageviews),
+            borderColor: '#3b82f6',
+            backgroundColor: 'transparent',
+            borderDash: [4, 4],
+            tension: 0.3,
+            pointRadius: 0,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } },
+        scales: {
+          x: { ticks: { color: '#64748b', maxTicksLimit: 12 }, grid: { color: 'rgba(51,65,85,0.3)' } },
+          y: { beginAtZero: true, ticks: { color: '#64748b' }, grid: { color: 'rgba(51,65,85,0.3)' } },
+        },
+      },
+    });
+  }
+
+  // Panel tab switching (pages/referrers/campaigns sub-tabs)
+  document.querySelectorAll('.wa-panel-tab').forEach(tab => {
+    tab.addEventListener('click', async function() {
+      const panel = this.dataset.waPanel;
+      this.closest('.wa-panel-tabs').querySelectorAll('.wa-panel-tab').forEach(t => t.classList.remove('active'));
+      this.classList.add('active');
+
+      const metric = this.dataset.waMetric;
+      const col = this.dataset.waCol || '';
+      const { from, to } = waGetDates();
+      const containerId = 'wa-' + panel + '-table';
+
+      document.getElementById(containerId).innerHTML = '<div class="wa-loading">Loading...</div>';
+
+      try {
+        const params = { site: waSite, from, to, metric };
+        if (col) params.col = col;
+        const data = await waFetch('analytics-dashboard', params);
+        const cols = [{ key: 'name', label: 'Name' }, { key: 'visitors', label: 'Visitors' }, { key: 'views', label: 'Views' }];
+        waRenderTable(containerId, data, cols);
+      } catch (err) {
+        document.getElementById(containerId).innerHTML = '<p style="color:var(--red);">Error loading data</p>';
+      }
+    });
+  });
+
+  // Date range controls
+  document.getElementById('wa-range').addEventListener('change', function() {
+    const custom = this.value === 'custom';
+    document.getElementById('wa-from').style.display = custom ? '' : 'none';
+    document.getElementById('wa-to').style.display = custom ? '' : 'none';
+    if (!custom) waLoadDashboard();
+  });
+  document.getElementById('wa-from').addEventListener('change', waLoadDashboard);
+  document.getElementById('wa-to').addEventListener('change', waLoadDashboard);
+
+  // Site selector
+  document.getElementById('wa-site').addEventListener('change', function() {
+    waSite = this.value;
+    waLoadDashboard();
+  });
+
+  // Main init
+  window.waInit = async function() {
+    if (!waToken()) return;
+
+    // Load sites list
+    try {
+      const sites = await waFetch('analytics-dashboard', { metric: 'sites' });
+      const sel = document.getElementById('wa-site');
+      sel.innerHTML = '';
+      if (sites && sites.length > 0) {
+        sites.forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = s; opt.textContent = s;
+          sel.appendChild(opt);
+        });
+        waSite = sites[0];
+      } else {
+        sel.innerHTML = '<option value="">No sites yet</option>';
+        return;
+      }
+    } catch (err) {
+      document.getElementById('wa-site').innerHTML = '<option value="">Error loading sites</option>';
+      return;
+    }
+
+    waLoadDashboard();
+  };
+})();
 </script>
 </body>
 </html>

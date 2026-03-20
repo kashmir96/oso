@@ -1,8 +1,10 @@
 /**
  * staff-auth.js
  *
- * Staff authentication & user management.
- * Actions: login, change-password, list-users, create-user, update-user, delete-user, seed
+ * Staff authentication & user management with TOTP 2FA and activity logging.
+ * Actions: login, change-password, verify-totp, setup-totp,
+ *          list-users, create-user, update-user, delete-user,
+ *          log-activity, get-activity-log, seed
  *
  * Env vars required:
  *   SUPABASE_URL, SUPABASE_SERVICE_KEY
@@ -10,6 +12,7 @@
 
 const crypto = require('crypto');
 
+// ── Password helpers ──
 function hashPassword(password, salt) {
   return crypto.createHash('sha256').update(salt + password).digest('hex');
 }
@@ -20,6 +23,62 @@ function generateToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
+// ── TOTP helpers (RFC 6238, no external deps) ──
+const BASE32_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+
+function base32Encode(buffer) {
+  let bits = '';
+  for (const byte of buffer) bits += byte.toString(2).padStart(8, '0');
+  let result = '';
+  for (let i = 0; i < bits.length; i += 5) {
+    const chunk = bits.slice(i, i + 5).padEnd(5, '0');
+    result += BASE32_CHARS[parseInt(chunk, 2)];
+  }
+  return result;
+}
+
+function base32Decode(str) {
+  let bits = '';
+  for (const c of str.toUpperCase()) {
+    const idx = BASE32_CHARS.indexOf(c);
+    if (idx === -1) continue;
+    bits += idx.toString(2).padStart(5, '0');
+  }
+  const bytes = [];
+  for (let i = 0; i + 8 <= bits.length; i += 8) {
+    bytes.push(parseInt(bits.slice(i, i + 8), 2));
+  }
+  return Buffer.from(bytes);
+}
+
+function generateTOTPSecret() {
+  return base32Encode(crypto.randomBytes(20));
+}
+
+function generateTOTP(secret, timeStep) {
+  const key = base32Decode(secret);
+  const time = Buffer.alloc(8);
+  time.writeUInt32BE(0, 0);
+  time.writeUInt32BE(timeStep, 4);
+  const hmac = crypto.createHmac('sha1', key).update(time).digest();
+  const offset = hmac[hmac.length - 1] & 0x0f;
+  const code = ((hmac[offset] & 0x7f) << 24 | hmac[offset + 1] << 16 | hmac[offset + 2] << 8 | hmac[offset + 3]) % 1000000;
+  return code.toString().padStart(6, '0');
+}
+
+function verifyTOTP(secret, code) {
+  const now = Math.floor(Date.now() / 1000 / 30);
+  for (let i = -1; i <= 1; i++) {
+    if (generateTOTP(secret, now + i) === code) return true;
+  }
+  return false;
+}
+
+function generateOTPAuthURL(username, secret) {
+  return `otpauth://totp/PrimalPantry:${encodeURIComponent(username)}?secret=${secret}&issuer=PrimalPantry&algorithm=SHA1&digits=6&period=30`;
+}
+
+// ── HTTP helpers ──
 const HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'Content-Type',
@@ -44,6 +103,19 @@ async function sbFetch(url, opts = {}) {
   });
 }
 
+// ── Activity logging ──
+async function logActivity(staffId, staffUsername, action, detail) {
+  try {
+    await sbFetch('/rest/v1/staff_activity_log', {
+      method: 'POST',
+      body: JSON.stringify({ staff_id: staffId, staff_username: staffUsername, action, detail }),
+    });
+  } catch (e) {
+    console.error('[staff-auth] Failed to log activity:', e.message);
+  }
+}
+
+// ── Staff lookups ──
 async function getStaffByToken(token) {
   if (!token) return null;
   const res = await sbFetch(`/rest/v1/staff?session_token=eq.${encodeURIComponent(token)}&select=*`);
@@ -61,7 +133,7 @@ async function getStaffByUsername(username) {
 async function seedAccounts() {
   const res = await sbFetch('/rest/v1/staff?select=id&limit=1');
   const rows = await res.json();
-  if (rows && rows.length > 0) return false; // already seeded
+  if (rows && rows.length > 0) return false;
 
   const accounts = [
     { username: 'Kashmir', display_name: 'Kashmir (Curtis)', password: '1532Milo2631!', role: 'owner', can_manage_users: true, must_change_password: false },
@@ -80,6 +152,8 @@ async function seedAccounts() {
       role: a.role,
       can_manage_users: a.can_manage_users,
       must_change_password: a.must_change_password,
+      totp_secret: null,
+      totp_enabled: false,
     };
   });
 
@@ -101,7 +175,6 @@ exports.handler = async (event) => {
 
   // ── LOGIN ──
   if (action === 'login') {
-    // Auto-seed on first login attempt
     await seedAccounts();
 
     const { username, password } = body;
@@ -120,7 +193,9 @@ exports.handler = async (event) => {
       body: JSON.stringify({ session_token: token }),
     });
 
-    return reply(200, {
+    await logActivity(staff.id, staff.username, 'login', `${staff.display_name} logged in`);
+
+    const response = {
       success: true,
       token,
       staff: {
@@ -131,7 +206,67 @@ exports.handler = async (event) => {
         can_manage_users: staff.can_manage_users,
         must_change_password: staff.must_change_password,
       },
+    };
+
+    // Check TOTP status
+    if (!staff.must_change_password) {
+      if (!staff.totp_enabled) {
+        // Generate a new secret for setup
+        const secret = staff.totp_secret || generateTOTPSecret();
+        if (!staff.totp_secret) {
+          await sbFetch(`/rest/v1/staff?id=eq.${staff.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ totp_secret: secret }),
+          });
+        }
+        response.needs_totp_setup = true;
+        response.totp_secret = secret;
+        response.totp_uri = generateOTPAuthURL(staff.username, secret);
+      } else {
+        response.needs_totp_verify = true;
+      }
+    }
+
+    return reply(200, response);
+  }
+
+  // ── VERIFY TOTP (login step 2) ──
+  if (action === 'verify-totp') {
+    const { token, code } = body;
+    if (!token || !code) return reply(400, { error: 'Token and code required' });
+
+    const staff = await getStaffByToken(token);
+    if (!staff) return reply(401, { error: 'Invalid session' });
+    if (!staff.totp_secret) return reply(400, { error: 'TOTP not configured' });
+
+    if (!verifyTOTP(staff.totp_secret, code.toString().padStart(6, '0'))) {
+      return reply(401, { error: 'Invalid code. Check your authenticator app and try again.' });
+    }
+
+    return reply(200, { success: true });
+  }
+
+  // ── SETUP TOTP (first-time enrollment) ──
+  if (action === 'setup-totp') {
+    const { token, code } = body;
+    if (!token || !code) return reply(400, { error: 'Token and code required' });
+
+    const staff = await getStaffByToken(token);
+    if (!staff) return reply(401, { error: 'Invalid session' });
+    if (!staff.totp_secret) return reply(400, { error: 'No TOTP secret found — try logging in again' });
+
+    if (!verifyTOTP(staff.totp_secret, code.toString().padStart(6, '0'))) {
+      return reply(401, { error: 'Invalid code. Make sure you scanned the QR code and entered the current 6-digit code.' });
+    }
+
+    await sbFetch(`/rest/v1/staff?id=eq.${staff.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ totp_enabled: true }),
     });
+
+    await logActivity(staff.id, staff.username, 'totp_setup', `${staff.display_name} set up 2FA`);
+
+    return reply(200, { success: true });
   }
 
   // ── CHANGE PASSWORD ──
@@ -151,6 +286,8 @@ exports.handler = async (event) => {
       body: JSON.stringify({ password_hash, salt, must_change_password: false }),
     });
 
+    await logActivity(staff.id, staff.username, 'password_change', `${staff.display_name} changed their password`);
+
     return reply(200, { success: true });
   }
 
@@ -160,7 +297,7 @@ exports.handler = async (event) => {
     const admin = await getStaffByToken(token);
     if (!admin || !admin.can_manage_users) return reply(403, { error: 'Not authorised' });
 
-    const res = await sbFetch('/rest/v1/staff?select=id,username,display_name,role,can_manage_users,must_change_password,created_at&order=id.asc');
+    const res = await sbFetch('/rest/v1/staff?select=id,username,display_name,role,can_manage_users,must_change_password,totp_enabled,created_at&order=id.asc');
     const users = await res.json();
     return reply(200, { success: true, users });
   }
@@ -171,7 +308,6 @@ exports.handler = async (event) => {
     const admin = await getStaffByToken(token);
     if (!admin || !admin.can_manage_users) return reply(403, { error: 'Not authorised' });
 
-    // Only owner can create admins with manage permissions
     if (can_manage_users && admin.role !== 'owner' && admin.role !== 'admin') {
       return reply(403, { error: 'Only owner/admin can grant user management permissions' });
     }
@@ -195,18 +331,22 @@ exports.handler = async (event) => {
         role: role || 'staff',
         can_manage_users: can_manage_users || false,
         must_change_password: true,
+        totp_secret: null,
+        totp_enabled: false,
       }),
     });
 
     const data = await res.json();
     if (!res.ok) return reply(500, { error: JSON.stringify(data) });
 
+    await logActivity(admin.id, admin.username, 'user_create', `Created user "${username}" (${display_name})`);
+
     return reply(200, { success: true, temp_password: tempPassword });
   }
 
   // ── UPDATE USER (admin only) ──
   if (action === 'update-user') {
-    const { token, user_id, display_name, role, can_manage_users, reset_password } = body;
+    const { token, user_id, display_name, role, can_manage_users, reset_password, reset_totp } = body;
     const admin = await getStaffByToken(token);
     if (!admin || !admin.can_manage_users) return reply(403, { error: 'Not authorised' });
 
@@ -222,10 +362,22 @@ exports.handler = async (event) => {
       updates.must_change_password = true;
     }
 
+    if (reset_totp) {
+      updates.totp_secret = null;
+      updates.totp_enabled = false;
+    }
+
     await sbFetch(`/rest/v1/staff?id=eq.${user_id}`, {
       method: 'PATCH',
       body: JSON.stringify(updates),
     });
+
+    const details = [];
+    if (reset_password) details.push('reset password');
+    if (reset_totp) details.push('reset 2FA');
+    if (display_name) details.push(`renamed to "${display_name}"`);
+    if (role) details.push(`role → ${role}`);
+    await logActivity(admin.id, admin.username, 'user_update', `Updated user #${user_id}: ${details.join(', ') || 'settings changed'}`);
 
     return reply(200, { success: true, password_reset: reset_password ? 'ChangeMe1!' : undefined });
   }
@@ -236,11 +388,46 @@ exports.handler = async (event) => {
     const admin = await getStaffByToken(token);
     if (!admin || !admin.can_manage_users) return reply(403, { error: 'Not authorised' });
 
-    // Can't delete yourself
     if (admin.id === user_id) return reply(400, { error: "Can't delete your own account" });
 
+    // Get username before deleting
+    const targetRes = await sbFetch(`/rest/v1/staff?id=eq.${user_id}&select=username,display_name`);
+    const targets = await targetRes.json();
+    const targetName = targets && targets[0] ? targets[0].display_name || targets[0].username : `#${user_id}`;
+
     await sbFetch(`/rest/v1/staff?id=eq.${user_id}`, { method: 'DELETE' });
+
+    await logActivity(admin.id, admin.username, 'user_delete', `Deleted user "${targetName}"`);
+
     return reply(200, { success: true });
+  }
+
+  // ── LOG ACTIVITY (from frontend) ──
+  if (action === 'log-activity') {
+    const { token, activity_action, detail } = body;
+    const staff = await getStaffByToken(token);
+    if (!staff) return reply(401, { error: 'Invalid session' });
+
+    if (!activity_action || !detail) return reply(400, { error: 'activity_action and detail required' });
+
+    await logActivity(staff.id, staff.username, activity_action, detail);
+    return reply(200, { success: true });
+  }
+
+  // ── GET ACTIVITY LOG (owner only) ──
+  if (action === 'get-activity-log') {
+    const { token, staff_filter, limit: logLimit } = body;
+    const admin = await getStaffByToken(token);
+    if (!admin || admin.role !== 'owner') return reply(403, { error: 'Owner access required' });
+
+    let url = `/rest/v1/staff_activity_log?select=*&order=created_at.desc&limit=${logLimit || 100}`;
+    if (staff_filter) {
+      url += `&staff_username=eq.${encodeURIComponent(staff_filter)}`;
+    }
+
+    const res = await sbFetch(url);
+    const logs = await res.json();
+    return reply(200, { success: true, logs: Array.isArray(logs) ? logs : [] });
   }
 
   return reply(400, { error: 'Unknown action' });
