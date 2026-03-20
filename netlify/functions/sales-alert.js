@@ -8,8 +8,8 @@
  * Env vars required:
  *   SUPABASE_URL
  *   SUPABASE_SERVICE_KEY
- *   TWILIO_ACCOUNT_SID
- *   TWILIO_AUTH_TOKEN
+ *   TWILIO_SID
+ *   TWILIO_API
  *   TWILIO_FROM_NUMBER   (e.g. +1234567890)
  *   ALERT_PHONE_NUMBERS  (comma-separated, e.g. +64272415215,+64212784022)
  */
@@ -33,8 +33,8 @@ function getNZDate() {
 }
 
 async function sendSMS(message) {
-  const SID = process.env.TWILIO_ACCOUNT_SID;
-  const TOKEN = process.env.TWILIO_AUTH_TOKEN;
+  const SID = process.env.TWILIO_SID;
+  const TOKEN = process.env.TWILIO_API;
   const FROM = process.env.TWILIO_FROM_NUMBER;
   const numbers = (process.env.ALERT_PHONE_NUMBERS || '').split(',').map(n => n.trim()).filter(Boolean);
 
