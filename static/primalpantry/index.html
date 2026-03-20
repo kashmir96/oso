@@ -46,6 +46,10 @@
     .team-actions button.danger { border-color: var(--red); color: var(--red); }
     .team-actions button.danger:hover { background: var(--red); color: white; }
     .staff-greeting { font-size: 0.8rem; color: var(--muted); }
+    .staff-logout-btn { background: none; border: 1px solid var(--border); color: var(--muted); padding: 0.35rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-family: 'DM Sans', sans-serif; display: flex; align-items: center; gap: 0.4rem; transition: all 0.15s; }
+    .staff-logout-btn:hover { border-color: var(--red); color: var(--text); }
+    .staff-logout-btn svg { opacity: 0.5; transition: opacity 0.15s; }
+    .staff-logout-btn:hover svg { opacity: 1; color: var(--red); }
     .team-btn { background: var(--card); border: 1px solid var(--honey); color: var(--honey); padding: 0.4rem 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 600; }
     .team-btn:hover { background: var(--honey); color: #141210; }
 
@@ -166,6 +170,13 @@
     .ship-status-badge.printed { background: rgba(219,191,168,0.15); color: var(--blush); }
     .ship-status-badge.in-transit { background: rgba(140,180,122,0.15); color: var(--sage); }
     .ship-status-badge.delivered { background: rgba(140,180,122,0.2); color: var(--cyan); }
+    .dw-badge { display: inline-block; padding: 0.1rem 0.45rem; border-radius: 10px; font-size: 0.7rem; font-weight: 700; line-height: 1.4; }
+    .dw-green { background: #4ade80; color: #111; }
+    .dw-yellow { background: #facc15; color: #111; }
+    .dw-orange { background: #fb923c; color: #111; }
+    .dw-red { background: #ef4444; color: #fff; }
+    .dw-pulse { animation: dw-throb 1.5s ease-in-out infinite; }
+    @keyframes dw-throb { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.85; transform: scale(1.08); } }
     .ship-status-badge.exception { background: rgba(224,96,80,0.15); color: var(--red); }
     .tracking-link { color: var(--sage); text-decoration: none; font-size: 0.8rem; font-weight: 600; }
     .tracking-link:hover { text-decoration: underline; }
@@ -443,14 +454,13 @@
   <div class="header">
     <div style="display:flex;align-items:center;gap:1rem;">
       <h1>Primal Pantry</h1>
-      <span class="staff-greeting" id="staff-greeting"></span>
     </div>
     <div class="header-controls">
       <button id="refresh-btn" title="Refresh data" style="font-size:1rem;line-height:1;">↻</button>
       <span id="last-refresh" style="font-size:0.7rem;color:var(--dim);"></span>
       <button class="manual-order-btn" id="manual-order-btn">+ Order</button>
       <button class="team-btn" id="team-btn" style="display:none;">Team</button>
-      <button id="logout-btn">Sign out</button>
+      <button id="logout-btn" class="staff-logout-btn" title="Sign out"><span id="staff-greeting"></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
     </div>
   </div>
 
@@ -577,18 +587,21 @@
       <table>
         <thead>
           <tr>
+            <th style="width:3rem;">Wait</th>
             <th>Date</th>
             <th>Customer</th>
             <th>Email</th>
             <th>Location</th>
             <th>Total</th>
+            <th>COGS</th>
+            <th>Margin</th>
             <th>Source</th>
             <th>Items Ordered</th>
             <th>Shipping</th>
           </tr>
         </thead>
         <tbody id="orders-table">
-          <tr><td colspan="8" class="loading">Loading...</td></tr>
+          <tr><td colspan="10" class="loading">Loading...</td></tr>
         </tbody>
       </table>
       <div id="orders-pagination"></div>
@@ -615,11 +628,11 @@
     <div class="charts-row">
       <div class="chart-card">
         <h3>Shipping Status Breakdown</h3>
-        <canvas id="shipping-status-chart"></canvas>
+        <div class="chart-wrap"><canvas id="shipping-status-chart"></canvas></div>
       </div>
       <div class="chart-card">
         <h3>Avg Days to Ship <span style="font-size:0.65rem;color:var(--dim);font-weight:400;">(order → shipped)</span></h3>
-        <canvas id="ship-time-chart"></canvas>
+        <div class="chart-wrap"><canvas id="ship-time-chart"></canvas></div>
       </div>
     </div>
     <div class="orders-card">
@@ -641,6 +654,8 @@
             <th>Order #</th>
             <th>Customer</th>
             <th>Destination</th>
+            <th>Value</th>
+            <th>Items</th>
             <th>Carrier</th>
             <th>Tracking</th>
             <th>Status</th>
@@ -648,7 +663,7 @@
           </tr>
         </thead>
         <tbody id="shipments-table">
-          <tr><td colspan="7" class="loading">Click to load shipping data...</td></tr>
+          <tr><td colspan="9" class="loading">Click to load shipping data...</td></tr>
         </tbody>
       </table>
       <div id="shipments-pagination"></div>
@@ -657,39 +672,72 @@
 
   <div id="tab-manufacturing" class="tab-content">
     <div class="stats" id="manufacturing-stats"></div>
-    <div class="orders-card">
-      <h3>Manufacturing Batches</h3>
-      <div class="mfg-form" id="mfg-form">
-        <div class="mfg-form-row">
-          <div class="form-group"><label>Date</label><input type="date" id="mfg-date"></div>
-          <div class="form-group"><label>Product SKU</label><div class="mfg-sku-wrap"><input type="text" id="mfg-sku" placeholder="e.g. BB-250" autocomplete="off"><div class="mfg-sku-dropdown" id="mfg-sku-dropdown"></div></div></div>
-          <div class="form-group"><label>Quantity</label><input type="number" id="mfg-qty" min="1" placeholder="0"></div>
-          <div class="form-group"><label>Batch No</label>
-            <div class="mfg-batch-input">
-              <input type="text" id="mfg-batch-a" maxlength="2" placeholder="17" class="batch-part">
-              <span class="batch-sep">-</span>
-              <input type="text" id="mfg-batch-b" maxlength="2" placeholder="13" class="batch-part">
+
+    <div class="wa-panel-tabs" id="mfg-sub-tabs">
+      <button class="wa-panel-tab active" data-mfg-panel="batches">Batches</button>
+      <button class="wa-panel-tab" data-mfg-panel="unit-costs">Unit Costs</button>
+    </div>
+
+    <div id="mfg-panel-batches">
+      <div class="orders-card">
+        <h3>Manufacturing Batches</h3>
+        <div class="mfg-form" id="mfg-form">
+          <div class="mfg-form-row">
+            <div class="form-group"><label>Date</label><input type="date" id="mfg-date"></div>
+            <div class="form-group"><label>Product SKU</label><div class="mfg-sku-wrap"><input type="text" id="mfg-sku" placeholder="e.g. BB-250" autocomplete="off"><div class="mfg-sku-dropdown" id="mfg-sku-dropdown"></div></div></div>
+            <div class="form-group"><label>Quantity</label><input type="number" id="mfg-qty" min="1" placeholder="0"></div>
+            <div class="form-group"><label>Batch No</label>
+              <div class="mfg-batch-input">
+                <input type="text" id="mfg-batch-a" maxlength="2" placeholder="17" class="batch-part">
+                <span class="batch-sep">-</span>
+                <input type="text" id="mfg-batch-b" maxlength="2" placeholder="13" class="batch-part">
+              </div>
             </div>
+            <div class="form-group"><label>Exp Date</label><input type="date" id="mfg-exp"></div>
+            <div class="form-group mfg-action-col"><label>&nbsp;</label><button class="mfg-add-btn" id="mfg-add-btn">+ Add Batch</button></div>
           </div>
-          <div class="form-group"><label>Exp Date</label><input type="date" id="mfg-exp"></div>
-          <div class="form-group mfg-action-col"><label>&nbsp;</label><button class="mfg-add-btn" id="mfg-add-btn">+ Add Batch</button></div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Product SKU</th>
+              <th>Quantity</th>
+              <th>Batch No</th>
+              <th>Exp Date</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="mfg-table">
+            <tr><td colspan="6" class="loading">Loading batches...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="mfg-panel-unit-costs" style="display:none;">
+      <div class="orders-card">
+        <h3>Product Unit Costs</h3>
+        <p style="font-size:0.8rem;color:var(--muted);margin-bottom:0.75rem;">Enter cost breakdown per unit for each SKU. Total = Ingredients + Labor + Packaging.</p>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>SKU</th>
+                <th>Product</th>
+                <th>Ingredients ($)</th>
+                <th>Labor ($)</th>
+                <th>Packaging ($)</th>
+                <th>Total ($)</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="unit-costs-table">
+              <tr><td colspan="7" class="loading">Loading...</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Product SKU</th>
-            <th>Quantity</th>
-            <th>Batch No</th>
-            <th>Exp Date</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="mfg-table">
-          <tr><td colspan="6" class="loading">Loading batches...</td></tr>
-        </tbody>
-      </table>
     </div>
   </div><!-- /tab-manufacturing -->
 
@@ -1400,6 +1448,7 @@ async function initDashboard() {
 
   allOrders = ordersRes.data || [];
   allLineItems = liRes.data || [];
+  await loadUnitCosts();
   populateFilterDropdowns();
   applyFilter();
   loadAdSpend();
@@ -1672,9 +1721,16 @@ function renderStats(orders, lineItems) {
     }).join('') + '</div>';
   }
 
+  // COGS for period
+  const periodCOGS = orders.reduce((s, o) => s + getOrderCOGS(o.id), 0);
+  const priorCOGS = priorOrders.reduce((s, o) => s + getOrderCOGS(o.id), 0);
+  const grossMargin = revenue > 0 ? ((revenue - periodCOGS) / revenue * 100).toFixed(1) : '0.0';
+  const sparkCOGS = buildSparkline(d => allOrders.filter(o => o.order_date === d).reduce((s, o) => s + getOrderCOGS(o.id), 0));
+
   // Sales tab stats
   const stats = [
     { label: 'Revenue', value: fmt_money(revenue), sub: `${growthSign}${growthPct}% vs prior period`, prior: fmtDelta(revenue, priorRevenue, true), spark: renderSparkBars(sparkRevenue, 'var(--sage)'), color: 'var(--green)' },
+    { label: 'COGS', value: fmt_money(periodCOGS), sub: `${grossMargin}% gross margin`, prior: fmtDelta(periodCOGS, priorCOGS, true), spark: renderSparkBars(sparkCOGS, 'var(--honey)'), color: 'var(--honey)' },
     { label: 'Orders', value: orderCount, sub: `${periodEmails.size} customers`, prior: fmtDelta(orderCount, priorOrderCount), spark: renderSparkBars(sparkOrders, 'var(--blue)'), color: 'var(--blue)' },
     { label: 'AOV', value: fmt_money(aov), sub: 'avg order value', prior: fmtDelta(aov, priorAov, true), spark: renderSparkBars(sparkAov, 'var(--purple)'), color: 'var(--purple)' },
     { label: 'Website Visitors', value: '<span id="wa-visitors-count">-</span>', sub: 'across all sites', color: 'var(--cyan)' },
@@ -2040,26 +2096,50 @@ function shipStatusPill(order) {
   return `<span class="ship-status-badge ${cls}">${status}</span>`;
 }
 
-// Auto-mark orders as Delivered when shipping shows Delivered
+// Auto-sync shipping: persist shipped_at (one-way flip) + mark Delivered
 async function syncDeliveredOrders() {
   if (!allShipments.length || !allOrders.length) return;
   const skipStatuses = ['delivered', 'refunded', 'incorrect order', 'cancelled'];
-  const toUpdate = [];
+  const toDeliver = [], toShip = [];
   allShipments.forEach(ship => {
-    if (ship._shipping_status !== 'Delivered') return;
+    const st = ship._shipping_status;
+    if (st !== 'In Transit' && st !== 'Delivered') return;
     const order = allOrders.find(o => o.stripe_session_id === ship.order_number);
     if (!order) return;
-    if (skipStatuses.includes((order.status || '').toLowerCase())) return;
-    toUpdate.push(order);
+    if (!order.shipped_at) toShip.push({ order, shipped_date: ship.shipped_date || new Date().toISOString() });
+    if (st === 'Delivered' && !skipStatuses.includes((order.status || '').toLowerCase())) toDeliver.push(order);
   });
-  for (const order of toUpdate) {
-    const { error } = await sb.from('orders').update({ status: 'Delivered' }).eq('id', order.id);
-    if (!error) {
-      order.status = 'Delivered';
-      logFrontendActivity('auto_status', `Auto-marked order #${order.id} (${order.customer_name || order.email || '?'}) as Delivered`);
-    }
+  for (const { order, shipped_date } of toShip) {
+    const { error } = await sb.from('orders').update({ shipped_at: shipped_date }).eq('id', order.id);
+    if (!error) { order.shipped_at = shipped_date; }
   }
-  if (toUpdate.length) renderOrdersTable();
+  for (const order of toDeliver) {
+    const { error } = await sb.from('orders').update({ status: 'Delivered' }).eq('id', order.id);
+    if (!error) { order.status = 'Delivered'; }
+  }
+  if (toShip.length || toDeliver.length) renderOrdersTable();
+}
+
+// Days waiting badge for unshipped orders
+function daysWaitingBadge(order) {
+  const skip = ['delivered', 'refunded', 'incorrect order', 'cancelled'];
+  if (order.shipped_at || skip.includes((order.status || '').toLowerCase())) return '';
+  const created = order.created_at ? new Date(order.created_at) : (order.order_date ? new Date(order.order_date + 'T00:00:00') : null);
+  if (!created) return '';
+  const days = Math.floor((Date.now() - created) / 86400000);
+  let cls = 'dw-green';
+  if (days >= 4) cls = 'dw-red dw-pulse';
+  else if (days >= 3) cls = 'dw-orange';
+  else if (days >= 2) cls = 'dw-yellow';
+  return `<span class="dw-badge ${cls}" title="${days} day${days !== 1 ? 's' : ''} waiting">${days}d</span>`;
+}
+
+function orderDaysWaiting(order) {
+  const skip = ['delivered', 'refunded', 'incorrect order', 'cancelled'];
+  if (order.shipped_at || skip.includes((order.status || '').toLowerCase())) return -1;
+  const created = order.created_at ? new Date(order.created_at) : (order.order_date ? new Date(order.order_date + 'T00:00:00') : null);
+  if (!created) return -1;
+  return Math.floor((Date.now() - created) / 86400000);
 }
 
 function orderStatusIcon(status) {
@@ -2080,7 +2160,7 @@ function renderOrdersTable() {
     orderLineItemMap[li.order_id].push(li);
   });
 
-  let orders = filteredOrders;
+  let orders = [...filteredOrders];
   if (query) {
     orders = orders.filter(o => {
       const fields = [o.customer_name, o.email, o.city, o.utm_source, o.status].join(' ').toLowerCase();
@@ -2088,9 +2168,15 @@ function renderOrdersTable() {
       return fields.includes(query) || liText.includes(query);
     });
   }
+  // Sort: days waiting desc, then total value desc
+  orders.sort((a, b) => {
+    const da = orderDaysWaiting(a), db = orderDaysWaiting(b);
+    if (da !== db) return db - da;
+    return Number(b.total_value || 0) - Number(a.total_value || 0);
+  });
 
   if (orders.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" class="loading">No orders found</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="loading">No orders found</td></tr>';
     document.getElementById('orders-pagination').innerHTML = '';
     return;
   }
@@ -2108,11 +2194,14 @@ function renderOrdersTable() {
     const src = o.analytics_source || o.utm_source || getUtmFromUrl(o.thank_you_url, 'utm_source') || '';
     return `
     <tr class="clickable" data-id="${o.id}">
+      <td>${daysWaitingBadge(o)}</td>
       <td>${o.order_date}${o.created_at ? ' ' + new Date(o.created_at).toLocaleTimeString('en-NZ', {hour:'2-digit',minute:'2-digit'}) : ''}</td>
       <td>${o.customer_name || '-'}${orderStatusIcon(o.status)}</td>
       <td>${o.email || '-'}</td>
       <td>${[o.city, o.country_code].filter(Boolean).join(', ') || '-'}</td>
       <td>$${Number(o.total_value || 0).toFixed(2)}</td>
+      <td>${(() => { const cg = getOrderCOGS(o.id); return cg > 0 ? '$' + cg.toFixed(2) : '-'; })()}</td>
+      <td>${(() => { const cg = getOrderCOGS(o.id); const tv = Number(o.total_value || 0); return cg > 0 && tv > 0 ? ((tv - cg) / tv * 100).toFixed(0) + '%' : '-'; })()}</td>
       <td>${sourcePill(src) || '-'}</td>
       <td style="font-size:0.82rem;">${itemsHtml}</td>
       <td>${shipStatusPill(o)}</td>
@@ -2871,6 +2960,12 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     this.classList.add('active');
     activeTab = this.dataset.tab;
     document.getElementById('tab-' + activeTab).classList.add('active');
+    // Hide irrelevant filters on manufacturing tab
+    const hideOnMfg = activeTab === 'manufacturing';
+    document.querySelectorAll('.filter-bar .filter-group').forEach((g, i) => {
+      if (i === 0) return; // Keep Period filter visible
+      g.style.display = hideOnMfg ? 'none' : '';
+    });
     loadActiveTab();
   });
 });
@@ -3061,7 +3156,7 @@ let activeShipFilter = '';
 
 async function loadShippingData() {
   const tbody = document.getElementById('shipments-table');
-  tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading shipping data...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="9" class="loading">Loading shipping data...</td></tr>';
 
   try {
     const res = await fetch(ESHIP_PROXY + '?limit=500');
@@ -3084,7 +3179,7 @@ async function loadShippingData() {
       renderShipmentsTable();
     });
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="7" class="loading">Error loading shipping data: ${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="loading">Error loading shipping data: ${err.message}</td></tr>`;
   }
 }
 
@@ -3220,7 +3315,7 @@ function renderShipmentsTable() {
   }
 
   if (orders.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="loading">No shipments found</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="loading">No shipments found</td></tr>';
     renderPagination('shipments-pagination', 1, 0, () => {});
     return;
   }
@@ -3236,13 +3331,22 @@ function renderShipmentsTable() {
     const date = o.shipped_date || o.order_date || '-';
     const displayDate = date !== '-' ? new Date(date).toLocaleString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : '-';
 
+    // Match to order data for $ value, # items, days waiting badge
+    const matched = allOrders.find(ord => ord.order_number === o.order_number);
+    const orderValue = matched ? '$' + Number(matched.total_value || 0).toFixed(2) : '-';
+    const itemCount = matched ? allLineItems.filter(li => li.order_id === matched.id).reduce((s, li) => s + (li.quantity || 1), 0) : '-';
+    const badge = matched ? daysWaitingBadge(matched) : '';
+    const clippedOrder = (o.order_number || '-').length > 12 ? (o.order_number.slice(0, 12) + '…') : (o.order_number || '-');
+
     return `<tr>
-      <td>${o.order_number || '-'}</td>
+      <td title="${o.order_number || ''}" style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${clippedOrder}</td>
       <td>${dest.name || o.name || '-'}</td>
       <td>${[dest.city, dest.country_code || dest.country].filter(Boolean).join(', ') || '-'}</td>
+      <td>${orderValue}</td>
+      <td style="text-align:center;">${itemCount}</td>
       <td>${carrier}</td>
       <td>${tracking ? `<a class="tracking-link" href="${trackUrl}" target="_blank" rel="noopener">${tracking}</a>` : '-'}</td>
-      <td><span class="ship-status-badge ${statusClass}">${status}</span></td>
+      <td><span class="ship-status-badge ${statusClass}">${status}</span> ${badge}</td>
       <td>${displayDate}</td>
     </tr>`;
   }).join('');
@@ -4277,6 +4381,105 @@ function getMfgSkuList() {
     if (!e.target.closest('.mfg-sku-wrap')) dropdown.classList.remove('open');
   });
 })();
+
+// ── Unit Costs (COGS) ──
+let unitCosts = {};
+let unitCostsLoaded = false;
+let unitCostEditingSku = null;
+
+async function loadUnitCosts() {
+  if (unitCostsLoaded) return;
+  const { data, error } = await sb.from('product_unit_costs').select('*');
+  if (error) { console.error('Unit costs error:', error); return; }
+  unitCosts = {};
+  (data || []).forEach(row => { unitCosts[row.sku] = row; });
+  unitCostsLoaded = true;
+}
+
+function getFullSkuList() {
+  const map = {};
+  SHOP_PRODUCTS.forEach(p => { map[p.sku] = p.desc; });
+  allLineItems.forEach(li => { if (li.sku && !map[li.sku]) map[li.sku] = li.description || li.sku; });
+  mfgBatches.forEach(b => { if (b.product_sku && !map[b.product_sku]) map[b.product_sku] = b.product_sku; });
+  return Object.entries(map).map(([sku, desc]) => ({ sku, desc })).sort((a, b) => a.sku.localeCompare(b.sku));
+}
+
+function renderUnitCostsTable() {
+  const tbody = document.getElementById('unit-costs-table');
+  const allSkus = getFullSkuList();
+  if (!allSkus.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);">No products found</td></tr>'; return; }
+  tbody.innerHTML = allSkus.map(({ sku, desc }) => {
+    const c = unitCosts[sku] || {};
+    const ing = Number(c.ingredients || 0), lab = Number(c.labor || 0), pkg = Number(c.packaging || 0);
+    const total = ing + lab + pkg;
+    if (unitCostEditingSku === sku) {
+      return '<tr data-sku="' + sku + '">' +
+        '<td><strong>' + sku + '</strong></td>' +
+        '<td style="font-size:0.82rem;">' + desc + '</td>' +
+        '<td><input type="number" step="0.01" min="0" class="mfg-inline-input" value="' + (ing || '') + '" data-field="ingredients" style="width:70px;"></td>' +
+        '<td><input type="number" step="0.01" min="0" class="mfg-inline-input" value="' + (lab || '') + '" data-field="labor" style="width:70px;"></td>' +
+        '<td><input type="number" step="0.01" min="0" class="mfg-inline-input" value="' + (pkg || '') + '" data-field="packaging" style="width:70px;"></td>' +
+        '<td>--</td>' +
+        '<td><button class="mfg-save-btn" onclick="saveUnitCost(\'' + sku + '\')">Save</button> ' +
+        '<button class="mfg-edit-btn" onclick="cancelUnitCostEdit()">Cancel</button></td></tr>';
+    }
+    const dash = '<span style=color:var(--dim)>--</span>';
+    return '<tr class="clickable" onclick="startUnitCostEdit(\'' + sku + '\')" style="cursor:pointer;">' +
+      '<td><strong>' + sku + '</strong></td>' +
+      '<td style="font-size:0.82rem;">' + desc + '</td>' +
+      '<td>' + (ing > 0 ? '$' + ing.toFixed(2) : dash) + '</td>' +
+      '<td>' + (lab > 0 ? '$' + lab.toFixed(2) : dash) + '</td>' +
+      '<td>' + (pkg > 0 ? '$' + pkg.toFixed(2) : dash) + '</td>' +
+      '<td style="font-weight:600;">' + (total > 0 ? '$' + total.toFixed(2) : dash) + '</td>' +
+      '<td><button class="mfg-edit-btn" onclick="event.stopPropagation(); startUnitCostEdit(\'' + sku + '\')">Edit</button></td></tr>';
+  }).join('');
+}
+
+function startUnitCostEdit(sku) {
+  unitCostEditingSku = sku;
+  renderUnitCostsTable();
+  const row = document.querySelector('tr[data-sku="' + sku + '"]');
+  if (row) { const inp = row.querySelector('input'); if (inp) inp.focus(); }
+}
+
+function cancelUnitCostEdit() { unitCostEditingSku = null; renderUnitCostsTable(); }
+
+async function saveUnitCost(sku) {
+  const row = document.querySelector('tr[data-sku="' + sku + '"]');
+  if (!row) return;
+  const ingredients = parseFloat(row.querySelector('[data-field="ingredients"]').value) || 0;
+  const labor = parseFloat(row.querySelector('[data-field="labor"]').value) || 0;
+  const packaging = parseFloat(row.querySelector('[data-field="packaging"]').value) || 0;
+  const { data, error } = await sb.from('product_unit_costs')
+    .upsert({ sku, ingredients, labor, packaging, updated_at: new Date().toISOString() }, { onConflict: 'sku' })
+    .select().single();
+  if (error) { alert('Save failed: ' + error.message); return; }
+  unitCosts[sku] = data;
+  unitCostEditingSku = null;
+  renderUnitCostsTable();
+}
+
+function getOrderCOGS(orderId) {
+  const items = allLineItems.filter(li => li.order_id === orderId);
+  let cogs = 0;
+  items.forEach(li => {
+    const c = unitCosts[li.sku];
+    if (c) cogs += (li.quantity || 1) * (Number(c.ingredients || 0) + Number(c.labor || 0) + Number(c.packaging || 0));
+  });
+  return cogs;
+}
+
+// Manufacturing sub-tab switching
+document.querySelectorAll('#mfg-sub-tabs .wa-panel-tab').forEach(tab => {
+  tab.addEventListener('click', function() {
+    document.querySelectorAll('#mfg-sub-tabs .wa-panel-tab').forEach(t => t.classList.remove('active'));
+    this.classList.add('active');
+    const panel = this.dataset.mfgPanel;
+    document.getElementById('mfg-panel-batches').style.display = panel === 'batches' ? '' : 'none';
+    document.getElementById('mfg-panel-unit-costs').style.display = panel === 'unit-costs' ? '' : 'none';
+    if (panel === 'unit-costs') { loadUnitCosts().then(function() { renderUnitCostsTable(); }); }
+  });
+});
 </script>
 
 <!-- Claude AI Chat Widget -->
