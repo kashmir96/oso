@@ -1736,7 +1736,6 @@ function renderStats(orders, lineItems) {
     { label: 'AOV', value: fmt_money(aov), sub: 'avg order value', prior: fmtDelta(aov, priorAov, true), spark: renderSparkBars(sparkAov, 'var(--purple)'), color: 'var(--purple)' },
     { label: 'Website Visitors', value: '<span id="wa-visitors-count">-</span>', sub: 'across all sites', color: 'var(--cyan)' },
     { label: 'Avg Items/Order', value: avgJars.toFixed(1), sub: 'line items', prior: fmtDelta(avgJars, priorAvgJars), color: 'var(--pink)' },
-    { label: 'Discounts Given', value: fmt_money(sum(orders, 'discount_applied')), sub: `${orders.filter(o => Number(o.discount_applied) > 0).length} orders`, prior: fmtDelta(sum(orders, 'discount_applied'), priorDiscounts, true), color: 'var(--red)' },
     { label: 'Refunds', value: fmt_money(refundTotal), sub: `${refundedOrders.length} order${refundedOrders.length !== 1 ? 's' : ''} refunded`, color: 'var(--red)' },
     { label: 'Avg Wait Time', value: avgWait + 'd', sub: `${waitingOrders.length} unshipped`, color: Number(avgWait) >= 2 ? 'var(--amber)' : 'var(--green)' },
     { label: 'Waiting 2+ Days', value: waitOver2, sub: waitOver2 > 0 ? 'need attention' : 'all on track', color: waitOver2 > 0 ? 'var(--red)' : 'var(--green)' },
@@ -1768,6 +1767,7 @@ function renderStats(orders, lineItems) {
   const ordersTabEl = document.getElementById('orders-stats-grid');
   if (ordersTabEl) {
     ordersTabEl.innerHTML = [
+      { label: 'Discounts Given', value: fmt_money(sum(orders, 'discount_applied')), sub: `${orders.filter(o => Number(o.discount_applied) > 0).length} orders`, prior: fmtDelta(sum(orders, 'discount_applied'), priorDiscounts, true), color: 'var(--red)' },
       { label: 'Refund Rate', value: `${refundRate}%`, sub: `${refundedOrders.length} refunded`, prior: fmtDelta(Number(refundRate), Number(priorRefundRate), false, true), color: 'var(--red)' },
       { label: 'Longest Wait', value: longestWait + 'd', sub: 'unshipped order', color: longestWait >= 4 ? 'var(--red)' : longestWait >= 2 ? 'var(--amber)' : 'var(--green)' },
       { label: 'Waiting 2+ Days', value: waitOver2, sub: `of ${waitingOrders.length} unshipped`, color: waitOver2 > 0 ? 'var(--red)' : 'var(--green)' },
