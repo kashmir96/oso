@@ -433,12 +433,13 @@
             <th>Location</th>
             <th>Total</th>
             <th>Source</th>
+            <th>Magnet</th>
             <th>Status</th>
             <th>Shipping</th>
           </tr>
         </thead>
         <tbody id="orders-table">
-          <tr><td colspan="8" class="loading">Loading...</td></tr>
+          <tr><td colspan="9" class="loading">Loading...</td></tr>
         </tbody>
       </table>
       <div id="orders-pagination"></div>
@@ -1589,7 +1590,7 @@ function renderOrdersTable() {
   }
 
   if (orders.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" class="loading">No orders found</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="loading">No orders found</td></tr>';
     document.getElementById('orders-pagination').innerHTML = '';
     return;
   }
@@ -1608,7 +1609,8 @@ function renderOrdersTable() {
       <td>${o.email || '-'}</td>
       <td>${[o.city, o.country_code].filter(Boolean).join(', ') || '-'}</td>
       <td>$${Number(o.total_value || 0).toFixed(2)}</td>
-      <td>${sourcePill(src)} ${magnet ? sourcePill(magnet) : ''}</td>
+      <td>${sourcePill(src) || '-'}</td>
+      <td>${magnet ? sourcePill(magnet) : '-'}</td>
       <td><span class="status-badge">${o.status || '-'}</span></td>
       <td>${shipStatusPill(o)}</td>
     </tr>`;
