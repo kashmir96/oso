@@ -2,5 +2,9 @@
   publish = "public"
   command = "hugo --minify"
 
+[build.environment]
+  NODE_VERSION = "18"
+
 [functions]
   directory = "functions"
+  node_bundler = "esbuild"

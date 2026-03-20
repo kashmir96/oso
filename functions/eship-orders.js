@@ -26,8 +26,6 @@ exports.handler = async (event) => {
     return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
 
-  const fetch = (await import('node-fetch')).default;
-
   const API_KEY = process.env.STARSHIPIT_API_KEY;
   const SUB_KEY = process.env.STARSHIPIT_SUBSCRIPTION_KEY;
 
