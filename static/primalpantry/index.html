@@ -104,6 +104,24 @@
     .tracking-link { color: var(--cyan); text-decoration: none; font-size: 0.8rem; }
     .tracking-link:hover { text-decoration: underline; }
 
+    /* Customers tab */
+    .customer-profile { background: var(--card); border-radius: 10px; padding: 1.25rem; margin-bottom: 0.75rem; border: 1px solid transparent; cursor: pointer; transition: border 0.2s; }
+    .customer-profile:hover { border-color: var(--blue); }
+    .customer-profile.expanded { border-color: var(--border); }
+    .customer-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+    .customer-name { font-size: 1rem; font-weight: 700; }
+    .customer-email { font-size: 0.8rem; color: var(--muted); }
+    .customer-meta { display: flex; gap: 1.25rem; font-size: 0.8rem; color: var(--dim); }
+    .customer-meta span { white-space: nowrap; }
+    .customer-meta .val { color: var(--text); font-weight: 600; }
+    .customer-orders-list { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border); display: none; }
+    .customer-profile.expanded .customer-orders-list { display: block; }
+    .customer-order-row { display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0; border-bottom: 1px solid #111827; font-size: 0.8rem; flex-wrap: wrap; gap: 0.25rem; }
+    .customer-order-items { color: var(--dim); font-size: 0.75rem; }
+    .customer-sort { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 1rem; }
+    .customer-sort select, .customer-sort input { background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.8rem; }
+    .customer-sort input { width: 250px; }
+
     @media (max-width: 900px) { .charts-row { grid-template-columns: 1fr; } }
     @media (max-width: 600px) { .stats { grid-template-columns: repeat(2, 1fr); } }
   </style>
@@ -142,6 +160,7 @@
 
   <div class="tab-bar">
     <button class="tab-btn active" data-tab="sales">Sales</button>
+    <button class="tab-btn" data-tab="customers">Customers</button>
     <button class="tab-btn" data-tab="shipping">Shipping</button>
   </div>
 
@@ -225,6 +244,20 @@
   </div>
 
   </div><!-- /tab-sales -->
+
+  <div id="tab-customers" class="tab-content">
+    <div class="stats" id="customer-stats-grid"></div>
+    <div class="customer-sort">
+      <input type="text" id="customer-search" placeholder="Search by name or email...">
+      <select id="customer-sort">
+        <option value="spend">Sort by Spend</option>
+        <option value="orders">Sort by Orders</option>
+        <option value="recent">Sort by Most Recent</option>
+        <option value="name">Sort by Name</option>
+      </select>
+    </div>
+    <div id="customers-list"></div>
+  </div><!-- /tab-customers -->
 
   <div id="tab-shipping" class="tab-content">
     <div class="shipping-stats" id="shipping-stats"></div>
@@ -1074,12 +1107,136 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
     this.classList.add('active');
     document.getElementById('tab-' + this.dataset.tab).classList.add('active');
-    // Load shipping data on first click
+    // Load tab data on click
     if (this.dataset.tab === 'shipping' && !shippingLoaded) {
       loadShippingData();
     }
+    if (this.dataset.tab === 'customers') {
+      renderCustomersTab();
+    }
   });
 });
+
+// ── Customers Tab ──
+function renderCustomersTab() {
+  const customers = {};
+  allOrders.forEach(o => {
+    if (!o.email) return;
+    if (!customers[o.email]) {
+      customers[o.email] = {
+        name: o.customer_name || o.email,
+        email: o.email,
+        phone: o.phone || '',
+        city: o.city || '',
+        country: o.country_code || '',
+        orders: [],
+        totalSpend: 0,
+        firstOrder: o.order_date,
+        lastOrder: o.order_date,
+      };
+    }
+    const c = customers[o.email];
+    c.totalSpend += Number(o.total_value || 0);
+    if (o.customer_name) c.name = o.customer_name;
+    if (o.phone) c.phone = o.phone;
+    if (o.city) c.city = o.city;
+    if (o.order_date < c.firstOrder) c.firstOrder = o.order_date;
+    if (o.order_date > c.lastOrder) c.lastOrder = o.order_date;
+    c.orders.push(o);
+  });
+
+  // Sort orders within each customer by date desc
+  Object.values(customers).forEach(c => c.orders.sort((a, b) => b.order_date.localeCompare(a.order_date)));
+
+  let customerList = Object.values(customers);
+
+  // Stats
+  const totalCustomers = customerList.length;
+  const repeatCustomers = customerList.filter(c => c.orders.length > 1).length;
+  const avgOrdersPerCustomer = totalCustomers > 0 ? (allOrders.length / totalCustomers).toFixed(1) : '0';
+  const avgSpend = totalCustomers > 0 ? sum(allOrders, 'total_value') / totalCustomers : 0;
+  const topSpender = customerList.sort((a, b) => b.totalSpend - a.totalSpend)[0];
+  const topOrderer = customerList.sort((a, b) => b.orders.length - a.orders.length)[0];
+
+  document.getElementById('customer-stats-grid').innerHTML = [
+    { label: 'Total Customers', value: totalCustomers, sub: `${repeatCustomers} repeat`, color: 'var(--blue)' },
+    { label: 'Repeat Rate', value: totalCustomers > 0 ? (repeatCustomers / totalCustomers * 100).toFixed(1) + '%' : '0%', sub: `${repeatCustomers} of ${totalCustomers}`, color: 'var(--green)' },
+    { label: 'Avg Orders/Customer', value: avgOrdersPerCustomer, sub: 'all time', color: 'var(--purple)' },
+    { label: 'Avg Spend/Customer', value: fmt_money(avgSpend), sub: 'lifetime', color: 'var(--cyan)' },
+    { label: 'Top Spender', value: topSpender ? topSpender.name : '-', sub: topSpender ? fmt_money(topSpender.totalSpend) : '', color: 'var(--lime)' },
+    { label: 'Most Orders', value: topOrderer ? topOrderer.name : '-', sub: topOrderer ? topOrderer.orders.length + ' orders' : '', color: 'var(--amber)' },
+  ].map(s => `
+    <div class="stat-card">
+      <div class="label">${s.label}</div>
+      <div class="value" style="color:${s.color}">${s.value}</div>
+      <div class="sub">${s.sub}</div>
+    </div>
+  `).join('');
+
+  // Search + sort
+  const query = (document.getElementById('customer-search').value || '').toLowerCase();
+  const sortBy = document.getElementById('customer-sort').value;
+
+  if (query) {
+    customerList = customerList.filter(c =>
+      c.name.toLowerCase().includes(query) || c.email.toLowerCase().includes(query)
+    );
+  }
+
+  switch (sortBy) {
+    case 'spend': customerList.sort((a, b) => b.totalSpend - a.totalSpend); break;
+    case 'orders': customerList.sort((a, b) => b.orders.length - a.orders.length); break;
+    case 'recent': customerList.sort((a, b) => b.lastOrder.localeCompare(a.lastOrder)); break;
+    case 'name': customerList.sort((a, b) => a.name.localeCompare(b.name)); break;
+  }
+
+  const container = document.getElementById('customers-list');
+  if (customerList.length === 0) {
+    container.innerHTML = '<p style="color:var(--dim);padding:1rem;">No customers found</p>';
+    return;
+  }
+
+  container.innerHTML = customerList.slice(0, 100).map((c, i) => {
+    const orderItems = c.orders.map(o => {
+      const items = allLineItems.filter(li => li.order_id === o.id);
+      const itemStr = items.map(li => `${li.quantity}x ${li.description || li.sku || '?'}`).join(', ');
+      return `<div class="customer-order-row">
+        <span>${o.order_date}</span>
+        <span class="status-badge">${o.status || '-'}</span>
+        <span>$${Number(o.total_value || 0).toFixed(2)}</span>
+        <div class="customer-order-items" style="width:100%;">${itemStr || 'No items'}</div>
+      </div>`;
+    }).join('');
+
+    const daysSinceFirst = c.orders.length > 1 ? Math.round((new Date(c.lastOrder) - new Date(c.firstOrder)) / 86400000) : 0;
+
+    return `<div class="customer-profile" onclick="this.classList.toggle('expanded')">
+      <div class="customer-header">
+        <div>
+          <span class="customer-name">${c.name}</span>
+          <span class="customer-email">${c.email}</span>
+        </div>
+        <div class="customer-meta">
+          <span><span class="val">${c.orders.length}</span> orders</span>
+          <span><span class="val">${fmt_money(c.totalSpend)}</span> spent</span>
+          <span><span class="val">${fmt_money(c.totalSpend / c.orders.length)}</span> AOV</span>
+          ${c.city ? `<span>${c.city}${c.country ? ', ' + c.country : ''}</span>` : ''}
+          ${c.phone ? `<span>${c.phone}</span>` : ''}
+          ${c.orders.length > 1 ? `<span><span class="val">${daysSinceFirst}d</span> span</span>` : ''}
+          <span>Last: ${c.lastOrder}</span>
+        </div>
+      </div>
+      <div class="customer-orders-list">
+        <div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.5rem;text-transform:uppercase;">Order History (${c.orders.length})</div>
+        ${orderItems}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Attach customer tab events
+document.getElementById('customer-search').addEventListener('input', renderCustomersTab);
+document.getElementById('customer-sort').addEventListener('change', renderCustomersTab);
 
 // ── Shipping Tab ──
 const ESHIP_PROXY = '/.netlify/functions/eship-orders';
