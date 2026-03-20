@@ -1375,20 +1375,30 @@ document.getElementById('filter-utm-medium').addEventListener('change', applyFil
 document.getElementById('filter-utm-campaign').addEventListener('change', applyFilter);
 document.getElementById('filter-city').addEventListener('change', applyFilter);
 
+// Local date helper — returns YYYY-MM-DD in browser timezone (not UTC)
+function localDateStr(d) {
+  // Convert to NZ time for consistent date handling
+  const nz = new Date(d.toLocaleString('en-US', { timeZone: 'Pacific/Auckland' }));
+  const p = n => String(n).padStart(2, '0');
+  return `${nz.getFullYear()}-${p(nz.getMonth() + 1)}-${p(nz.getDate())}`;
+}
+function daysAgoLocal(n) { const d = new Date(); d.setDate(d.getDate() - n); return localDateStr(d); }
+
 function getDateRange() {
-  // Use the same date source as the Revenue Pace chart: toISOString for UTC date
+  // Use NZ time — all order dates should be in NZ timezone
   const now = new Date();
-  const today = now.toISOString().slice(0, 10);
-  const yesterday = new Date(now - 86400000).toISOString().slice(0, 10);
+  const today = localDateStr(now);
+  const yesterday = daysAgoLocal(1);
 
   switch (currentRange) {
     case 'today': return [today, today];
     case 'yesterday': return [yesterday, yesterday];
-    case '7d': return [new Date(now - 7 * 86400000).toISOString().slice(0, 10), today];
-    case '30d': return [new Date(now - 30 * 86400000).toISOString().slice(0, 10), today];
+    case '7d': return [daysAgoLocal(7), today];
+    case '30d': return [daysAgoLocal(30), today];
     case 'month': {
-      const y = now.getUTCFullYear(), m = String(now.getUTCMonth() + 1).padStart(2, '0');
-      return [`${y}-${m}-01`, today];
+      const nz = new Date(now.toLocaleString('en-US', { timeZone: 'Pacific/Auckland' }));
+      const p = n => String(n).padStart(2, '0');
+      return [`${nz.getFullYear()}-${p(nz.getMonth() + 1)}-01`, today];
     }
     case 'all': return ['2000-01-01', today];
     case 'custom': {
@@ -1694,8 +1704,10 @@ function renderStats(orders, lineItems) {
   // Revenue growth (current period vs same-length prior period)
   const [from, to] = getDateRange();
   const periodDays = Math.max(1, Math.round((new Date(to) - new Date(from)) / 86400000) + 1);
-  const priorFrom = new Date(new Date(from) - periodDays * 86400000).toISOString().slice(0, 10);
-  const priorTo = new Date(new Date(from) - 86400000).toISOString().slice(0, 10);
+  const pfFrom = new Date(from); pfFrom.setDate(pfFrom.getDate() - periodDays);
+  const priorFrom = localDateStr(pfFrom);
+  const pfTo = new Date(from); pfTo.setDate(pfTo.getDate() - 1);
+  const priorTo = localDateStr(pfTo);
   const priorOrders = allOrders.filter(o => o.order_date >= priorFrom && o.order_date <= priorTo);
   const priorRevenue = sum(priorOrders, 'total_value');
   const growthPct = priorRevenue > 0 ? ((revenue - priorRevenue) / priorRevenue * 100).toFixed(1) : (revenue > 0 ? '100.0' : '0.0');
@@ -1736,7 +1748,7 @@ function renderStats(orders, lineItems) {
     const now = new Date();
     const points = [];
     for (let i = 29; i >= 0; i--) {
-      const d = new Date(now - i * 86400000).toISOString().slice(0, 10);
+      const d = daysAgoLocal(i);
       points.push(metricFn(d));
     }
     return points;
@@ -1875,12 +1887,12 @@ document.getElementById('pace-mode')?.addEventListener('change', renderCumulativ
 function renderDailyPace() {
   const now = new Date();
   const currentHour = now.getHours();
-  const todayStr = now.toISOString().slice(0, 10);
+  const todayStr = localDateStr(now);
 
   // Same weekday last week
   const lastWeek = new Date(now);
   lastWeek.setDate(lastWeek.getDate() - 7);
-  const lastWeekStr = lastWeek.toISOString().slice(0, 10);
+  const lastWeekStr = localDateStr(lastWeek);
 
   const todayHourly = Array(24).fill(0);
   const lastWeekHourly = Array(24).fill(0);
@@ -2852,8 +2864,10 @@ function renderBoughtTogether(orders) {
 function renderTrending(orders) {
   const [from, to] = getDateRange();
   const periodDays = Math.max(1, Math.round((new Date(to) - new Date(from)) / 86400000) + 1);
-  const priorFrom = new Date(new Date(from) - periodDays * 86400000).toISOString().slice(0, 10);
-  const priorTo = new Date(new Date(from) - 86400000).toISOString().slice(0, 10);
+  const tpFrom = new Date(from); tpFrom.setDate(tpFrom.getDate() - periodDays);
+  const priorFrom = localDateStr(tpFrom);
+  const tpTo = new Date(from); tpTo.setDate(tpTo.getDate() - 1);
+  const priorTo = localDateStr(tpTo);
 
   // Current period product quantities
   const currentProducts = {};
@@ -3885,19 +3899,30 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     return String(n);
   }
 
+  const WA_PAGE_SIZE = 10;
+  const waTablePages = {}; // { containerId: currentPage }
+
   function waRenderTable(containerId, rows, cols, opts = {}) {
     const el = document.getElementById(containerId);
     if (!Array.isArray(rows) || rows.length === 0) {
       el.innerHTML = '<p style="color:var(--dim);text-align:center;padding:1rem;font-size:0.85rem;">No data</p>';
       return;
     }
+    if (!waTablePages[containerId]) waTablePages[containerId] = 1;
+    const page = waTablePages[containerId];
+    const totalPages = Math.ceil(rows.length / WA_PAGE_SIZE);
+    // Clamp page
+    if (page > totalPages) waTablePages[containerId] = totalPages;
+    const start = (waTablePages[containerId] - 1) * WA_PAGE_SIZE;
+    const pageRows = rows.slice(start, start + WA_PAGE_SIZE);
+
     const filterInfo = waFilterMap[containerId];
     const activeFilterVal = filterInfo ? waFilters.find(f => f.col === filterInfo.col)?.val : null;
     const maxVal = Math.max(...rows.map(r => r[cols[1].key] || 0));
     let html = '<table class="wa-table"><thead><tr>';
     cols.forEach(c => { html += `<th>${c.label}</th>`; });
     html += '</tr></thead><tbody>';
-    rows.forEach(r => {
+    pageRows.forEach(r => {
       const pct = maxVal > 0 ? ((r[cols[1].key] || 0) / maxVal * 100) : 0;
       const nameVal = r[cols[0].key] || '';
       const isActive = activeFilterVal === nameVal;
@@ -3914,8 +3939,20 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
       html += '</tr>';
     });
     html += '</tbody></table>';
+    // Pagination controls
+    if (rows.length > WA_PAGE_SIZE) {
+      const cp = waTablePages[containerId];
+      html += `<div class="pagination" style="margin-top:0.5rem;"><button class="wa-pg-prev" data-wa-pg="${containerId}" ${cp <= 1 ? 'disabled' : ''}>← Prev</button><span style="font-size:0.75rem;color:var(--dim);">Page ${cp} of ${totalPages} (${rows.length} total)</span><button class="wa-pg-next" data-wa-pg="${containerId}" ${cp >= totalPages ? 'disabled' : ''}>Next →</button></div>`;
+    }
     el.innerHTML = html;
-    // Add click handlers
+    // Pagination click handlers
+    el.querySelectorAll('.wa-pg-prev').forEach(btn => {
+      btn.addEventListener('click', () => { waTablePages[containerId] = Math.max(1, waTablePages[containerId] - 1); waRenderTable(containerId, rows, cols, opts); });
+    });
+    el.querySelectorAll('.wa-pg-next').forEach(btn => {
+      btn.addEventListener('click', () => { waTablePages[containerId] = Math.min(totalPages, waTablePages[containerId] + 1); waRenderTable(containerId, rows, cols, opts); });
+    });
+    // Add click handlers for filtering
     if (filterInfo) {
       el.querySelectorAll('tr[data-wa-val]').forEach(row => {
         row.addEventListener('click', function() {
@@ -4113,6 +4150,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
   async function waLoadDashboard() {
     if (!waSite || !waToken()) return;
     waFunnelData = {}; // Clear cached funnel data on reload
+    Object.keys(waTablePages).forEach(k => { waTablePages[k] = 1; }); // Reset pagination
     const { from, to } = waGetDates();
 
     // Show loading
@@ -4171,14 +4209,17 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
       document.getElementById('wa-atc-sale').textContent = atcSale + '%';
       document.getElementById('wa-aov').textContent = fmt_money(waAov);
 
-      // Funnel visualisation
+      // Funnel visualisation — enforce monotonic decreasing (each stage <= previous)
       const checkoutEvent = (events || []).find(e => e.event_name === 'proceed to checkout');
-      const checkoutUniques = checkoutEvent ? checkoutEvent.uniques : 0;
+      const rawCheckout = checkoutEvent ? checkoutEvent.uniques : 0;
+      const funnelAtc = Math.min(atcUniques, uniqueVisitors);
+      const funnelCheckout = Math.min(rawCheckout, funnelAtc);
+      const funnelSales = Math.min(saleUniques, funnelCheckout);
       const funnelStages = [
         { label: 'Visitors', count: uniqueVisitors, color: '#6B8F5B' },
-        { label: 'Add to Cart', count: atcUniques, color: '#8CB47A' },
-        { label: 'Checkout', count: checkoutUniques, color: '#D4A84B' },
-        { label: 'Purchased', count: saleUniques, color: '#C0955A' },
+        { label: 'Add to Cart', count: funnelAtc, color: '#8CB47A' },
+        { label: 'Checkout', count: funnelCheckout, color: '#D4A84B' },
+        { label: 'Purchased', count: funnelSales, color: '#C0955A' },
       ];
       const funnelEl = document.getElementById('wa-funnel-viz');
       if (uniqueVisitors > 0) {
@@ -4249,6 +4290,9 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
       } else {
         waRenderTrafficTables();
       }
+
+      // Historical country heatmap
+      waRenderHistoricalMap(countries);
 
       // Events table (special columns)
       waRenderTable('wa-events-table', events, [
@@ -4356,6 +4400,196 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
       }
     });
   });
+
+  // ── Country Heatmap ──
+  // Simplified world map using country code → [lat, lng] centroids
+  const COUNTRY_COORDS = {NZ:[-41,174],AU:[-25,134],US:[38,-97],GB:[54,-2],CA:[56,-106],DE:[51,10],FR:[47,2],JP:[36,138],CN:[35,105],IN:[21,78],BR:[-14,-51],ZA:[-29,24],MX:[23,-102],KR:[36,128],SG:[1.35,103.8],MY:[4,101],ID:[-5,120],TH:[15,100],PH:[13,122],VN:[16,108],TW:[24,121],HK:[22,114],AE:[24,54],SA:[24,45],IL:[31,35],IT:[43,12],ES:[40,-4],NL:[52,5],SE:[62,15],NO:[60,8],DK:[56,10],FI:[64,26],PL:[52,20],CZ:[50,15],AT:[47,14],CH:[47,8],BE:[50,4],IE:[53,-8],PT:[40,-8],RU:[62,105],UA:[49,32],AR:[-34,-64],CL:[-35,-71],CO:[4,-72],PE:[-10,-76],PK:[30,69],BD:[24,90],LK:[7,81],MM:[22,98],KH:[13,105],NP:[28,84]};
+
+  function waRenderCountryMap(container, countryCounts, isRealtime) {
+    const maxCount = Math.max(...Object.values(countryCounts), 1);
+    // Use mercator-like projection for a simple inline map
+    const W = 600, H = 300;
+    const toX = lng => ((lng + 180) / 360) * W;
+    const toY = lat => {
+      const latR = lat * Math.PI / 180;
+      const merc = Math.log(Math.tan(Math.PI / 4 + latR / 2));
+      return (H / 2) - (merc * H / (2 * Math.PI)) * 0.9;
+    };
+
+    let svg = `<svg viewBox="0 0 ${W} ${H}" class="wa-map-svg" style="background:var(--bg);border-radius:8px;border:1px solid var(--border);">`;
+    // Draw subtle grid lines
+    for (let lng = -180; lng <= 180; lng += 60) {
+      svg += `<line x1="${toX(lng)}" y1="0" x2="${toX(lng)}" y2="${H}" stroke="var(--border)" stroke-width="0.3" opacity="0.5"/>`;
+    }
+    for (let lat = -60; lat <= 80; lat += 30) {
+      svg += `<line x1="0" y1="${toY(lat)}" x2="${W}" y2="${toY(lat)}" stroke="var(--border)" stroke-width="0.3" opacity="0.5"/>`;
+    }
+
+    // Draw dots for each country
+    Object.entries(countryCounts).forEach(([code, count]) => {
+      const coords = COUNTRY_COORDS[code];
+      if (!coords) return;
+      const x = toX(coords[1]);
+      const y = toY(coords[0]);
+      const intensity = count / maxCount;
+      const r = isRealtime ? Math.max(5, intensity * 14) : Math.max(4, intensity * 12);
+      const color = isRealtime ? '74,222,128' : '107,143,91';
+      svg += `<circle cx="${x}" cy="${y}" r="${r}" fill="rgba(${color},${0.4 + intensity * 0.5})" stroke="rgba(${color},0.8)" stroke-width="1">`;
+      svg += `<title>${code}: ${count} visitor${count !== 1 ? 's' : ''}</title>`;
+      svg += `</circle>`;
+      if (isRealtime) {
+        svg += `<circle cx="${x}" cy="${y}" r="${r}" fill="none" stroke="rgba(${color},0.4)" stroke-width="1"><animate attributeName="r" from="${r}" to="${r + 8}" dur="2s" repeatCount="indefinite"/><animate attributeName="opacity" from="0.6" to="0" dur="2s" repeatCount="indefinite"/></circle>`;
+      }
+    });
+
+    svg += '</svg>';
+    const legendHtml = `<div class="wa-map-legend"><span>Fewer</span><div class="wa-map-legend-bar"></div><span>More</span></div>`;
+    const mapDiv = document.createElement('div');
+    mapDiv.innerHTML = svg + legendHtml;
+    container.appendChild(mapDiv);
+  }
+
+  // Render historical country map after dashboard loads
+  function waRenderHistoricalMap(countriesData) {
+    const mapEl = document.getElementById('wa-country-map');
+    if (!mapEl) return;
+    if (!countriesData || !countriesData.length) {
+      mapEl.innerHTML = '<p style="color:var(--dim);text-align:center;padding:1rem;font-size:0.85rem;">No location data</p>';
+      return;
+    }
+    const counts = {};
+    countriesData.forEach(c => { if (c.name) counts[c.name] = c.visitors || 0; });
+    mapEl.innerHTML = '';
+    waRenderCountryMap(mapEl, counts, false);
+  }
+
+  // ── Funnel Filters ──
+  let waFunnelFilterCol = '';
+  let waFunnelFilterVal = '';
+
+  document.getElementById('wa-funnel-filter-type').addEventListener('change', async function() {
+    const col = this.value;
+    waFunnelFilterCol = col;
+    waFunnelFilterVal = '';
+    const valSelect = document.getElementById('wa-funnel-filter-value');
+    if (!col) {
+      valSelect.style.display = 'none';
+      valSelect.innerHTML = '';
+      // Reload funnel without filter
+      await waReloadFunnel();
+      return;
+    }
+    // Populate value dropdown from traffic data
+    let options = [];
+    if (col === 'utm_source') {
+      const data = waTrafficData.campaigns || [];
+      // We need utm_source data — check if we have it cached or fetch it
+      const { from, to } = waGetDates();
+      const fp = {}; waFilters.forEach((f, i) => { fp['fc'+i] = f.col; fp['fv'+i] = f.val; });
+      try {
+        const srcData = await waFetch('analytics-dashboard', { site: waSite, from, to, ...fp, metric: 'campaigns', col: 'utm_source' });
+        options = (srcData || []).map(r => r.name).filter(Boolean);
+      } catch { options = []; }
+    } else if (col === 'pathname') {
+      options = (waTrafficData.pages || []).map(r => r.name).filter(Boolean);
+    } else if (col === 'device_type') {
+      options = (waTrafficData.devices || []).map(r => r.name).filter(Boolean);
+    } else if (col === 'country') {
+      options = (waTrafficData.countries || []).map(r => r.name).filter(Boolean);
+    }
+    valSelect.innerHTML = '<option value="">All</option>' + options.map(o => `<option value="${o.replace(/"/g,'&quot;')}">${o}</option>`).join('');
+    valSelect.style.display = '';
+  });
+
+  document.getElementById('wa-funnel-filter-value').addEventListener('change', async function() {
+    waFunnelFilterVal = this.value;
+    await waReloadFunnel();
+  });
+
+  async function waReloadFunnel() {
+    const { from, to } = waGetDates();
+    const fp = {}; waFilters.forEach((f, i) => { fp['fc'+i] = f.col; fp['fv'+i] = f.val; });
+    // Add funnel-specific filter
+    let extraIdx = waFilters.length;
+    if (waFunnelFilterCol && waFunnelFilterVal) {
+      fp['fc'+extraIdx] = waFunnelFilterCol;
+      fp['fv'+extraIdx] = waFunnelFilterVal;
+    }
+    const base = { site: waSite, from, to, ...fp, metric: 'funnel' };
+    const dims = Object.entries(waDimMap);
+    const results = await Promise.allSettled(
+      dims.map(([_, d]) => waFetch('analytics-dashboard', { ...base, col: d.col }))
+    );
+    // Also get summary + events for funnel viz header
+    const [summaryRes, eventsRes] = await Promise.allSettled([
+      waFetch('analytics-dashboard', { site: waSite, from, to, ...fp, ...(waFunnelFilterCol && waFunnelFilterVal ? { ['fc'+extraIdx]: waFunnelFilterCol, ['fv'+extraIdx]: waFunnelFilterVal } : {}), metric: 'summary' }),
+      waFetch('analytics-dashboard', { site: waSite, from, to, ...fp, ...(waFunnelFilterCol && waFunnelFilterVal ? { ['fc'+extraIdx]: waFunnelFilterCol, ['fv'+extraIdx]: waFunnelFilterVal } : {}), metric: 'events' }),
+    ]);
+    const summary = summaryRes.status === 'fulfilled' ? summaryRes.value : {};
+    const events = eventsRes.status === 'fulfilled' ? eventsRes.value : [];
+
+    // Update funnel viz
+    const uniqueVisitors = summary.unique_visitors || 0;
+    const atcEvent = (events || []).find(e => e.event_name === 'add to cart');
+    const saleEvent = (events || []).find(e => e.event_name === 'checkout completed');
+    const checkoutEvent = (events || []).find(e => e.event_name === 'proceed to checkout');
+    const rawAtc = atcEvent ? atcEvent.uniques : 0;
+    const rawSale = saleEvent ? saleEvent.uniques : 0;
+    const rawCheckout = checkoutEvent ? checkoutEvent.uniques : 0;
+    // Enforce monotonic decreasing
+    const fAtc = Math.min(rawAtc, uniqueVisitors);
+    const fCheckout = Math.min(rawCheckout, fAtc);
+    const fSale = Math.min(rawSale, fCheckout);
+
+    const funnelStages = [
+      { label: 'Visitors', count: uniqueVisitors, color: '#6B8F5B' },
+      { label: 'Add to Cart', count: fAtc, color: '#8CB47A' },
+      { label: 'Checkout', count: fCheckout, color: '#D4A84B' },
+      { label: 'Purchased', count: fSale, color: '#C0955A' },
+    ];
+    const funnelEl = document.getElementById('wa-funnel-viz');
+    if (uniqueVisitors > 0) {
+      let fhtml = '<div class="wa-funnel">';
+      funnelStages.forEach((st, i) => {
+        const widthPct = uniqueVisitors > 0 ? Math.max(15, (st.count / uniqueVisitors) * 100) : 15;
+        const dropPct = i > 0 ? ((1 - st.count / funnelStages[i - 1].count) * 100) : 0;
+        const dropStr = i > 0 && funnelStages[i - 1].count > 0 ? `↓ ${dropPct.toFixed(0)}% drop` : '';
+        if (i > 0) fhtml += '<div class="wa-funnel-arrow">→</div>';
+        fhtml += `<div class="wa-funnel-stage"><div class="wa-funnel-bar" style="background:${st.color};width:${widthPct}%;min-width:60px;"><span class="wa-funnel-count">${st.count}</span><span class="wa-funnel-label">${st.label}</span></div>${dropStr ? `<div class="wa-funnel-drop">${dropStr}</div>` : ''}</div>`;
+      });
+      fhtml += '</div>';
+      funnelEl.innerHTML = fhtml;
+      funnelEl.style.display = '';
+    }
+
+    // Update funnel stats (using capped values)
+    const lpAtc = uniqueVisitors > 0 ? (fAtc / uniqueVisitors * 100).toFixed(1) : '0.0';
+    const lpSale = uniqueVisitors > 0 ? (fSale / uniqueVisitors * 100).toFixed(1) : '0.0';
+    const atcSale = fAtc > 0 ? (fSale / fAtc * 100).toFixed(1) : '0.0';
+    document.getElementById('wa-lp-atc').textContent = lpAtc + '%';
+    document.getElementById('wa-lp-sale').textContent = lpSale + '%';
+    document.getElementById('wa-atc-sale').textContent = atcSale + '%';
+
+    waFunnelData = {};
+    dims.forEach(([tableId, dim], i) => {
+      const data = results[i].status === 'fulfilled' ? results[i].value : [];
+      const enriched = (data || []).map(r => ({
+        ...r,
+        _atc_rate: r.visitors > 0 ? (r.atc / r.visitors * 100).toFixed(1) : '0.0',
+        _sale_rate: r.visitors > 0 ? (r.sales / r.visitors * 100).toFixed(1) : '0.0',
+        _revenue: 0,
+      }));
+      waFunnelData[tableId] = enriched;
+    });
+    waRenderFunnelTables();
+  }
+
+  // Show/hide funnel filters when switching views
+  const origSetView = window.waSetView;
+  window.waSetView = async function(view) {
+    document.getElementById('wa-funnel-filters').style.display = view === 'funnel' ? '' : 'none';
+    return origSetView(view);
+  };
 
   // Date range controls
   document.getElementById('wa-range').addEventListener('change', function() {

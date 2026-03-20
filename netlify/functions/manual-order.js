@@ -51,8 +51,16 @@ exports.handler = async (event) => {
 
   // ── Calculate totals ──
   const totalValue = items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
-  const orderDate = new Date().toISOString().split('T')[0];
-  const orderHour = new Date().getHours();
+  // Use NZ time for order_date and order_hour (fallback to UTC if conversion fails)
+  let orderDate, orderHour;
+  try {
+    const nzNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Pacific/Auckland' }));
+    orderDate = `${nzNow.getFullYear()}-${String(nzNow.getMonth() + 1).padStart(2, '0')}-${String(nzNow.getDate()).padStart(2, '0')}`;
+    orderHour = nzNow.getHours();
+  } catch (_) {
+    orderDate = new Date().toISOString().split('T')[0];
+    orderHour = new Date().getUTCHours();
+  }
   const manualId = 'manual_' + Date.now();
 
   // ── 1. Save to Supabase ──
