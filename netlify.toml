@@ -8,3 +8,6 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
+
+[functions."sales-alert"]
+  schedule = "0 * * * *"
