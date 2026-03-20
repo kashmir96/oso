@@ -11,3 +11,6 @@
 
 [functions."sales-alert"]
   schedule = "0 * * * *"
+
+[functions."deploy-alert"]
+  schedule = "*/15 * * * *"
