@@ -640,6 +640,7 @@
       <h3>Shipments</h3>
       <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.5rem;">
         <input type="text" class="search-bar" id="shipment-search" placeholder="Search by name, tracking number, or order..." style="margin-bottom:0;flex:1;">
+        <button id="eship-print-btn" style="background:var(--card);border:1px solid var(--sage);color:var(--sage);padding:0.5rem 0.85rem;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600;white-space:nowrap;display:flex;align-items:center;gap:0.35rem;" title="Print all waiting orders via eShip Desktop Agent"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> Print All</button>
         <select id="shipment-status-filter" style="background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.5rem;font-size:0.85rem;">
           <option value="">All Statuses</option>
           <option value="Waiting to Print">Waiting to Print</option>
@@ -1784,7 +1785,7 @@ function renderStats(orders, lineItems) {
   // Async: fetch website visitors from analytics
   if (currentStaff && currentStaff.token) {
     const [waFrom, waTo] = getDateRange();
-    fetch(`/.netlify/functions/analytics-dashboard?metric=summary&site=reviora&from=${waFrom}&to=${waTo}&token=${currentStaff.token}`)
+    fetch(`/.netlify/functions/analytics-dashboard?metric=summary&site=PrimalPantry.co.nz&from=${waFrom}&to=${waTo}&token=${currentStaff.token}`)
       .then(r => r.json())
       .then(s => {
         const el = document.getElementById('wa-visitors-count');
@@ -3370,6 +3371,41 @@ function renderShipmentsTable() {
   renderPagination('shipments-pagination', shipmentsPage, orders.length, p => { shipmentsPage = p; renderShipmentsTable(); });
 }
 
+// ── eShip Print ──
+document.getElementById('eship-print-btn').addEventListener('click', async () => {
+  const waitingCount = allShipments.filter(o => o._shipping_status === 'Waiting to Print').length;
+  if (waitingCount === 0) {
+    alert('No orders waiting to print.');
+    return;
+  }
+  if (!confirm(`Print ${waitingCount} order${waitingCount !== 1 ? 's' : ''} via eShip?\n\nLabels will be sent to the printer connected to the eShip Desktop Agent.`)) return;
+
+  const btn = document.getElementById('eship-print-btn');
+  const origHTML = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = 'Printing...';
+  btn.style.opacity = '0.6';
+
+  try {
+    const res = await fetch('/.netlify/functions/eship-print', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Print failed');
+    alert(`${data.printed} order${data.printed !== 1 ? 's' : ''} sent to printer.`);
+    // Refresh shipping data to update statuses
+    await loadShippingData();
+  } catch (err) {
+    alert('Print failed: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = origHTML;
+    btn.style.opacity = '1';
+  }
+});
+
 // ── Manual Order ──
 const SHOP_PRODUCTS = [
   { desc: 'Tallow Balm - Vanilla Rose 60ml', sku: 'Balm-VR60', price: 18.95 },
@@ -3620,7 +3656,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     // Also load order revenue by dimension
     const revByDim = {};
     const orders = (typeof filteredOrders !== 'undefined' ? filteredOrders : allOrders || []).filter(o => {
-      if (waSite === 'reviora' || waSite === 'reviana') return (o.source_site || '').includes('reviana') || (o.source_site || '').includes('reviora') || (o.landing_page || '').includes('reviana') || (o.landing_page || '').includes('reviora');
+      if (waSite.toLowerCase().includes('reviana')) return (o.source_site || '').toLowerCase().includes('reviana') || (o.source_site || '').toLowerCase().includes('reviora') || (o.landing_page || '').toLowerCase().includes('reviana') || (o.landing_page || '').toLowerCase().includes('reviora');
       return true;
     });
 
@@ -3971,7 +4007,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
       const atcSale = atcUniques > 0 ? (saleUniques / atcUniques * 100).toFixed(1) : '0.0';
       // AOV from orders data for the selected site + date range
       const siteOrders = (typeof filteredOrders !== 'undefined' ? filteredOrders : allOrders || []).filter(o => {
-        if (waSite === 'reviora' || waSite === 'reviana') return (o.source_site || '').includes('reviana') || (o.source_site || '').includes('reviora') || (o.landing_page || '').includes('reviana') || (o.landing_page || '').includes('reviora');
+        if (waSite.toLowerCase().includes('reviana')) return (o.source_site || '').toLowerCase().includes('reviana') || (o.source_site || '').toLowerCase().includes('reviora') || (o.landing_page || '').toLowerCase().includes('reviana') || (o.landing_page || '').toLowerCase().includes('reviora');
         return true;
       });
       const waAov = siteOrders.length > 0 ? siteOrders.reduce((s, o) => s + Number(o.total_value || 0), 0) / siteOrders.length : 0;
@@ -4160,6 +4196,9 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
       const sel = document.getElementById('wa-site');
       sel.innerHTML = '';
       if (sites && sites.length > 0) {
+        // Sort so PrimalPantry.co.nz is first (default)
+        const preferred = 'PrimalPantry.co.nz';
+        sites.sort((a, b) => a === preferred ? -1 : b === preferred ? 1 : a.localeCompare(b));
         sites.forEach(s => {
           const opt = document.createElement('option');
           opt.value = s; opt.textContent = s;
