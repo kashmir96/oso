@@ -189,6 +189,11 @@
     .mfg-cancel-btn:hover { border-color: var(--red); color: var(--red); }
     .mfg-inline-input { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 0.3rem 0.4rem; border-radius: 4px; font-size: 0.8rem; width: 100%; }
     .mfg-inline-batch { width: 2.5rem; text-align: center; }
+    .mfg-sku-wrap { position: relative; }
+    .mfg-sku-dropdown { display: none; position: absolute; top: 100%; left: 0; right: 0; background: var(--card); border: 1px solid var(--border); border-top: none; border-radius: 0 0 6px 6px; max-height: 200px; overflow-y: auto; z-index: 10; }
+    .mfg-sku-dropdown.open { display: block; }
+    .mfg-sku-option { padding: 0.5rem 0.6rem; font-size: 0.8rem; cursor: pointer; }
+    .mfg-sku-option:hover, .mfg-sku-option.active { background: var(--blue); color: white; }
     .mfg-action-col { min-width: 100px; }
     @media (max-width: 900px) { .mfg-form-row { grid-template-columns: 1fr 1fr; } }
 
@@ -286,6 +291,8 @@
       <input type="date" id="date-from" title="From" style="display:none;">
       <input type="date" id="date-to" title="To" style="display:none;">
       <select id="filter-utm"><option value="">All Sources</option></select>
+      <select id="filter-utm-medium"><option value="">All Mediums</option></select>
+      <select id="filter-utm-campaign"><option value="">All Campaigns</option></select>
       <select id="filter-city"><option value="">All Cities</option></select>
       <button id="refresh-btn" title="Refresh data" style="font-size:1rem;line-height:1;">↻ Refresh</button>
       <span id="last-refresh" style="font-size:0.7rem;color:var(--dim);"></span>
@@ -444,7 +451,7 @@
       <div class="mfg-form" id="mfg-form">
         <div class="mfg-form-row">
           <div class="form-group"><label>Date</label><input type="date" id="mfg-date"></div>
-          <div class="form-group"><label>Product SKU</label><input type="text" id="mfg-sku" placeholder="e.g. BB-250"></div>
+          <div class="form-group"><label>Product SKU</label><div class="mfg-sku-wrap"><input type="text" id="mfg-sku" placeholder="e.g. BB-250" autocomplete="off"><div class="mfg-sku-dropdown" id="mfg-sku-dropdown"></div></div></div>
           <div class="form-group"><label>Quantity</label><input type="number" id="mfg-qty" min="1" placeholder="0"></div>
           <div class="form-group"><label>Batch No</label>
             <div class="mfg-batch-input">
@@ -961,6 +968,8 @@ document.getElementById('date-range').addEventListener('change', function() {
 document.getElementById('date-from').addEventListener('change', applyFilter);
 document.getElementById('date-to').addEventListener('change', applyFilter);
 document.getElementById('filter-utm').addEventListener('change', applyFilter);
+document.getElementById('filter-utm-medium').addEventListener('change', applyFilter);
+document.getElementById('filter-utm-campaign').addEventListener('change', applyFilter);
 document.getElementById('filter-city').addEventListener('change', applyFilter);
 
 function getDateRange() {
@@ -987,8 +996,18 @@ function getDateRange() {
 function populateFilterDropdowns() {
   // UTM sources
   const utmSelect = document.getElementById('filter-utm');
-  const sources = [...new Set(allOrders.map(o => o.utm_source || getUtmFromUrl(o.thank_you_url) || '').filter(Boolean))].sort();
+  const sources = [...new Set(allOrders.map(o => o.utm_source || getUtmFromUrl(o.thank_you_url, 'utm_source') || '').filter(Boolean))].sort();
   utmSelect.innerHTML = '<option value="">All Sources</option>' + sources.map(s => `<option value="${s}">${s}</option>`).join('');
+
+  // UTM mediums
+  const mediumSelect = document.getElementById('filter-utm-medium');
+  const mediums = [...new Set(allOrders.map(o => o.utm_medium || getUtmFromUrl(o.thank_you_url, 'utm_medium') || '').filter(Boolean))].sort();
+  mediumSelect.innerHTML = '<option value="">All Mediums</option>' + mediums.map(m => `<option value="${m}">${m}</option>`).join('');
+
+  // UTM campaigns
+  const campaignSelect = document.getElementById('filter-utm-campaign');
+  const campaigns = [...new Set(allOrders.map(o => o.utm_campaign || getUtmFromUrl(o.thank_you_url, 'utm_campaign') || '').filter(Boolean))].sort();
+  campaignSelect.innerHTML = '<option value="">All Campaigns</option>' + campaigns.map(c => `<option value="${c}">${c}</option>`).join('');
 
   // Cities
   const citySelect = document.getElementById('filter-city');
@@ -999,11 +1018,15 @@ function populateFilterDropdowns() {
 function applyFilter() {
   const [from, to] = getDateRange();
   const utmFilter = document.getElementById('filter-utm').value;
+  const mediumFilter = document.getElementById('filter-utm-medium').value;
+  const campaignFilter = document.getElementById('filter-utm-campaign').value;
   const cityFilter = document.getElementById('filter-city').value;
 
   filteredOrders = allOrders.filter(o => {
     if (o.order_date < from || o.order_date > to) return false;
-    if (utmFilter && (o.utm_source || getUtmFromUrl(o.thank_you_url) || '') !== utmFilter) return false;
+    if (utmFilter && (o.utm_source || getUtmFromUrl(o.thank_you_url, 'utm_source') || '') !== utmFilter) return false;
+    if (mediumFilter && (o.utm_medium || getUtmFromUrl(o.thank_you_url, 'utm_medium') || '') !== mediumFilter) return false;
+    if (campaignFilter && (o.utm_campaign || getUtmFromUrl(o.thank_you_url, 'utm_campaign') || '') !== campaignFilter) return false;
     if (cityFilter && o.city !== cityFilter) return false;
     return true;
   });
@@ -1065,10 +1088,14 @@ async function refreshStats() {
     // Re-apply filters and update stats only
     const [from, to] = getDateRange();
     const utmFilter = document.getElementById('filter-utm').value;
+    const mediumFilter = document.getElementById('filter-utm-medium').value;
+    const campaignFilter = document.getElementById('filter-utm-campaign').value;
     const cityFilter = document.getElementById('filter-city').value;
     filteredOrders = allOrders.filter(o => {
       if (o.order_date < from || o.order_date > to) return false;
-      if (utmFilter && (o.utm_source || getUtmFromUrl(o.thank_you_url) || '') !== utmFilter) return false;
+      if (utmFilter && (o.utm_source || getUtmFromUrl(o.thank_you_url, 'utm_source') || '') !== utmFilter) return false;
+      if (mediumFilter && (o.utm_medium || getUtmFromUrl(o.thank_you_url, 'utm_medium') || '') !== mediumFilter) return false;
+      if (campaignFilter && (o.utm_campaign || getUtmFromUrl(o.thank_you_url, 'utm_campaign') || '') !== campaignFilter) return false;
       if (cityFilter && o.city !== cityFilter) return false;
       return true;
     });
@@ -1297,7 +1324,7 @@ function renderProductsChart(lineItems) {
 function renderUTM(orders) {
   const sources = {};
   orders.forEach(o => {
-    const src = o.utm_source || (o.thank_you_url && getUtmFromUrl(o.thank_you_url)) || 'Direct';
+    const src = o.utm_source || (o.thank_you_url && getUtmFromUrl(o.thank_you_url, 'utm_source')) || 'Direct';
     sources[src] = (sources[src] || 0) + 1;
   });
 
@@ -1322,8 +1349,16 @@ function renderUTM(orders) {
   </table>`;
 }
 
-function getUtmFromUrl(url) {
-  try { return new URL(url).searchParams.get('utm_source') || ''; } catch { return ''; }
+function getUtmFromUrl(url, param) {
+  try {
+    const p = param || 'utm_source';
+    const u = new URL(url);
+    const direct = u.searchParams.get(p);
+    if (direct) return direct;
+    const landing = u.searchParams.get('landing_url');
+    if (landing) { try { return new URL(landing).searchParams.get(p) || ''; } catch { return ''; } }
+    return '';
+  } catch { return ''; }
 }
 
 // ── Heatmap (Day of week x Hour) ──
@@ -1429,9 +1464,10 @@ function openOrderModal(orderId) {
     ['Currency', order.currency],
     ['Market', order.market],
     ['Address', [order.street_address, order.suburb, order.city, order.postcode, order.country_code].filter(Boolean).join(', ')],
-    ['UTM Source', order.utm_source || '-'],
-    ['UTM Medium', order.utm_medium || '-'],
-    ['UTM Campaign', order.utm_campaign || '-'],
+    ['UTM Source', order.utm_source || getUtmFromUrl(order.thank_you_url, 'utm_source') || '-'],
+    ['UTM Medium', order.utm_medium || getUtmFromUrl(order.thank_you_url, 'utm_medium') || '-'],
+    ['UTM Campaign', order.utm_campaign || getUtmFromUrl(order.thank_you_url, 'utm_campaign') || '-'],
+    ['Thank You URL', order.thank_you_url ? `<a href="${order.thank_you_url}" target="_blank" rel="noopener" style="color:var(--accent);word-break:break-all;font-size:0.8rem;">${order.thank_you_url}</a>` : '-'],
     ['Stripe ID', order.stripe_session_id],
   ];
 
@@ -2790,6 +2826,57 @@ document.getElementById('mfg-add-btn').addEventListener('click', async function(
 document.getElementById('mfg-batch-a').addEventListener('input', function() {
   if (this.value.length === 2) document.getElementById('mfg-batch-b').focus();
 });
+
+// ── SKU Autocomplete ──
+function getMfgSkuList() {
+  const skus = new Set();
+  allLineItems.forEach(li => { if (li.sku) skus.add(li.sku); });
+  mfgBatches.forEach(b => { if (b.product_sku) skus.add(b.product_sku); });
+  return [...skus].sort();
+}
+
+(function() {
+  const input = document.getElementById('mfg-sku');
+  const dropdown = document.getElementById('mfg-sku-dropdown');
+  let activeIdx = -1;
+
+  function showDropdown(filter) {
+    const all = getMfgSkuList();
+    const q = filter.toLowerCase();
+    const matches = q ? all.filter(s => s.toLowerCase().includes(q)) : all;
+    if (!matches.length) { dropdown.classList.remove('open'); return; }
+    activeIdx = -1;
+    dropdown.innerHTML = matches.map((s, i) => `<div class="mfg-sku-option" data-idx="${i}">${s}</div>`).join('');
+    dropdown.classList.add('open');
+  }
+
+  function pick(val) {
+    input.value = val;
+    dropdown.classList.remove('open');
+    document.getElementById('mfg-qty').focus();
+  }
+
+  input.addEventListener('input', () => showDropdown(input.value));
+  input.addEventListener('focus', () => { if (input.value || getMfgSkuList().length) showDropdown(input.value); });
+
+  input.addEventListener('keydown', function(e) {
+    const items = dropdown.querySelectorAll('.mfg-sku-option');
+    if (!items.length || !dropdown.classList.contains('open')) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); activeIdx = Math.min(activeIdx + 1, items.length - 1); items.forEach((el, i) => el.classList.toggle('active', i === activeIdx)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); activeIdx = Math.max(activeIdx - 1, 0); items.forEach((el, i) => el.classList.toggle('active', i === activeIdx)); }
+    else if (e.key === 'Enter' && activeIdx >= 0) { e.preventDefault(); pick(items[activeIdx].textContent); }
+    else if (e.key === 'Escape') { dropdown.classList.remove('open'); }
+  });
+
+  dropdown.addEventListener('click', function(e) {
+    const opt = e.target.closest('.mfg-sku-option');
+    if (opt) pick(opt.textContent);
+  });
+
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.mfg-sku-wrap')) dropdown.classList.remove('open');
+  });
+})();
 </script>
 </body>
 </html>
