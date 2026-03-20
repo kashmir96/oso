@@ -120,9 +120,11 @@
     /* Shipping tab */
     .shipping-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
     .ship-status-badge { padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
-    .ship-status-badge.shipped { background: #166534; color: var(--green); }
-    .ship-status-badge.unshipped { background: #92400e; color: var(--amber); }
-    .ship-status-badge.delivered { background: #1e40af; color: var(--blue); }
+    .ship-status-badge.waiting-to-print { background: #92400e; color: var(--amber); }
+    .ship-status-badge.printed { background: #854d0e; color: #facc15; }
+    .ship-status-badge.in-transit { background: #1e40af; color: var(--blue); }
+    .ship-status-badge.delivered { background: #166534; color: var(--green); }
+    .ship-status-badge.exception { background: #991b1b; color: #fca5a5; }
     .tracking-link { color: var(--cyan); text-decoration: none; font-size: 0.8rem; }
     .tracking-link:hover { text-decoration: underline; }
 
@@ -171,6 +173,24 @@
     .pagination button { background: var(--card); border: 1px solid var(--border); color: var(--muted); padding: 0.35rem 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
     .pagination button:hover:not(:disabled) { border-color: var(--blue); color: var(--text); }
     .pagination button:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    /* Manufacturing tab */
+    .mfg-form { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+    .mfg-form-row { display: grid; grid-template-columns: 1fr 1fr 0.7fr 1fr 1fr auto; gap: 0.75rem; align-items: end; }
+    .mfg-batch-input { display: flex; align-items: center; gap: 0.25rem; }
+    .batch-part { width: 3rem !important; text-align: center; padding: 0.5rem 0.25rem !important; }
+    .batch-sep { color: var(--dim); font-weight: 700; font-size: 1rem; }
+    .mfg-add-btn { background: var(--green); color: #000; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.8rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+    .mfg-add-btn:hover { opacity: 0.9; }
+    .mfg-edit-btn, .mfg-save-btn, .mfg-cancel-btn { background: none; border: 1px solid var(--border); color: var(--muted); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.7rem; cursor: pointer; margin-right: 0.25rem; }
+    .mfg-edit-btn:hover { border-color: var(--blue); color: var(--text); }
+    .mfg-save-btn { border-color: var(--green); color: var(--green); }
+    .mfg-save-btn:hover { background: var(--green); color: #000; }
+    .mfg-cancel-btn:hover { border-color: var(--red); color: var(--red); }
+    .mfg-inline-input { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 0.3rem 0.4rem; border-radius: 4px; font-size: 0.8rem; width: 100%; }
+    .mfg-inline-batch { width: 2.5rem; text-align: center; }
+    .mfg-action-col { min-width: 100px; }
+    @media (max-width: 900px) { .mfg-form-row { grid-template-columns: 1fr 1fr; } }
 
     /* Website analytics tab */
     .wa-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
@@ -1903,6 +1923,8 @@ function loadActiveTab() {
     loadShippingData();
   } else if (activeTab === 'customers') {
     renderCustomersTab();
+  } else if (activeTab === 'manufacturing') {
+    loadManufacturingTab();
   } else if (activeTab === 'website') {
     waInit();
   }
@@ -2060,16 +2082,12 @@ async function loadShippingData() {
 
 function renderShippingStats(data) {
   const total = allShipments.length;
-  const shipped = allShipments.filter(o => o._shipping_status === 'Shipped').length;
-  const unshipped = allShipments.filter(o => o._shipping_status === 'Unshipped').length;
-
-  // Count unique carriers
-  const carriers = {};
-  allShipments.forEach(o => {
-    const c = o.carrier_name || o.carrier || 'Unknown';
-    carriers[c] = (carriers[c] || 0) + 1;
-  });
-  const topCarrier = Object.entries(carriers).sort((a,b) => b[1] - a[1])[0];
+  const waitingToPrint = allShipments.filter(o => o._shipping_status === 'Waiting to Print').length;
+  const printed = allShipments.filter(o => o._shipping_status === 'Printed').length;
+  const unshipped = waitingToPrint + printed;
+  const inTransit = allShipments.filter(o => o._shipping_status === 'In Transit').length;
+  const delivered = allShipments.filter(o => o._shipping_status === 'Delivered').length;
+  const exception = allShipments.filter(o => o._shipping_status === 'Exception').length;
 
   // Avg days to ship (where we have both order_date and shipped_date)
   let shipDays = [];
@@ -2082,11 +2100,11 @@ function renderShippingStats(data) {
   const avgShipDays = shipDays.length > 0 ? (shipDays.reduce((a,b)=>a+b,0) / shipDays.length).toFixed(1) : '-';
 
   const stats = [
-    { label: 'Total Orders', value: total, sub: `${data.total_shipped || shipped} shipped`, color: 'var(--blue)' },
-    { label: 'Shipped', value: shipped, sub: 'dispatched', color: 'var(--green)' },
-    { label: 'Unshipped', value: unshipped, sub: 'awaiting dispatch', color: 'var(--amber)' },
+    { label: 'Unshipped', value: unshipped, sub: `${waitingToPrint} waiting \u00b7 ${printed} printed`, color: 'var(--amber)' },
+    { label: 'In Transit', value: inTransit, sub: 'dispatched', color: 'var(--blue)' },
+    { label: 'Delivered', value: delivered, sub: 'completed', color: 'var(--green)' },
+    { label: 'Exception', value: exception, sub: 'needs attention', color: '#fca5a5' },
     { label: 'Avg Days to Ship', value: avgShipDays === '-' ? '-' : avgShipDays + 'd', sub: 'order to dispatch', color: 'var(--cyan)' },
-    { label: 'Top Carrier', value: topCarrier ? topCarrier[0] : '-', sub: topCarrier ? topCarrier[1] + ' shipments' : '', color: 'var(--purple)' },
   ];
 
   document.getElementById('shipping-stats').innerHTML = stats.map(s => `
@@ -2099,20 +2117,24 @@ function renderShippingStats(data) {
 }
 
 function renderShippingStatusChart() {
+  // Fixed order and colors for statuses
+  const statusOrder = ['Waiting to Print', 'Printed', 'In Transit', 'Delivered', 'Exception'];
+  const statusColors = { 'Waiting to Print': '#f59e0b', 'Printed': '#facc15', 'In Transit': '#3b82f6', 'Delivered': '#4ade80', 'Exception': '#f87171' };
+
   const statusCounts = {};
   allShipments.forEach(o => {
-    const s = o._shipping_status || o.status || 'Unknown';
+    const s = o._shipping_status || 'Unknown';
     statusCounts[s] = (statusCounts[s] || 0) + 1;
   });
 
-  const labels = Object.keys(statusCounts);
-  const data = Object.values(statusCounts);
-  const colors = ['#4ade80', '#f59e0b', '#3b82f6', '#ec4899', '#8b5cf6', '#06b6d4'];
+  const labels = statusOrder.filter(s => statusCounts[s]);
+  const data = labels.map(s => statusCounts[s]);
+  const colors = labels.map(s => statusColors[s]);
 
   if (charts.shipStatus) charts.shipStatus.destroy();
   charts.shipStatus = new Chart(document.getElementById('shipping-status-chart'), {
     type: 'doughnut',
-    data: { labels, datasets: [{ data, backgroundColor: colors.slice(0, labels.length) }] },
+    data: { labels, datasets: [{ data, backgroundColor: colors }] },
     options: { responsive: true, plugins: { legend: { position: 'right', labels: { color: '#94a3b8', font: { size: 11 }, padding: 6, boxWidth: 12 } } } },
   });
 }
@@ -2168,8 +2190,8 @@ function renderShipmentsTable() {
   const start = (shipmentsPage - 1) * PAGE_SIZE;
   tbody.innerHTML = orders.slice(start, start + PAGE_SIZE).map(o => {
     const dest = o.destination || {};
-    const status = o._shipping_status || o.status || '-';
-    const statusClass = status.toLowerCase().includes('ship') ? 'shipped' : 'unshipped';
+    const status = o._shipping_status || '-';
+    const statusClass = status.toLowerCase().replace(/\s+/g, '-');
     const carrier = o.carrier_name || o.carrier || '-';
     const tracking = o.tracking_number || o.tracking_numbers?.[0] || '';
     const trackUrl = o.tracking_url || (tracking ? '#' : '');
@@ -2600,6 +2622,174 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     waLoadDashboard();
   };
 })();
+
+// ── Manufacturing Tab ──
+let mfgBatches = [];
+let mfgLoaded = false;
+let mfgEditingId = null;
+
+function parseBatchNo(str) {
+  const parts = str.split('-');
+  return { a: parseInt(parts[0], 10), b: parseInt(parts[1], 10) };
+}
+
+function nextBatchNo(batches) {
+  if (!batches.length) return { a: 17, b: 13 };
+  let maxA = 0, maxB = 0;
+  batches.forEach(b => {
+    const p = parseBatchNo(b.batch_no);
+    if (p.a > maxA || (p.a === maxA && p.b > maxB)) { maxA = p.a; maxB = p.b; }
+  });
+  maxB++;
+  if (maxB > 99) { maxB = 0; maxA++; }
+  if (maxA > 99) maxA = 0;
+  return { a: maxA, b: maxB };
+}
+
+function padBatch(n) { return String(n).padStart(2, '0'); }
+
+function formatDate(d) {
+  if (!d) return '';
+  const dt = new Date(d);
+  return dt.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+async function loadManufacturingTab() {
+  if (mfgLoaded) return;
+  const { data, error } = await sb.from('manufacturing_batches').select('*').order('created_at', { ascending: false });
+  if (error) {
+    document.getElementById('mfg-table').innerHTML = `<tr><td colspan="6" class="loading">Error: ${error.message}</td></tr>`;
+    return;
+  }
+  mfgBatches = data || [];
+  mfgLoaded = true;
+  renderMfgStats();
+  renderMfgTable();
+  prefillMfgForm();
+}
+
+function prefillMfgForm() {
+  const today = new Date();
+  document.getElementById('mfg-date').value = today.toISOString().split('T')[0];
+  const exp = new Date(today);
+  exp.setMonth(exp.getMonth() + 14);
+  document.getElementById('mfg-exp').value = exp.toISOString().split('T')[0];
+  const next = nextBatchNo(mfgBatches);
+  document.getElementById('mfg-batch-a').value = padBatch(next.a);
+  document.getElementById('mfg-batch-b').value = padBatch(next.b);
+}
+
+function renderMfgStats() {
+  const stats = document.getElementById('manufacturing-stats');
+  const total = mfgBatches.length;
+  const totalQty = mfgBatches.reduce((s, b) => s + (b.quantity || 0), 0);
+  const uniqueSkus = new Set(mfgBatches.map(b => b.product_sku)).size;
+  const latest = mfgBatches.length ? mfgBatches[0].batch_no : '—';
+  stats.innerHTML = `
+    <div class="stat-card"><div class="label">Total Batches</div><div class="value">${total}</div></div>
+    <div class="stat-card"><div class="label">Total Units</div><div class="value">${totalQty.toLocaleString()}</div></div>
+    <div class="stat-card"><div class="label">Unique SKUs</div><div class="value">${uniqueSkus}</div></div>
+    <div class="stat-card"><div class="label">Latest Batch</div><div class="value">${latest}</div></div>
+  `;
+}
+
+function renderMfgTable() {
+  const tbody = document.getElementById('mfg-table');
+  if (!mfgBatches.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="loading">No batches yet. Add your first batch above.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = mfgBatches.map(b => {
+    if (mfgEditingId === b.id) {
+      const bp = parseBatchNo(b.batch_no);
+      return `<tr data-id="${b.id}">
+        <td><input type="date" class="mfg-inline-input" value="${b.production_date || ''}" data-field="date"></td>
+        <td><input type="text" class="mfg-inline-input" value="${b.product_sku || ''}" data-field="sku"></td>
+        <td><input type="number" class="mfg-inline-input" value="${b.quantity || ''}" data-field="qty" min="1" style="width:5rem;"></td>
+        <td><input type="text" class="mfg-inline-input mfg-inline-batch" value="${padBatch(bp.a)}" data-field="ba" maxlength="2"><span class="batch-sep">-</span><input type="text" class="mfg-inline-input mfg-inline-batch" value="${padBatch(bp.b)}" data-field="bb" maxlength="2"></td>
+        <td><input type="date" class="mfg-inline-input" value="${b.expiry_date || ''}" data-field="exp"></td>
+        <td><button class="mfg-save-btn" onclick="saveMfgEdit(${b.id})">Save</button><button class="mfg-cancel-btn" onclick="cancelMfgEdit()">Cancel</button></td>
+      </tr>`;
+    }
+    return `<tr data-id="${b.id}" class="clickable" onclick="startMfgEdit(${b.id})">
+      <td>${formatDate(b.production_date)}</td>
+      <td>${b.product_sku || ''}</td>
+      <td>${b.quantity || ''}</td>
+      <td>${b.batch_no}</td>
+      <td>${formatDate(b.expiry_date)}</td>
+      <td><button class="mfg-edit-btn" onclick="event.stopPropagation(); startMfgEdit(${b.id})">Edit</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function startMfgEdit(id) {
+  mfgEditingId = id;
+  renderMfgTable();
+}
+
+function cancelMfgEdit() {
+  mfgEditingId = null;
+  renderMfgTable();
+}
+
+async function saveMfgEdit(id) {
+  const row = document.querySelector(`tr[data-id="${id}"]`);
+  const date = row.querySelector('[data-field="date"]').value;
+  const sku = row.querySelector('[data-field="sku"]').value.trim();
+  const qty = parseInt(row.querySelector('[data-field="qty"]').value, 10);
+  const ba = row.querySelector('[data-field="ba"]').value.padStart(2, '0');
+  const bb = row.querySelector('[data-field="bb"]').value.padStart(2, '0');
+  const exp = row.querySelector('[data-field="exp"]').value;
+  const batchNo = `${ba}-${bb}`;
+
+  const { error } = await sb.from('manufacturing_batches').update({
+    production_date: date, product_sku: sku, quantity: qty, batch_no: batchNo, expiry_date: exp
+  }).eq('id', id);
+
+  if (error) { alert('Save failed: ' + error.message); return; }
+
+  const idx = mfgBatches.findIndex(b => b.id === id);
+  if (idx >= 0) Object.assign(mfgBatches[idx], { production_date: date, product_sku: sku, quantity: qty, batch_no: batchNo, expiry_date: exp });
+  mfgEditingId = null;
+  renderMfgStats();
+  renderMfgTable();
+}
+
+document.getElementById('mfg-add-btn').addEventListener('click', async function() {
+  const date = document.getElementById('mfg-date').value;
+  const sku = document.getElementById('mfg-sku').value.trim();
+  const qty = parseInt(document.getElementById('mfg-qty').value, 10);
+  const ba = document.getElementById('mfg-batch-a').value.padStart(2, '0');
+  const bb = document.getElementById('mfg-batch-b').value.padStart(2, '0');
+  const exp = document.getElementById('mfg-exp').value;
+
+  if (!date || !sku || !qty || !ba || !bb || !exp) { alert('Please fill in all fields.'); return; }
+
+  const batchNo = `${ba}-${bb}`;
+  this.disabled = true;
+  this.textContent = 'Adding...';
+
+  const { data, error } = await sb.from('manufacturing_batches').insert({
+    production_date: date, product_sku: sku, quantity: qty, batch_no: batchNo, expiry_date: exp
+  }).select().single();
+
+  this.disabled = false;
+  this.textContent = '+ Add Batch';
+
+  if (error) { alert('Error adding batch: ' + error.message); return; }
+
+  mfgBatches.unshift(data);
+  renderMfgStats();
+  renderMfgTable();
+  document.getElementById('mfg-sku').value = '';
+  document.getElementById('mfg-qty').value = '';
+  prefillMfgForm();
+});
+
+// Auto-advance batch-a to batch-b on input
+document.getElementById('mfg-batch-a').addEventListener('input', function() {
+  if (this.value.length === 2) document.getElementById('mfg-batch-b').focus();
+});
 </script>
 </body>
 </html>
