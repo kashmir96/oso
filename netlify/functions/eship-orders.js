@@ -2,13 +2,8 @@
  * eship-orders.js
  *
  * Netlify function proxy for StarshipIt API.
- * Returns unshipped + printed + shipped orders so the dashboard can display
- * shipping status, tracking numbers, etc.
- *
- * StarshipIt API endpoints used:
- *   /api/orders/unshipped  – "New" tab orders (waiting to print)
- *   /api/orders?status=Printed – "Printed" tab orders (labels printed, not yet shipped)
- *   /api/orders/shipped    – "Shipped" tab orders (dispatched)
+ * Fetches orders from all tabs (New, Printed, Shipped) sequentially
+ * to avoid rate limits, with summary counts for stat cards.
  *
  * Env vars required:
  *   STARSHIPIT_API_KEY
@@ -49,38 +44,39 @@ exports.handler = async (event) => {
   const limit = params.limit || '50';
 
   try {
-    // Fetch order lists + summary counts in parallel
-    const [unshippedRes, printedRes, shippedRes, summaryNewRes, summaryPrintedRes, summaryShippedRes] = await Promise.all([
-      // "New" tab — /api/orders/unshipped
+    // Batch 1: unshipped + printed (2 calls)
+    const [unshippedRes, printedRes] = await Promise.all([
       fetch(`https://api.starshipit.com/api/orders/unshipped?limit=${limit}&page=${page}${sinceDate ? '&since_order_date=' + sinceDate : ''}`, {
         headers: apiHeaders,
       }),
-      // "Printed" tab — /api/orders?status=Printed
       fetch(`https://api.starshipit.com/api/orders?status=Printed&page_size=${limit}&page_number=${page}`, {
         headers: apiHeaders,
       }),
-      // "Shipped" tab — /api/orders/shipped
-      fetch(`https://api.starshipit.com/api/orders/shipped?limit=${limit}&page=${page}${sinceDate ? '&since_order_date=' + sinceDate : ''}`, {
-        headers: apiHeaders,
-      }),
-      // Summary counts for accurate totals
-      fetch('https://api.starshipit.com/api/orders/summary?order_status=new', { headers: apiHeaders }),
-      fetch('https://api.starshipit.com/api/orders/summary?order_status=printed', { headers: apiHeaders }),
-      fetch('https://api.starshipit.com/api/orders/summary?order_status=shipped', { headers: apiHeaders }),
     ]);
 
     const unshippedData = await unshippedRes.json();
     const printedData = await printedRes.json();
+
+    // Batch 2: shipped + summary counts (3 calls, slight delay to avoid rate limit)
+    const [shippedRes, summaryNewRes, summaryPrintedRes] = await Promise.all([
+      fetch(`https://api.starshipit.com/api/orders/shipped?limit=${limit}&page=${page}${sinceDate ? '&since_order_date=' + sinceDate : ''}`, {
+        headers: apiHeaders,
+      }),
+      fetch('https://api.starshipit.com/api/orders/summary?order_status=new', { headers: apiHeaders }),
+      fetch('https://api.starshipit.com/api/orders/summary?order_status=printed', { headers: apiHeaders }),
+    ]);
+
     const shippedData = await shippedRes.json();
     const summaryNew = await summaryNewRes.json();
     const summaryPrinted = await summaryPrintedRes.json();
+
+    // Batch 3: shipped summary
+    const summaryShippedRes = await fetch('https://api.starshipit.com/api/orders/summary?order_status=shipped', { headers: apiHeaders });
     const summaryShipped = await summaryShippedRes.json();
 
-    // /api/orders/unshipped returns { orders: [...] }
+    // Parse order lists
     const unshippedList = Array.isArray(unshippedData.orders) ? unshippedData.orders : [];
-    // /api/orders?status=Printed returns { order: [...] }
     const printedList = Array.isArray(printedData.order) ? printedData.order : [];
-    // /api/orders/shipped returns { orders: [...] }
     const shippedList = Array.isArray(shippedData.orders) ? shippedData.orders : [];
 
     const unshipped = unshippedList.map(o => ({
@@ -129,15 +125,19 @@ exports.handler = async (event) => {
       return db - da;
     });
 
+    // Extract total counts from summaries
+    const totalNew = summaryNew.order_counts || unshipped.length;
+    const totalPrinted = summaryPrinted.order_counts || printed.length;
+    const totalShipped = summaryShipped.order_counts || (shippedData.total || shipped.length);
+
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
         orders: all,
-        summary: { new: summaryNew, printed: summaryPrinted, shipped: summaryShipped },
-        total_unshipped: unshipped.length,
-        total_printed: printedList.length,
-        total_shipped: shippedData.total || shipped.length,
+        total_new: totalNew,
+        total_printed: totalPrinted,
+        total_shipped: totalShipped,
       }),
     };
   } catch (err) {

@@ -97,6 +97,7 @@
     tr.clickable { cursor: pointer; }
     tr.clickable:hover td { background: var(--border); }
     .status-badge { padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; background: #166534; color: var(--green); }
+    .source-pill { padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
 
     /* Order detail modal */
     .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; align-items: center; justify-content: center; }
@@ -1431,6 +1432,29 @@ function getUtmFromUrl(url, param) {
   } catch { return ''; }
 }
 
+function sourceColor(src) {
+  const colors = [
+    { bg: '#1e3a5f', fg: '#60a5fa' },
+    { bg: '#5b2160', fg: '#c084fc' },
+    { bg: '#164e36', fg: '#34d399' },
+    { bg: '#6b3410', fg: '#fb923c' },
+    { bg: '#5c1a1a', fg: '#f87171' },
+    { bg: '#4a4310', fg: '#facc15' },
+    { bg: '#1a3c4e', fg: '#22d3ee' },
+    { bg: '#4a2040', fg: '#f472b6' },
+  ];
+  let h = 0;
+  for (let i = 0; i < src.length; i++) h = ((h << 5) - h + src.charCodeAt(i)) | 0;
+  const c = colors[Math.abs(h) % colors.length];
+  return c;
+}
+
+function sourcePill(src) {
+  if (!src) return '';
+  const c = sourceColor(src);
+  return `<span class="source-pill" style="background:${c.bg};color:${c.fg}">${src}</span>`;
+}
+
 // ── Heatmap (Day of week x Hour) ──
 function renderHeatmap(orders) {
   const grid = Array(7).fill(null).map(() => Array(24).fill(0));
@@ -1499,7 +1523,7 @@ function renderOrdersTable() {
       <td>${o.email || '-'}</td>
       <td>${[o.city, o.country_code].filter(Boolean).join(', ') || '-'}</td>
       <td>$${Number(o.total_value || 0).toFixed(2)}</td>
-      <td>${o.utm_source || '-'}</td>
+      <td>${sourcePill(o.utm_source || getUtmFromUrl(o.thank_you_url, 'utm_source') || '') || '-'}</td>
       <td><span class="status-badge">${o.status || '-'}</span></td>
     </tr>
   `).join('');
@@ -2292,7 +2316,7 @@ function renderCustomersTab() {
       const itemStr = items.map(li => `${li.quantity}x ${li.description || li.sku || '?'}`).join(', ');
       return `<div class="customer-order-row" onclick="event.stopPropagation(); openOrderModal(${o.id});">
         <span>${o.order_date}</span>
-        <span class="status-badge">${o.status || '-'}</span>
+        <span class="status-badge">${o.status || '-'}</span> ${sourcePill(o.utm_source || getUtmFromUrl(o.thank_you_url, 'utm_source') || '')}
         <span>$${Number(o.total_value || 0).toFixed(2)}</span>
         <div class="customer-order-items" style="width:100%;">${itemStr || 'No items'}</div>
       </div>`;
@@ -2365,11 +2389,14 @@ async function loadShippingData() {
   }
 }
 
+let shipSummaryTotals = {};
 function renderShippingStats(data) {
-  const total = allShipments.length;
-  const waitingToPrint = allShipments.filter(o => o._shipping_status === 'Waiting to Print').length;
-  const printed = allShipments.filter(o => o._shipping_status === 'Printed').length;
-  const unshipped = waitingToPrint + printed;
+  // Use summary totals from API if available (accurate across all pages)
+  if (data.total_new !== undefined) {
+    shipSummaryTotals = { new: data.total_new, printed: data.total_printed, shipped: data.total_shipped };
+  }
+  const waitingToPrint = shipSummaryTotals.new || allShipments.filter(o => o._shipping_status === 'Waiting to Print').length;
+  const printed = shipSummaryTotals.printed || allShipments.filter(o => o._shipping_status === 'Printed').length;
   const inTransit = allShipments.filter(o => o._shipping_status === 'In Transit').length;
   const delivered = allShipments.filter(o => o._shipping_status === 'Delivered').length;
   const exception = allShipments.filter(o => o._shipping_status === 'Exception').length;
@@ -3212,8 +3239,8 @@ function renderMfgStats() {
   const uniqueSkus = new Set(mfgBatches.map(b => b.product_sku)).size;
   const latest = mfgBatches.length ? mfgBatches[0].batch_no : '—';
   stats.innerHTML = `
-    <div class="stat-card"><div class="label">Total Batches</div><div class="value">${total}</div></div>
-    <div class="stat-card"><div class="label">Total Units</div><div class="value">${totalQty.toLocaleString()}</div></div>
+    <div class="stat-card"><div class="label">Batches Produced</div><div class="value">${total}</div></div>
+    <div class="stat-card"><div class="label">Units Produced</div><div class="value">${totalQty.toLocaleString()}</div></div>
     <div class="stat-card"><div class="label">Unique SKUs</div><div class="value">${uniqueSkus}</div></div>
     <div class="stat-card"><div class="label">Latest Batch</div><div class="value">${latest}</div></div>
   `;
