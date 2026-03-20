@@ -9,8 +9,6 @@
  *   STARSHIPIT_SUBSCRIPTION_KEY
  */
 
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
 exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -45,10 +43,10 @@ exports.handler = async (event) => {
   const limit = params.limit || '50';
 
   try {
-    // Call APIs sequentially to avoid rate limits (StarshipIt allows 20 req/s but seems stricter)
+    // Sequential API calls to avoid rate limits
 
-    // 1. Summary counts (single call gives all counts)
-    const summaryRes = await fetch('https://api.starshipit.com/api/orders/summary?order_status=new', { headers: apiHeaders });
+    // 1. Summary (gives counts + printed orders list)
+    const summaryRes = await fetch('https://api.starshipit.com/api/orders/summary?order_status=printed', { headers: apiHeaders });
     const summaryData = await summaryRes.json();
 
     // 2. Unshipped orders (New tab)
@@ -57,13 +55,7 @@ exports.handler = async (event) => {
     });
     const unshippedData = await unshippedRes.json();
 
-    // 3. Printed orders
-    const printedRes = await fetch(`https://api.starshipit.com/api/orders?status=Printed&page_size=${limit}&page_number=${page}`, {
-      headers: apiHeaders,
-    });
-    const printedData = await printedRes.json();
-
-    // 4. Shipped orders
+    // 3. Shipped orders
     const shippedRes = await fetch(`https://api.starshipit.com/api/orders/shipped?limit=${limit}&page=${page}${sinceDate ? '&since_order_date=' + sinceDate : ''}`, {
       headers: apiHeaders,
     });
@@ -71,8 +63,8 @@ exports.handler = async (event) => {
 
     // Parse order lists
     const unshippedList = Array.isArray(unshippedData.orders) ? unshippedData.orders : [];
-    const printedList = Array.isArray(printedData.order) ? printedData.order
-      : Array.isArray(printedData.orders) ? printedData.orders : [];
+    // Summary endpoint returns printed orders in the "orders" array
+    const printedList = Array.isArray(summaryData.orders) ? summaryData.orders : [];
     const shippedList = Array.isArray(shippedData.orders) ? shippedData.orders : [];
 
     const unshipped = unshippedList.map(o => ({
@@ -122,7 +114,7 @@ exports.handler = async (event) => {
     });
 
     // Summary counts
-    const counts = summaryData.order_counts || summaryData;
+    const counts = summaryData.order_counts || {};
 
     return {
       statusCode: 200,
