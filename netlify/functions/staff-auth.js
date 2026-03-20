@@ -64,7 +64,7 @@ async function seedAccounts() {
   if (rows && rows.length > 0) return false; // already seeded
 
   const accounts = [
-    { username: 'Kashmir', display_name: 'Kashmir (Curtis)', password: '2631Milo1532!', role: 'owner', can_manage_users: true, must_change_password: false },
+    { username: 'Kashmir', display_name: 'Kashmir (Curtis)', password: '1532Milo2631!', role: 'owner', can_manage_users: true, must_change_password: false },
     { username: 'Linda', display_name: 'Linda (Mum)', password: 'ChangeMe1!', role: 'admin', can_manage_users: true, must_change_password: true },
     { username: 'Kerry', display_name: 'Kerry', password: 'ChangeMe1!', role: 'staff', can_manage_users: false, must_change_password: true },
     { username: 'Trixy', display_name: 'Trixy', password: 'ChangeMe1!', role: 'staff', can_manage_users: false, must_change_password: true },
