@@ -119,6 +119,9 @@ exports.handler = async (event) => {
         orders: all,
         total_unshipped: unshippedData.total_records || unshipped.length,
         total_shipped: shippedData.total || shipped.length,
+        _debug_unshipped_type: typeof (unshippedData.data),
+        _debug_unshipped_keys: Object.keys(unshippedData),
+        _debug_unshipped_data_sample: unshippedData.data ? JSON.stringify(unshippedData.data).slice(0, 500) : 'null',
       }),
     };
   } catch (err) {
