@@ -74,7 +74,7 @@
     .stat-card.celebrate { animation: sale-glow 1.5s ease-out; }
     @keyframes sale-glow { 0% { box-shadow: 0 0 20px rgba(140,180,122,0.6); border-color: var(--sage); } 100% { box-shadow: none; } }
     .confetti-piece { position: fixed; width: 8px; height: 8px; border-radius: 2px; pointer-events: none; z-index: 9999; animation: confetti-fall linear forwards; }
-    @keyframes confetti-fall { 0% { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(100vh) rotate(720deg) scale(0.3); } }
+    @keyframes confetti-fall { 0% { opacity: 1; transform: translate(0,0) rotate(0deg) scale(1); } 30% { opacity: 1; transform: translate(var(--dx, 0px), -80px) rotate(200deg) scale(1); } 100% { opacity: 0; transform: translate(var(--dx, 0px), 300px) rotate(720deg) scale(0.2); } }
     .stat-card .label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.2rem; }
     .stat-card .value { font-size: 1.5rem; font-weight: 700; }
     .stat-card .sub { font-size: 0.75rem; color: var(--dim); margin-top: 0.15rem; }
@@ -1368,7 +1368,26 @@ function updateRefreshTime() {
 
 function startStatsRefresh() {
   if (statsRefreshTimer) clearInterval(statsRefreshTimer);
-  statsRefreshTimer = setInterval(refreshStats, STATS_REFRESH_MS);
+  statsRefreshTimer = setInterval(autoRefresh, STATS_REFRESH_MS);
+}
+
+// ── Auto-refresh: re-fetch data and update all widgets silently ──
+async function autoRefresh() {
+  if (!sb) return;
+  try {
+    const [ordersRes, liRes] = await Promise.all([
+      sb.from('orders').select('*').order('created_at', { ascending: false }),
+      sb.from('order_line_items').select('*'),
+    ]);
+    if (ordersRes.error) return;
+    allOrders = ordersRes.data || [];
+    allLineItems = liRes.data || [];
+    populateFilterDropdowns();
+    applyFilter();
+    updateRefreshTime();
+  } catch (e) {
+    // Silent fail on auto-refresh
+  }
 }
 
 // ── Full refresh (stats + active tab tables/charts) ──
@@ -1519,12 +1538,19 @@ function renderStats(orders, lineItems) {
   ];
 
   document.getElementById('stats-grid').innerHTML = stats.map(s => `
-    <div class="stat-card">
+    <div class="stat-card" ${s.label === 'Revenue' ? 'id="revenue-stat-card"' : ''}>
       <div class="label">${s.label}</div>
       <div class="value" style="color:${s.color}">${s.value}</div>
       <div class="sub">${s.sub}</div>
     </div>
   `).join('');
+
+  // Confetti on new sale
+  if (lastKnownRevenue !== null && revenue > lastKnownRevenue) {
+    const revenueCard = document.getElementById('revenue-stat-card');
+    if (revenueCard) fireConfetti(revenueCard);
+  }
+  lastKnownRevenue = revenue;
 }
 
 // ── Revenue chart ──
@@ -3437,7 +3463,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
       // Conversions (async, doesn't block main load)
       waFetch('analytics-dashboard', { site: waSite, from, to, metric: 'conversions' })
         .then(conv => waRenderConversions(conv || []))
-        .catch(() => {});
+        .catch(() => waRenderConversions([]));
 
     } catch (err) {
       console.error('WA load error:', err);
