@@ -63,7 +63,7 @@
   <div id="login-box">
     <h1>Primal Pantry Dashboard</h1>
     <input type="password" id="password-input" placeholder="Enter password" autofocus>
-    <button onclick="attemptLogin()">Sign in</button>
+    <button id="login-btn">Sign in</button>
     <div id="login-error">Incorrect password</div>
   </div>
 </div>
@@ -72,7 +72,7 @@
 <div id="dashboard">
   <div class="header">
     <h1>Sales Dashboard</h1>
-    <button onclick="logout()">Sign out</button>
+    <button id="logout-btn">Sign out</button>
   </div>
 
   <div class="stats">
@@ -133,51 +133,40 @@
   // Config
   const SUPABASE_URL = 'https://yufthilajhcaedudaxkm.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_4qo2PFoiZ0d0ip0Yf3TQFg_Cmc-kSuv';
-  // SHA-256 hash of the password — never store plaintext
-  const PASSWORD_HASH = 'dfe373bb19a05d135408a7fe7ba814a1e8db5ddc7ab26710b8908ea9b2360dc8';
+  const VALID_PASSWORD = 'MoreSales01!';
 
-  let supabase;
+  let sb;
 
-  // Hash function
-  async function sha256(text) {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(text);
-    const hash = await crypto.subtle.digest('SHA-256', data);
-    return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+  function showError(msg) {
+    const el = document.getElementById('login-error');
+    el.textContent = msg;
+    el.style.display = 'block';
   }
 
   // Login
-  async function attemptLogin() {
+  function attemptLogin() {
     try {
       const pw = document.getElementById('password-input').value;
-      const hash = await sha256(pw);
-      if (hash === PASSWORD_HASH) {
+      if (pw === VALID_PASSWORD) {
         sessionStorage.setItem('dashboard_auth', 'true');
         showDashboard();
       } else {
-        document.getElementById('login-error').style.display = 'block';
+        showError('Incorrect password');
       }
     } catch (err) {
-      console.error('Login error:', err);
-      // Fallback: direct comparison if crypto.subtle unavailable
-      const pw = document.getElementById('password-input').value;
-      if (pw === 'MoreSales01!') {
-        sessionStorage.setItem('dashboard_auth', 'true');
-        showDashboard();
-      } else {
-        document.getElementById('login-error').style.display = 'block';
-      }
+      showError('Error: ' + err.message);
     }
   }
 
-  document.getElementById('password-input').addEventListener('keydown', (e) => {
+  // Wire up events after DOM ready
+  document.getElementById('login-btn').addEventListener('click', attemptLogin);
+  document.getElementById('password-input').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') attemptLogin();
   });
-
-  function logout() {
+  document.getElementById('logout-btn').addEventListener('click', function() {
     sessionStorage.removeItem('dashboard_auth');
     location.reload();
-  }
+  });
 
   function showDashboard() {
     document.getElementById('login-screen').style.display = 'none';
@@ -192,15 +181,20 @@
 
   // Dashboard
   async function initDashboard() {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    try {
+      sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } catch (err) {
+      document.getElementById('orders-table').innerHTML = '<tr><td colspan="6">Error loading Supabase: ' + err.message + '</td></tr>';
+      return;
+    }
 
     const [orders, lineItems] = await Promise.all([
-      supabase.from('orders').select('*').order('order_date', { ascending: false }),
-      supabase.from('order_line_items').select('*'),
+      sb.from('orders').select('*').order('order_date', { ascending: false }),
+      sb.from('order_line_items').select('*'),
     ]);
 
     if (orders.error) {
-      console.error('Failed to load orders:', orders.error);
+      document.getElementById('orders-table').innerHTML = '<tr><td colspan="6">DB error: ' + orders.error.message + '</td></tr>';
       return;
     }
 
