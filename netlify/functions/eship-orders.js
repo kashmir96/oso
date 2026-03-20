@@ -9,6 +9,8 @@
  *   STARSHIPIT_SUBSCRIPTION_KEY
  */
 
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -43,33 +45,32 @@ exports.handler = async (event) => {
   const limit = params.limit || '50';
 
   try {
-    // Batch 1: unshipped + summary (summary returns all counts regardless of order_status param)
-    const [unshippedRes, summaryRes] = await Promise.all([
-      fetch(`https://api.starshipit.com/api/orders/unshipped?limit=${limit}&page=${page}${sinceDate ? '&since_order_date=' + sinceDate : ''}`, {
-        headers: apiHeaders,
-      }),
-      fetch('https://api.starshipit.com/api/orders/summary?order_status=new', { headers: apiHeaders }),
-    ]);
+    // Call APIs sequentially to avoid rate limits (StarshipIt allows 20 req/s but seems stricter)
 
-    const unshippedData = await unshippedRes.json();
+    // 1. Summary counts (single call gives all counts)
+    const summaryRes = await fetch('https://api.starshipit.com/api/orders/summary?order_status=new', { headers: apiHeaders });
     const summaryData = await summaryRes.json();
 
-    // Batch 2: printed + shipped
-    const [printedRes, shippedRes] = await Promise.all([
-      fetch(`https://api.starshipit.com/api/orders?status=Printed&page_size=${limit}&page_number=${page}`, {
-        headers: apiHeaders,
-      }),
-      fetch(`https://api.starshipit.com/api/orders/shipped?limit=${limit}&page=${page}${sinceDate ? '&since_order_date=' + sinceDate : ''}`, {
-        headers: apiHeaders,
-      }),
-    ]);
+    // 2. Unshipped orders (New tab)
+    const unshippedRes = await fetch(`https://api.starshipit.com/api/orders/unshipped?limit=${limit}&page=${page}${sinceDate ? '&since_order_date=' + sinceDate : ''}`, {
+      headers: apiHeaders,
+    });
+    const unshippedData = await unshippedRes.json();
 
+    // 3. Printed orders
+    const printedRes = await fetch(`https://api.starshipit.com/api/orders?status=Printed&page_size=${limit}&page_number=${page}`, {
+      headers: apiHeaders,
+    });
     const printedData = await printedRes.json();
+
+    // 4. Shipped orders
+    const shippedRes = await fetch(`https://api.starshipit.com/api/orders/shipped?limit=${limit}&page=${page}${sinceDate ? '&since_order_date=' + sinceDate : ''}`, {
+      headers: apiHeaders,
+    });
     const shippedData = await shippedRes.json();
 
     // Parse order lists
     const unshippedList = Array.isArray(unshippedData.orders) ? unshippedData.orders : [];
-    // /api/orders returns { order: [...] } per docs
     const printedList = Array.isArray(printedData.order) ? printedData.order
       : Array.isArray(printedData.orders) ? printedData.orders : [];
     const shippedList = Array.isArray(shippedData.orders) ? shippedData.orders : [];
@@ -120,7 +121,7 @@ exports.handler = async (event) => {
       return db - da;
     });
 
-    // Summary has: unprinted_count, printed_count, shipped_count, archived_count, etc.
+    // Summary counts
     const counts = summaryData.order_counts || summaryData;
 
     return {
@@ -134,8 +135,6 @@ exports.handler = async (event) => {
           shipped: counts.shipped_count || shipped.length,
           archived: counts.archived_count || 0,
         },
-        _debug_printed_keys: Object.keys(printedData),
-        _debug_printed_sample: JSON.stringify(printedData).slice(0, 300),
       }),
     };
   } catch (err) {
