@@ -10,8 +10,8 @@
   function b(o){
     o.s=d;o.p=p;
     var j=JSON.stringify(o);
-    try{navigator.sendBeacon(u,new Blob([j],{type:'application/json'}))}
-    catch(x){fetch(u,{method:'POST',body:j,keepalive:true,headers:{'Content-Type':'application/json'}})}
+    try{navigator.sendBeacon(u,new Blob([j],{type:'text/plain'}))}
+    catch(x){fetch(u,{method:'POST',body:j,keepalive:true})}
   }
   b({t:'pv',r:document.referrer,sw:screen.width,
     uc:q.get('utm_campaign')||'',us:q.get('utm_source')||'',
