@@ -5,6 +5,10 @@
  * Returns unshipped + shipped orders so the dashboard can display
  * shipping status, tracking numbers, etc.
  *
+ * Statuses:
+ *   Unshipped: "Waiting to Print" | "Printed"
+ *   Shipped:   "In Transit" | "Delivered" | "Exception"
+ *
  * Env vars required:
  *   STARSHIPIT_API_KEY
  *   STARSHIPIT_SUBSCRIPTION_KEY
@@ -64,13 +68,32 @@ exports.handler = async (event) => {
     // Normalize: StarshipIt returns { orders: [...] } or { order: [...] }
     const unshipped = (unshippedData.orders || unshippedData.order || []).map(o => ({
       ...o,
-      _shipping_status: 'Unshipped',
+      _shipping_status: o.printed ? 'Printed' : 'Waiting to Print',
+      _status_group: 'unshipped',
     }));
 
-    const shipped = (shippedData.orders || shippedData.order || []).map(o => ({
-      ...o,
-      _shipping_status: 'Shipped',
-    }));
+    const shipped = (shippedData.orders || shippedData.order || []).map(o => {
+      // Determine shipped status from tracking/delivery info
+      const status = (o.status || '').toLowerCase();
+      const lastEvent = (o.tracking_events || []).slice(-1)[0];
+      const lastEventDesc = (lastEvent?.description || lastEvent?.status || '').toLowerCase();
+
+      let _shipping_status = 'In Transit';
+      let _status_group = 'shipped';
+
+      if (o.delivered || status.includes('deliver') || lastEventDesc.includes('deliver')) {
+        _shipping_status = 'Delivered';
+        _status_group = 'delivered';
+      } else if (
+        status.includes('exception') || status.includes('fail') || status.includes('return') ||
+        lastEventDesc.includes('exception') || lastEventDesc.includes('fail') || lastEventDesc.includes('return')
+      ) {
+        _shipping_status = 'Exception';
+        _status_group = 'exception';
+      }
+
+      return { ...o, _shipping_status, _status_group };
+    });
 
     // Combine and sort by date descending
     const all = [...shipped, ...unshipped].sort((a, b) => {
