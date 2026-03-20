@@ -55,6 +55,16 @@ exports.handler = async (event) => {
   const qs = event.queryStringParameters || {};
   const { token, site, from, to, metric, col } = qs;
 
+  // Parse filters: fc0/fv0, fc1/fv1, etc.
+  const allowed_filter_cols = ['pathname','referrer_domain','browser','device_type','country','os','utm_campaign','utm_source','utm_medium','utm_content','utm_term','event_name'];
+  const filters = [];
+  for (let i = 0; i < 5; i++) {
+    const fc = qs['fc' + i], fv = qs['fv' + i];
+    if (fc && fv && allowed_filter_cols.includes(fc)) {
+      filters.push({ col: fc, val: fv });
+    }
+  }
+
   // Auth
   const staff = await getStaffByToken(token);
   if (!staff) return reply(401, { error: 'Unauthorized' });
@@ -76,6 +86,10 @@ exports.handler = async (event) => {
   const p_to = toDate.toISOString();
 
   const baseParams = { p_site: site, p_from, p_to };
+  // Add filters as JSON array if present
+  if (filters.length > 0) {
+    baseParams.p_filters = filters; // Supabase RPC will serialize as JSON
+  }
 
   switch (metric) {
     case 'summary': {

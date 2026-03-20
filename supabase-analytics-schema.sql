@@ -72,56 +72,102 @@ CREATE POLICY "service_full_access" ON analytics_salt FOR ALL USING (true) WITH 
 -- RPC Functions (needed because PostgREST can't GROUP BY)
 -- ============================================
 
--- Summary stats
-CREATE OR REPLACE FUNCTION analytics_summary(p_site text, p_from timestamptz, p_to timestamptz)
+-- Helper: build dynamic filter WHERE clause from JSON array
+-- Filters is a JSON array like [{"col":"referrer_domain","val":"google.com"},...]
+-- Returns SQL fragment like: AND referrer_domain = 'google.com' AND browser = 'Chrome'
+CREATE OR REPLACE FUNCTION _analytics_filter_clause(p_filters json DEFAULT NULL)
+RETURNS text AS $$
+DECLARE
+  f json;
+  clause text := '';
+  col_name text;
+  col_val text;
+  allowed text[] := ARRAY['pathname','referrer_domain','browser','device_type','country','os','utm_campaign','utm_source','utm_medium','utm_content','utm_term','event_name'];
+BEGIN
+  IF p_filters IS NULL THEN RETURN ''; END IF;
+  FOR f IN SELECT json_array_elements(p_filters)
+  LOOP
+    col_name := f->>'col';
+    col_val := f->>'val';
+    IF col_name = ANY(allowed) THEN
+      clause := clause || format(' AND %I = %L', col_name, col_val);
+    END IF;
+  END LOOP;
+  RETURN clause;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+-- Summary stats (with optional filters)
+DROP FUNCTION IF EXISTS analytics_summary(text, timestamptz, timestamptz);
+CREATE OR REPLACE FUNCTION analytics_summary(p_site text, p_from timestamptz, p_to timestamptz, p_filters json DEFAULT NULL)
 RETURNS json AS $$
-  WITH pv AS (
-    SELECT visitor_hash, COUNT(*) AS cnt
-    FROM analytics_pageviews
-    WHERE site_id = p_site AND created_at >= p_from AND created_at < p_to
-    GROUP BY visitor_hash
-  ),
-  ev AS (
-    SELECT COUNT(*) AS total
-    FROM analytics_events
-    WHERE site_id = p_site AND created_at >= p_from AND created_at < p_to
-  )
-  SELECT json_build_object(
-    'unique_visitors', (SELECT COUNT(*) FROM pv),
-    'total_pageviews', (SELECT COALESCE(SUM(cnt), 0) FROM pv),
-    'avg_duration', (
-      SELECT COALESCE(AVG(duration), 0)::int
+DECLARE
+  result json;
+  fc text;
+BEGIN
+  fc := _analytics_filter_clause(p_filters);
+  EXECUTE format(
+    'WITH pv AS (
+      SELECT visitor_hash, COUNT(*) AS cnt
       FROM analytics_pageviews
-      WHERE site_id = p_site AND created_at >= p_from AND created_at < p_to AND duration > 0
+      WHERE site_id = $1 AND created_at >= $2 AND created_at < $3 %s
+      GROUP BY visitor_hash
     ),
-    'bounce_rate', CASE
-      WHEN (SELECT COUNT(*) FROM pv) = 0 THEN 0
-      ELSE ROUND(
-        (SELECT COUNT(*) FROM pv WHERE cnt = 1)::numeric
-        / NULLIF((SELECT COUNT(*) FROM pv), 0) * 100
-      )
-    END,
-    'event_completions', (SELECT total FROM ev)
-  );
-$$ LANGUAGE sql STABLE;
+    ev AS (
+      SELECT COUNT(*) AS total
+      FROM analytics_events
+      WHERE site_id = $1 AND created_at >= $2 AND created_at < $3
+    )
+    SELECT json_build_object(
+      ''unique_visitors'', (SELECT COUNT(*) FROM pv),
+      ''total_pageviews'', (SELECT COALESCE(SUM(cnt), 0) FROM pv),
+      ''avg_duration'', (
+        SELECT COALESCE(AVG(duration), 0)::int
+        FROM analytics_pageviews
+        WHERE site_id = $1 AND created_at >= $2 AND created_at < $3 AND duration > 0 %s
+      ),
+      ''bounce_rate'', CASE
+        WHEN (SELECT COUNT(*) FROM pv) = 0 THEN 0
+        ELSE ROUND(
+          (SELECT COUNT(*) FROM pv WHERE cnt = 1)::numeric
+          / NULLIF((SELECT COUNT(*) FROM pv), 0) * 100
+        )
+      END,
+      ''event_completions'', (SELECT total FROM ev)
+    )', fc, fc)
+  USING p_site, p_from, p_to
+  INTO result;
+  RETURN result;
+END;
+$$ LANGUAGE plpgsql STABLE;
 
--- Time series
-CREATE OR REPLACE FUNCTION analytics_timeseries(p_site text, p_from timestamptz, p_to timestamptz, p_interval text)
+-- Time series (with optional filters)
+DROP FUNCTION IF EXISTS analytics_timeseries(text, timestamptz, timestamptz, text);
+CREATE OR REPLACE FUNCTION analytics_timeseries(p_site text, p_from timestamptz, p_to timestamptz, p_interval text, p_filters json DEFAULT NULL)
 RETURNS json AS $$
-  SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (
-    SELECT
-      date_trunc(p_interval, created_at) AS period,
-      COUNT(DISTINCT visitor_hash) AS visitors,
-      COUNT(*) AS pageviews
-    FROM analytics_pageviews
-    WHERE site_id = p_site AND created_at >= p_from AND created_at < p_to
-    GROUP BY period
-    ORDER BY period
-  ) t;
-$$ LANGUAGE sql STABLE;
+DECLARE
+  result json;
+BEGIN
+  EXECUTE format(
+    'SELECT COALESCE(json_agg(row_to_json(t)), ''[]''::json) FROM (
+      SELECT
+        date_trunc($4, created_at) AS period,
+        COUNT(DISTINCT visitor_hash) AS visitors,
+        COUNT(*) AS pageviews
+      FROM analytics_pageviews
+      WHERE site_id = $1 AND created_at >= $2 AND created_at < $3 %s
+      GROUP BY period
+      ORDER BY period
+    ) t', _analytics_filter_clause(p_filters))
+  USING p_site, p_from, p_to, p_interval
+  INTO result;
+  RETURN result;
+END;
+$$ LANGUAGE plpgsql STABLE;
 
--- Generic grouped metric
-CREATE OR REPLACE FUNCTION analytics_grouped(p_site text, p_from timestamptz, p_to timestamptz, p_column text)
+-- Generic grouped metric (with optional filters)
+DROP FUNCTION IF EXISTS analytics_grouped(text, timestamptz, timestamptz, text);
+CREATE OR REPLACE FUNCTION analytics_grouped(p_site text, p_from timestamptz, p_to timestamptz, p_column text, p_filters json DEFAULT NULL)
 RETURNS json AS $$
 DECLARE
   result json;
@@ -133,78 +179,107 @@ BEGIN
              COUNT(*) AS views
       FROM analytics_pageviews
       WHERE site_id = $1 AND created_at >= $2 AND created_at < $3
-        AND %I IS NOT NULL AND %I != ''''
+        AND %I IS NOT NULL AND %I != '''' %s
       GROUP BY %I
       ORDER BY visitors DESC
       LIMIT 50
-    ) t', p_column, p_column, p_column, p_column)
+    ) t', p_column, p_column, p_column, _analytics_filter_clause(p_filters), p_column)
   USING p_site, p_from, p_to
   INTO result;
   RETURN result;
 END;
 $$ LANGUAGE plpgsql STABLE;
 
--- Entry pages
-CREATE OR REPLACE FUNCTION analytics_entry_pages(p_site text, p_from timestamptz, p_to timestamptz)
+-- Entry pages (with optional filters)
+DROP FUNCTION IF EXISTS analytics_entry_pages(text, timestamptz, timestamptz);
+CREATE OR REPLACE FUNCTION analytics_entry_pages(p_site text, p_from timestamptz, p_to timestamptz, p_filters json DEFAULT NULL)
 RETURNS json AS $$
-  SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (
-    SELECT pathname AS name,
-           COUNT(DISTINCT visitor_hash) AS visitors,
-           COUNT(*) AS views
-    FROM analytics_pageviews
-    WHERE site_id = p_site AND created_at >= p_from AND created_at < p_to AND entry_page = true
-    GROUP BY pathname
-    ORDER BY visitors DESC
-    LIMIT 50
-  ) t;
-$$ LANGUAGE sql STABLE;
-
--- Exit pages (last page per visitor session)
-CREATE OR REPLACE FUNCTION analytics_exit_pages(p_site text, p_from timestamptz, p_to timestamptz)
-RETURNS json AS $$
-  SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (
-    SELECT pathname AS name,
-           COUNT(*) AS visitors,
-           COUNT(*) AS views
-    FROM (
-      SELECT DISTINCT ON (visitor_hash) visitor_hash, pathname
+DECLARE
+  result json;
+BEGIN
+  EXECUTE format(
+    'SELECT COALESCE(json_agg(row_to_json(t)), ''[]''::json) FROM (
+      SELECT pathname AS name,
+             COUNT(DISTINCT visitor_hash) AS visitors,
+             COUNT(*) AS views
       FROM analytics_pageviews
-      WHERE site_id = p_site AND created_at >= p_from AND created_at < p_to
-      ORDER BY visitor_hash, created_at DESC
-    ) last_pages
-    GROUP BY pathname
-    ORDER BY visitors DESC
-    LIMIT 50
-  ) t;
-$$ LANGUAGE sql STABLE;
+      WHERE site_id = $1 AND created_at >= $2 AND created_at < $3 AND entry_page = true %s
+      GROUP BY pathname
+      ORDER BY visitors DESC
+      LIMIT 50
+    ) t', _analytics_filter_clause(p_filters))
+  USING p_site, p_from, p_to
+  INTO result;
+  RETURN result;
+END;
+$$ LANGUAGE plpgsql STABLE;
 
--- Events summary
-CREATE OR REPLACE FUNCTION analytics_events_summary(p_site text, p_from timestamptz, p_to timestamptz)
+-- Exit pages (with optional filters)
+DROP FUNCTION IF EXISTS analytics_exit_pages(text, timestamptz, timestamptz);
+CREATE OR REPLACE FUNCTION analytics_exit_pages(p_site text, p_from timestamptz, p_to timestamptz, p_filters json DEFAULT NULL)
 RETURNS json AS $$
-  WITH ev AS (
-    SELECT event_name,
-           COUNT(DISTINCT visitor_hash) AS uniques,
-           COUNT(*) AS completions
-    FROM analytics_events
-    WHERE site_id = p_site AND created_at >= p_from AND created_at < p_to
-    GROUP BY event_name
-    ORDER BY completions DESC
-    LIMIT 50
-  ),
-  pv AS (
-    SELECT COUNT(DISTINCT visitor_hash) AS total_visitors
-    FROM analytics_pageviews
-    WHERE site_id = p_site AND created_at >= p_from AND created_at < p_to
-  )
-  SELECT COALESCE(json_agg(json_build_object(
-    'event_name', ev.event_name,
-    'uniques', ev.uniques,
-    'completions', ev.completions,
-    'conv_rate', CASE WHEN pv.total_visitors = 0 THEN 0
-      ELSE ROUND(ev.uniques::numeric / pv.total_visitors * 100, 1) END
-  )), '[]'::json)
-  FROM ev, pv;
-$$ LANGUAGE sql STABLE;
+DECLARE
+  result json;
+BEGIN
+  EXECUTE format(
+    'SELECT COALESCE(json_agg(row_to_json(t)), ''[]''::json) FROM (
+      SELECT pathname AS name,
+             COUNT(*) AS visitors,
+             COUNT(*) AS views
+      FROM (
+        SELECT DISTINCT ON (visitor_hash) visitor_hash, pathname
+        FROM analytics_pageviews
+        WHERE site_id = $1 AND created_at >= $2 AND created_at < $3 %s
+        ORDER BY visitor_hash, created_at DESC
+      ) last_pages
+      GROUP BY pathname
+      ORDER BY visitors DESC
+      LIMIT 50
+    ) t', _analytics_filter_clause(p_filters))
+  USING p_site, p_from, p_to
+  INTO result;
+  RETURN result;
+END;
+$$ LANGUAGE plpgsql STABLE;
+
+-- Events summary (with optional filters)
+DROP FUNCTION IF EXISTS analytics_events_summary(text, timestamptz, timestamptz);
+CREATE OR REPLACE FUNCTION analytics_events_summary(p_site text, p_from timestamptz, p_to timestamptz, p_filters json DEFAULT NULL)
+RETURNS json AS $$
+DECLARE
+  result json;
+  fc text;
+BEGIN
+  fc := _analytics_filter_clause(p_filters);
+  EXECUTE format(
+    'WITH ev AS (
+      SELECT event_name,
+             COUNT(DISTINCT visitor_hash) AS uniques,
+             COUNT(*) AS completions
+      FROM analytics_events
+      WHERE site_id = $1 AND created_at >= $2 AND created_at < $3
+      GROUP BY event_name
+      ORDER BY completions DESC
+      LIMIT 50
+    ),
+    pv AS (
+      SELECT COUNT(DISTINCT visitor_hash) AS total_visitors
+      FROM analytics_pageviews
+      WHERE site_id = $1 AND created_at >= $2 AND created_at < $3 %s
+    )
+    SELECT COALESCE(json_agg(json_build_object(
+      ''event_name'', ev.event_name,
+      ''uniques'', ev.uniques,
+      ''completions'', ev.completions,
+      ''conv_rate'', CASE WHEN pv.total_visitors = 0 THEN 0
+        ELSE ROUND(ev.uniques::numeric / pv.total_visitors * 100, 1) END
+    )), ''[]''::json)
+    FROM ev, pv', fc)
+  USING p_site, p_from, p_to
+  INTO result;
+  RETURN result;
+END;
+$$ LANGUAGE plpgsql STABLE;
 
 -- Realtime (active visitors in last 5 minutes)
 CREATE OR REPLACE FUNCTION analytics_realtime(p_site text)

@@ -222,6 +222,12 @@
     .wa-bar-bg { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(99,102,241,0.15); border-radius: 3px; z-index: 0; }
     .wa-bar-text { position: relative; z-index: 1; }
     .wa-small-panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
+    .wa-table tr { cursor: pointer; } .wa-table tr:hover td { background: rgba(99,102,241,0.08); }
+    .wa-table tr.wa-active td { background: rgba(99,102,241,0.18); }
+    .wa-filter-bar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    .wa-filter-chip { display: inline-flex; align-items: center; gap: 0.4rem; background: rgba(99,102,241,0.2); color: var(--blue); padding: 0.3rem 0.6rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+    .wa-filter-chip button { background: none; border: none; color: var(--blue); cursor: pointer; font-size: 0.9rem; padding: 0; line-height: 1; }
+    .wa-filter-chip button:hover { color: var(--text); }
     .wa-loading { text-align: center; padding: 2rem; color: var(--dim); }
     .wa-realtime-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--green); margin-right: 6px; animation: wa-pulse 1.5s infinite; }
     @keyframes wa-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
@@ -405,6 +411,7 @@
           <tr><td colspan="7" class="loading">Loading...</td></tr>
         </tbody>
       </table>
+      <div id="orders-pagination"></div>
     </div>
   </div><!-- /tab-orders -->
 
@@ -420,6 +427,7 @@
       </select>
     </div>
     <div id="customers-list"></div>
+    <div id="customers-pagination"></div>
   </div><!-- /tab-customers -->
 
   <div id="tab-shipping" class="tab-content">
@@ -508,6 +516,7 @@
       <input type="date" id="wa-from" style="display:none;">
       <input type="date" id="wa-to" style="display:none;">
     </div>
+    <div class="wa-filter-bar" id="wa-filter-bar" style="display:none;"></div>
 
     <div class="wa-stats">
       <div class="wa-stat wa-realtime" id="wa-realtime-card" style="cursor:pointer;"><div class="wa-val" id="wa-realtime">-</div><div class="wa-lbl">Current Visitors</div></div>
@@ -681,6 +690,12 @@ const SUPABASE_URL = 'https://yufthilajhcaedudaxkm.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_4qo2PFoiZ0d0ip0Yf3TQFg_Cmc-kSuv';
 let sb, allOrders = [], allLineItems = [], filteredOrders = [], charts = {};
 let shipmentsPage = 1;
+let trendingPage = 1;
+let utmPage = 1;
+let magnetPage = 1;
+let bundlesPage = 1;
+let ordersPage = 1;
+let customersPage = 1;
 const PAGE_SIZE = 10;
 let currentStaff = null;
 let activeTab = 'sales';
@@ -719,7 +734,7 @@ document.getElementById('totp-verify-code').addEventListener('input', e => { if 
 document.getElementById('logout-btn').addEventListener('click', () => { sessionStorage.removeItem('pp_staff'); location.reload(); });
 document.getElementById('modal-close').addEventListener('click', closeModal);
 document.getElementById('order-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
-document.getElementById('order-search').addEventListener('input', renderOrdersTable);
+document.getElementById('order-search').addEventListener('input', () => { ordersPage = 1; renderOrdersTable(); });
 document.getElementById('product-view').addEventListener('change', () => renderProductsChart(currentLineItems));
 document.getElementById('product-metric').addEventListener('change', () => renderProductsChart(currentLineItems));
 document.getElementById('team-btn').addEventListener('click', openTeamModal);
@@ -1169,6 +1184,7 @@ document.getElementById('refresh-btn').addEventListener('click', fullRefresh);
 
 // ── Render all ──
 function renderAll(orders, lineItems) {
+  trendingPage = 1; utmPage = 1; magnetPage = 1; bundlesPage = 1; ordersPage = 1; customersPage = 1;
   renderStats(orders, lineItems);
   renderRevenueChart(orders);
   renderHoursChart(orders);
@@ -1355,16 +1371,20 @@ function renderUTM(orders) {
     return;
   }
 
+  const start = (utmPage - 1) * PAGE_SIZE;
+  const page = sorted.slice(start, start + PAGE_SIZE);
+
   container.innerHTML = `<table class="utm-table">
     <thead><tr><th>Source</th><th>Orders</th><th></th></tr></thead>
-    <tbody>${sorted.map(([src, count]) => `
+    <tbody>${page.map(([src, count]) => `
       <tr>
         <td>${src}</td>
         <td>${count}</td>
         <td><span class="utm-bar" style="width:${(count / max) * 100}px"></span></td>
       </tr>
     `).join('')}</tbody>
-  </table>`;
+  </table><div id="utm-pagination"></div>`;
+  renderPagination('utm-pagination', utmPage, sorted.length, p => { utmPage = p; renderUTM(orders); });
 }
 
 function getUtmFromUrl(url, param) {
@@ -1433,10 +1453,14 @@ function renderOrdersTable() {
 
   if (orders.length === 0) {
     tbody.innerHTML = '<tr><td colspan="7" class="loading">No orders found</td></tr>';
+    document.getElementById('orders-pagination').innerHTML = '';
     return;
   }
 
-  tbody.innerHTML = orders.slice(0, 100).map(o => `
+  const start = (ordersPage - 1) * PAGE_SIZE;
+  const page = orders.slice(start, start + PAGE_SIZE);
+
+  tbody.innerHTML = page.map(o => `
     <tr class="clickable" data-id="${o.id}">
       <td>${o.order_date}${o.created_at ? ' ' + new Date(o.created_at).toLocaleTimeString('en-NZ', {hour:'2-digit',minute:'2-digit'}) : ''}</td>
       <td>${o.customer_name || '-'}</td>
@@ -1452,6 +1476,7 @@ function renderOrdersTable() {
   tbody.querySelectorAll('tr.clickable').forEach(tr => {
     tr.addEventListener('click', () => openOrderModal(Number(tr.dataset.id)));
   });
+  renderPagination('orders-pagination', ordersPage, orders.length, p => { ordersPage = p; renderOrdersTable(); });
 }
 
 // ── Order modal ──
@@ -1501,12 +1526,15 @@ function openOrderModal(orderId) {
     `).join('');
   }
 
-  // Only owner/admin can see delete button
+  // Only owner/admin can see refund/delete buttons
   if (currentStaff && (currentStaff.role === 'owner' || currentStaff.role === 'admin')) {
+    const isStripe = order.stripe_session_id && !order.stripe_session_id.startsWith('manual_');
     html += `<div style="margin-top:1.5rem;padding-top:1rem;border-top:2px solid var(--red);background:rgba(244,63,94,0.08);border-radius:0 0 8px 8px;padding:1rem;">
       <div style="color:var(--red);font-weight:700;font-size:0.85rem;margin-bottom:0.5rem;">DANGER ZONE</div>
-      <div style="color:var(--muted);font-size:0.78rem;margin-bottom:0.75rem;">Deleting will issue a Stripe refund, cancel the NZ Post shipment, and permanently remove the order. This cannot be undone.</div>
-      <button class="delete-btn" id="modal-delete" data-order-id="${orderId}" style="padding:0.4rem 1rem;font-size:0.8rem;">Delete &amp; Refund Order</button>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+        ${isStripe ? `<button class="delete-btn" id="modal-refund" data-order-id="${orderId}" style="padding:0.4rem 1rem;font-size:0.8rem;border-color:var(--amber);color:var(--amber);">Refund</button>` : ''}
+        <button class="delete-btn" id="modal-delete" data-order-id="${orderId}" style="padding:0.4rem 1rem;font-size:0.8rem;">Delete Order</button>
+      </div>
     </div>`;
   }
 
@@ -1528,37 +1556,118 @@ function openOrderModal(orderId) {
     }
   });
 
-  // Delete handler — refunds Stripe, removes from eShip, deletes from Supabase
+  // Refund handler — refunds Stripe only, optionally removes from eShip if not shipped
+  const refundBtn = document.getElementById('modal-refund');
+  if (refundBtn) {
+    refundBtn.addEventListener('click', async function(e) {
+      e.stopPropagation();
+      const oid = Number(this.dataset.orderId);
+      const order = allOrders.find(o => o.id === oid);
+      if (!order) return;
+
+      if (!confirm('Refund $' + Number(order.total_value || 0).toFixed(2) + ' to the customer on Stripe?')) return;
+
+      const statusMessages = [];
+      this.disabled = true;
+      this.textContent = 'Refunding...';
+
+      // Issue Stripe refund
+      try {
+        const refundRes = await fetch('/.netlify/functions/stripe-refund', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ stripe_session_id: order.stripe_session_id }),
+        });
+        const refundData = await refundRes.json();
+        if (refundRes.ok && refundData.success) {
+          statusMessages.push('Stripe refund issued');
+        } else {
+          statusMessages.push('Stripe refund failed: ' + (refundData.error || 'unknown'));
+          this.disabled = false;
+          this.textContent = 'Refund';
+          alert(statusMessages.join('\n'));
+          return;
+        }
+      } catch (err) {
+        statusMessages.push('Stripe refund error: ' + err.message);
+        this.disabled = false;
+        this.textContent = 'Refund';
+        alert(statusMessages.join('\n'));
+        return;
+      }
+
+      // Update order status to Refunded
+      await sb.from('orders').update({ status: 'Refunded' }).eq('id', oid);
+      if (order) order.status = 'Refunded';
+
+      // Check if order is unshipped in eShip — offer to remove
+      if (order.stripe_session_id && (order.status === 'Refunded' || order.status === 'Ordered - Paid' || order.status === 'Processing')) {
+        if (confirm('Not Printed - Remove from eShip?')) {
+          try {
+            const cancelRes = await fetch('/.netlify/functions/eship-cancel', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ order_number: order.stripe_session_id }),
+            });
+            const cancelData = await cancelRes.json();
+            if (cancelRes.ok && cancelData.success) {
+              statusMessages.push('Removed from eShip');
+            } else {
+              statusMessages.push('eShip: ' + (cancelData.error || 'not found'));
+            }
+          } catch (err) {
+            statusMessages.push('eShip removal skipped');
+          }
+        }
+      }
+
+      renderOrdersTable();
+      closeModal();
+      logFrontendActivity('order_refund', `Refunded order #${oid} (${order.customer_name || order.email || '?'}) — $${Number(order.total_value || 0).toFixed(2)}. ${statusMessages.join('. ')}`);
+      alert(statusMessages.join('\n'));
+    });
+  }
+
+  // Delete handler — permanently removes order, with optional Stripe refund and eShip removal
   const deleteBtn = document.getElementById('modal-delete');
-  if (!deleteBtn) return; // staff role doesn't have delete button
+  if (!deleteBtn) return;
   deleteBtn.addEventListener('click', async function(e) {
     e.stopPropagation();
     const oid = Number(this.dataset.orderId);
     const order = allOrders.find(o => o.id === oid);
     if (!order) return;
 
-    // Permission check
     if (!currentStaff || (currentStaff.role !== 'owner' && currentStaff.role !== 'admin')) {
       alert('You do not have permission to delete orders.'); return;
     }
 
-    // First confirmation
     const isStripeOrder = order.stripe_session_id && !order.stripe_session_id.startsWith('manual_');
-    const warningMsg = isStripeOrder
-      ? 'WARNING: This will:\n\n1. REFUND the customer $' + Number(order.total_value || 0).toFixed(2) + ' on Stripe\n2. CANCEL the NZ Post shipment\n3. PERMANENTLY DELETE the order\n\nThis CANNOT be undone. Continue?'
-      : 'WARNING: This will:\n\n1. Cancel the NZ Post shipment (if exists)\n2. PERMANENTLY DELETE the order\n\nThis CANNOT be undone. Continue?';
-    if (!confirm(warningMsg)) return;
 
-    // Second confirmation — type to confirm
-    const confirmText = prompt('To confirm, type DELETE below:');
+    // Build options dialog
+    let dialogMsg = 'DELETE order #' + oid + ' ($' + Number(order.total_value || 0).toFixed(2) + ')?\n\nThis will permanently remove the order record.\n\nAdditional actions (enter Y for yes):\n';
+    let doRefund = false;
+    let doEship = false;
+
+    if (isStripeOrder) {
+      const refundAnswer = prompt(dialogMsg + '\nRefund on Stripe? (Y/N)');
+      if (refundAnswer === null) return; // cancelled
+      doRefund = refundAnswer.trim().toUpperCase() === 'Y';
+    }
+
+    const eshipAnswer = prompt('Remove from eShip? (Y/N)');
+    if (eshipAnswer === null) return;
+    doEship = eshipAnswer.trim().toUpperCase() === 'Y';
+
+    // Final confirmation
+    const confirmText = prompt('To confirm deletion, type DELETE:');
     if (confirmText !== 'DELETE') { alert('Deletion cancelled.'); return; }
 
     const statusMessages = [];
     this.disabled = true;
     this.textContent = 'Deleting...';
 
-    // 1. Refund via Stripe (skip manual orders)
-    if (order.stripe_session_id && !order.stripe_session_id.startsWith('manual_')) {
+    // 1. Optionally refund via Stripe
+    if (doRefund && isStripeOrder) {
       try {
         const refundRes = await fetch('/.netlify/functions/stripe-refund', {
           method: 'POST',
@@ -1574,12 +1683,10 @@ function openOrderModal(orderId) {
       } catch (err) {
         statusMessages.push('Stripe refund error: ' + err.message);
       }
-    } else {
-      statusMessages.push('No Stripe payment to refund');
     }
 
-    // 2. Remove from eShip / NZ Post (if it exists)
-    if (order.stripe_session_id) {
+    // 2. Optionally remove from eShip
+    if (doEship && order.stripe_session_id) {
       try {
         const cancelRes = await fetch('/.netlify/functions/eship-cancel', {
           method: 'POST',
@@ -1588,12 +1695,12 @@ function openOrderModal(orderId) {
         });
         const cancelData = await cancelRes.json();
         if (cancelRes.ok && cancelData.success) {
-          statusMessages.push('Removed from NZ Post');
+          statusMessages.push('Removed from eShip');
         } else {
-          statusMessages.push('NZ Post: ' + (cancelData.error || 'not found'));
+          statusMessages.push('eShip: ' + (cancelData.error || 'not found'));
         }
       } catch (err) {
-        statusMessages.push('NZ Post cancel skipped');
+        statusMessages.push('eShip removal skipped');
       }
     }
 
@@ -1606,14 +1713,13 @@ function openOrderModal(orderId) {
       this.textContent = 'Delete Order';
       return;
     }
+    statusMessages.push('Order deleted from database');
 
     // 4. Remove from local state
     const deletedEmail = order.email;
     allOrders = allOrders.filter(o => o.id !== oid);
     allLineItems = allLineItems.filter(li => li.order_id !== oid);
 
-    // 5. If customer has no more orders, delete their orders (they're already gone from local state)
-    // Check if any orders remain for this customer
     if (deletedEmail) {
       const remainingOrders = allOrders.filter(o => o.email === deletedEmail);
       if (remainingOrders.length === 0) {
@@ -1655,9 +1761,12 @@ function renderMagnetProducts(orders) {
     return;
   }
 
+  const start = (magnetPage - 1) * PAGE_SIZE;
+  const page = sorted.slice(start, start + PAGE_SIZE);
+
   container.innerHTML = `<table class="utm-table">
     <thead><tr><th>Product</th><th>Orders</th><th>Revenue</th><th>% of Orders</th><th></th></tr></thead>
-    <tbody>${sorted.map(([name, data]) => `
+    <tbody>${page.map(([name, data]) => `
       <tr>
         <td>${name}</td>
         <td>${data.count}</td>
@@ -1666,7 +1775,8 @@ function renderMagnetProducts(orders) {
         <td><span class="utm-bar" style="width:${(data.count / max) * 120}px;background:var(--cyan);"></span></td>
       </tr>
     `).join('')}</tbody>
-  </table>`;
+  </table><div id="magnet-pagination"></div>`;
+  renderPagination('magnet-pagination', magnetPage, sorted.length, p => { magnetPage = p; renderMagnetProducts(orders); });
 }
 
 // ── Frequently Bought Together ──
@@ -1684,7 +1794,7 @@ function renderBoughtTogether(orders) {
     }
   });
 
-  const sorted = Object.entries(pairCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const sorted = Object.entries(pairCounts).sort((a, b) => b[1] - a[1]);
   const max = sorted.length > 0 ? sorted[0][1] : 1;
   const container = document.getElementById('bundles-container');
 
@@ -1693,16 +1803,20 @@ function renderBoughtTogether(orders) {
     return;
   }
 
+  const start = (bundlesPage - 1) * PAGE_SIZE;
+  const page = sorted.slice(start, start + PAGE_SIZE);
+
   container.innerHTML = `<table class="utm-table">
     <thead><tr><th>Product Pair</th><th>Orders</th><th></th></tr></thead>
-    <tbody>${sorted.map(([pair, count]) => `
+    <tbody>${page.map(([pair, count]) => `
       <tr>
         <td style="font-size:0.75rem;">${pair}</td>
         <td>${count}</td>
         <td><span class="utm-bar" style="width:${(count / max) * 100}px;background:var(--purple);"></span></td>
       </tr>
     `).join('')}</tbody>
-  </table>`;
+  </table><div id="bundles-pagination"></div>`;
+  renderPagination('bundles-pagination', bundlesPage, sorted.length, p => { bundlesPage = p; renderBoughtTogether(orders); });
 }
 
 // ── Trending Products ──
@@ -1739,7 +1853,7 @@ function renderTrending(orders) {
     if (curr > 0 || prev > 0) trends.push({ name, curr, prev, change });
   });
 
-  trends.sort((a, b) => b.change - a.change);
+  trends.sort((a, b) => b.change - a.change || b.curr - a.curr);
   const container = document.getElementById('trending-container');
 
   if (trends.length === 0) {
@@ -1747,9 +1861,12 @@ function renderTrending(orders) {
     return;
   }
 
+  const start = (trendingPage - 1) * PAGE_SIZE;
+  const page = trends.slice(start, start + PAGE_SIZE);
+
   container.innerHTML = `<table class="utm-table">
     <thead><tr><th>Product</th><th>Now</th><th>Prior</th><th>Change</th></tr></thead>
-    <tbody>${trends.slice(0, 10).map(t => {
+    <tbody>${page.map(t => {
       const color = t.change > 0 ? 'var(--green)' : t.change < 0 ? 'var(--red)' : 'var(--dim)';
       const arrow = t.change > 0 ? '↑' : t.change < 0 ? '↓' : '→';
       return `<tr>
@@ -1759,7 +1876,8 @@ function renderTrending(orders) {
         <td style="color:${color};font-weight:600;">${arrow} ${Math.abs(t.change).toFixed(0)}%</td>
       </tr>`;
     }).join('')}</tbody>
-  </table>`;
+  </table><div id="trending-pagination"></div>`;
+  renderPagination('trending-pagination', trendingPage, trends.length, p => { trendingPage = p; renderTrending(orders); });
 }
 
 // ── New vs Returning Customers ──
@@ -2060,10 +2178,14 @@ function renderCustomersTab() {
   const container = document.getElementById('customers-list');
   if (customerList.length === 0) {
     container.innerHTML = '<p style="color:var(--dim);padding:1rem;">No customers found</p>';
+    document.getElementById('customers-pagination').innerHTML = '';
     return;
   }
 
-  container.innerHTML = customerList.slice(0, 100).map((c, i) => {
+  const start = (customersPage - 1) * PAGE_SIZE;
+  const pageList = customerList.slice(start, start + PAGE_SIZE);
+
+  container.innerHTML = pageList.map((c, i) => {
     const orderItems = c.orders.map(o => {
       const items = allLineItems.filter(li => li.order_id === o.id);
       const itemStr = items.map(li => `${li.quantity}x ${li.description || li.sku || '?'}`).join(', ');
@@ -2101,11 +2223,12 @@ function renderCustomersTab() {
     </div>`;
   }).join('');
 
+  renderPagination('customers-pagination', customersPage, customerList.length, p => { customersPage = p; renderCustomersTab(); });
 }
 
 // Attach customer tab events
-document.getElementById('customer-search').addEventListener('input', renderCustomersTab);
-document.getElementById('customer-sort').addEventListener('change', renderCustomersTab);
+document.getElementById('customer-search').addEventListener('input', () => { customersPage = 1; renderCustomersTab(); });
+document.getElementById('customer-sort').addEventListener('change', () => { customersPage = 1; renderCustomersTab(); });
 
 // ── Shipping Tab ──
 const ESHIP_PROXY = '/.netlify/functions/eship-orders';
@@ -2413,6 +2536,50 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
   const WA_API = '/.netlify/functions';
   let waLoaded = false, waChart = null, waRealtimeInterval = null;
   let waSite = '', waDateRange = 'today';
+  let waFilters = []; // [{col:'referrer_domain', val:'google.com', label:'Referrer: google.com'}, ...]
+
+  // Map table container IDs to filter column names
+  const waFilterMap = {
+    'wa-pages-table': { col: 'pathname', labelPrefix: 'Page' },
+    'wa-referrers-table': { col: 'referrer_domain', labelPrefix: 'Referrer' },
+    'wa-devices-table': { col: 'device_type', labelPrefix: 'Device' },
+    'wa-browsers-table': { col: 'browser', labelPrefix: 'Browser' },
+    'wa-countries-table': { col: 'country', labelPrefix: 'Country' },
+    'wa-os-table': { col: 'os', labelPrefix: 'OS' },
+    'wa-events-table': { col: 'event_name', labelPrefix: 'Event' },
+  };
+
+  function waAddFilter(col, val, labelPrefix) {
+    // Remove existing filter on same column
+    waFilters = waFilters.filter(f => f.col !== col);
+    waFilters.push({ col, val, label: labelPrefix + ': ' + val });
+    waRenderFilterBar();
+    waLoadDashboard();
+  }
+
+  function waRemoveFilter(col) {
+    waFilters = waFilters.filter(f => f.col !== col);
+    waRenderFilterBar();
+    waLoadDashboard();
+  }
+
+  function waClearFilters() {
+    waFilters = [];
+    waRenderFilterBar();
+    waLoadDashboard();
+  }
+
+  function waRenderFilterBar() {
+    const bar = document.getElementById('wa-filter-bar');
+    if (!waFilters.length) { bar.style.display = 'none'; bar.innerHTML = ''; return; }
+    bar.style.display = 'flex';
+    bar.innerHTML = waFilters.map(f =>
+      `<span class="wa-filter-chip">${f.label} <button onclick="waRemoveFilter('${f.col}')">&times;</button></span>`
+    ).join('') + (waFilters.length > 1 ? '<button onclick="waClearFilters()" style="background:none;border:none;color:var(--dim);font-size:0.75rem;cursor:pointer;">Clear all</button>' : '');
+  }
+  // Expose to onclick handlers
+  window.waRemoveFilter = waRemoveFilter;
+  window.waClearFilters = waClearFilters;
 
   function waToken() { return currentStaff ? currentStaff.token : ''; }
 
@@ -2466,13 +2633,17 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
       el.innerHTML = '<p style="color:var(--dim);text-align:center;padding:1rem;font-size:0.85rem;">No data</p>';
       return;
     }
+    const filterInfo = waFilterMap[containerId];
+    const activeFilterVal = filterInfo ? waFilters.find(f => f.col === filterInfo.col)?.val : null;
     const maxVal = Math.max(...rows.map(r => r[cols[1].key] || 0));
     let html = '<table class="wa-table"><thead><tr>';
     cols.forEach(c => { html += `<th>${c.label}</th>`; });
     html += '</tr></thead><tbody>';
     rows.forEach(r => {
       const pct = maxVal > 0 ? ((r[cols[1].key] || 0) / maxVal * 100) : 0;
-      html += '<tr>';
+      const nameVal = r[cols[0].key] || '';
+      const isActive = activeFilterVal === nameVal;
+      html += `<tr class="${isActive ? 'wa-active' : ''}" data-wa-container="${containerId}" data-wa-val="${nameVal.replace(/"/g, '&quot;')}">`;
       cols.forEach((c, i) => {
         let val = r[c.key] != null ? r[c.key] : '-';
         if (c.fmt) val = c.fmt(val);
@@ -2486,6 +2657,19 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     });
     html += '</tbody></table>';
     el.innerHTML = html;
+    // Add click handlers
+    if (filterInfo) {
+      el.querySelectorAll('tr[data-wa-val]').forEach(row => {
+        row.addEventListener('click', function() {
+          const val = this.dataset.waVal;
+          if (activeFilterVal === val) {
+            waRemoveFilter(filterInfo.col);
+          } else {
+            waAddFilter(filterInfo.col, val, filterInfo.labelPrefix);
+          }
+        });
+      });
+    }
   }
 
   let waRealtimePages = [], waRealtimeVisitors = [];
@@ -2577,17 +2761,22 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     document.querySelectorAll('#tab-website .wa-loading').forEach(el => { el.style.display = ''; });
 
     try {
+      // Build filter params
+      const fp = {};
+      waFilters.forEach((f, i) => { fp['fc' + i] = f.col; fp['fv' + i] = f.val; });
+      const base = { site: waSite, from, to, ...fp };
+
       const [summary, timeseries, pages, referrers, browsers, devices, countries, os, events, campaigns] = await Promise.all([
-        waFetch('analytics-dashboard', { site: waSite, from, to, metric: 'summary' }),
-        waFetch('analytics-dashboard', { site: waSite, from, to, metric: 'timeseries' }),
-        waFetch('analytics-dashboard', { site: waSite, from, to, metric: 'pages' }),
-        waFetch('analytics-dashboard', { site: waSite, from, to, metric: 'referrers' }),
-        waFetch('analytics-dashboard', { site: waSite, from, to, metric: 'browsers' }),
-        waFetch('analytics-dashboard', { site: waSite, from, to, metric: 'devices' }),
-        waFetch('analytics-dashboard', { site: waSite, from, to, metric: 'countries' }),
-        waFetch('analytics-dashboard', { site: waSite, from, to, metric: 'os' }),
-        waFetch('analytics-dashboard', { site: waSite, from, to, metric: 'events' }),
-        waFetch('analytics-dashboard', { site: waSite, from, to, metric: 'campaigns', col: 'utm_campaign' }),
+        waFetch('analytics-dashboard', { ...base, metric: 'summary' }),
+        waFetch('analytics-dashboard', { ...base, metric: 'timeseries' }),
+        waFetch('analytics-dashboard', { ...base, metric: 'pages' }),
+        waFetch('analytics-dashboard', { ...base, metric: 'referrers' }),
+        waFetch('analytics-dashboard', { ...base, metric: 'browsers' }),
+        waFetch('analytics-dashboard', { ...base, metric: 'devices' }),
+        waFetch('analytics-dashboard', { ...base, metric: 'countries' }),
+        waFetch('analytics-dashboard', { ...base, metric: 'os' }),
+        waFetch('analytics-dashboard', { ...base, metric: 'events' }),
+        waFetch('analytics-dashboard', { ...base, metric: 'campaigns', col: 'utm_campaign' }),
       ]);
 
       // Stats
