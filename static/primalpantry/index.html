@@ -92,8 +92,14 @@
 
     /* Charts */
     .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.5rem; }
-    .chart-card { background: var(--card); border-radius: 10px; padding: 1rem; border: 1px solid var(--border); }
-    .chart-card h3 { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
+    .chart-card { background: var(--card); border-radius: 10px; padding: 1rem; border: 1px solid var(--border); cursor: pointer; transition: border-color 0.2s; }
+    .chart-card:hover { border-color: var(--sage); }
+    .chart-card h3 { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; display: flex; justify-content: space-between; align-items: center; }
+    .chart-card h3::after { content: '⤢'; font-size: 0.7rem; color: var(--dim); transition: transform 0.2s; }
+    .chart-card.expanded h3::after { content: '⤡'; }
+    .chart-card .chart-wrap { max-height: 180px; overflow: hidden; transition: max-height 0.3s ease; position: relative; }
+    .chart-card.expanded .chart-wrap { max-height: 500px; }
+    .chart-card .chart-wrap canvas { width: 100% !important; }
 
     /* Heatmap */
     .heatmap-grid { display: grid; grid-template-columns: 40px repeat(24, 1fr); gap: 2px; font-size: 0.65rem; }
@@ -250,6 +256,9 @@
     .wa-panel-tab { padding: 0.4rem 0.75rem; border: none; background: none; color: var(--dim); font-size: 0.75rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; font-family: 'DM Sans', sans-serif; }
     .wa-panel-tab:hover { color: var(--text); }
     .wa-panel-tab.active { color: var(--sage); border-bottom-color: var(--sage); }
+    .wa-view-btn { background: var(--card); border: 1px solid var(--border); color: var(--muted); padding: 0.3rem 0.7rem; border-radius: 6px; font-size: 0.75rem; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+    .wa-view-btn:hover { border-color: var(--sage); color: var(--text); }
+    .wa-view-btn.active { background: var(--sage); color: #141210; border-color: var(--sage); font-weight: 600; }
     .wa-table { width: 100%; border-collapse: collapse; }
     .wa-table th { text-align: left; padding: 0.35rem 0.5rem; font-size: 0.65rem; color: var(--dim); text-transform: uppercase; border-bottom: 2px solid var(--border); }
     .wa-table th:not(:first-child) { text-align: right; }
@@ -495,25 +504,25 @@
   <div class="stats" id="stats-grid"></div>
 
   <div class="chart-card" style="margin-bottom:1.5rem;">
-    <h3>Monthly Revenue Pace</h3>
-    <canvas id="cumulative-revenue-chart" style="height:220px;"></canvas>
+    <h3>Revenue Pace <select id="pace-mode" style="float:right;background:var(--bg);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:0.75rem;" onclick="event.stopPropagation()"><option value="daily">Today vs Last Week</option><option value="monthly">Monthly Progress</option></select></h3>
+    <div class="chart-wrap"><canvas id="cumulative-revenue-chart"></canvas></div>
   </div>
 
   <div class="charts-row">
     <div class="chart-card">
       <h3>Revenue</h3>
-      <canvas id="revenue-chart"></canvas>
+      <div class="chart-wrap"><canvas id="revenue-chart"></canvas></div>
     </div>
     <div class="chart-card">
       <h3>Orders by Hour</h3>
-      <canvas id="hours-chart"></canvas>
+      <div class="chart-wrap"><canvas id="hours-chart"></canvas></div>
     </div>
   </div>
 
   <div class="charts-row">
     <div class="chart-card">
-      <h3>Top Products <select id="product-metric" style="float:right;background:var(--bg);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:0.75rem;margin-left:4px;"><option value="qty">By Orders</option><option value="revenue">By Revenue</option></select><select id="product-view" style="float:right;background:var(--bg);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:0.75rem;"><option value="name">By Name</option><option value="sku">By SKU</option></select></h3>
-      <canvas id="products-chart"></canvas>
+      <h3>Top Products <select id="product-metric" style="float:right;background:var(--bg);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:0.75rem;margin-left:4px;" onclick="event.stopPropagation()"><option value="qty">By Orders</option><option value="revenue">By Revenue</option></select><select id="product-view" style="float:right;background:var(--bg);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:0.75rem;" onclick="event.stopPropagation()"><option value="name">By Name</option><option value="sku">By SKU</option></select></h3>
+      <div class="chart-wrap"><canvas id="products-chart"></canvas></div>
     </div>
     <div class="chart-card">
       <h3>UTM Sources</h3>
@@ -524,11 +533,11 @@
   <div class="charts-row">
     <div class="chart-card">
       <h3>Order Heatmap (Day x Hour)</h3>
-      <div id="heatmap-container"></div>
+      <div class="chart-wrap"><div id="heatmap-container"></div></div>
     </div>
     <div class="chart-card">
       <h3>Order Locations</h3>
-      <div id="order-map"></div>
+      <div class="chart-wrap" style="max-height:200px;"><div id="order-map"></div></div>
     </div>
   </div>
 
@@ -557,7 +566,7 @@
     </div>
     <div class="chart-card">
       <h3>New vs Returning Customers</h3>
-      <canvas id="newret-chart"></canvas>
+      <div class="chart-wrap"><canvas id="newret-chart"></canvas></div>
     </div>
   </div>
 
@@ -723,6 +732,12 @@
 
     <div class="wa-chart-wrap">
       <canvas id="wa-timeseries" height="80"></canvas>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem;">
+      <span style="font-size:0.75rem;color:var(--dim);text-transform:uppercase;letter-spacing:0.05em;">View</span>
+      <button class="wa-view-btn active" id="wa-view-traffic" onclick="waSetView('traffic')">Traffic</button>
+      <button class="wa-view-btn" id="wa-view-funnel" onclick="waSetView('funnel')">Funnel</button>
     </div>
 
     <div class="wa-panels">
@@ -923,6 +938,19 @@ document.addEventListener('DOMContentLoaded', () => {
     sortObserver.observe(dashboard, { childList: true, subtree: true });
     applySortableToAllTables();
   }
+});
+
+// Chart card expand/collapse on click
+document.addEventListener('click', function(e) {
+  const card = e.target.closest('.chart-card');
+  if (!card) return;
+  // Only toggle if the card has a chart-wrap child (canvas charts, heatmap, map)
+  if (!card.querySelector('.chart-wrap')) return;
+  // Don't toggle if clicking interactive elements inside
+  if (e.target.closest('select, input, button, a, .utm-table, .wa-table, table')) return;
+  card.classList.toggle('expanded');
+  // Trigger Chart.js resize after transition
+  setTimeout(() => { window.dispatchEvent(new Event('resize')); }, 350);
 });
 
 // Password visibility toggle
@@ -1700,7 +1728,7 @@ function renderRevenueChart(orders) {
   charts.revenue = new Chart(document.getElementById('revenue-chart'), {
     type: 'bar',
     data: { labels, datasets: [{ label: 'Revenue', data: Object.values(days), backgroundColor: '#6B8F5B', borderRadius: 6 }] },
-    options: { responsive: true, plugins: { legend: { display: false } }, scales: {
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: {
       y: { ticks: { color: '#9c9287', callback: v => '$' + v }, grid: { color: '#252220' } },
       x: { ticks: { color: '#9c9287', maxRotation: 45, maxTicksLimit: 15 }, grid: { display: false } },
     }},
@@ -1834,7 +1862,7 @@ function renderHoursChart(orders) {
   charts.hours = new Chart(document.getElementById('hours-chart'), {
     type: 'bar',
     data: { labels, datasets: [{ label: 'Orders', data: hours, backgroundColor: '#D4A84B', borderRadius: 6 }] },
-    options: { responsive: true, plugins: { legend: { display: false } }, scales: {
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: {
       y: { ticks: { color: '#9c9287' }, grid: { color: '#252220' } },
       x: { ticks: { color: '#9c9287', maxRotation: 45 }, grid: { display: false } },
     }},
@@ -1864,7 +1892,7 @@ function renderProductsChart(lineItems) {
   charts.products = new Chart(document.getElementById('products-chart'), {
     type: 'doughnut',
     data: { labels: sorted.map(s => s[0]), datasets: [{ data: sorted.map(s => s[1]), backgroundColor: colors.slice(0, sorted.length) }] },
-    options: { responsive: true, plugins: { legend: { position: 'right', labels: { color: '#9c9287', font: { size: 11, family: 'DM Sans' }, padding: 6, boxWidth: 12 } } } },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#9c9287', font: { size: 11, family: 'DM Sans' }, padding: 6, boxWidth: 12 } } } },
   });
 }
 
@@ -3110,7 +3138,7 @@ function renderShippingStatusChart() {
   charts.shipStatus = new Chart(document.getElementById('shipping-status-chart'), {
     type: 'doughnut',
     data: { labels, datasets: [{ data, backgroundColor: colors }] },
-    options: { responsive: true, plugins: { legend: { position: 'right', labels: { color: '#9c9287', font: { size: 11, family: 'DM Sans' }, padding: 6, boxWidth: 12 } } } },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#9c9287', font: { size: 11, family: 'DM Sans' }, padding: 6, boxWidth: 12 } } } },
   });
 }
 
@@ -3133,7 +3161,7 @@ function renderShipTimeChart() {
       labels: Object.keys(buckets).map(k => k + (k !== '5+' ? ' day' + (k !== '1' ? 's' : '') : '')),
       datasets: [{ label: 'Orders', data: Object.values(buckets), backgroundColor: '#8CB47A', borderRadius: 6 }],
     },
-    options: { responsive: true, plugins: { legend: { display: false } }, scales: {
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: {
       y: { ticks: { color: '#9c9287' }, grid: { color: '#252220' } },
       x: { ticks: { color: '#9c9287' }, grid: { display: false } },
     }},
@@ -3339,6 +3367,9 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
   let waSite = '', waDateRange = 'today';
   let waFilters = []; // [{col:'referrer_domain', val:'google.com', label:'Referrer: google.com'}, ...]
   let waRevMaps = {}; // Revenue lookups by dimension, populated in waLoadDashboard
+  let waView = 'traffic'; // 'traffic' or 'funnel'
+  let waTrafficData = {}; // cached traffic-mode table data
+  let waFunnelData = {}; // cached funnel-mode table data
 
   // Map table container IDs to filter column names
   const waFilterMap = {
@@ -3382,6 +3413,103 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
   // Expose to onclick handlers
   window.waRemoveFilter = waRemoveFilter;
   window.waClearFilters = waClearFilters;
+
+  // View toggle: traffic vs funnel
+  window.waSetView = async function(view) {
+    waView = view;
+    document.getElementById('wa-view-traffic').classList.toggle('active', view === 'traffic');
+    document.getElementById('wa-view-funnel').classList.toggle('active', view === 'funnel');
+    if (view === 'funnel' && (!waFunnelData['wa-pages-table'] || waFunnelData['wa-pages-table'].length === 0)) {
+      // Show loading state
+      Object.keys(waDimMap).forEach(id => { document.getElementById(id).innerHTML = '<div class="wa-loading">Loading funnel data...</div>'; });
+      await waLoadFunnelData();
+    }
+    waRenderCurrentView();
+  };
+
+  function waRenderCurrentView() {
+    if (waView === 'funnel') {
+      waRenderFunnelTables();
+    } else {
+      waRenderTrafficTables();
+    }
+  }
+
+  // Dimension mapping for funnel API calls
+  const waDimMap = {
+    'wa-pages-table': { col: 'pathname', label: 'Page' },
+    'wa-referrers-table': { col: 'referrer_domain', label: 'Referrer' },
+    'wa-devices-table': { col: 'device_type', label: 'Device' },
+    'wa-browsers-table': { col: 'browser', label: 'Browser' },
+    'wa-countries-table': { col: 'country', label: 'Country' },
+    'wa-os-table': { col: 'os', label: 'OS' },
+    'wa-campaigns-table': { col: 'utm_campaign', label: 'Campaign' },
+  };
+
+  const funnelCols = function(nameLabel) {
+    return [
+      { key: 'name', label: nameLabel },
+      { key: 'visitors', label: 'Visitors' },
+      { key: 'atc', label: 'ATC' },
+      { key: 'sales', label: 'Sales' },
+      { key: '_atc_rate', label: 'ATC %', fmt: v => v + '%' },
+      { key: '_sale_rate', label: 'Sale %', fmt: v => v + '%' },
+      { key: '_revenue', label: 'Revenue', fmt: v => v > 0 ? fmt_money(v) : '-' },
+    ];
+  };
+
+  async function waLoadFunnelData() {
+    const { from, to } = waGetDates();
+    const base = { site: waSite, from, to, metric: 'funnel' };
+    const dims = Object.entries(waDimMap);
+    const results = await Promise.allSettled(
+      dims.map(([_, d]) => waFetch('analytics-dashboard', { ...base, col: d.col }))
+    );
+    // Also load order revenue by dimension
+    const revByDim = {};
+    const orders = (typeof filteredOrders !== 'undefined' ? filteredOrders : allOrders || []).filter(o => {
+      if (waSite === 'reviora' || waSite === 'reviana') return (o.source_site || '').includes('reviana') || (o.source_site || '').includes('reviora') || (o.landing_page || '').includes('reviana') || (o.landing_page || '').includes('reviora');
+      return true;
+    });
+
+    waFunnelData = {};
+    dims.forEach(([tableId, dim], i) => {
+      const data = results[i].status === 'fulfilled' ? results[i].value : [];
+      // Build revenue lookup for this dimension from orders
+      const revMap = {};
+      if (dim.col === 'pathname') {
+        orders.forEach(o => { let lp = o.landing_page || ''; if (lp) { try { lp = new URL(lp, 'https://x.com').pathname; } catch {} revMap[lp] = (revMap[lp] || 0) + Number(o.total_value || 0); } });
+      }
+      // Enrich rows with computed rates and revenue
+      const enriched = (data || []).map(r => ({
+        ...r,
+        _atc_rate: r.visitors > 0 ? (r.atc / r.visitors * 100).toFixed(1) : '0.0',
+        _sale_rate: r.visitors > 0 ? (r.sales / r.visitors * 100).toFixed(1) : '0.0',
+        _revenue: revMap[r.name] || 0,
+      }));
+      waFunnelData[tableId] = enriched;
+    });
+  }
+
+  function waRenderFunnelTables() {
+    Object.entries(waDimMap).forEach(([tableId, dim]) => {
+      const rows = waFunnelData[tableId] || [];
+      waRenderTable(tableId, rows, funnelCols(dim.label));
+    });
+  }
+
+  function waRenderTrafficTables() {
+    const t = waTrafficData;
+    if (!t.pages) return;
+    const revCol = { key: '_revenue', label: 'Revenue', fmt: v => v > 0 ? fmt_money(v) : '-' };
+    waRenderTable('wa-pages-table', t.pages, [{ key: 'name', label: 'Page' }, { key: 'visitors', label: 'Visitors' }, { key: 'views', label: 'Views' }, revCol]);
+    waRenderTable('wa-referrers-table', t.referrers, [{ key: 'name', label: 'Referrer' }, { key: 'visitors', label: 'Visitors' }, { key: 'views', label: 'Views' }]);
+    waRenderTable('wa-devices-table', t.devices, [{ key: 'name', label: 'Device' }, { key: 'visitors', label: 'Visitors' }]);
+    waRenderTable('wa-browsers-table', t.browsers, [{ key: 'name', label: 'Browser' }, { key: 'visitors', label: 'Visitors' }]);
+    waRenderTable('wa-countries-table', t.countries, [{ key: 'name', label: 'Country' }, { key: 'visitors', label: 'Visitors' }]);
+    waRenderTable('wa-os-table', t.os, [{ key: 'name', label: 'OS' }, { key: 'visitors', label: 'Visitors' }]);
+    waRenderTable('wa-campaigns-table', t.campaigns, [{ key: 'name', label: 'Name' }, { key: 'visitors', label: 'Visitors' }, { key: 'views', label: 'Views' }, revCol]);
+  }
 
   function waToken() { return currentStaff ? currentStaff.token : ''; }
 
@@ -3641,6 +3769,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
 
   async function waLoadDashboard() {
     if (!waSite || !waToken()) return;
+    waFunnelData = {}; // Clear cached funnel data on reload
     const { from, to } = waGetDates();
 
     // Show loading
@@ -3724,19 +3853,27 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
       });
       waRevMaps = { pathname: revByPage, utm_source: revBySource, utm_medium: revByMedium, utm_campaign: revByCampaign };
 
-      // Tables
-      const revCol = { key: '_revenue', label: 'Revenue', fmt: v => v > 0 ? fmt_money(v) : '-' };
+      // Cache traffic data and render based on view mode
       function waEnrichRev(rows, revMap) {
         if (!rows) return rows;
         return rows.map(r => ({ ...r, _revenue: revMap[r.name] || 0 }));
       }
-      waRenderTable('wa-pages-table', waEnrichRev(pages, revByPage), [{ key: 'name', label: 'Page' }, { key: 'visitors', label: 'Visitors' }, { key: 'views', label: 'Views' }, revCol]);
-      waRenderTable('wa-referrers-table', referrers, [{ key: 'name', label: 'Referrer' }, { key: 'visitors', label: 'Visitors' }, { key: 'views', label: 'Views' }]);
-      waRenderTable('wa-devices-table', devices, [{ key: 'name', label: 'Device' }, { key: 'visitors', label: 'Visitors' }]);
-      waRenderTable('wa-browsers-table', browsers, [{ key: 'name', label: 'Browser' }, { key: 'visitors', label: 'Visitors' }]);
-      waRenderTable('wa-countries-table', countries, [{ key: 'name', label: 'Country' }, { key: 'visitors', label: 'Visitors' }]);
-      waRenderTable('wa-os-table', os, [{ key: 'name', label: 'OS' }, { key: 'visitors', label: 'Visitors' }]);
-      waRenderTable('wa-campaigns-table', waEnrichRev(campaigns, revByCampaign), [{ key: 'name', label: 'Name' }, { key: 'visitors', label: 'Visitors' }, { key: 'views', label: 'Views' }, revCol]);
+      waTrafficData = {
+        pages: waEnrichRev(pages, revByPage),
+        referrers: referrers,
+        devices: devices,
+        browsers: browsers,
+        countries: countries,
+        os: os,
+        campaigns: waEnrichRev(campaigns, revByCampaign),
+      };
+
+      if (waView === 'funnel') {
+        await waLoadFunnelData();
+        waRenderFunnelTables();
+      } else {
+        waRenderTrafficTables();
+      }
 
       // Events table (special columns)
       waRenderTable('wa-events-table', events, [

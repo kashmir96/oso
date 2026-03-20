@@ -403,6 +403,41 @@ RETURNS json AS $$
   FROM funnels f;
 $$ LANGUAGE sql STABLE;
 
+-- Funnel metrics grouped by any dimension
+-- Returns visitors, add-to-cart uniques, sale uniques per dimension value
+CREATE OR REPLACE FUNCTION analytics_funnel_grouped(p_site text, p_from timestamptz, p_to timestamptz, p_column text)
+RETURNS json AS $$
+DECLARE
+  result json;
+BEGIN
+  EXECUTE format(
+    'SELECT COALESCE(json_agg(row_to_json(t)), ''[]''::json) FROM (
+      SELECT
+        %I AS name,
+        COUNT(DISTINCT pv.visitor_hash) AS visitors,
+        COUNT(DISTINCT ev_atc.visitor_hash) AS atc,
+        COUNT(DISTINCT ev_sale.visitor_hash) AS sales
+      FROM analytics_pageviews pv
+      LEFT JOIN (
+        SELECT DISTINCT visitor_hash FROM analytics_events
+        WHERE site_id = $1 AND created_at >= $2 AND created_at < $3 AND event_name = ''add to cart''
+      ) ev_atc ON ev_atc.visitor_hash = pv.visitor_hash
+      LEFT JOIN (
+        SELECT DISTINCT visitor_hash FROM analytics_events
+        WHERE site_id = $1 AND created_at >= $2 AND created_at < $3 AND event_name = ''checkout completed''
+      ) ev_sale ON ev_sale.visitor_hash = pv.visitor_hash
+      WHERE pv.site_id = $1 AND pv.created_at >= $2 AND pv.created_at < $3
+        AND %I IS NOT NULL AND %I != ''''
+      GROUP BY %I
+      ORDER BY visitors DESC
+      LIMIT 50
+    ) t', p_column, p_column, p_column, p_column)
+  USING p_site, p_from, p_to
+  INTO result;
+  RETURN result;
+END;
+$$ LANGUAGE plpgsql STABLE;
+
 -- List distinct site IDs
 CREATE OR REPLACE FUNCTION analytics_sites()
 RETURNS json AS $$

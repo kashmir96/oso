@@ -166,6 +166,14 @@ exports.handler = async (event) => {
         return reply(200, data);
       }
 
+      case 'funnel': {
+        const column = col || 'pathname';
+        const allowed = ['pathname', 'referrer_domain', 'browser', 'device_type', 'country', 'os', 'utm_campaign', 'utm_source', 'utm_medium', 'utm_content', 'utm_term'];
+        if (!allowed.includes(column)) return reply(400, { error: 'Invalid column' });
+        const data = await callRpc('analytics_funnel_grouped', { ...baseParams, p_column: column });
+        return reply(200, data);
+      }
+
       case 'conversions': {
         const thankYou = qs.thank_you || '/pages/thank-you/';
         const data = await callRpc('analytics_conversions', { ...baseParams, p_thank_you: thankYou });
