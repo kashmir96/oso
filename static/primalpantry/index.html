@@ -285,6 +285,53 @@
 
     @media (max-width: 900px) { .charts-row { grid-template-columns: 1fr; } .wa-panels { grid-template-columns: 1fr; } }
     @media (max-width: 600px) { .stats { grid-template-columns: repeat(2, 1fr); } .wa-stats { grid-template-columns: repeat(2, 1fr); } }
+
+    /* Claude Chat Widget */
+    .claude-fab { position: fixed; bottom: 1.5rem; right: 1.5rem; width: 52px; height: 52px; border-radius: 50%; background: var(--sage); border: none; cursor: pointer; z-index: 200; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(0,0,0,0.3); transition: transform 0.15s, box-shadow 0.15s; }
+    .claude-fab:hover { transform: scale(1.08); box-shadow: 0 6px 24px rgba(0,0,0,0.4); }
+    .claude-fab svg { width: 26px; height: 26px; fill: #141210; }
+    .claude-fab.open svg.icon-chat { display: none; }
+    .claude-fab:not(.open) svg.icon-close { display: none; }
+
+    .claude-panel { position: fixed; bottom: 5.5rem; right: 1.5rem; width: 400px; max-height: 520px; background: var(--card); border: 1px solid var(--border); border-radius: 14px; z-index: 199; display: none; flex-direction: column; box-shadow: 0 12px 40px rgba(0,0,0,0.4); }
+    .claude-panel.open { display: flex; }
+    .claude-panel-header { padding: 0.85rem 1rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .claude-panel-header h3 { font-size: 0.9rem; font-weight: 700; color: var(--text); margin: 0; }
+    .claude-panel-header .claude-clear-btn { background: none; border: none; color: var(--dim); font-size: 0.7rem; cursor: pointer; padding: 0.2rem 0.4rem; border-radius: 4px; }
+    .claude-panel-header .claude-clear-btn:hover { color: var(--text); background: var(--bg); }
+
+    .claude-messages { flex: 1; overflow-y: auto; padding: 0.75rem 1rem; min-height: 200px; max-height: 380px; }
+    .claude-msg { margin-bottom: 0.75rem; font-size: 0.82rem; line-height: 1.5; }
+    .claude-msg.user { text-align: right; }
+    .claude-msg.user .claude-bubble { background: var(--sage); color: #141210; display: inline-block; padding: 0.5rem 0.75rem; border-radius: 12px 12px 2px 12px; max-width: 85%; text-align: left; }
+    .claude-msg.assistant .claude-bubble { background: var(--bg); color: var(--text); display: inline-block; padding: 0.5rem 0.75rem; border-radius: 12px 12px 12px 2px; max-width: 90%; text-align: left; border: 1px solid var(--border); }
+    .claude-msg.assistant .claude-bubble p { margin: 0 0 0.4rem; }
+    .claude-msg.assistant .claude-bubble p:last-child { margin-bottom: 0; }
+    .claude-msg.assistant .claude-bubble ul, .claude-msg.assistant .claude-bubble ol { margin: 0.25rem 0; padding-left: 1.25rem; }
+    .claude-msg.assistant .claude-bubble li { margin-bottom: 0.15rem; }
+    .claude-msg.assistant .claude-bubble strong { color: var(--honey); }
+    .claude-msg.assistant .claude-bubble code { background: var(--card); padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.78rem; }
+    .claude-msg.action .claude-bubble { background: transparent; color: var(--dim); font-size: 0.75rem; font-style: italic; display: inline-block; padding: 0.2rem 0; }
+    .claude-msg.thinking { text-align: center; }
+    .claude-msg.thinking .claude-bubble { background: transparent; color: var(--dim); font-size: 0.75rem; }
+    .claude-dots { display: inline-flex; gap: 4px; }
+    .claude-dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--dim); animation: claude-bounce 1.2s infinite; }
+    .claude-dots span:nth-child(2) { animation-delay: 0.15s; }
+    .claude-dots span:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes claude-bounce { 0%,80%,100% { opacity: 0.3; } 40% { opacity: 1; } }
+
+    .claude-input-row { padding: 0.6rem 0.75rem; border-top: 1px solid var(--border); display: flex; gap: 0.5rem; }
+    .claude-input-row input { flex: 1; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 0.55rem 0.75rem; border-radius: 10px; font-size: 0.85rem; font-family: 'DM Sans', sans-serif; }
+    .claude-input-row input:focus { outline: none; border-color: var(--sage); box-shadow: 0 0 0 3px rgba(140,180,122,0.2); }
+    .claude-input-row input::placeholder { color: var(--dim); }
+    .claude-input-row button { background: var(--sage); border: none; color: #141210; padding: 0.55rem 0.85rem; border-radius: 10px; cursor: pointer; font-weight: 700; font-size: 0.85rem; font-family: 'DM Sans', sans-serif; transition: opacity 0.15s; }
+    .claude-input-row button:hover { opacity: 0.85; }
+    .claude-input-row button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    @media (max-width: 600px) {
+      .claude-panel { left: 0.75rem; right: 0.75rem; width: auto; bottom: 5rem; max-height: 70vh; }
+      .claude-fab { bottom: 1rem; right: 1rem; width: 48px; height: 48px; }
+    }
   </style>
 </head>
 <body>
@@ -347,6 +394,11 @@
       <button class="team-btn" id="team-btn" style="display:none;">Team</button>
       <button id="logout-btn">Sign out</button>
     </div>
+  </div>
+
+  <div id="adspend-banner" style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:0.75rem 1.25rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:0.75rem;">
+    <span style="font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">Ad Spend Today</span>
+    <span id="adspend-value" style="font-size:1.5rem;font-weight:700;color:var(--honey);">—</span>
   </div>
 
   <div class="tab-bar">
@@ -1216,6 +1268,22 @@ function applyFilter() {
 }
 
 // ── Init ──
+async function loadAdSpend() {
+  if (!currentStaff || !currentStaff.token) return;
+  try {
+    const res = await fetch(`/.netlify/functions/facebook-adspend?token=${encodeURIComponent(currentStaff.token)}`);
+    const json = await res.json();
+    const el = document.getElementById('adspend-value');
+    if (json.spend !== null && json.spend !== undefined) {
+      el.textContent = '$' + Number(json.spend).toFixed(2);
+    } else {
+      el.textContent = '—';
+    }
+  } catch (e) {
+    document.getElementById('adspend-value').textContent = '—';
+  }
+}
+
 async function initDashboard() {
   try {
     sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -1238,6 +1306,7 @@ async function initDashboard() {
   allLineItems = liRes.data || [];
   populateFilterDropdowns();
   applyFilter();
+  loadAdSpend();
 
   // Start auto-refresh of stats every 15 seconds
   startStatsRefresh();
@@ -1272,6 +1341,7 @@ async function refreshStats() {
     const filteredOrderIds = new Set(filteredOrders.map(o => o.id));
     const filteredLI = allLineItems.filter(li => filteredOrderIds.has(li.order_id));
     renderStats(filteredOrders, filteredLI);
+    loadAdSpend();
     updateRefreshTime();
   } catch (e) {
     // Silent fail on auto-refresh
@@ -3633,6 +3703,365 @@ function getMfgSkuList() {
   document.addEventListener('click', function(e) {
     if (!e.target.closest('.mfg-sku-wrap')) dropdown.classList.remove('open');
   });
+})();
+</script>
+
+<!-- Claude AI Chat Widget -->
+<button class="claude-fab" id="claude-fab" title="Ask Claude AI" style="display:none;">
+  <svg class="icon-chat" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.2L4 17.2V4h16v12z"/><path d="M7 9h2v2H7zm4 0h2v2h-2zm4 0h2v2h-2z"/></svg>
+  <svg class="icon-close" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+</button>
+<div class="claude-panel" id="claude-panel">
+  <div class="claude-panel-header">
+    <h3>Claude AI</h3>
+    <button class="claude-clear-btn" id="claude-clear-btn">Clear chat</button>
+  </div>
+  <div class="claude-messages" id="claude-messages">
+    <div class="claude-msg assistant"><div class="claude-bubble">Hi! I can help you interpret your dashboard data. Ask me about sales, trends, products, or tell me to change filters and tabs.</div></div>
+  </div>
+  <div class="claude-input-row">
+    <input type="text" id="claude-input" placeholder="Ask about your data..." autocomplete="off">
+    <button id="claude-send-btn">Send</button>
+  </div>
+</div>
+
+<script>
+// ── Claude Chat Widget ──
+(function() {
+  const fab = document.getElementById('claude-fab');
+  const panel = document.getElementById('claude-panel');
+  const messagesEl = document.getElementById('claude-messages');
+  const input = document.getElementById('claude-input');
+  const sendBtn = document.getElementById('claude-send-btn');
+  const clearBtn = document.getElementById('claude-clear-btn');
+
+  let chatMessages = []; // API message history
+  let isSending = false;
+
+  // Show FAB only when logged in (dashboard visible)
+  const dashObserver = new MutationObserver(() => {
+    fab.style.display = document.getElementById('dashboard').style.display === 'none' ? 'none' : 'flex';
+  });
+  dashObserver.observe(document.getElementById('dashboard'), { attributes: true, attributeFilter: ['style'] });
+
+  // Toggle panel
+  fab.addEventListener('click', () => {
+    const isOpen = panel.classList.toggle('open');
+    fab.classList.toggle('open', isOpen);
+    if (isOpen) input.focus();
+  });
+
+  // Clear chat
+  clearBtn.addEventListener('click', () => {
+    chatMessages = [];
+    messagesEl.innerHTML = '<div class="claude-msg assistant"><div class="claude-bubble">Chat cleared. Ask me anything about your dashboard data.</div></div>';
+  });
+
+  // Send on Enter
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && !isSending) sendMessage();
+  });
+  sendBtn.addEventListener('click', () => { if (!isSending) sendMessage(); });
+
+  // ── Context Gathering ──
+  function gatherDashboardContext() {
+    const lines = [];
+
+    // Active tab
+    const activeTabBtn = document.querySelector('.tab-btn.active');
+    if (activeTabBtn) lines.push(`Active tab: ${activeTabBtn.textContent.trim()}`);
+
+    // Date range
+    const rangeEl = document.getElementById('date-range');
+    if (rangeEl) {
+      const opt = rangeEl.options[rangeEl.selectedIndex];
+      lines.push(`Date range: ${opt ? opt.textContent : rangeEl.value}`);
+    }
+
+    // Filters
+    const filterIds = [
+      { id: 'filter-utm', label: 'Source' },
+      { id: 'filter-utm-medium', label: 'Medium' },
+      { id: 'filter-utm-campaign', label: 'Campaign' },
+      { id: 'filter-city', label: 'City' },
+    ];
+    filterIds.forEach(f => {
+      const el = document.getElementById(f.id);
+      if (el && el.value) lines.push(`Filter ${f.label}: ${el.value}`);
+    });
+
+    // Stat cards
+    const statCards = document.querySelectorAll('.stat-card');
+    if (statCards.length) {
+      lines.push('\nSummary stats:');
+      statCards.forEach(card => {
+        const label = card.querySelector('.label');
+        const value = card.querySelector('.value');
+        const sub = card.querySelector('.sub');
+        if (label && value) {
+          let text = `- ${label.textContent.trim()}: ${value.textContent.trim()}`;
+          if (sub) text += ` (${sub.textContent.trim()})`;
+          lines.push(text);
+        }
+      });
+    }
+
+    // Ad spend
+    const adSpend = document.getElementById('adspend-value');
+    if (adSpend && adSpend.textContent.trim() !== '—') {
+      lines.push(`\nAd Spend Today: ${adSpend.textContent.trim()}`);
+    }
+
+    // Website analytics stats (if on that tab)
+    const waStats = document.querySelectorAll('.wa-stat');
+    if (waStats.length) {
+      lines.push('\nWebsite analytics:');
+      waStats.forEach(stat => {
+        const val = stat.querySelector('.wa-val');
+        const lbl = stat.querySelector('.wa-lbl');
+        if (val && lbl) lines.push(`- ${lbl.textContent.trim()}: ${val.textContent.trim()}`);
+      });
+    }
+
+    return lines.join('\n');
+  }
+
+  // ── Read table data for get_table_data tool ──
+  function readTableData(tableName) {
+    const tableMap = {
+      orders: '#orders-table',
+      trending_products: '#trending-body',
+      utm_campaigns: '#utm-body',
+      bought_together: '#together-body',
+      magnet_products: '#magnet-body',
+      shipping: '#shipping-table-body',
+      customers: '.customer-profile',
+      website_pages: '#wa-pages-body',
+      website_referrers: '#wa-referrers-body',
+      website_browsers: '#wa-browsers-body',
+      website_countries: '#wa-countries-body',
+    };
+    const selector = tableMap[tableName];
+    if (!selector) return 'Table not found.';
+
+    if (tableName === 'customers') {
+      const profiles = document.querySelectorAll(selector);
+      if (!profiles.length) return 'No customer data loaded.';
+      const rows = [];
+      profiles.forEach((p, i) => {
+        if (i >= 20) return;
+        const name = p.querySelector('.customer-name')?.textContent?.trim() || '';
+        const email = p.querySelector('.customer-email')?.textContent?.trim() || '';
+        const meta = p.querySelector('.customer-meta')?.textContent?.trim() || '';
+        rows.push(`${name} | ${email} | ${meta}`);
+      });
+      return rows.join('\n') || 'No data.';
+    }
+
+    const tbody = document.querySelector(selector);
+    if (!tbody) return 'Table not loaded yet.';
+    const trs = tbody.querySelectorAll('tr');
+    if (!trs.length) return 'No rows in table.';
+    const rows = [];
+    // Get headers from the parent table's thead
+    const table = tbody.closest('table');
+    if (table) {
+      const ths = table.querySelectorAll('thead th');
+      if (ths.length) rows.push(Array.from(ths).map(th => th.textContent.trim()).join(' | '));
+    }
+    trs.forEach((tr, i) => {
+      if (i >= 30) return;
+      const cells = tr.querySelectorAll('td');
+      rows.push(Array.from(cells).map(td => td.textContent.trim()).join(' | '));
+    });
+    return rows.join('\n') || 'No data.';
+  }
+
+  // ── Action Executor ──
+  function executeDashboardAction(toolName, toolInput) {
+    switch (toolName) {
+      case 'switch_tab': {
+        const btn = document.querySelector(`.tab-btn[data-tab="${toolInput.tab}"]`);
+        if (btn) { btn.click(); return `Switched to ${btn.textContent.trim()} tab.`; }
+        return `Tab "${toolInput.tab}" not found.`;
+      }
+      case 'set_date_range': {
+        const rangeEl = document.getElementById('date-range');
+        if (!rangeEl) return 'Date range control not found.';
+        rangeEl.value = toolInput.range;
+        rangeEl.dispatchEvent(new Event('change', { bubbles: true }));
+        if (toolInput.range === 'custom' && toolInput.from && toolInput.to) {
+          const fromEl = document.getElementById('date-from');
+          const toEl = document.getElementById('date-to');
+          if (fromEl) { fromEl.value = toolInput.from; fromEl.dispatchEvent(new Event('change', { bubbles: true })); }
+          if (toEl) { toEl.value = toolInput.to; toEl.dispatchEvent(new Event('change', { bubbles: true })); }
+          return `Set date range to ${toolInput.from} – ${toolInput.to}.`;
+        }
+        const opt = rangeEl.options[rangeEl.selectedIndex];
+        return `Set date range to ${opt ? opt.textContent : toolInput.range}.`;
+      }
+      case 'set_filter': {
+        const filterMap = { source: 'filter-utm', medium: 'filter-utm-medium', campaign: 'filter-utm-campaign', city: 'filter-city' };
+        const el = document.getElementById(filterMap[toolInput.filter_type]);
+        if (!el) return `Filter "${toolInput.filter_type}" not found.`;
+        el.value = toolInput.value;
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        return toolInput.value ? `Set ${toolInput.filter_type} filter to "${toolInput.value}".` : `Cleared ${toolInput.filter_type} filter.`;
+      }
+      case 'clear_filters': {
+        ['filter-utm', 'filter-utm-medium', 'filter-utm-campaign', 'filter-city'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) { el.value = ''; el.dispatchEvent(new Event('change', { bubbles: true })); }
+        });
+        return 'All filters cleared.';
+      }
+      case 'scroll_to_section': {
+        const sectionMap = {
+          stats: '.stats', 'revenue-chart': '#revenue-chart', 'hours-chart': '#hours-chart',
+          'products-chart': '#products-chart', heatmap: '.heatmap-grid', map: '#order-map',
+          utm: '#utm-body', trending: '#trending-body', 'orders-table': '#orders-table',
+        };
+        const el = document.querySelector(sectionMap[toolInput.section]);
+        if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); return `Scrolled to ${toolInput.section}.`; }
+        return `Section "${toolInput.section}" not found.`;
+      }
+      case 'get_table_data': {
+        return readTableData(toolInput.table);
+      }
+      default:
+        return `Unknown action: ${toolName}`;
+    }
+  }
+
+  // ── Markdown-lite renderer ──
+  function renderMarkdown(text) {
+    return text
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/`(.+?)`/g, '<code>$1</code>')
+      .replace(/\n\n/g, '</p><p>')
+      .replace(/\n- /g, '</p><ul><li>').replace(/<\/li>(?=<ul>)/g, '')
+      .replace(/^- /gm, '<li>')
+      // Wrap in paragraphs
+      .replace(/^(?!<)/, '<p>').replace(/(?<!>)$/, '</p>')
+      // Fix dangling list items
+      .replace(/<li>(.+?)(?=<li>|<\/p>|$)/g, '<li>$1</li>')
+      .replace(/<ul>([\s\S]*?)(?=<\/p>|$)/g, '<ul>$1</ul>');
+  }
+
+  // ── UI helpers ──
+  function addMessage(role, html) {
+    const div = document.createElement('div');
+    div.className = `claude-msg ${role}`;
+    div.innerHTML = `<div class="claude-bubble">${html}</div>`;
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return div;
+  }
+
+  function showThinking() {
+    return addMessage('thinking', '<div class="claude-dots"><span></span><span></span><span></span></div>');
+  }
+
+  function removeThinking(el) {
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+  }
+
+  // ── Send message ──
+  async function sendMessage() {
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    isSending = true;
+    sendBtn.disabled = true;
+
+    addMessage('user', text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+    chatMessages.push({ role: 'user', content: text });
+
+    const thinkingEl = showThinking();
+
+    try {
+      await claudeLoop();
+    } catch (err) {
+      removeThinking(thinkingEl);
+      addMessage('assistant', `<em style="color:var(--red);">Error: ${err.message}</em>`);
+    }
+
+    removeThinking(thinkingEl);
+    isSending = false;
+    sendBtn.disabled = false;
+    input.focus();
+  }
+
+  // ── Claude conversation loop (handles tool use) ──
+  async function claudeLoop() {
+    const MAX_TURNS = 6;
+    for (let turn = 0; turn < MAX_TURNS; turn++) {
+      const context = gatherDashboardContext();
+      const res = await fetch('/.netlify/functions/claude-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: currentStaff ? currentStaff.token : '',
+          messages: chatMessages,
+          context: context,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Request failed' }));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+
+      // Process response content blocks
+      let textParts = [];
+      let toolUses = [];
+
+      data.content.forEach(block => {
+        if (block.type === 'text') textParts.push(block.text);
+        if (block.type === 'tool_use') toolUses.push(block);
+      });
+
+      // Show any text
+      if (textParts.length) {
+        const fullText = textParts.join('\n');
+        // Remove existing thinking indicator before showing real response
+        const thinkingEls = messagesEl.querySelectorAll('.claude-msg.thinking');
+        thinkingEls.forEach(el => el.remove());
+        addMessage('assistant', renderMarkdown(fullText));
+      }
+
+      // If no tool use, we're done
+      if (data.stop_reason !== 'tool_use' || !toolUses.length) {
+        // Add assistant message to history
+        chatMessages.push({ role: 'assistant', content: data.content });
+        return;
+      }
+
+      // Add assistant message with tool calls to history
+      chatMessages.push({ role: 'assistant', content: data.content });
+
+      // Execute each tool call and build tool results
+      const toolResults = [];
+      for (const tool of toolUses) {
+        const result = executeDashboardAction(tool.name, tool.input);
+        addMessage('action', `⚡ ${result}`);
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: tool.id,
+          content: result,
+        });
+      }
+
+      // Add tool results to message history
+      chatMessages.push({ role: 'user', content: toolResults });
+
+      // Brief delay for UI to update after actions
+      await new Promise(r => setTimeout(r, 300));
+    }
+  }
 })();
 </script>
 </body>
