@@ -52,7 +52,7 @@ async function getStaffByToken(token) {
 const SCOPES = 'openid profile email accounting.transactions.read accounting.reports.read accounting.contacts.read accounting.settings.read';
 
 function getRedirectUri() {
-  return 'https://www.oso.nz/.netlify/functions/xero-auth';
+  return 'https://oso.nz/.netlify/functions/xero-auth';
 }
 
 exports.handler = async (event) => {
