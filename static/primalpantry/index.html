@@ -316,7 +316,7 @@
 
     @media (max-width: 900px) {
       .charts-row { grid-template-columns: 1fr; }
-      #pace-map-row { grid-template-columns: 1fr 1fr !important; }
+      #pace-map-row { grid-template-columns: 1fr !important; }
       .wa-panels { grid-template-columns: 1fr; }
       .wa-small-panels { grid-template-columns: 1fr; }
       .mfg-form-row { grid-template-columns: 1fr 1fr; }
@@ -514,19 +514,20 @@
   <div id="tab-sales" class="tab-content active">
   <div class="stats" id="stats-grid"></div>
 
-  <div class="chart-card" style="margin-bottom:1.5rem;">
-    <h3>Order Heatmap (Day x Hour)</h3>
-    <div id="heatmap-container"></div>
-  </div>
-
-  <div id="pace-map-row" style="display:grid;grid-template-columns:3fr 1fr;gap:0.75rem;margin-bottom:1.5rem;">
-    <div class="chart-card">
-      <h3>Revenue Pace <select id="pace-mode" style="float:right;background:var(--bg);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:0.75rem;" onclick="event.stopPropagation()"><option value="daily">Today vs Last Week</option><option value="monthly">Monthly Progress</option></select></h3>
-      <div class="chart-wrap"><canvas id="cumulative-revenue-chart"></canvas></div>
+  <div id="pace-map-row" style="display:grid;grid-template-columns:2fr 1fr;gap:0.75rem;margin-bottom:1.5rem;">
+    <div style="display:flex;flex-direction:column;gap:0.75rem;">
+      <div class="chart-card" style="flex:1;">
+        <h3>Order Heatmap (Day x Hour)</h3>
+        <div id="heatmap-container"></div>
+      </div>
+      <div class="chart-card" style="flex:1;">
+        <h3>Revenue Pace <select id="pace-mode" style="float:right;background:var(--bg);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:0.75rem;" onclick="event.stopPropagation()"><option value="daily">Today vs Last Week</option><option value="monthly">Monthly Progress</option></select></h3>
+        <div class="chart-wrap"><canvas id="cumulative-revenue-chart"></canvas></div>
+      </div>
     </div>
     <div class="chart-card" style="min-height:0;">
       <h3>Order Locations</h3>
-      <div id="order-map" style="height:100%;min-height:250px;"></div>
+      <div id="order-map" style="height:100%;min-height:400px;"></div>
     </div>
   </div>
 
@@ -3108,7 +3109,7 @@ function renderCustomersTab() {
       return `<div class="customer-order-row" onclick="event.stopPropagation(); openOrderModal(${o.id});">
         <span>${o.order_date}</span>
         <span>$${Number(o.total_value || 0).toFixed(2)}</span>
-        ${sourcePill(src)} ${magnet ? sourcePill(magnet) : ''} ${shipPill}
+        ${sourcePill(src)} ${magnet ? sourcePill(magnet) : ''} ${shipPill} ${daysWaitingBadge(o)}
         <span style="font-size:0.7rem;color:var(--muted);" title="Time to ship">Ship: ${shipTimeStr}</span>
         <span style="font-size:0.7rem;color:var(--muted);" title="Total wait time">Wait: ${waitStr}</span>
         <div class="customer-order-items" style="width:100%;">${itemStr || 'No items'}</div>

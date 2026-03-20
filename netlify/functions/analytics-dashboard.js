@@ -176,7 +176,8 @@ exports.handler = async (event) => {
 
       case 'conversions': {
         const thankYou = qs.thank_you || '/pages/thank-you/';
-        const data = await callRpc('analytics_conversions', { ...baseParams, p_thank_you: thankYou });
+        // Don't pass p_filters — analytics_conversions doesn't support them
+        const data = await callRpc('analytics_conversions', { p_site: site, p_from, p_to, p_thank_you: thankYou });
         return reply(200, data);
       }
 

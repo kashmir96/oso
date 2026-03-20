@@ -359,16 +359,22 @@ RETURNS json AS $$
   ) v;
 $$ LANGUAGE sql STABLE;
 
--- Conversion funnels: for visitors who hit a thank-you/success page,
--- show entry page → last page before conversion → thank-you page
+-- Conversion funnels: for visitors who triggered 'checkout completed' event,
+-- show entry page → last product page before conversion
 CREATE OR REPLACE FUNCTION analytics_conversions(p_site text, p_from timestamptz, p_to timestamptz, p_thank_you text DEFAULT '/pages/thank-you/')
 RETURNS json AS $$
   WITH converted AS (
-    -- Visitors who hit the thank-you page
-    SELECT DISTINCT visitor_hash, MIN(created_at) AS converted_at
-    FROM analytics_pageviews
-    WHERE site_id = p_site AND created_at >= p_from AND created_at < p_to
-      AND pathname = p_thank_you
+    -- Visitors who fired 'checkout completed' event OR hit thank-you page
+    SELECT visitor_hash, MIN(created_at) AS converted_at
+    FROM (
+      SELECT visitor_hash, created_at FROM analytics_events
+      WHERE site_id = p_site AND created_at >= p_from AND created_at < p_to
+        AND event_name = 'checkout completed'
+      UNION ALL
+      SELECT visitor_hash, created_at FROM analytics_pageviews
+      WHERE site_id = p_site AND created_at >= p_from AND created_at < p_to
+        AND pathname = p_thank_you
+    ) x
     GROUP BY visitor_hash
   ),
   journeys AS (
@@ -386,7 +392,7 @@ RETURNS json AS $$
       (SELECT pathname FROM journeys j2
        WHERE j2.visitor_hash = j.visitor_hash
        ORDER BY j2.entry_page DESC, j2.created_at ASC LIMIT 1) AS landing_page,
-      -- Last page before thank-you (the "sale page")
+      -- Last product/non-thankyou page before conversion
       (SELECT pathname FROM journeys j2
        WHERE j2.visitor_hash = j.visitor_hash AND j2.pathname != p_thank_you
        ORDER BY j2.created_at DESC LIMIT 1) AS sale_page,
