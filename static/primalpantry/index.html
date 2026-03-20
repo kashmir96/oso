@@ -63,7 +63,7 @@
     .utm-bar { height: 6px; border-radius: 3px; background: var(--blue); display: inline-block; }
 
     /* Map */
-    #order-map { height: 400px; border-radius: 8px; }
+    #order-map { height: 400px; border-radius: 8px; z-index: 1; position: relative; }
 
     /* Orders table */
     .orders-card { background: var(--card); border-radius: 10px; padding: 1rem; }
@@ -156,6 +156,11 @@
       <h3>Order Locations</h3>
       <div id="order-map"></div>
     </div>
+  </div>
+
+  <div class="chart-card" style="margin-bottom:1.5rem;">
+    <h3>Magnet Products (Most Common First Item in Cart)</h3>
+    <div id="magnet-container"></div>
   </div>
 
   <div class="orders-card">
@@ -324,6 +329,7 @@ function renderAll(orders, lineItems) {
   renderUTM(orders);
   renderHeatmap(orders);
   renderMap(orders);
+  renderMagnetProducts(orders);
   renderOrdersTable();
 }
 
@@ -350,18 +356,6 @@ function renderStats(orders, lineItems) {
   // Unique emails in filtered period
   const periodEmails = new Set(orders.map(o => o.email).filter(Boolean));
 
-  // Magnet product — most common first line item per order
-  const firstItems = {};
-  orders.forEach(o => {
-    const items = allLineItems.filter(li => li.order_id === o.id).sort((a, b) => a.id - b.id);
-    if (items.length > 0) {
-      const name = items[0].description || items[0].sku || 'Unknown';
-      firstItems[name] = (firstItems[name] || 0) + 1;
-    }
-  });
-  const magnetEntries = Object.entries(firstItems).sort((a, b) => b[1] - a[1]);
-  const magnetProduct = magnetEntries.length > 0 ? magnetEntries[0] : ['None', 0];
-
   const stats = [
     { label: 'Revenue', value: fmt_money(revenue), sub: `${orderCount} orders`, color: 'var(--green)' },
     { label: 'Orders', value: orderCount, sub: `${periodEmails.size} customers`, color: 'var(--blue)' },
@@ -373,7 +367,6 @@ function renderStats(orders, lineItems) {
     { label: 'Discounts Given', value: fmt_money(sum(orders, 'discount_applied')), sub: `${orders.filter(o => Number(o.discount_applied) > 0).length} orders`, color: 'var(--red)' },
     { label: 'Top Customer (Spend)', value: topCustomer(allOrders, 'total_value').name, sub: fmt_money(topCustomer(allOrders, 'total_value').total), color: 'var(--lime)' },
     { label: 'Top Customer (Orders)', value: topCustomer(allOrders, 'count').name, sub: `${topCustomer(allOrders, 'count').total} orders`, color: 'var(--amber)' },
-    { label: 'Magnet Product', value: magnetProduct[0], sub: `${magnetProduct[1]} orders as first item`, color: 'var(--cyan)' },
   ];
 
   document.getElementById('stats-grid').innerHTML = stats.map(s => `
@@ -630,6 +623,42 @@ function closeModal() {
 }
 
 // ── Helpers ──
+// ── Magnet Products ──
+function renderMagnetProducts(orders) {
+  const firstItems = {};
+  const totalOrders = orders.length;
+  orders.forEach(o => {
+    const items = allLineItems.filter(li => li.order_id === o.id).sort((a, b) => a.id - b.id);
+    if (items.length > 0) {
+      const name = items[0].description || items[0].sku || 'Unknown';
+      if (!firstItems[name]) firstItems[name] = { count: 0, revenue: 0 };
+      firstItems[name].count++;
+      firstItems[name].revenue += Number(o.total_value || 0);
+    }
+  });
+  const sorted = Object.entries(firstItems).sort((a, b) => b[1].count - a[1].count);
+  const max = sorted.length > 0 ? sorted[0][1].count : 1;
+  const container = document.getElementById('magnet-container');
+
+  if (sorted.length === 0) {
+    container.innerHTML = '<p style="color:var(--dim);font-size:0.85rem;">No data yet</p>';
+    return;
+  }
+
+  container.innerHTML = `<table class="utm-table">
+    <thead><tr><th>Product</th><th>Orders</th><th>Revenue</th><th>% of Orders</th><th></th></tr></thead>
+    <tbody>${sorted.map(([name, data]) => `
+      <tr>
+        <td>${name}</td>
+        <td>${data.count}</td>
+        <td>${fmt_money(data.revenue)}</td>
+        <td>${totalOrders > 0 ? (data.count / totalOrders * 100).toFixed(1) : 0}%</td>
+        <td><span class="utm-bar" style="width:${(data.count / max) * 120}px;background:var(--cyan);"></span></td>
+      </tr>
+    `).join('')}</tbody>
+  </table>`;
+}
+
 // ── Geographic Map ──
 const NZ_CITIES = {
   'auckland':[-36.85,174.76],'wellington':[-41.29,174.78],'christchurch':[-43.53,172.64],
@@ -720,14 +749,30 @@ function renderMap(orders) {
   // Clear old markers
   mapInstance.eachLayer(l => { if (l instanceof L.CircleMarker) mapInstance.removeLayer(l); });
   markers.forEach(m => {
-    L.circleMarker(m.coords, {
+    const marker = L.circleMarker(m.coords, {
       radius: Math.min(4 + m.count * 2, 20),
       color: 'var(--blue)',
       fillColor: '#3b82f6',
       fillOpacity: 0.6,
       weight: 1,
-    }).bindTooltip(`<b>${m.name}</b><br>${m.count} orders<br>$${m.revenue.toFixed(2)}`, { className: '' })
+    }).bindTooltip(`<b>${m.name}</b><br>${m.count} orders<br>$${m.revenue.toFixed(2)}<br><i>Click to filter</i>`, { className: '' })
       .addTo(mapInstance);
+    marker.on('click', () => {
+      const citySelect = document.getElementById('filter-city');
+      // Find matching option (case-insensitive)
+      const match = [...citySelect.options].find(opt => opt.value.toLowerCase() === m.name.toLowerCase());
+      if (match) {
+        citySelect.value = match.value;
+      } else {
+        // Add it if not in dropdown
+        const opt = document.createElement('option');
+        opt.value = m.name;
+        opt.textContent = m.name;
+        citySelect.appendChild(opt);
+        citySelect.value = m.name;
+      }
+      applyFilter();
+    });
   });
 
   // Invalidate size in case container was hidden
