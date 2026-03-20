@@ -69,7 +69,9 @@ exports.handler = async (event) => {
 
     // Parse order lists
     const unshippedList = Array.isArray(unshippedData.orders) ? unshippedData.orders : [];
-    const printedList = Array.isArray(printedData.order) ? printedData.order : [];
+    // /api/orders returns { order: [...] } per docs
+    const printedList = Array.isArray(printedData.order) ? printedData.order
+      : Array.isArray(printedData.orders) ? printedData.orders : [];
     const shippedList = Array.isArray(shippedData.orders) ? shippedData.orders : [];
 
     const unshipped = unshippedList.map(o => ({
@@ -132,6 +134,8 @@ exports.handler = async (event) => {
           shipped: counts.shipped_count || shipped.length,
           archived: counts.archived_count || 0,
         },
+        _debug_printed_keys: Object.keys(printedData),
+        _debug_printed_sample: JSON.stringify(printedData).slice(0, 300),
       }),
     };
   } catch (err) {
