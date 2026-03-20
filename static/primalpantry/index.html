@@ -1247,7 +1247,7 @@ function renderOrdersTable() {
 
   tbody.innerHTML = orders.slice(0, 100).map(o => `
     <tr class="clickable" data-id="${o.id}">
-      <td>${o.order_date}</td>
+      <td>${o.order_date}${o.created_at ? ' ' + new Date(o.created_at).toLocaleTimeString('en-NZ', {hour:'2-digit',minute:'2-digit'}) : ''}</td>
       <td>${o.customer_name || '-'}</td>
       <td>${o.email || '-'}</td>
       <td>${[o.city, o.country_code].filter(Boolean).join(', ') || '-'}</td>
