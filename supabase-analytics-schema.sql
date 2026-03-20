@@ -349,6 +349,50 @@ RETURNS json AS $$
   ) v;
 $$ LANGUAGE sql STABLE;
 
+-- Conversion funnels: for visitors who hit a thank-you/success page,
+-- show entry page → last page before conversion → thank-you page
+CREATE OR REPLACE FUNCTION analytics_conversions(p_site text, p_from timestamptz, p_to timestamptz, p_thank_you text DEFAULT '/pages/thank-you/')
+RETURNS json AS $$
+  WITH converted AS (
+    -- Visitors who hit the thank-you page
+    SELECT DISTINCT visitor_hash, MIN(created_at) AS converted_at
+    FROM analytics_pageviews
+    WHERE site_id = p_site AND created_at >= p_from AND created_at < p_to
+      AND pathname = p_thank_you
+    GROUP BY visitor_hash
+  ),
+  journeys AS (
+    -- All pages for converted visitors in the date range
+    SELECT pv.visitor_hash, pv.pathname, pv.created_at, pv.entry_page,
+           pv.referrer_domain, pv.browser, pv.device_type, pv.country
+    FROM analytics_pageviews pv
+    JOIN converted c ON c.visitor_hash = pv.visitor_hash
+    WHERE pv.site_id = p_site AND pv.created_at >= p_from AND pv.created_at < p_to
+  ),
+  funnels AS (
+    SELECT
+      j.visitor_hash,
+      -- Entry page: first page with entry_page=true, or first page
+      (SELECT pathname FROM journeys j2
+       WHERE j2.visitor_hash = j.visitor_hash
+       ORDER BY j2.entry_page DESC, j2.created_at ASC LIMIT 1) AS landing_page,
+      -- Last page before thank-you (the "sale page")
+      (SELECT pathname FROM journeys j2
+       WHERE j2.visitor_hash = j.visitor_hash AND j2.pathname != p_thank_you
+       ORDER BY j2.created_at DESC LIMIT 1) AS sale_page,
+      c.converted_at,
+      MIN(CASE WHEN j.entry_page THEN j.referrer_domain END) AS referrer,
+      MIN(j.browser) AS browser,
+      MIN(j.device_type) AS device,
+      MIN(j.country) AS country
+    FROM journeys j
+    JOIN converted c ON c.visitor_hash = j.visitor_hash
+    GROUP BY j.visitor_hash, c.converted_at
+  )
+  SELECT COALESCE(json_agg(row_to_json(f) ORDER BY f.converted_at DESC), '[]'::json)
+  FROM funnels f;
+$$ LANGUAGE sql STABLE;
+
 -- List distinct site IDs
 CREATE OR REPLACE FUNCTION analytics_sites()
 RETURNS json AS $$

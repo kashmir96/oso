@@ -160,6 +160,12 @@ exports.handler = async (event) => {
       return reply(200, data);
     }
 
+    case 'conversions': {
+      const thankYou = qs.thank_you || '/pages/thank-you/';
+      const data = await callRpc('analytics_conversions', { ...baseParams, p_thank_you: thankYou });
+      return reply(200, data);
+    }
+
     default:
       return reply(400, { error: 'Unknown metric' });
   }

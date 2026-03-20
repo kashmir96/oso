@@ -242,6 +242,20 @@
     .wa-journey-step.wa-current { border-left: 2px solid var(--blue); background: rgba(59,130,246,0.15); }
     .wa-journey-arrow { color: var(--dim); font-size: 0.65rem; padding: 0 0.25rem; }
     .wa-journey-dur { font-size: 0.6rem; color: var(--dim); margin-left: 2px; }
+    .wa-conversion { display: flex; align-items: center; gap: 0; flex-wrap: wrap; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
+    .wa-conversion:last-child { border-bottom: none; }
+    .wa-conv-page { font-size: 0.75rem; padding: 0.25rem 0.5rem; background: var(--card); border-radius: 4px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .wa-conv-page.wa-landing { border-left: 2px solid var(--green); }
+    .wa-conv-page.wa-sale { border-left: 2px solid var(--yellow, #f59e0b); }
+    .wa-conv-page.wa-thankyou { border-left: 2px solid var(--blue); background: rgba(59,130,246,0.15); }
+    .wa-conv-meta { font-size: 0.65rem; color: var(--dim); margin-left: auto; display: flex; gap: 0.5rem; }
+    /* Spark animations for realtime events */
+    .wa-spark { position: fixed; pointer-events: none; z-index: 9999; }
+    .wa-spark-particle { position: absolute; border-radius: 50%; animation: wa-spark-fly 0.8s ease-out forwards; }
+    @keyframes wa-spark-fly {
+      0% { opacity: 1; transform: translate(0, 0) scale(1); }
+      100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0); }
+    }
 
     @media (max-width: 900px) { .charts-row { grid-template-columns: 1fr; } .wa-panels { grid-template-columns: 1fr; } }
     @media (max-width: 600px) { .stats { grid-template-columns: repeat(2, 1fr); } .wa-stats { grid-template-columns: repeat(2, 1fr); } }
@@ -588,6 +602,11 @@
         </div>
         <div id="wa-campaigns-table"><div class="wa-loading">Loading...</div></div>
       </div>
+    </div>
+
+    <div class="wa-panel" style="margin-bottom:1.5rem;">
+      <h3>Conversion Journeys</h3>
+      <div id="wa-conversions"><div class="wa-loading">Loading...</div></div>
     </div>
   </div><!-- /tab-website -->
 
@@ -2753,6 +2772,90 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     }
   });
 
+  function waRenderConversions(data) {
+    const el = document.getElementById('wa-conversions');
+    if (!data || !data.length) {
+      el.innerHTML = '<p style="color:var(--dim);text-align:center;padding:1rem;font-size:0.85rem;">No conversions</p>';
+      return;
+    }
+    let html = '';
+    data.forEach(c => {
+      html += '<div class="wa-conversion">';
+      html += '<span class="wa-conv-page wa-landing" title="Landing">' + (c.landing_page || '?') + '</span>';
+      html += '<span class="wa-journey-arrow">→</span>';
+      html += '<span class="wa-conv-page wa-sale" title="Sale page">' + (c.sale_page || '?') + '</span>';
+      html += '<span class="wa-journey-arrow">→</span>';
+      html += '<span class="wa-conv-page wa-thankyou">✓ converted</span>';
+      const meta = [];
+      if (c.referrer) meta.push('via ' + c.referrer);
+      if (c.country) meta.push(c.country);
+      if (c.device) meta.push(c.device);
+      html += '<span class="wa-conv-meta">' + meta.join(' · ') + '</span>';
+      html += '</div>';
+    });
+    el.innerHTML = html;
+  }
+
+  // Spark animation for realtime events
+  let waPrevEvents = {};
+  function waCheckForNewEvents(data) {
+    if (!data.pages) return;
+    // Check for new "add to cart" and "proceed to checkout" events
+    const evNames = { 'add to cart': { color: '#C0C0C0', label: 'Add to Cart' }, 'proceed to checkout': { color: '#FFD700', label: 'Checkout' }, 'checkout completed': { color: '#FFD700', label: 'Purchase!' } };
+    // We need the events endpoint for this - poll alongside realtime
+  }
+
+  function waSpark(color, label) {
+    const card = document.getElementById('wa-realtime-card');
+    if (!card) return;
+    const rect = card.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+
+    const container = document.createElement('div');
+    container.className = 'wa-spark';
+    container.style.left = cx + 'px';
+    container.style.top = cy + 'px';
+
+    // Label
+    const lbl = document.createElement('div');
+    lbl.style.cssText = 'position:absolute;left:50%;transform:translateX(-50%);top:-25px;font-size:0.7rem;font-weight:700;color:' + color + ';white-space:nowrap;animation:wa-spark-fly 1.2s ease-out forwards;--dx:0px;--dy:-40px;';
+    lbl.textContent = label;
+    container.appendChild(lbl);
+
+    // Particles
+    for (let i = 0; i < 12; i++) {
+      const p = document.createElement('div');
+      p.className = 'wa-spark-particle';
+      const angle = (Math.PI * 2 / 12) * i;
+      const dist = 30 + Math.random() * 30;
+      p.style.cssText = 'width:4px;height:4px;background:' + color + ';--dx:' + Math.cos(angle) * dist + 'px;--dy:' + Math.sin(angle) * dist + 'px;animation-delay:' + (Math.random() * 0.1) + 's;';
+      container.appendChild(p);
+    }
+    document.body.appendChild(container);
+    setTimeout(() => container.remove(), 1200);
+  }
+
+  // Track event counts to detect new events between polls
+  let waLastEventCounts = {};
+  async function waCheckRealtimeEvents() {
+    if (!waSite || !waToken()) return;
+    try {
+      const { from, to } = waGetDates();
+      const events = await waFetch('analytics-dashboard', { site: waSite, from, to, metric: 'events' });
+      if (!events || !events.length) return;
+      const sparkEvents = { 'add to cart': '#C0C0C0', 'proceed to checkout': '#FFD700', 'checkout completed': '#FFD700' };
+      events.forEach(e => {
+        const name = e.event_name;
+        const count = e.completions || 0;
+        if (sparkEvents[name] && waLastEventCounts[name] !== undefined && count > waLastEventCounts[name]) {
+          waSpark(sparkEvents[name], name === 'add to cart' ? '🛒 Add to Cart!' : name === 'proceed to checkout' ? '💳 Checkout!' : '🎉 Purchase!');
+        }
+        waLastEventCounts[name] = count;
+      });
+    } catch {}
+  }
+
   async function waLoadDashboard() {
     if (!waSite || !waToken()) return;
     const { from, to } = waGetDates();
@@ -2807,6 +2910,11 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
         { key: 'conv_rate', label: 'Conv. Rate', fmt: v => v + '%' },
       ]);
 
+      // Conversions (async, doesn't block main load)
+      waFetch('analytics-dashboard', { site: waSite, from, to, metric: 'conversions' })
+        .then(conv => waRenderConversions(conv || []))
+        .catch(() => {});
+
     } catch (err) {
       console.error('WA load error:', err);
     }
@@ -2814,7 +2922,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     // Realtime
     waLoadRealtime();
     if (waRealtimeInterval) clearInterval(waRealtimeInterval);
-    waRealtimeInterval = setInterval(waLoadRealtime, 30000);
+    waRealtimeInterval = setInterval(() => { waLoadRealtime(); waCheckRealtimeEvents(); }, 30000);
   }
 
   function waRenderTimeseries(data) {
