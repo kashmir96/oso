@@ -1615,7 +1615,7 @@ function renderAll(orders, lineItems) {
   renderHoursChart(orders);
   renderProductsChart(lineItems);
   renderUTM(orders);
-  renderHeatmap(orders);
+  renderHeatmap(allOrders);
   renderMap(orders);
   renderLandingRevenue(orders);
   renderMagnetProducts(orders);
@@ -4173,13 +4173,14 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
         waFetch('analytics-dashboard', { ...base, metric: 'os' }),
         waFetch('analytics-dashboard', { ...base, metric: 'events' }),
         waFetch('analytics-dashboard', { ...base, metric: 'campaigns', col: 'utm_campaign' }),
+        waFetch('analytics-dashboard', { ...base, metric: 'funnel_stages' }),
       ]);
       const v = results.map((r, i) => {
         if (r.status === 'fulfilled') return r.value;
-        console.error('WA metric failed:', ['summary','timeseries','pages','referrers','browsers','devices','countries','os','events','campaigns'][i], r.reason);
+        console.error('WA metric failed:', ['summary','timeseries','pages','referrers','browsers','devices','countries','os','events','campaigns','funnel_stages'][i], r.reason);
         return null;
       });
-      const [summary, timeseries, pages, referrers, browsers, devices, countries, os, events, campaigns] = v;
+      const [summary, timeseries, pages, referrers, browsers, devices, countries, os, events, campaigns, funnelStagesData] = v;
 
       // Stats
       const s = summary || {};
@@ -4189,15 +4190,16 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
       document.getElementById('wa-bounce').textContent = (s.bounce_rate || 0) + '%';
       document.getElementById('wa-events').textContent = fmtNum(s.event_completions || 0);
 
-      // Funnel metrics: LP > ATC %, LP > Sale %, ATC > Sale %, AOV
-      const uniqueVisitors = s.unique_visitors || 0;
-      const atcEvent = (events || []).find(e => e.event_name === 'add to cart');
-      const saleEvent = (events || []).find(e => e.event_name === 'checkout completed');
-      const atcUniques = atcEvent ? atcEvent.uniques : 0;
-      const saleUniques = saleEvent ? saleEvent.uniques : 0;
-      const lpAtc = uniqueVisitors > 0 ? (atcUniques / uniqueVisitors * 100).toFixed(1) : '0.0';
-      const lpSale = uniqueVisitors > 0 ? (saleUniques / uniqueVisitors * 100).toFixed(1) : '0.0';
-      const atcSale = atcUniques > 0 ? (saleUniques / atcUniques * 100).toFixed(1) : '0.0';
+      // Funnel metrics from session-based funnel_stages RPC
+      // Each stage only counts visitors who completed ALL prior stages
+      const fs = funnelStagesData || {};
+      const fVisitors = fs.visitors || (s.unique_visitors || 0);
+      const fAtc = fs.atc || 0;
+      const fCheckout = fs.checkout || 0;
+      const fPurchased = fs.purchased || 0;
+      const lpAtc = fVisitors > 0 ? (fAtc / fVisitors * 100).toFixed(1) : '0.0';
+      const lpSale = fVisitors > 0 ? (fPurchased / fVisitors * 100).toFixed(1) : '0.0';
+      const atcSale = fAtc > 0 ? (fPurchased / fAtc * 100).toFixed(1) : '0.0';
       // AOV from orders data for the selected site + date range
       const siteOrders = (typeof filteredOrders !== 'undefined' ? filteredOrders : allOrders || []).filter(o => {
         if (waSite.toLowerCase().includes('reviana')) return (o.source_site || '').toLowerCase().includes('reviana') || (o.source_site || '').toLowerCase().includes('reviora') || (o.landing_page || '').toLowerCase().includes('reviana') || (o.landing_page || '').toLowerCase().includes('reviora');
@@ -4209,23 +4211,18 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
       document.getElementById('wa-atc-sale').textContent = atcSale + '%';
       document.getElementById('wa-aov').textContent = fmt_money(waAov);
 
-      // Funnel visualisation — enforce monotonic decreasing (each stage <= previous)
-      const checkoutEvent = (events || []).find(e => e.event_name === 'proceed to checkout');
-      const rawCheckout = checkoutEvent ? checkoutEvent.uniques : 0;
-      const funnelAtc = Math.min(atcUniques, uniqueVisitors);
-      const funnelCheckout = Math.min(rawCheckout, funnelAtc);
-      const funnelSales = Math.min(saleUniques, funnelCheckout);
+      // Funnel visualisation — session-based, each stage is a subset of the prior
       const funnelStages = [
-        { label: 'Visitors', count: uniqueVisitors, color: '#6B8F5B' },
-        { label: 'Add to Cart', count: funnelAtc, color: '#8CB47A' },
-        { label: 'Checkout', count: funnelCheckout, color: '#D4A84B' },
-        { label: 'Purchased', count: funnelSales, color: '#C0955A' },
+        { label: 'Visitors', count: fVisitors, color: '#6B8F5B' },
+        { label: 'Add to Cart', count: fAtc, color: '#8CB47A' },
+        { label: 'Checkout', count: fCheckout, color: '#D4A84B' },
+        { label: 'Purchased', count: fPurchased, color: '#C0955A' },
       ];
       const funnelEl = document.getElementById('wa-funnel-viz');
-      if (uniqueVisitors > 0) {
+      if (fVisitors > 0) {
         let fhtml = '<div class="wa-funnel">';
         funnelStages.forEach((st, i) => {
-          const widthPct = uniqueVisitors > 0 ? Math.max(15, (st.count / uniqueVisitors) * 100) : 15;
+          const widthPct = fVisitors > 0 ? Math.max(15, (st.count / fVisitors) * 100) : 15;
           const dropPct = i > 0 ? ((1 - st.count / funnelStages[i - 1].count) * 100) : 0;
           const dropStr = i > 0 && funnelStages[i - 1].count > 0 ? `↓ ${dropPct.toFixed(0)}% drop` : '';
           if (i > 0) fhtml += '<div class="wa-funnel-arrow">→</div>';
@@ -4520,38 +4517,30 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     const results = await Promise.allSettled(
       dims.map(([_, d]) => waFetch('analytics-dashboard', { ...base, col: d.col }))
     );
-    // Also get summary + events for funnel viz header
-    const [summaryRes, eventsRes] = await Promise.allSettled([
-      waFetch('analytics-dashboard', { site: waSite, from, to, ...fp, ...(waFunnelFilterCol && waFunnelFilterVal ? { ['fc'+extraIdx]: waFunnelFilterCol, ['fv'+extraIdx]: waFunnelFilterVal } : {}), metric: 'summary' }),
-      waFetch('analytics-dashboard', { site: waSite, from, to, ...fp, ...(waFunnelFilterCol && waFunnelFilterVal ? { ['fc'+extraIdx]: waFunnelFilterCol, ['fv'+extraIdx]: waFunnelFilterVal } : {}), metric: 'events' }),
-    ]);
-    const summary = summaryRes.status === 'fulfilled' ? summaryRes.value : {};
-    const events = eventsRes.status === 'fulfilled' ? eventsRes.value : [];
-
-    // Update funnel viz
-    const uniqueVisitors = summary.unique_visitors || 0;
-    const atcEvent = (events || []).find(e => e.event_name === 'add to cart');
-    const saleEvent = (events || []).find(e => e.event_name === 'checkout completed');
-    const checkoutEvent = (events || []).find(e => e.event_name === 'proceed to checkout');
-    const rawAtc = atcEvent ? atcEvent.uniques : 0;
-    const rawSale = saleEvent ? saleEvent.uniques : 0;
-    const rawCheckout = checkoutEvent ? checkoutEvent.uniques : 0;
-    // Enforce monotonic decreasing
-    const fAtc = Math.min(rawAtc, uniqueVisitors);
-    const fCheckout = Math.min(rawCheckout, fAtc);
-    const fSale = Math.min(rawSale, fCheckout);
+    // Get session-based funnel stages (each stage = subset of prior)
+    const filterParams = { site: waSite, from, to, ...fp };
+    if (waFunnelFilterCol && waFunnelFilterVal) {
+      filterParams['fc'+extraIdx] = waFunnelFilterCol;
+      filterParams['fv'+extraIdx] = waFunnelFilterVal;
+    }
+    const fsRes = await waFetch('analytics-dashboard', { ...filterParams, metric: 'funnel_stages' }).catch(() => null);
+    const fs = fsRes || {};
+    const fVisitors = fs.visitors || 0;
+    const fAtc = fs.atc || 0;
+    const fCheckout = fs.checkout || 0;
+    const fPurchased = fs.purchased || 0;
 
     const funnelStages = [
-      { label: 'Visitors', count: uniqueVisitors, color: '#6B8F5B' },
+      { label: 'Visitors', count: fVisitors, color: '#6B8F5B' },
       { label: 'Add to Cart', count: fAtc, color: '#8CB47A' },
       { label: 'Checkout', count: fCheckout, color: '#D4A84B' },
-      { label: 'Purchased', count: fSale, color: '#C0955A' },
+      { label: 'Purchased', count: fPurchased, color: '#C0955A' },
     ];
     const funnelEl = document.getElementById('wa-funnel-viz');
-    if (uniqueVisitors > 0) {
+    if (fVisitors > 0) {
       let fhtml = '<div class="wa-funnel">';
       funnelStages.forEach((st, i) => {
-        const widthPct = uniqueVisitors > 0 ? Math.max(15, (st.count / uniqueVisitors) * 100) : 15;
+        const widthPct = fVisitors > 0 ? Math.max(15, (st.count / fVisitors) * 100) : 15;
         const dropPct = i > 0 ? ((1 - st.count / funnelStages[i - 1].count) * 100) : 0;
         const dropStr = i > 0 && funnelStages[i - 1].count > 0 ? `↓ ${dropPct.toFixed(0)}% drop` : '';
         if (i > 0) fhtml += '<div class="wa-funnel-arrow">→</div>';
@@ -4562,10 +4551,10 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
       funnelEl.style.display = '';
     }
 
-    // Update funnel stats (using capped values)
-    const lpAtc = uniqueVisitors > 0 ? (fAtc / uniqueVisitors * 100).toFixed(1) : '0.0';
-    const lpSale = uniqueVisitors > 0 ? (fSale / uniqueVisitors * 100).toFixed(1) : '0.0';
-    const atcSale = fAtc > 0 ? (fSale / fAtc * 100).toFixed(1) : '0.0';
+    // Update funnel stats
+    const lpAtc = fVisitors > 0 ? (fAtc / fVisitors * 100).toFixed(1) : '0.0';
+    const lpSale = fVisitors > 0 ? (fPurchased / fVisitors * 100).toFixed(1) : '0.0';
+    const atcSale = fAtc > 0 ? (fPurchased / fAtc * 100).toFixed(1) : '0.0';
     document.getElementById('wa-lp-atc').textContent = lpAtc + '%';
     document.getElementById('wa-lp-sale').textContent = lpSale + '%';
     document.getElementById('wa-atc-sale').textContent = atcSale + '%';
