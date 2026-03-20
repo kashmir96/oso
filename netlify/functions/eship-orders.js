@@ -50,9 +50,13 @@ exports.handler = async (event) => {
   const limit = params.limit || '50';
 
   try {
-    // Fetch both unshipped and shipped orders in parallel
-    const [unshippedRes, shippedRes] = await Promise.all([
+    // Fetch unshipped (new), printed, and shipped orders in parallel
+    const [unshippedRes, printedRes, shippedRes] = await Promise.all([
       fetch(`https://api.starshipit.com/api/orders?limit=${limit}&page=${page}${sinceDate ? '&since_order_date=' + sinceDate : ''}`, {
+        method: 'GET',
+        headers: apiHeaders,
+      }),
+      fetch(`https://api.starshipit.com/api/orders/printed?limit=${limit}&page=${page}${sinceDate ? '&since_order_date=' + sinceDate : ''}`, {
         method: 'GET',
         headers: apiHeaders,
       }),
@@ -63,17 +67,26 @@ exports.handler = async (event) => {
     ]);
 
     const unshippedData = await unshippedRes.json();
+    const printedData = await printedRes.json();
     const shippedData = await shippedRes.json();
 
     // StarshipIt unshipped endpoint returns { data: { orders: [...] } }, shipped returns { orders: [...] }
     const rawUnshipped = unshippedData.data?.orders || unshippedData.orders || unshippedData.order || [];
     const unshippedList = Array.isArray(rawUnshipped) ? rawUnshipped : [];
+    const rawPrinted = printedData.data?.orders || printedData.orders || printedData.order || [];
+    const printedList = Array.isArray(rawPrinted) ? rawPrinted : [];
     const rawShipped = shippedData.orders || shippedData.order || [];
     const shippedList = Array.isArray(rawShipped) ? rawShipped : [];
 
     const unshipped = unshippedList.map(o => ({
       ...o,
-      _shipping_status: (o.printed || (o.order_status || '').toLowerCase() === 'printed') ? 'Printed' : 'Waiting to Print',
+      _shipping_status: 'Waiting to Print',
+      _status_group: 'unshipped',
+    }));
+
+    const printed = printedList.map(o => ({
+      ...o,
+      _shipping_status: 'Printed',
       _status_group: 'unshipped',
     }));
 
@@ -106,7 +119,7 @@ exports.handler = async (event) => {
     });
 
     // Combine and sort by date descending
-    const all = [...shipped, ...unshipped].sort((a, b) => {
+    const all = [...shipped, ...printed, ...unshipped].sort((a, b) => {
       const da = new Date(a.order_date || a.shipped_date || 0);
       const db = new Date(b.order_date || b.shipped_date || 0);
       return db - da;
@@ -117,7 +130,7 @@ exports.handler = async (event) => {
       headers,
       body: JSON.stringify({
         orders: all,
-        total_unshipped: unshippedData.total_records || unshipped.length,
+        total_unshipped: (unshippedData.total_records || unshipped.length) + printed.length,
         total_shipped: shippedData.total || shipped.length,
       }),
     };
