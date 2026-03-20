@@ -1348,18 +1348,20 @@ document.getElementById('filter-utm-campaign').addEventListener('change', applyF
 document.getElementById('filter-city').addEventListener('change', applyFilter);
 
 function getDateRange() {
+  // Use the same date source as the Revenue Pace chart: toISOString for UTC date
   const now = new Date();
-  const today = fmt_date(now);
-  const yesterday = fmt_date(new Date(now - 86400000));
-  // NZ time for "this month" calculation
-  const nzNow = new Date(now.toLocaleString('en-US', { timeZone: 'Pacific/Auckland' }));
+  const today = now.toISOString().slice(0, 10);
+  const yesterday = new Date(now - 86400000).toISOString().slice(0, 10);
 
   switch (currentRange) {
     case 'today': return [today, today];
     case 'yesterday': return [yesterday, yesterday];
-    case '7d': return [fmt_date(new Date(now - 7 * 86400000)), today];
-    case '30d': return [fmt_date(new Date(now - 30 * 86400000)), today];
-    case 'month': return [`${nzNow.getFullYear()}-${String(nzNow.getMonth() + 1).padStart(2, '0')}-01`, today];
+    case '7d': return [new Date(now - 7 * 86400000).toISOString().slice(0, 10), today];
+    case '30d': return [new Date(now - 30 * 86400000).toISOString().slice(0, 10), today];
+    case 'month': {
+      const y = now.getUTCFullYear(), m = String(now.getUTCMonth() + 1).padStart(2, '0');
+      return [`${y}-${m}-01`, today];
+    }
     case 'all': return ['2000-01-01', today];
     case 'custom': {
       const from = document.getElementById('date-from').value || '2000-01-01';
@@ -1664,8 +1666,8 @@ function renderStats(orders, lineItems) {
   // Revenue growth (current period vs same-length prior period)
   const [from, to] = getDateRange();
   const periodDays = Math.max(1, Math.round((new Date(to) - new Date(from)) / 86400000) + 1);
-  const priorFrom = fmt_date(new Date(new Date(from) - periodDays * 86400000));
-  const priorTo = fmt_date(new Date(new Date(from) - 86400000));
+  const priorFrom = new Date(new Date(from) - periodDays * 86400000).toISOString().slice(0, 10);
+  const priorTo = new Date(new Date(from) - 86400000).toISOString().slice(0, 10);
   const priorOrders = allOrders.filter(o => o.order_date >= priorFrom && o.order_date <= priorTo);
   const priorRevenue = sum(priorOrders, 'total_value');
   const growthPct = priorRevenue > 0 ? ((revenue - priorRevenue) / priorRevenue * 100).toFixed(1) : (revenue > 0 ? '100.0' : '0.0');
@@ -1701,12 +1703,12 @@ function renderStats(orders, lineItems) {
   const priorShippingAvg = priorOrderCount > 0 ? sum(priorOrders, 'shipping_cost') / priorOrderCount : 0;
   const priorDiscounts = sum(priorOrders, 'discount_applied');
 
-  // Build 30-day sparkline data for each metric
+  // Build 30-day sparkline data for each metric (use ISO date to match pace chart)
   function buildSparkline(metricFn) {
     const now = new Date();
     const points = [];
     for (let i = 29; i >= 0; i--) {
-      const d = fmt_date(new Date(now - i * 86400000));
+      const d = new Date(now - i * 86400000).toISOString().slice(0, 10);
       points.push(metricFn(d));
     }
     return points;
@@ -2312,12 +2314,49 @@ function openOrderModal(orderId) {
   // Only owner/admin can see refund/delete buttons
   if (currentStaff && (currentStaff.role === 'owner' || currentStaff.role === 'admin')) {
     const isStripe = order.stripe_session_id && !order.stripe_session_id.startsWith('manual_');
+    const isRefunded = order.status === 'Refunded' || order.status === 'Partial Refund';
+    const orderTotal = Number(order.total_value || 0);
+
     html += `<div style="margin-top:1.5rem;padding-top:1rem;border-top:2px solid var(--red);background:rgba(244,63,94,0.08);border-radius:0 0 8px 8px;padding:1rem;">
-      <div style="color:var(--red);font-weight:700;font-size:0.85rem;margin-bottom:0.5rem;">DANGER ZONE</div>
-      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-        ${isStripe ? `<button class="delete-btn" id="modal-refund" data-order-id="${orderId}" style="padding:0.4rem 1rem;font-size:0.8rem;border-color:var(--amber);color:var(--amber);">Refund</button>` : ''}
-        <button class="delete-btn" id="modal-delete" data-order-id="${orderId}" style="padding:0.4rem 1rem;font-size:0.8rem;">Delete Order</button>
+      <div style="color:var(--red);font-weight:700;font-size:0.85rem;margin-bottom:0.75rem;">DANGER ZONE</div>`;
+
+    // Show refund details if already refunded
+    if (isRefunded && order.refund_reason) {
+      html += `<div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0.75rem;margin-bottom:0.75rem;font-size:0.85rem;">
+        <div style="font-weight:600;color:var(--amber);margin-bottom:0.25rem;">Refund Processed</div>
+        <div class="modal-row"><span class="label">Amount</span><span>$${Number(order.refund_amount || orderTotal).toFixed(2)}</span></div>
+        <div class="modal-row"><span class="label">Reason</span><span>${(order.refund_reason || '').replace(/</g,'&lt;')}</span></div>
+        <div class="modal-row"><span class="label">Date</span><span>${order.refund_date ? new Date(order.refund_date).toLocaleDateString('en-NZ', { timeZone: 'Pacific/Auckland' }) : '-'}</span></div>
+      </div>`;
+    }
+
+    // Refund form (only if not already refunded AND has Stripe session)
+    if (!isRefunded && isStripe) {
+      html += `<div style="margin-bottom:0.75rem;">
+        <label style="font-size:0.8rem;color:var(--muted);display:block;margin-bottom:0.25rem;">Refund Amount ($)</label>
+        <input type="number" id="refund-amount" step="0.01" min="0.01" max="${orderTotal.toFixed(2)}" value="${orderTotal.toFixed(2)}" style="width:120px;padding:0.35rem 0.5rem;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--fg);font-size:0.85rem;">
+        <span id="refund-type-label" style="font-size:0.75rem;color:var(--amber);font-weight:600;margin-left:0.5rem;">FULL REFUND</span>
       </div>
+      <div style="margin-bottom:0.75rem;">
+        <label style="font-size:0.8rem;color:var(--muted);display:block;margin-bottom:0.25rem;">Reason (required)</label>
+        <textarea id="refund-reason" rows="2" placeholder="Reason for refund..." style="width:100%;padding:0.35rem 0.5rem;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--fg);font-size:0.85rem;resize:vertical;font-family:inherit;"></textarea>
+      </div>
+      <button class="delete-btn" id="modal-refund" data-order-id="${orderId}" data-order-total="${orderTotal}" style="padding:0.4rem 1rem;font-size:0.8rem;border-color:var(--amber);color:var(--amber);">Process Refund</button>`;
+    } else if (!isRefunded && !isStripe) {
+      // Manual order — allow marking as refunded without Stripe
+      html += `<div style="margin-bottom:0.75rem;">
+        <label style="font-size:0.8rem;color:var(--muted);display:block;margin-bottom:0.25rem;">Refund Amount ($)</label>
+        <input type="number" id="refund-amount" step="0.01" min="0.01" value="${orderTotal.toFixed(2)}" style="width:120px;padding:0.35rem 0.5rem;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--fg);font-size:0.85rem;">
+      </div>
+      <div style="margin-bottom:0.75rem;">
+        <label style="font-size:0.8rem;color:var(--muted);display:block;margin-bottom:0.25rem;">Reason (required)</label>
+        <textarea id="refund-reason" rows="2" placeholder="Reason for refund..." style="width:100%;padding:0.35rem 0.5rem;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--fg);font-size:0.85rem;resize:vertical;font-family:inherit;"></textarea>
+      </div>
+      <button class="delete-btn" id="modal-refund" data-order-id="${orderId}" data-order-total="${orderTotal}" style="padding:0.4rem 1rem;font-size:0.8rem;border-color:var(--amber);color:var(--amber);">Mark as Refunded</button>`;
+    }
+
+    html += `
+      <button class="delete-btn" id="modal-delete" data-order-id="${orderId}" style="padding:0.4rem 1rem;font-size:0.8rem;margin-top:0.5rem;">Delete Order</button>
     </div>`;
   }
 
@@ -2419,7 +2458,24 @@ function openOrderModal(orderId) {
     detail.style.display = 'block';
   });
 
-  // Refund handler — refunds Stripe only, optionally removes from eShip if not shipped
+  // Refund amount input — update label dynamically
+  const refundAmountInput = document.getElementById('refund-amount');
+  const refundTypeLabel = document.getElementById('refund-type-label');
+  if (refundAmountInput && refundTypeLabel) {
+    refundAmountInput.addEventListener('input', function() {
+      const orderTotal = Number(this.max || this.dataset?.orderTotal || 0);
+      const entered = Number(this.value || 0);
+      if (entered >= orderTotal) {
+        refundTypeLabel.textContent = 'FULL REFUND';
+        refundTypeLabel.style.color = 'var(--amber)';
+      } else {
+        refundTypeLabel.textContent = 'PARTIAL REFUND';
+        refundTypeLabel.style.color = 'var(--accent)';
+      }
+    });
+  }
+
+  // Refund handler — refunds Stripe (full or partial), saves reason to Supabase
   const refundBtn = document.getElementById('modal-refund');
   if (refundBtn) {
     refundBtn.addEventListener('click', async function(e) {
@@ -2428,44 +2484,82 @@ function openOrderModal(orderId) {
       const order = allOrders.find(o => o.id === oid);
       if (!order) return;
 
-      if (!confirm('Refund $' + Number(order.total_value || 0).toFixed(2) + ' to the customer on Stripe?')) return;
+      const orderTotal = Number(this.dataset.orderTotal || order.total_value || 0);
+      const amountInput = document.getElementById('refund-amount');
+      const reasonInput = document.getElementById('refund-reason');
+      const refundAmount = Number(amountInput?.value || orderTotal);
+      const reason = (reasonInput?.value || '').trim();
+
+      if (!reason) { alert('Please enter a reason for the refund.'); reasonInput?.focus(); return; }
+      if (refundAmount <= 0) { alert('Refund amount must be greater than $0.'); amountInput?.focus(); return; }
+      if (refundAmount > orderTotal) { alert('Refund amount cannot exceed $' + orderTotal.toFixed(2)); amountInput?.focus(); return; }
+
+      const isPartial = refundAmount < orderTotal;
+      const isManual = !order.stripe_session_id || order.stripe_session_id.startsWith('manual_');
+      const confirmMsg = isManual
+        ? `Mark this order as ${isPartial ? 'partially ' : ''}refunded ($${refundAmount.toFixed(2)})?\n\nReason: ${reason}`
+        : `${isPartial ? 'Partial refund' : 'Full refund'} of $${refundAmount.toFixed(2)} via Stripe?\n\nReason: ${reason}`;
+
+      if (!confirm(confirmMsg)) return;
 
       const statusMessages = [];
       this.disabled = true;
-      this.textContent = 'Refunding...';
+      this.textContent = 'Processing...';
 
-      // Issue Stripe refund
-      try {
-        const refundRes = await fetch('/.netlify/functions/stripe-refund', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ stripe_session_id: order.stripe_session_id }),
-        });
-        const refundData = await refundRes.json();
-        if (refundRes.ok && refundData.success) {
-          statusMessages.push('Stripe refund issued');
-        } else {
-          statusMessages.push('Stripe refund failed: ' + (refundData.error || 'unknown'));
+      // Issue Stripe refund (skip for manual orders)
+      if (!isManual) {
+        try {
+          const amountCents = Math.round(refundAmount * 100);
+          const refundRes = await fetch('/.netlify/functions/stripe-refund', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              stripe_session_id: order.stripe_session_id,
+              amount_cents: isPartial ? amountCents : undefined,
+              reason: reason,
+              token: currentStaff?.token,
+            }),
+          });
+          const refundData = await refundRes.json();
+          if (refundRes.ok && refundData.success) {
+            statusMessages.push('Stripe refund issued — $' + refundAmount.toFixed(2));
+          } else {
+            statusMessages.push('Stripe refund failed: ' + (refundData.error || 'unknown'));
+            this.disabled = false;
+            this.textContent = 'Process Refund';
+            alert(statusMessages.join('\n'));
+            return;
+          }
+        } catch (err) {
+          statusMessages.push('Stripe refund error: ' + err.message);
           this.disabled = false;
-          this.textContent = 'Refund';
+          this.textContent = 'Process Refund';
           alert(statusMessages.join('\n'));
           return;
         }
-      } catch (err) {
-        statusMessages.push('Stripe refund error: ' + err.message);
-        this.disabled = false;
-        this.textContent = 'Refund';
-        alert(statusMessages.join('\n'));
-        return;
+      } else {
+        statusMessages.push('Manual order — marked as refunded');
       }
 
-      // Update order status to Refunded
-      await sb.from('orders').update({ status: 'Refunded' }).eq('id', oid);
-      if (order) order.status = 'Refunded';
+      // Update order in Supabase with refund details
+      const newStatus = isPartial ? 'Partial Refund' : 'Refunded';
+      const updateData = {
+        status: newStatus,
+        refund_amount: refundAmount,
+        refund_reason: reason,
+        refund_date: new Date().toISOString(),
+      };
+      await sb.from('orders').update(updateData).eq('id', oid);
+      if (order) {
+        order.status = newStatus;
+        order.refund_amount = refundAmount;
+        order.refund_reason = reason;
+        order.refund_date = updateData.refund_date;
+      }
 
       // Check if order is unshipped in eShip — offer to remove
-      if (order.stripe_session_id && (order.status === 'Refunded' || order.status === 'Ordered - Paid' || order.status === 'Processing')) {
-        if (confirm('Not Printed - Remove from eShip?')) {
+      if (order.stripe_session_id && !order.stripe_session_id.startsWith('manual_')) {
+        if (confirm('Remove from eShip? (if not yet shipped)')) {
           try {
             const cancelRes = await fetch('/.netlify/functions/eship-cancel', {
               method: 'POST',
@@ -2486,7 +2580,7 @@ function openOrderModal(orderId) {
 
       renderOrdersTable();
       closeModal();
-      logFrontendActivity('order_refund', `Refunded order #${oid} (${order.customer_name || order.email || '?'}) — $${Number(order.total_value || 0).toFixed(2)}. ${statusMessages.join('. ')}`);
+      logFrontendActivity('order_refund', `${isPartial ? 'Partial refund' : 'Full refund'} on order #${oid} (${order.customer_name || order.email || '?'}) — $${refundAmount.toFixed(2)}. Reason: ${reason}. ${statusMessages.join('. ')}`);
       alert(statusMessages.join('\n'));
     });
   }
@@ -2730,8 +2824,8 @@ function renderBoughtTogether(orders) {
 function renderTrending(orders) {
   const [from, to] = getDateRange();
   const periodDays = Math.max(1, Math.round((new Date(to) - new Date(from)) / 86400000) + 1);
-  const priorFrom = fmt_date(new Date(new Date(from) - periodDays * 86400000));
-  const priorTo = fmt_date(new Date(new Date(from) - 86400000));
+  const priorFrom = new Date(new Date(from) - periodDays * 86400000).toISOString().slice(0, 10);
+  const priorTo = new Date(new Date(from) - 86400000).toISOString().slice(0, 10);
 
   // Current period product quantities
   const currentProducts = {};
