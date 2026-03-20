@@ -65,38 +65,36 @@ exports.handler = async (event) => {
     const unshippedData = await unshippedRes.json();
     const shippedData = await shippedRes.json();
 
-    // Debug: log response keys and sample order to help diagnose status mapping
-    const unshippedKeys = Object.keys(unshippedData);
-    const shippedKeys = Object.keys(shippedData);
-    const sampleUnshipped = (unshippedData.orders || unshippedData.order || [])[0];
-    const sampleShipped = (shippedData.orders || shippedData.order || [])[0];
-    console.log('[eship-orders] Unshipped response keys:', unshippedKeys, 'count:', (unshippedData.orders || unshippedData.order || []).length);
-    console.log('[eship-orders] Shipped response keys:', shippedKeys, 'count:', (shippedData.orders || shippedData.order || []).length);
-    if (sampleUnshipped) console.log('[eship-orders] Sample unshipped order keys:', Object.keys(sampleUnshipped));
-    if (sampleShipped) console.log('[eship-orders] Sample shipped order keys:', Object.keys(sampleShipped), 'status:', sampleShipped.status, 'delivered:', sampleShipped.delivered, 'tracking_events:', sampleShipped.tracking_events?.length);
+    // StarshipIt unshipped endpoint returns { data: [...] }, shipped returns { orders: [...] }
+    const unshippedList = unshippedData.data || unshippedData.orders || unshippedData.order || [];
+    const shippedList = shippedData.orders || shippedData.order || [];
 
-    // Normalize: StarshipIt returns { orders: [...] } or { order: [...] }
-    const unshipped = (unshippedData.orders || unshippedData.order || []).map(o => ({
+    const unshipped = unshippedList.map(o => ({
       ...o,
       _shipping_status: o.printed ? 'Printed' : 'Waiting to Print',
       _status_group: 'unshipped',
     }));
 
-    const shipped = (shippedData.orders || shippedData.order || []).map(o => {
-      // Determine shipped status from tracking/delivery info
+    const shipped = shippedList.map(o => {
+      // StarshipIt uses tracking_short_status / tracking_full_status rather than status/tracking_events
+      const shortStatus = (o.tracking_short_status || '').toLowerCase();
+      const fullStatus = (o.tracking_full_status || '').toLowerCase();
       const status = (o.status || '').toLowerCase();
-      const lastEvent = (o.tracking_events || []).slice(-1)[0];
-      const lastEventDesc = (lastEvent?.description || lastEvent?.status || '').toLowerCase();
 
       let _shipping_status = 'In Transit';
       let _status_group = 'shipped';
 
-      if (o.delivered || status.includes('deliver') || lastEventDesc.includes('deliver')) {
+      if (
+        o.delivered ||
+        shortStatus.includes('deliver') || fullStatus.includes('deliver') ||
+        status.includes('deliver')
+      ) {
         _shipping_status = 'Delivered';
         _status_group = 'delivered';
       } else if (
-        status.includes('exception') || status.includes('fail') || status.includes('return') ||
-        lastEventDesc.includes('exception') || lastEventDesc.includes('fail') || lastEventDesc.includes('return')
+        shortStatus.includes('exception') || shortStatus.includes('fail') || shortStatus.includes('return') ||
+        fullStatus.includes('exception') || fullStatus.includes('fail') || fullStatus.includes('return') ||
+        status.includes('exception') || status.includes('fail') || status.includes('return')
       ) {
         _shipping_status = 'Exception';
         _status_group = 'exception';
@@ -117,16 +115,8 @@ exports.handler = async (event) => {
       headers,
       body: JSON.stringify({
         orders: all,
-        total_unshipped: unshippedData.total || unshipped.length,
+        total_unshipped: unshippedData.total_records || unshipped.length,
         total_shipped: shippedData.total || shipped.length,
-        _debug: {
-          unshipped_keys: unshippedKeys,
-          shipped_keys: shippedKeys,
-          unshipped_count: (unshippedData.orders || unshippedData.order || []).length,
-          shipped_count: (shippedData.orders || shippedData.order || []).length,
-          sample_shipped_status: sampleShipped ? { status: sampleShipped.status, delivered: sampleShipped.delivered, tracking_events_count: sampleShipped.tracking_events?.length, tracking_status: sampleShipped.tracking_status, current_status: sampleShipped.current_status } : null,
-          sample_unshipped: sampleUnshipped ? { status: sampleUnshipped.status, printed: sampleUnshipped.printed, keys: Object.keys(sampleUnshipped) } : null,
-        },
       }),
     };
   } catch (err) {
