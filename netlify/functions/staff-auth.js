@@ -223,7 +223,14 @@ exports.handler = async (event) => {
         response.totp_secret = secret;
         response.totp_uri = generateOTPAuthURL(staff.username, secret);
       } else {
-        response.needs_totp_verify = true;
+        // Skip 2FA if remembered within 7 days
+        const remembered = body.totp_remembered;
+        const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+        if (remembered && (Date.now() - Number(remembered)) < SEVEN_DAYS) {
+          // 2FA already verified recently, skip
+        } else {
+          response.needs_totp_verify = true;
+        }
       }
     }
 

@@ -1093,7 +1093,7 @@ async function doLogin() {
   try {
     const res = await fetch('/.netlify/functions/staff-auth', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'login', username, password }),
+      body: JSON.stringify({ action: 'login', username, password, totp_remembered: localStorage.getItem('pp_totp_remembered') }),
     });
     const data = await res.json();
     if (!res.ok || !data.success) {
@@ -1165,6 +1165,7 @@ async function doTOTPSetup() {
     });
     const data = await res.json();
     if (!res.ok || !data.success) { errEl.textContent = data.error || 'Invalid code'; errEl.style.display = 'block'; document.getElementById('totp-setup-code').value = ''; return; }
+    localStorage.setItem('pp_totp_remembered', String(Date.now()));
     sessionStorage.setItem('pp_staff', JSON.stringify(currentStaff));
     showDashboard();
   } catch { errEl.textContent = 'Connection error'; errEl.style.display = 'block'; }
@@ -1182,6 +1183,7 @@ async function doTOTPVerify() {
     });
     const data = await res.json();
     if (!res.ok || !data.success) { errEl.textContent = data.error || 'Invalid code'; errEl.style.display = 'block'; document.getElementById('totp-verify-code').value = ''; return; }
+    localStorage.setItem('pp_totp_remembered', String(Date.now()));
     sessionStorage.setItem('pp_staff', JSON.stringify(currentStaff));
     showDashboard();
   } catch { errEl.textContent = 'Connection error'; errEl.style.display = 'block'; }
