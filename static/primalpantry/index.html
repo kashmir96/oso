@@ -1545,6 +1545,12 @@ function openOrderModal(orderId) {
     `).join('');
   }
 
+  // Shipping status button
+  html += `<div style="margin-top:1rem;text-align:center;">
+    <button id="modal-shipping-btn" data-order-id="${orderId}" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:0.5rem 1.2rem;font-size:0.85rem;cursor:pointer;font-weight:600;">Shipping Status</button>
+  </div>
+  <div id="modal-shipping-detail" style="display:none;margin-top:0.75rem;padding:0.75rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;"></div>`;
+
   // Only owner/admin can see refund/delete buttons
   if (currentStaff && (currentStaff.role === 'owner' || currentStaff.role === 'admin')) {
     const isStripe = order.stripe_session_id && !order.stripe_session_id.startsWith('manual_');
@@ -1573,6 +1579,69 @@ function openOrderModal(orderId) {
       renderOrdersTable();
       logFrontendActivity('status_change', `Changed order #${oid} (${order ? order.customer_name || order.email : '?'}) status to "${newStatus}"`);
     }
+  });
+
+  // Shipping status button handler
+  document.getElementById('modal-shipping-btn').addEventListener('click', async function() {
+    const detail = document.getElementById('modal-shipping-detail');
+    if (detail.style.display !== 'none') {
+      detail.style.display = 'none';
+      return;
+    }
+
+    const order = allOrders.find(o => o.id === orderId);
+    if (!order || !order.stripe_session_id) {
+      detail.innerHTML = '<span style="color:var(--muted);font-size:0.85rem;">No shipping reference found.</span>';
+      detail.style.display = 'block';
+      return;
+    }
+
+    // If shipping data not loaded yet, fetch it
+    if (!shippingLoaded) {
+      detail.innerHTML = '<span style="color:var(--muted);font-size:0.85rem;">Loading shipping data...</span>';
+      detail.style.display = 'block';
+      try {
+        const res = await fetch(ESHIP_PROXY + '?limit=500');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        allShipments = data.orders || [];
+        shippingLoaded = true;
+      } catch (err) {
+        detail.innerHTML = `<span style="color:var(--red);font-size:0.85rem;">Failed to load shipping data: ${err.message}</span>`;
+        return;
+      }
+    }
+
+    const shipment = allShipments.find(s => s.order_number === order.stripe_session_id);
+    if (!shipment) {
+      detail.innerHTML = '<span style="color:var(--muted);font-size:0.85rem;">No matching shipment found in eShip.</span>';
+      detail.style.display = 'block';
+      return;
+    }
+
+    const statusColor = {
+      'Waiting to Print': 'var(--muted)',
+      'Printed': 'var(--amber)',
+      'In Transit': 'var(--accent)',
+      'Delivered': 'var(--green)',
+      'Exception': 'var(--red)',
+    }[shipment._shipping_status] || 'var(--text)';
+
+    const trackingLink = shipment.tracking_url
+      ? `<a href="${shipment.tracking_url}" target="_blank" rel="noopener" style="color:var(--accent);word-break:break-all;font-size:0.8rem;">${shipment.tracking_number || 'Track'}</a>`
+      : (shipment.tracking_number || '-');
+
+    const shipRows = [
+      ['Status', `<span style="color:${statusColor};font-weight:700;">${shipment._shipping_status}</span>`],
+      ['Carrier', shipment.carrier_name || shipment.carrier || '-'],
+      ['Tracking', trackingLink],
+      ['Shipped Date', shipment.shipped_date ? new Date(shipment.shipped_date).toLocaleDateString() : '-'],
+      ['Destination', [shipment.destination?.city, shipment.destination?.country_code].filter(Boolean).join(', ') || '-'],
+    ];
+
+    detail.innerHTML = '<h4 style="margin:0 0 0.5rem;font-size:0.85rem;color:var(--muted);">eShip Shipping Details</h4>' +
+      shipRows.map(([l, v]) => `<div class="modal-row"><span class="label">${l}</span><span>${v}</span></div>`).join('');
+    detail.style.display = 'block';
   });
 
   // Refund handler — refunds Stripe only, optionally removes from eShip if not shipped
