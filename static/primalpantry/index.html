@@ -160,13 +160,13 @@
     .nav-hamburger svg { width: 18px; height: 18px; }
     .nav-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 999; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
     .nav-overlay.open { opacity: 1; pointer-events: all; }
-    .nav-drawer { position: fixed; top: 0; left: -280px; width: 260px; height: 100%; background: var(--card); border-right: 1px solid var(--border); z-index: 1000; transition: left 0.25s cubic-bezier(0.4,0,0.2,1); display: flex; flex-direction: column; padding: 1.5rem 0; }
-    .nav-drawer.open { left: 0; }
+    .nav-drawer { position: fixed; top: 0; right: -280px; width: 260px; height: 100%; background: var(--card); border-left: 1px solid var(--border); z-index: 1000; transition: right 0.25s cubic-bezier(0.4,0,0.2,1); display: flex; flex-direction: column; padding: 1.5rem 0; }
+    .nav-drawer.open { right: 0; }
     .nav-drawer-header { padding: 0 1.25rem 1rem; border-bottom: 1px solid var(--border); margin-bottom: 0.5rem; }
     .nav-drawer-header h2 { font-size: 1rem; color: var(--text); margin: 0; font-family: 'DM Sans', sans-serif; }
     .nav-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.7rem 1.25rem; border: none; background: none; color: var(--muted); font-size: 0.9rem; font-weight: 500; cursor: pointer; width: 100%; text-align: left; transition: all 0.15s; font-family: 'DM Sans', sans-serif; }
     .nav-item:hover { background: rgba(255,255,255,0.04); color: var(--text); }
-    .nav-item.active { color: var(--sage); background: rgba(168,187,147,0.1); border-right: 3px solid var(--sage); }
+    .nav-item.active { color: var(--sage); background: rgba(168,187,147,0.1); border-left: 3px solid var(--sage); }
     .nav-item svg { width: 18px; height: 18px; opacity: 0.6; flex-shrink: 0; }
     .nav-item.active svg { opacity: 1; }
     .nav-active-label { font-size: 0.8rem; color: var(--sage); font-weight: 600; margin-left: 0.25rem; }
@@ -461,6 +461,7 @@
     .fin-detail-table tr.fin-section-head td { font-weight: 700; color: var(--text); padding-top: 0.75rem; border-bottom: none; }
     .fin-detail-table tr.fin-total td { font-weight: 700; color: var(--honey); border-top: 2px solid var(--border); }
     .fin-detail-table tr.fin-indent td:first-child { padding-left: 1.5rem; }
+    .fin-stat.blurred .fin-val, .fin-stat.blurred .fin-sub { filter: blur(8px); user-select: none; pointer-events: none; }
     .fin-overdue { color: var(--red); }
     .fin-current { color: var(--sage); }
     @media (max-width: 768px) { .fin-stats { grid-template-columns: repeat(2, 1fr); } }
@@ -516,9 +517,6 @@
 <div id="dashboard">
   <div class="header">
     <div style="display:flex;align-items:center;gap:0.75rem;">
-      <button class="nav-hamburger" id="nav-hamburger-btn" title="Menu">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-      </button>
       <h1 style="margin:0;">Primal Pantry</h1>
       <span class="nav-active-label" id="nav-active-label">Overview</span>
     </div>
@@ -526,9 +524,9 @@
       <button id="stats-eye-btn" title="Show/hide stats" style="background:var(--card);border:1px solid var(--border);color:var(--dim);padding:0.4rem 0.5rem;border-radius:6px;cursor:pointer;line-height:1;display:flex;align-items:center;transition:all 0.15s;"><svg id="stats-eye-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button>
       <button id="refresh-btn" title="Refresh data" style="font-size:1rem;line-height:1;">↻</button>
       <span id="last-refresh" style="font-size:0.7rem;color:var(--dim);"></span>
-      <button class="manual-order-btn" id="manual-order-btn">+ Order</button>
-      <button class="team-btn" id="team-btn" style="display:none;">Team</button>
-      <button id="logout-btn" class="staff-logout-btn" title="Sign out"><span id="staff-greeting"></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
+      <button class="nav-hamburger" id="nav-hamburger-btn" title="Menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
     </div>
   </div>
 
@@ -569,6 +567,12 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
       Finance
     </button>
+    <div style="flex:1;"></div>
+    <div style="padding:0.75rem 1.25rem;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:0.5rem;">
+      <button class="manual-order-btn" id="manual-order-btn" style="width:100%;text-align:center;">+ Order</button>
+      <button class="team-btn" id="team-btn" style="display:none;width:100%;text-align:center;">Team</button>
+      <button id="logout-btn" class="staff-logout-btn" style="width:100%;justify-content:center;"><span id="staff-greeting"></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
+    </div>
   </nav>
 
   <div class="filter-bar">
@@ -1013,6 +1017,12 @@
     </div>
 
     <div id="wa-funnel-viz" class="wa-panel" style="margin-bottom:1rem;padding:1rem;"></div>
+    <div id="wa-abandonment-stats" class="wa-stats" style="margin-bottom:1rem;display:none;">
+      <div class="wa-stat"><div class="wa-val" id="wa-browse-abandon">-</div><div class="wa-lbl">Browse Abandons</div></div>
+      <div class="wa-stat"><div class="wa-val" id="wa-cart-abandon">-</div><div class="wa-lbl">Cart Abandons</div></div>
+      <div class="wa-stat"><div class="wa-val" id="wa-checkout-abandon">-</div><div class="wa-lbl">Checkout Abandons</div></div>
+      <div class="wa-stat"><div class="wa-val" id="wa-overall-abandon-rate">-</div><div class="wa-lbl">Overall Drop-off</div></div>
+    </div>
 
     <div id="wa-funnel-filters" style="display:none;margin-bottom:1rem;">
       <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
@@ -1112,6 +1122,55 @@
     <div class="wa-panel" style="margin-bottom:1.5rem;">
       <h3>Checkout Errors</h3>
       <div id="wa-checkout-errors"><div class="wa-loading">Loading...</div></div>
+    </div>
+
+    <div class="wa-panel" style="margin-bottom:1.5rem;">
+      <h3>Abandoned Checkouts <span style="font-size:0.65rem;color:var(--dim);font-weight:400;">(from Stripe)</span></h3>
+      <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.75rem;">
+        <select id="ac-days" style="background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.6rem;font-size:0.8rem;">
+          <option value="7" selected>Last 7 days</option>
+          <option value="14">Last 14 days</option>
+          <option value="30">Last 30 days</option>
+        </select>
+        <button id="ac-load-btn" style="background:var(--sage);color:#141210;border:none;padding:0.4rem 0.75rem;border-radius:6px;font-size:0.8rem;font-weight:600;cursor:pointer;">Load</button>
+      </div>
+      <div class="wa-stats" id="ac-stats" style="display:none;margin-bottom:0.75rem;">
+        <div class="wa-stat"><div class="wa-val" id="ac-total">-</div><div class="wa-lbl">Abandoned</div></div>
+        <div class="wa-stat"><div class="wa-val" id="ac-lost-rev">-</div><div class="wa-lbl">Est. Lost Revenue</div></div>
+        <div class="wa-stat"><div class="wa-val" id="ac-contacted">-</div><div class="wa-lbl">Contacted</div></div>
+        <div class="wa-stat"><div class="wa-val" id="ac-recovered">-</div><div class="wa-lbl">Recovered</div></div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Email</th>
+              <th>Name</th>
+              <th>Cart Contents</th>
+              <th style="text-align:right;">Value</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="ac-table">
+            <tr><td colspan="7" class="loading">Click "Load" to fetch abandoned checkouts</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Recovery Email Preview Modal -->
+    <div class="modal-overlay" id="recovery-modal">
+      <div class="modal" style="max-width:620px;">
+        <button class="modal-close" onclick="document.getElementById('recovery-modal').classList.remove('open')">&times;</button>
+        <h2>Recovery Email Preview</h2>
+        <div id="recovery-preview" style="background:#f8f5f0;border-radius:8px;padding:1rem;margin-bottom:1rem;max-height:400px;overflow-y:auto;"></div>
+        <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+          <button onclick="document.getElementById('recovery-modal').classList.remove('open')" style="background:var(--card);border:1px solid var(--border);color:var(--muted);padding:0.5rem 1rem;border-radius:6px;cursor:pointer;font-size:0.85rem;">Cancel</button>
+          <button id="recovery-send-btn" style="background:var(--sage);color:#141210;border:none;padding:0.5rem 1rem;border-radius:6px;cursor:pointer;font-size:0.85rem;font-weight:600;">Send Email</button>
+        </div>
+      </div>
     </div>
   </div><!-- /tab-website -->
 
@@ -4810,8 +4869,10 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
         fhtml += '</div>';
         funnelEl.innerHTML = fhtml;
         funnelEl.style.display = '';
+        renderAbandonmentStats(funnelStages);
       } else {
         funnelEl.style.display = 'none';
+        document.getElementById('wa-abandonment-stats').style.display = 'none';
       }
 
       // Timeseries chart
@@ -5008,6 +5069,154 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     }
   }
 
+  // ── Abandonment Stats (Layer 1) ──
+  function renderAbandonmentStats(stages) {
+    const el = document.getElementById('wa-abandonment-stats');
+    if (!stages || stages.length < 4) { el.style.display = 'none'; return; }
+    const visitors = stages[0].count || 0;
+    const atc = stages[1].count || 0;
+    const checkout = stages[2].count || 0;
+    const purchased = stages[3].count || 0;
+    if (visitors === 0) { el.style.display = 'none'; return; }
+
+    const browseAbandons = visitors - atc;
+    const cartAbandons = atc - checkout;
+    const checkoutAbandons = checkout - purchased;
+    const overallDropoff = ((1 - purchased / visitors) * 100).toFixed(1);
+
+    document.getElementById('wa-browse-abandon').innerHTML = `${browseAbandons} <span style="font-size:0.65rem;color:var(--dim);">(${(browseAbandons / visitors * 100).toFixed(0)}%)</span>`;
+    document.getElementById('wa-cart-abandon').innerHTML = `${cartAbandons} <span style="font-size:0.65rem;color:var(--dim);">${atc > 0 ? '(' + (cartAbandons / atc * 100).toFixed(0) + '%)' : ''}</span>`;
+    document.getElementById('wa-checkout-abandon').innerHTML = `${checkoutAbandons} <span style="font-size:0.65rem;color:var(--dim);">${checkout > 0 ? '(' + (checkoutAbandons / checkout * 100).toFixed(0) + '%)' : ''}</span>`;
+    document.getElementById('wa-overall-abandon-rate').textContent = overallDropoff + '%';
+    el.style.display = '';
+  }
+
+  // ── Abandoned Checkouts (Layer 2 — Stripe) ──
+  let abandonedCheckouts = [];
+  let acRecoveryTarget = null;
+  const AC_BASE = '/.netlify/functions/abandoned-checkouts';
+  const RC_BASE = '/.netlify/functions/send-recovery-email';
+
+  document.getElementById('ac-load-btn').addEventListener('click', loadAbandonedCheckouts);
+
+  async function loadAbandonedCheckouts() {
+    const tbody = document.getElementById('ac-table');
+    const days = document.getElementById('ac-days').value;
+    tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading abandoned checkouts...</td></tr>';
+
+    try {
+      const res = await fetch(`${AC_BASE}?days=${days}`);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      abandonedCheckouts = data.abandoned || [];
+      const summary = data.summary || {};
+
+      // Stats
+      const statsEl = document.getElementById('ac-stats');
+      document.getElementById('ac-total').textContent = summary.total || 0;
+      document.getElementById('ac-lost-rev').textContent = '$' + ((summary.lost_revenue || 0) / 100).toFixed(2);
+      document.getElementById('ac-contacted').textContent = summary.contacted || 0;
+      document.getElementById('ac-recovered').textContent = summary.recovered || 0;
+      statsEl.style.display = '';
+
+      renderAbandonedTable();
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="7" class="loading">Error: ${err.message}</td></tr>`;
+    }
+  }
+
+  function renderAbandonedTable() {
+    const tbody = document.getElementById('ac-table');
+    if (!abandonedCheckouts.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="loading">No abandoned checkouts found.</td></tr>';
+      return;
+    }
+
+    const statusColors = { new: 'var(--amber)', contacted: 'var(--blue)', recovered: 'var(--sage)', lost: 'var(--red)' };
+
+    tbody.innerHTML = abandonedCheckouts.map((ac, idx) => {
+      const date = new Date(ac.created * 1000).toLocaleString('en-NZ', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true });
+      const items = (ac.line_items || []).map(li => `${li.quantity}x ${li.description}`).join(', ') || '-';
+      const value = ac.amount_total ? '$' + (ac.amount_total / 100).toFixed(2) : '-';
+      const color = statusColors[ac.status] || 'var(--muted)';
+      const canSend = ac.status === 'new' && !ac.later_purchased;
+
+      return `<tr>
+        <td style="white-space:nowrap;">${date}</td>
+        <td>${ac.email}</td>
+        <td>${ac.name || '-'}</td>
+        <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${items}">${items}</td>
+        <td style="text-align:right;">${value}</td>
+        <td><span class="ship-status-badge" style="background:${color}22;color:${color};">${ac.later_purchased && ac.status === 'new' ? 'recovered' : ac.status}</span></td>
+        <td>${canSend ? `<button onclick="previewRecoveryEmail(${idx})" style="background:var(--sage);color:#141210;border:none;padding:0.3rem 0.6rem;border-radius:4px;font-size:0.75rem;font-weight:600;cursor:pointer;white-space:nowrap;">Send Email</button>` : ''}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  function previewRecoveryEmail(idx) {
+    const ac = abandonedCheckouts[idx];
+    if (!ac) return;
+    acRecoveryTarget = ac;
+
+    const firstName = (ac.name || '').split(' ')[0] || 'there';
+    const currencySymbol = '$';
+    const total = ac.amount_total ? currencySymbol + (ac.amount_total / 100).toFixed(2) : '';
+    const itemsHtml = (ac.line_items || []).map(li =>
+      `<tr><td style="padding:6px 8px;border-bottom:1px solid #f0ebe5;font-size:13px;">${li.description || 'Product'}</td><td style="padding:6px 8px;border-bottom:1px solid #f0ebe5;font-size:13px;text-align:center;">${li.quantity || 1}</td><td style="padding:6px 8px;border-bottom:1px solid #f0ebe5;font-size:13px;text-align:right;">${currencySymbol}${((li.amount || 0) / 100).toFixed(2)}</td></tr>`
+    ).join('');
+
+    document.getElementById('recovery-preview').innerHTML = `
+      <div style="font-family:sans-serif;max-width:500px;margin:0 auto;">
+        <p style="font-size:13px;color:#6e6259;margin-bottom:8px;"><strong>To:</strong> ${ac.email}</p>
+        <p style="font-size:13px;color:#6e6259;margin-bottom:12px;"><strong>Subject:</strong> ${firstName}, you left something behind!</p>
+        <hr style="border:none;border-top:1px solid #e8e2da;margin:12px 0;">
+        <p style="font-size:14px;color:#2d2a26;">Hey ${firstName},</p>
+        <p style="font-size:13px;color:#6e6259;">We noticed you left some items in your cart. No worries — they're still waiting for you!</p>
+        <table style="width:100%;border-collapse:collapse;margin:12px 0;"><thead><tr style="background:#f8f5f0;"><th style="padding:6px 8px;text-align:left;font-size:11px;color:#9c9287;text-transform:uppercase;">Item</th><th style="padding:6px 8px;text-align:center;font-size:11px;color:#9c9287;">Qty</th><th style="padding:6px 8px;text-align:right;font-size:11px;color:#9c9287;">Price</th></tr></thead><tbody>${itemsHtml}</tbody></table>
+        ${total ? `<p style="text-align:right;font-weight:600;font-size:14px;color:#2d2a26;">Total: ${total}</p>` : ''}
+        <div style="text-align:center;margin:16px 0;"><span style="background:#8CB47A;color:#141210;padding:8px 24px;border-radius:6px;font-weight:600;font-size:13px;">Complete Your Order →</span></div>
+      </div>
+    `;
+
+    document.getElementById('recovery-modal').classList.add('open');
+  }
+
+  document.getElementById('recovery-send-btn').addEventListener('click', async function() {
+    if (!acRecoveryTarget) return;
+    const btn = this;
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+
+    try {
+      const res = await fetch(RC_BASE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_id: acRecoveryTarget.session_id,
+          email: acRecoveryTarget.email,
+          name: acRecoveryTarget.name,
+          line_items: acRecoveryTarget.line_items,
+          amount_total: acRecoveryTarget.amount_total,
+          currency: acRecoveryTarget.currency,
+          staff_name: currentStaff ? currentStaff.name : 'Unknown',
+        }),
+      });
+
+      if (!res.ok) throw new Error('Send failed: HTTP ' + res.status);
+
+      // Update local state
+      acRecoveryTarget.status = 'contacted';
+      acRecoveryTarget.contacted_at = new Date().toISOString();
+      renderAbandonedTable();
+      document.getElementById('recovery-modal').classList.remove('open');
+    } catch (err) {
+      alert('Error sending email: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Send Email';
+    }
+  });
+
   // ── Country Heatmap ──
   // Simplified world map using country code → [lat, lng] centroids
   const COUNTRY_COORDS = {NZ:[-41,174],AU:[-25,134],US:[38,-97],GB:[54,-2],CA:[56,-106],DE:[51,10],FR:[47,2],JP:[36,138],CN:[35,105],IN:[21,78],BR:[-14,-51],ZA:[-29,24],MX:[23,-102],KR:[36,128],SG:[1.35,103.8],MY:[4,101],ID:[-5,120],TH:[15,100],PH:[13,122],VN:[16,108],TW:[24,121],HK:[22,114],AE:[24,54],SA:[24,45],IL:[31,35],IT:[43,12],ES:[40,-4],NL:[52,5],SE:[62,15],NO:[60,8],DK:[56,10],FI:[64,26],PL:[52,20],CZ:[50,15],AT:[47,14],CH:[47,8],BE:[50,4],IE:[53,-8],PT:[40,-8],RU:[62,105],UA:[49,32],AR:[-34,-64],CL:[-35,-71],CO:[4,-72],PE:[-10,-76],PK:[30,69],BD:[24,90],LK:[7,81],MM:[22,98],KH:[13,105],NP:[28,84]};
@@ -5174,6 +5383,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
       fhtml += '</div>';
       funnelEl.innerHTML = fhtml;
       funnelEl.style.display = '';
+      renderAbandonmentStats(funnelStages);
     }
 
     // Update funnel stats
@@ -5646,16 +5856,703 @@ document.querySelectorAll('[data-sku-sort]').forEach(th => {
 });
 
 // Manufacturing sub-tab switching
+const mfgPanels = ['batches', 'unit-costs', 'sku-performance', 'inventory', 'supplier-orders'];
 document.querySelectorAll('#mfg-sub-tabs .wa-panel-tab').forEach(tab => {
   tab.addEventListener('click', function() {
     document.querySelectorAll('#mfg-sub-tabs .wa-panel-tab').forEach(t => t.classList.remove('active'));
     this.classList.add('active');
     const panel = this.dataset.mfgPanel;
-    document.getElementById('mfg-panel-batches').style.display = panel === 'batches' ? '' : 'none';
-    document.getElementById('mfg-panel-unit-costs').style.display = panel === 'unit-costs' ? '' : 'none';
-    document.getElementById('mfg-panel-sku-performance').style.display = panel === 'sku-performance' ? '' : 'none';
+    mfgPanels.forEach(p => {
+      const el = document.getElementById('mfg-panel-' + p);
+      if (el) el.style.display = p === panel ? '' : 'none';
+    });
     if (panel === 'unit-costs') { loadUnitCosts().then(function() { renderUnitCostsTable(); }); }
     if (panel === 'sku-performance') { renderSkuPerformance(); }
+    if (panel === 'inventory') { loadInventory(); }
+    if (panel === 'supplier-orders') { loadSupplierOrders(); }
+  });
+});
+
+// ── Inventory Tab ──
+let invBaselines = {};
+let invReorderPoints = {};
+let invLoaded = false;
+
+async function loadInventory() {
+  if (invLoaded) { renderInventory(); return; }
+  try {
+    const [blRes, rpRes] = await Promise.all([
+      sb.from('inventory_baselines').select('*').order('counted_at', { ascending: false }),
+      sb.from('inventory_reorder_points').select('*'),
+    ]);
+    // Keep only the latest baseline per SKU
+    invBaselines = {};
+    (blRes.data || []).forEach(row => {
+      if (!invBaselines[row.sku]) invBaselines[row.sku] = row;
+    });
+    invReorderPoints = {};
+    (rpRes.data || []).forEach(row => { invReorderPoints[row.sku] = row; });
+    invLoaded = true;
+    renderInventory();
+  } catch (e) {
+    document.getElementById('inventory-table').innerHTML = `<tr><td colspan="9" class="loading">Error: ${e.message}</td></tr>`;
+  }
+}
+
+function renderInventory() {
+  const tbody = document.getElementById('inventory-table');
+  const statsEl = document.getElementById('inventory-stats');
+
+  // Get all known SKUs
+  const skuMap = {};
+  SHOP_PRODUCTS.forEach(p => { skuMap[p.sku] = p.desc; });
+  allLineItems.forEach(li => { if (li.sku && !skuMap[li.sku]) skuMap[li.sku] = li.description || li.sku; });
+  mfgBatches.forEach(b => { if (b.product_sku && !skuMap[b.product_sku]) skuMap[b.product_sku] = b.product_sku; });
+
+  const now = new Date();
+  const thirtyDaysAgo = new Date(now);
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const thirtyDaysAgoStr = thirtyDaysAgo.toISOString();
+
+  const rows = Object.entries(skuMap).map(([sku, name]) => {
+    const baseline = invBaselines[sku];
+    const baselineQty = baseline ? baseline.quantity : 0;
+    const baselineDate = baseline ? baseline.counted_at : '1970-01-01T00:00:00Z';
+
+    // Manufactured since baseline
+    const manufactured = mfgBatches
+      .filter(b => b.product_sku === sku && b.created_at > baselineDate)
+      .reduce((s, b) => s + (b.quantity || 0), 0);
+
+    // Sold since baseline
+    const soldSinceBaseline = allLineItems
+      .filter(li => {
+        if (li.sku !== sku) return false;
+        const order = allOrders.find(o => o.id === li.order_id);
+        return order && new Date(order.created_at || order.order_date) > new Date(baselineDate);
+      })
+      .reduce((s, li) => s + (li.quantity || 1), 0);
+
+    const currentStock = baselineQty + manufactured - soldSinceBaseline;
+
+    // Sold in last 30 days
+    const sold30d = allLineItems
+      .filter(li => {
+        if (li.sku !== sku) return false;
+        const order = allOrders.find(o => o.id === li.order_id);
+        return order && new Date(order.created_at || order.order_date) >= thirtyDaysAgo;
+      })
+      .reduce((s, li) => s + (li.quantity || 1), 0);
+
+    const avgDailySales = sold30d / 30;
+    const daysRemaining = avgDailySales > 0 ? Math.round(currentStock / avgDailySales) : currentStock > 0 ? 999 : 0;
+    const sellThrough = (baselineQty + manufactured) > 0 ? (soldSinceBaseline / (baselineQty + manufactured) * 100) : 0;
+    const rp = invReorderPoints[sku];
+    const reorderPoint = rp ? rp.reorder_point : '-';
+    const reorderPointNum = rp ? rp.reorder_point : null;
+
+    let status = 'ok', statusLabel = 'OK', statusColor = 'var(--sage)';
+    if (currentStock <= 0) { status = 'out'; statusLabel = 'Out of Stock'; statusColor = 'var(--red)'; }
+    else if (reorderPointNum !== null && currentStock <= reorderPointNum) { status = 'low'; statusLabel = 'Low Stock'; statusColor = 'var(--amber)'; }
+    else if (reorderPointNum !== null && currentStock <= reorderPointNum * 1.5) { status = 'warning'; statusLabel = 'Warning'; statusColor = 'var(--honey)'; }
+
+    return { sku, name, currentStock, manufactured, sold30d, sellThrough, daysRemaining, reorderPoint, status, statusLabel, statusColor, hasBaseline: !!baseline };
+  });
+
+  // Sort: critical first, then low, then ok
+  const statusOrder = { out: 0, low: 1, warning: 2, ok: 3 };
+  rows.sort((a, b) => statusOrder[a.status] - statusOrder[b.status] || a.sku.localeCompare(b.sku));
+
+  // Stats
+  const lowCount = rows.filter(r => r.status === 'low' || r.status === 'warning').length;
+  const outCount = rows.filter(r => r.status === 'out').length;
+  const trackedCount = rows.filter(r => r.hasBaseline).length;
+  statsEl.innerHTML = `
+    <div class="stat-card"><div class="label">SKUs Tracked</div><div class="value">${trackedCount}</div><div class="sub">with stock counts</div></div>
+    <div class="stat-card"><div class="label">Low Stock</div><div class="value" style="color:var(--amber)">${lowCount}</div><div class="sub">approaching reorder</div></div>
+    <div class="stat-card"><div class="label">Out of Stock</div><div class="value" style="color:var(--red)">${outCount}</div><div class="sub">needs attention</div></div>
+    <div class="stat-card"><div class="label">Total SKUs</div><div class="value">${rows.length}</div></div>
+  `;
+
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="loading">No products found.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r => {
+    const stockStyle = r.currentStock <= 0 ? 'color:var(--red);font-weight:700;' : '';
+    const rpDisplay = r.reorderPoint === '-' ? `<span style="color:var(--dim);cursor:pointer;" onclick="editReorderPoint('${r.sku}')" title="Click to set">Set</span>` : `<span style="cursor:pointer;" onclick="editReorderPoint('${r.sku}')">${r.reorderPoint}</span>`;
+    return `<tr>
+      <td style="font-weight:600;">${r.sku}</td>
+      <td>${r.name}</td>
+      <td style="text-align:right;${stockStyle}">${r.hasBaseline ? r.currentStock : '<span style="color:var(--dim)">—</span>'}</td>
+      <td style="text-align:right;">${r.manufactured}</td>
+      <td style="text-align:right;">${r.sold30d}</td>
+      <td style="text-align:right;">${r.sellThrough.toFixed(1)}%</td>
+      <td style="text-align:right;">${r.hasBaseline ? (r.daysRemaining >= 999 ? '∞' : r.daysRemaining + 'd') : '—'}</td>
+      <td style="text-align:right;">${rpDisplay}</td>
+      <td><span class="ship-status-badge" style="background:${r.statusColor}22;color:${r.statusColor};">${r.statusLabel}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+// Stock count modal
+document.getElementById('inv-stock-count-btn').addEventListener('click', function() {
+  const sku = prompt('Enter SKU to set stock count for:');
+  if (!sku) return;
+  const qty = prompt('Enter current stock quantity for ' + sku + ':');
+  if (qty === null || qty === '') return;
+  const quantity = parseInt(qty, 10);
+  if (isNaN(quantity) || quantity < 0) { alert('Invalid quantity.'); return; }
+  const notes = prompt('Notes (optional):') || '';
+  sb.from('inventory_baselines').insert({ sku, quantity, notes }).then(({ error }) => {
+    if (error) { alert('Error: ' + error.message); return; }
+    invBaselines[sku] = { sku, quantity, counted_at: new Date().toISOString(), notes };
+    renderInventory();
+  });
+});
+
+function editReorderPoint(sku) {
+  const current = invReorderPoints[sku];
+  const val = prompt('Set reorder point for ' + sku + ':', current ? current.reorder_point : '10');
+  if (val === null) return;
+  const point = parseInt(val, 10);
+  if (isNaN(point) || point < 0) { alert('Invalid number.'); return; }
+  const reorderQty = prompt('Reorder quantity (how many to order):', current ? current.reorder_qty : '50');
+  const qty = parseInt(reorderQty, 10) || 50;
+  sb.from('inventory_reorder_points').upsert({ sku, reorder_point: point, reorder_qty: qty }, { onConflict: 'sku' }).then(({ error }) => {
+    if (error) { alert('Error: ' + error.message); return; }
+    invReorderPoints[sku] = { sku, reorder_point: point, reorder_qty: qty };
+    renderInventory();
+  });
+}
+
+// ── Supplier Orders Tab ──
+let supplierOrders = [];
+let soLoaded = false;
+let soEditingId = null;
+
+async function loadSupplierOrders() {
+  if (soLoaded) { renderSupplierOrders(); return; }
+  try {
+    const { data, error } = await sb.from('supplier_orders').select('*').order('requested_at', { ascending: false });
+    if (error) throw error;
+    supplierOrders = data || [];
+    soLoaded = true;
+    renderSupplierOrders();
+  } catch (e) {
+    document.getElementById('supplier-orders-table').innerHTML = `<tr><td colspan="9" class="loading">Error: ${e.message}</td></tr>`;
+  }
+}
+
+function renderSupplierOrders() {
+  const tbody = document.getElementById('supplier-orders-table');
+  const statsEl = document.getElementById('supplier-stats');
+  const filterVal = document.getElementById('so-status-filter').value;
+
+  const now = new Date();
+  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+
+  const pending = supplierOrders.filter(o => o.status === 'requested').length;
+  const ordered = supplierOrders.filter(o => o.status === 'ordered' || o.status === 'shipped').length;
+  const receivedMonth = supplierOrders.filter(o => o.status === 'received' && o.received_at >= monthStart).length;
+  const totalSpend = supplierOrders.filter(o => o.cost).reduce((s, o) => s + Number(o.cost), 0);
+
+  statsEl.innerHTML = `
+    <div class="stat-card"><div class="label">Pending Requests</div><div class="value" style="color:var(--amber)">${pending}</div></div>
+    <div class="stat-card"><div class="label">In Transit</div><div class="value" style="color:var(--sage)">${ordered}</div></div>
+    <div class="stat-card"><div class="label">Received (Month)</div><div class="value">${receivedMonth}</div></div>
+    <div class="stat-card"><div class="label">Total Spend</div><div class="value">$${totalSpend.toFixed(2)}</div></div>
+  `;
+
+  let filtered = supplierOrders;
+  if (filterVal) filtered = filtered.filter(o => o.status === filterVal);
+
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="loading">No supplier orders found.</td></tr>';
+    return;
+  }
+
+  const statusColors = { requested: 'var(--amber)', ordered: 'var(--blue)', shipped: 'var(--sage)', received: 'var(--cyan)' };
+
+  tbody.innerHTML = filtered.map(o => {
+    const color = statusColors[o.status] || 'var(--muted)';
+    const date = o.requested_at ? new Date(o.requested_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
+    const tracking = o.tracking_number ? (o.tracking_url ? `<a class="tracking-link" href="${o.tracking_url}" target="_blank">${o.tracking_number}</a>` : o.tracking_number) : '-';
+    const cost = o.cost ? '$' + Number(o.cost).toFixed(2) : '-';
+
+    if (soEditingId === o.id) {
+      return `<tr data-id="${o.id}">
+        <td>${o.item_name}</td>
+        <td>${o.supplier_name || '-'}</td>
+        <td>${o.quantity || '-'}</td>
+        <td><select class="filter-select so-edit-status" style="padding:0.3rem;">
+          <option value="requested" ${o.status === 'requested' ? 'selected' : ''}>Requested</option>
+          <option value="ordered" ${o.status === 'ordered' ? 'selected' : ''}>Ordered</option>
+          <option value="shipped" ${o.status === 'shipped' ? 'selected' : ''}>Shipped</option>
+          <option value="received" ${o.status === 'received' ? 'selected' : ''}>Received</option>
+        </select></td>
+        <td>${o.requested_by || '-'}</td>
+        <td>${date}</td>
+        <td><input type="text" class="mfg-inline-input so-edit-tracking" value="${o.tracking_number || ''}" placeholder="Tracking #" style="width:8rem;"></td>
+        <td><input type="number" class="mfg-inline-input so-edit-cost" value="${o.cost || ''}" placeholder="Cost" step="0.01" style="width:5rem;"></td>
+        <td><button class="mfg-save-btn" onclick="saveSupplierEdit(${o.id})">Save</button><button class="mfg-cancel-btn" onclick="cancelSupplierEdit()">Cancel</button></td>
+      </tr>`;
+    }
+
+    return `<tr class="clickable" onclick="startSupplierEdit(${o.id})">
+      <td>${o.item_name}</td>
+      <td>${o.supplier_name || '-'}</td>
+      <td>${o.quantity || '-'}</td>
+      <td><span class="ship-status-badge" style="background:${color}22;color:${color};">${o.status}</span></td>
+      <td>${o.requested_by || '-'}</td>
+      <td>${date}</td>
+      <td>${tracking}</td>
+      <td>${cost}</td>
+      <td><button class="mfg-edit-btn" onclick="event.stopPropagation(); startSupplierEdit(${o.id})">Edit</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function startSupplierEdit(id) {
+  soEditingId = id;
+  renderSupplierOrders();
+}
+
+function cancelSupplierEdit() {
+  soEditingId = null;
+  renderSupplierOrders();
+}
+
+async function saveSupplierEdit(id) {
+  const row = document.querySelector(`tr[data-id="${id}"]`);
+  if (!row) return;
+  const status = row.querySelector('.so-edit-status').value;
+  const tracking_number = row.querySelector('.so-edit-tracking').value.trim() || null;
+  const costVal = row.querySelector('.so-edit-cost').value;
+  const cost = costVal ? Number(costVal) : null;
+
+  const updates = { status, tracking_number, cost };
+  if (status === 'ordered' && !supplierOrders.find(o => o.id === id)?.ordered_at) updates.ordered_at = new Date().toISOString();
+  if (status === 'received' && !supplierOrders.find(o => o.id === id)?.received_at) updates.received_at = new Date().toISOString();
+
+  const { error } = await sb.from('supplier_orders').update(updates).eq('id', id);
+  if (error) { alert('Error: ' + error.message); return; }
+  const order = supplierOrders.find(o => o.id === id);
+  if (order) Object.assign(order, updates);
+  soEditingId = null;
+  renderSupplierOrders();
+}
+
+// Add supplier order
+document.getElementById('so-add-btn').addEventListener('click', async function() {
+  const item_name = document.getElementById('so-item').value.trim();
+  const supplier_name = document.getElementById('so-supplier').value.trim() || null;
+  const quantity = document.getElementById('so-qty').value.trim() || null;
+  const notes = document.getElementById('so-notes').value.trim() || null;
+  if (!item_name) { alert('Item name is required.'); return; }
+
+  const requested_by = currentStaff ? currentStaff.name : 'Unknown';
+  const { data, error } = await sb.from('supplier_orders').insert({ item_name, supplier_name, quantity, notes, requested_by }).select().single();
+  if (error) { alert('Error: ' + error.message); return; }
+  supplierOrders.unshift(data);
+  document.getElementById('so-item').value = '';
+  document.getElementById('so-supplier').value = '';
+  document.getElementById('so-qty').value = '';
+  document.getElementById('so-notes').value = '';
+  renderSupplierOrders();
+});
+
+document.getElementById('so-status-filter').addEventListener('change', () => { renderSupplierOrders(); });
+
+// ── Finance Tab ──
+
+let financeLoaded = false;
+
+// Mock data generators (structured to match Xero API responses for easy swap later)
+function getMockPnlData() {
+  const months = [];
+  const now = new Date();
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const label = d.toLocaleString('en-NZ', { month: 'short', year: '2-digit' });
+    const revenue = 12000 + Math.random() * 18000;
+    const cogs = revenue * (0.25 + Math.random() * 0.1);
+    const opex = revenue * (0.2 + Math.random() * 0.15);
+    const expenses = cogs + opex;
+    months.push({ label, revenue: Math.round(revenue), expenses: Math.round(expenses), cogs: Math.round(cogs), opex: Math.round(opex) });
+  }
+  return months;
+}
+
+function getMockPnlDetail() {
+  return [
+    { type: 'section', label: 'Revenue' },
+    { type: 'row', label: 'Product Sales', amount: 21450 },
+    { type: 'row', label: 'Wholesale', amount: 4320 },
+    { type: 'row', label: 'Markets & Events', amount: 1890 },
+    { type: 'total', label: 'Total Revenue', amount: 27660 },
+    { type: 'section', label: 'Cost of Sales' },
+    { type: 'row', label: 'Raw Materials', amount: -4120 },
+    { type: 'row', label: 'Packaging', amount: -1850 },
+    { type: 'row', label: 'Manufacturing Labor', amount: -2340 },
+    { type: 'total', label: 'Gross Profit', amount: 19350 },
+    { type: 'section', label: 'Operating Expenses' },
+    { type: 'row', label: 'Advertising & Marketing', amount: -3200 },
+    { type: 'row', label: 'Shipping & Freight', amount: -2450 },
+    { type: 'row', label: 'Platform Fees (Stripe/Shopify)', amount: -980 },
+    { type: 'row', label: 'Rent & Utilities', amount: -1200 },
+    { type: 'row', label: 'Insurance', amount: -380 },
+    { type: 'row', label: 'Software & Subscriptions', amount: -420 },
+    { type: 'row', label: 'Accounting & Legal', amount: -650 },
+    { type: 'total', label: 'Total Operating Expenses', amount: -9280 },
+    { type: 'total', label: 'Net Profit', amount: 10070 },
+  ];
+}
+
+function getMockBankData() {
+  return [
+    { name: 'Business Cheque Account', balance: 18420 },
+    { name: 'Savings Account', balance: 5930 },
+    { name: 'Tax Holding Account', balance: 3200 },
+  ];
+}
+
+function getMockCashflowData() {
+  const days = [];
+  const now = new Date();
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const label = d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
+    const moneyIn = 400 + Math.random() * 1200;
+    const moneyOut = 200 + Math.random() * 800;
+    days.push({ label, moneyIn: Math.round(moneyIn), moneyOut: Math.round(moneyOut) });
+  }
+  return days;
+}
+
+function getMockBankTransactions() {
+  const txns = [];
+  const descs = [
+    { desc: 'Stripe Payout', acct: 'Business Cheque', amt: 1245.60 },
+    { desc: 'NZ Post Shipping', acct: 'Business Cheque', amt: -187.50 },
+    { desc: 'Facebook Ads', acct: 'Business Cheque', amt: -320.00 },
+    { desc: 'Countdown Wholesale Payment', acct: 'Business Cheque', amt: 2100.00 },
+    { desc: 'Raw Material Supplier — BioGro Tallow', acct: 'Business Cheque', amt: -890.00 },
+    { desc: 'Xero Subscription', acct: 'Business Cheque', amt: -75.00 },
+    { desc: 'Transfer to Savings', acct: 'Business Cheque', amt: -500.00 },
+    { desc: 'Transfer from Cheque', acct: 'Savings Account', amt: 500.00 },
+    { desc: 'Stripe Payout', acct: 'Business Cheque', amt: 980.30 },
+    { desc: 'Packaging Supplier — EcoPak', acct: 'Business Cheque', amt: -445.00 },
+    { desc: 'Market Stall Income', acct: 'Business Cheque', amt: 620.00 },
+    { desc: 'Insurance Premium', acct: 'Business Cheque', amt: -190.00 },
+    { desc: 'Stripe Payout', acct: 'Business Cheque', amt: 1567.20 },
+    { desc: 'Google Ads', acct: 'Business Cheque', amt: -210.00 },
+    { desc: 'Label Printing — Avery', acct: 'Business Cheque', amt: -135.00 },
+    { desc: 'Wholesale — Health 2000', acct: 'Business Cheque', amt: 1840.00 },
+    { desc: 'Tax Transfer', acct: 'Tax Holding Account', amt: -1200.00 },
+    { desc: 'Essential Oils Supplier', acct: 'Business Cheque', amt: -560.00 },
+  ];
+  const now = new Date();
+  descs.forEach((t, i) => {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    txns.push({ date: d.toISOString().split('T')[0], description: t.desc, account: t.acct, amount: t.amt });
+  });
+  return txns;
+}
+
+function getMockInvoices() {
+  const now = new Date();
+  function dateDaysAgo(d) {
+    const dt = new Date(now);
+    dt.setDate(dt.getDate() - d);
+    return dt.toISOString().split('T')[0];
+  }
+  return [
+    { number: 'INV-0042', contact: 'Health 2000 NZ', dueDate: dateDaysAgo(-5), amount: 2400.00, status: 'current' },
+    { number: 'INV-0041', contact: 'Commonsense Organics', dueDate: dateDaysAgo(-12), amount: 1850.00, status: 'current' },
+    { number: 'INV-0039', contact: 'Huckleberry NZ', dueDate: dateDaysAgo(3), amount: 960.00, status: 'overdue' },
+    { number: 'INV-0038', contact: 'Good For Store', dueDate: dateDaysAgo(8), amount: 1240.00, status: 'overdue' },
+    { number: 'INV-0036', contact: 'Harvest Wholefoods', dueDate: dateDaysAgo(-20), amount: 780.00, status: 'current' },
+    { number: 'INV-0035', contact: 'The Source Bulk Foods', dueDate: dateDaysAgo(15), amount: 520.00, status: 'overdue' },
+    { number: 'INV-0034', contact: 'Bin Inn Wholefoods', dueDate: dateDaysAgo(-3), amount: 1650.00, status: 'current' },
+    { number: 'INV-0033', contact: 'Moore Wilsons', dueDate: dateDaysAgo(22), amount: 490.00, status: 'overdue' },
+  ];
+}
+
+function getMockBills() {
+  const now = new Date();
+  function dateDaysAgo(d) {
+    const dt = new Date(now);
+    dt.setDate(dt.getDate() - d);
+    return dt.toISOString().split('T')[0];
+  }
+  return [
+    { number: 'BILL-0187', contact: 'BioGro Tallow Supplies', dueDate: dateDaysAgo(-7), amount: 2800.00, status: 'current' },
+    { number: 'BILL-0185', contact: 'EcoPak Packaging', dueDate: dateDaysAgo(5), amount: 1450.00, status: 'overdue' },
+    { number: 'BILL-0183', contact: 'NZ Post Business', dueDate: dateDaysAgo(-14), amount: 680.00, status: 'current' },
+    { number: 'BILL-0181', contact: 'Essential Oils NZ', dueDate: dateDaysAgo(2), amount: 920.00, status: 'overdue' },
+    { number: 'BILL-0180', contact: 'Avery Labels NZ', dueDate: dateDaysAgo(-10), amount: 340.00, status: 'current' },
+  ];
+}
+
+function getMockAgingData(items) {
+  const buckets = { current: 0, '1-30': 0, '31-60': 0, '61-90': 0, '90+': 0 };
+  const now = new Date();
+  items.forEach(inv => {
+    const due = new Date(inv.dueDate);
+    const daysOverdue = Math.floor((now - due) / (1000 * 60 * 60 * 24));
+    if (daysOverdue <= 0) buckets.current += inv.amount;
+    else if (daysOverdue <= 30) buckets['1-30'] += inv.amount;
+    else if (daysOverdue <= 60) buckets['31-60'] += inv.amount;
+    else if (daysOverdue <= 90) buckets['61-90'] += inv.amount;
+    else buckets['90+'] += inv.amount;
+  });
+  return buckets;
+}
+
+// Chart rendering
+const finChartDefaults = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { labels: { color: '#9c9287', font: { family: 'DM Sans' } } } },
+  scales: {
+    y: { ticks: { color: '#9c9287' }, grid: { color: '#252220' } },
+    x: { ticks: { color: '#9c9287' }, grid: { display: false } },
+  }
+};
+
+function renderFinanceStats() {
+  const pnl = getMockPnlData();
+  const currentMonth = pnl[pnl.length - 1];
+  const banks = getMockBankData();
+  const invoices = getMockInvoices();
+  const bills = getMockBills();
+  const cashPosition = banks.reduce((s, b) => s + b.balance, 0);
+  const receivables = invoices.reduce((s, i) => s + i.amount, 0);
+  const payables = bills.reduce((s, b) => s + b.amount, 0);
+  const overdue = invoices.filter(i => i.status === 'overdue').length + bills.filter(b => b.status === 'overdue').length;
+  const netProfit = currentMonth.revenue - currentMonth.expenses;
+
+  const stats = [
+    { label: 'Cash Position', value: fmt_money(cashPosition), sub: banks.length + ' accounts' },
+    { label: 'Revenue (MTD)', value: fmt_money(currentMonth.revenue), sub: 'This month' },
+    { label: 'Net Profit (MTD)', value: fmt_money(netProfit), sub: ((netProfit / currentMonth.revenue) * 100).toFixed(1) + '% margin' },
+    { label: 'Receivables', value: fmt_money(receivables), sub: invoices.length + ' invoices' },
+    { label: 'Payables', value: fmt_money(payables), sub: bills.length + ' bills' },
+    { label: 'Overdue', value: overdue, sub: overdue > 0 ? 'Needs attention' : 'All current' },
+  ];
+
+  document.getElementById('finance-stats').innerHTML = stats.map(s =>
+    `<div class="fin-stat sensitive-stat${!statsVisible ? ' blurred' : ''}">
+      <div class="fin-lbl">${s.label}</div>
+      <div class="fin-val">${s.value}</div>
+      <div class="fin-sub">${s.sub}</div>
+    </div>`
+  ).join('');
+}
+
+function renderFinancePnl() {
+  const data = getMockPnlData();
+  // Revenue vs Expenses chart
+  if (charts.xeroRevExp) charts.xeroRevExp.destroy();
+  charts.xeroRevExp = new Chart(document.getElementById('xero-rev-exp-chart'), {
+    type: 'bar',
+    data: {
+      labels: data.map(d => d.label),
+      datasets: [
+        { label: 'Revenue', data: data.map(d => d.revenue), backgroundColor: '#8CB47A', borderRadius: 4 },
+        { label: 'Expenses', data: data.map(d => d.expenses), backgroundColor: '#e06050', borderRadius: 4 },
+      ]
+    },
+    options: {
+      ...finChartDefaults,
+      scales: {
+        ...finChartDefaults.scales,
+        y: { ...finChartDefaults.scales.y, ticks: { ...finChartDefaults.scales.y.ticks, callback: v => '$' + (v / 1000).toFixed(0) + 'k' } },
+        x: { ...finChartDefaults.scales.x, ticks: { ...finChartDefaults.scales.x.ticks, maxRotation: 45 } },
+      }
+    }
+  });
+
+  // Profit Margin chart
+  if (charts.xeroMargin) charts.xeroMargin.destroy();
+  const margins = data.map(d => ((d.revenue - d.expenses) / d.revenue * 100).toFixed(1));
+  charts.xeroMargin = new Chart(document.getElementById('xero-margin-chart'), {
+    type: 'line',
+    data: {
+      labels: data.map(d => d.label),
+      datasets: [{
+        label: 'Profit Margin %',
+        data: margins,
+        borderColor: '#8CB47A',
+        backgroundColor: 'rgba(140,180,122,0.15)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3,
+        pointBackgroundColor: '#8CB47A',
+      }]
+    },
+    options: {
+      ...finChartDefaults,
+      scales: {
+        ...finChartDefaults.scales,
+        y: { ...finChartDefaults.scales.y, ticks: { ...finChartDefaults.scales.y.ticks, callback: v => v + '%' }, min: 0, max: 100 },
+        x: { ...finChartDefaults.scales.x, ticks: { ...finChartDefaults.scales.x.ticks, maxRotation: 45 } },
+      }
+    }
+  });
+
+  // P&L detail table
+  const detail = getMockPnlDetail();
+  document.getElementById('pnl-detail-table').innerHTML = detail.map(row => {
+    if (row.type === 'section') return `<tr class="fin-section-head"><td colspan="2">${row.label}</td></tr>`;
+    if (row.type === 'total') return `<tr class="fin-total"><td>${row.label}</td><td style="text-align:right;color:${row.amount >= 0 ? 'var(--sage)' : 'var(--red)'}">${fmt_money(Math.abs(row.amount))}</td></tr>`;
+    return `<tr class="fin-indent"><td>${row.label}</td><td style="text-align:right;color:${row.amount >= 0 ? 'var(--sage)' : 'var(--red)'}">${row.amount < 0 ? '-' : ''}${fmt_money(Math.abs(row.amount))}</td></tr>`;
+  }).join('');
+}
+
+function renderFinanceCashflow() {
+  const banks = getMockBankData();
+  // Bank balances chart
+  if (charts.xeroBank) charts.xeroBank.destroy();
+  charts.xeroBank = new Chart(document.getElementById('xero-bank-chart'), {
+    type: 'bar',
+    data: {
+      labels: banks.map(b => b.name),
+      datasets: [{
+        label: 'Balance',
+        data: banks.map(b => b.balance),
+        backgroundColor: banks.map(b => b.balance >= 0 ? '#8CB47A' : '#e06050'),
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      ...finChartDefaults,
+      indexAxis: 'y',
+      plugins: { ...finChartDefaults.plugins, legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#9c9287', callback: v => '$' + (v / 1000).toFixed(0) + 'k' }, grid: { color: '#252220' } },
+        y: { ticks: { color: '#9c9287' }, grid: { display: false } },
+      }
+    }
+  });
+
+  // Cash flow chart
+  const cfData = getMockCashflowData();
+  if (charts.xeroCashflow) charts.xeroCashflow.destroy();
+  charts.xeroCashflow = new Chart(document.getElementById('xero-cashflow-chart'), {
+    type: 'line',
+    data: {
+      labels: cfData.map(d => d.label),
+      datasets: [
+        { label: 'Money In', data: cfData.map(d => d.moneyIn), borderColor: '#8CB47A', backgroundColor: 'rgba(140,180,122,0.1)', fill: true, tension: 0.3, pointRadius: 0 },
+        { label: 'Money Out', data: cfData.map(d => d.moneyOut), borderColor: '#D4A84B', backgroundColor: 'rgba(212,168,75,0.1)', fill: true, tension: 0.3, pointRadius: 0 },
+      ]
+    },
+    options: {
+      ...finChartDefaults,
+      scales: {
+        ...finChartDefaults.scales,
+        y: { ...finChartDefaults.scales.y, ticks: { ...finChartDefaults.scales.y.ticks, callback: v => '$' + v } },
+        x: { ...finChartDefaults.scales.x, ticks: { ...finChartDefaults.scales.x.ticks, maxTicksLimit: 10 } },
+      }
+    }
+  });
+
+  // Bank transactions table
+  const txns = getMockBankTransactions();
+  document.getElementById('bank-txn-table').innerHTML = txns.map(t =>
+    `<tr>
+      <td>${t.date}</td>
+      <td>${t.description}</td>
+      <td>${t.account}</td>
+      <td style="text-align:right;color:${t.amount >= 0 ? 'var(--sage)' : 'var(--red)'}">${t.amount < 0 ? '-' : ''}${fmt_money(Math.abs(t.amount))}</td>
+    </tr>`
+  ).join('');
+}
+
+function renderAgingChart(canvasId, chartKey, buckets, label) {
+  if (charts[chartKey]) charts[chartKey].destroy();
+  const labels = ['Current', '1-30 days', '31-60 days', '61-90 days', '90+ days'];
+  const values = [buckets.current, buckets['1-30'], buckets['31-60'], buckets['61-90'], buckets['90+']];
+  const colors = ['#8CB47A', '#D4A84B', '#DBBFA8', '#e06050', '#a03020'];
+  charts[chartKey] = new Chart(document.getElementById(canvasId), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ label, data: values, backgroundColor: colors, borderRadius: 6 }]
+    },
+    options: {
+      ...finChartDefaults,
+      indexAxis: 'y',
+      plugins: { ...finChartDefaults.plugins, legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#9c9287', callback: v => '$' + v }, grid: { color: '#252220' } },
+        y: { ticks: { color: '#9c9287' }, grid: { display: false } },
+      }
+    }
+  });
+}
+
+function renderFinanceInvoices() {
+  const invoices = getMockInvoices();
+  const bills = getMockBills();
+
+  // AR aging chart
+  renderAgingChart('xero-ar-chart', 'xeroAR', getMockAgingData(invoices), 'Receivables');
+
+  // AP aging chart
+  renderAgingChart('xero-ap-chart', 'xeroAP', getMockAgingData(bills), 'Payables');
+
+  // Invoices table
+  document.getElementById('invoices-table').innerHTML = invoices.map(inv =>
+    `<tr>
+      <td>${inv.number}</td>
+      <td>${inv.contact}</td>
+      <td>${inv.dueDate}</td>
+      <td style="text-align:right">${fmt_money(inv.amount)}</td>
+      <td><span class="status-badge" style="background:${inv.status === 'overdue' ? 'rgba(224,96,80,0.15)' : 'rgba(140,180,122,0.15)'};color:${inv.status === 'overdue' ? 'var(--red)' : 'var(--sage)'}">${inv.status === 'overdue' ? 'Overdue' : 'Current'}</span></td>
+    </tr>`
+  ).join('');
+
+  // Bills table
+  document.getElementById('bills-table').innerHTML = bills.map(bill =>
+    `<tr>
+      <td>${bill.number}</td>
+      <td>${bill.contact}</td>
+      <td>${bill.dueDate}</td>
+      <td style="text-align:right">${fmt_money(bill.amount)}</td>
+      <td><span class="status-badge" style="background:${bill.status === 'overdue' ? 'rgba(224,96,80,0.15)' : 'rgba(140,180,122,0.15)'};color:${bill.status === 'overdue' ? 'var(--red)' : 'var(--sage)'}">${bill.status === 'overdue' ? 'Overdue' : 'Current'}</span></td>
+    </tr>`
+  ).join('');
+}
+
+function loadFinanceTab() {
+  renderFinanceStats();
+  const activePanel = document.querySelector('#fin-sub-tabs .wa-panel-tab.active');
+  const panel = activePanel ? activePanel.dataset.finPanel : 'pnl';
+  if (panel === 'pnl') renderFinancePnl();
+  else if (panel === 'cashflow') renderFinanceCashflow();
+  else if (panel === 'invoices') renderFinanceInvoices();
+  applyStatsVisibility();
+}
+
+// Finance sub-tab switching
+document.querySelectorAll('#fin-sub-tabs .wa-panel-tab').forEach(tab => {
+  tab.addEventListener('click', function() {
+    document.querySelectorAll('#fin-sub-tabs .wa-panel-tab').forEach(t => t.classList.remove('active'));
+    this.classList.add('active');
+    const panel = this.dataset.finPanel;
+    document.getElementById('fin-panel-pnl').style.display = panel === 'pnl' ? '' : 'none';
+    document.getElementById('fin-panel-cashflow').style.display = panel === 'cashflow' ? '' : 'none';
+    document.getElementById('fin-panel-invoices').style.display = panel === 'invoices' ? '' : 'none';
+    if (panel === 'pnl') renderFinancePnl();
+    if (panel === 'cashflow') renderFinanceCashflow();
+    if (panel === 'invoices') renderFinanceInvoices();
+    applyStatsVisibility();
   });
 });
 </script>
