@@ -6,6 +6,9 @@
   <title>Primal Pantry — Sales Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9/dist/leaflet.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9/dist/leaflet.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
   <style>
     :root { --bg: #0f172a; --card: #1e293b; --border: #334155; --text: #e2e8f0; --muted: #94a3b8; --dim: #64748b; --blue: #3b82f6; --green: #4ade80; --purple: #8b5cf6; --pink: #ec4899; --amber: #f59e0b; --cyan: #06b6d4; --red: #f43f5e; --lime: #84cc16; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -59,6 +62,9 @@
     .utm-table td { padding: 0.4rem 0.5rem; font-size: 0.8rem; border-bottom: 1px solid #111827; }
     .utm-bar { height: 6px; border-radius: 3px; background: var(--blue); display: inline-block; }
 
+    /* Map */
+    #order-map { height: 400px; border-radius: 8px; }
+
     /* Orders table */
     .orders-card { background: var(--card); border-radius: 10px; padding: 1rem; }
     .orders-card h3 { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.75rem; text-transform: uppercase; }
@@ -100,14 +106,19 @@
   <div class="header">
     <h1>Sales Dashboard</h1>
     <div class="header-controls">
-      <button data-range="today" class="active">Today</button>
-      <button data-range="yesterday">Yesterday</button>
-      <button data-range="7d">7 Days</button>
-      <button data-range="30d">30 Days</button>
-      <button data-range="month">This Month</button>
-      <button data-range="all">All Time</button>
-      <input type="date" id="date-from" title="From">
-      <input type="date" id="date-to" title="To">
+      <select id="date-range">
+        <option value="today" selected>Today</option>
+        <option value="yesterday">Yesterday</option>
+        <option value="7d">Last 7 Days</option>
+        <option value="30d">Last 30 Days</option>
+        <option value="month">This Month</option>
+        <option value="all">All Time</option>
+        <option value="custom">Custom Range</option>
+      </select>
+      <input type="date" id="date-from" title="From" style="display:none;">
+      <input type="date" id="date-to" title="To" style="display:none;">
+      <select id="filter-utm"><option value="">All Sources</option></select>
+      <select id="filter-city"><option value="">All Cities</option></select>
       <button id="logout-btn">Sign out</button>
     </div>
   </div>
@@ -127,7 +138,7 @@
 
   <div class="charts-row">
     <div class="chart-card">
-      <h3>Top Products</h3>
+      <h3>Top Products <select id="product-view" style="float:right;background:var(--bg);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:0.75rem;"><option value="name">By Name</option><option value="sku">By SKU</option></select></h3>
       <canvas id="products-chart"></canvas>
     </div>
     <div class="chart-card">
@@ -136,9 +147,15 @@
     </div>
   </div>
 
-  <div class="chart-card" style="margin-bottom:1.5rem;">
-    <h3>Order Heatmap (Day x Hour)</h3>
-    <div id="heatmap-container"></div>
+  <div class="charts-row">
+    <div class="chart-card">
+      <h3>Order Heatmap (Day x Hour)</h3>
+      <div id="heatmap-container"></div>
+    </div>
+    <div class="chart-card">
+      <h3>Order Locations</h3>
+      <div id="order-map"></div>
+    </div>
   </div>
 
   <div class="orders-card">
@@ -186,6 +203,7 @@ document.getElementById('logout-btn').addEventListener('click', () => { sessionS
 document.getElementById('modal-close').addEventListener('click', closeModal);
 document.getElementById('order-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
 document.getElementById('order-search').addEventListener('input', renderOrdersTable);
+document.getElementById('product-view').addEventListener('change', () => renderProductsChart(currentLineItems));
 
 function login() {
   if (document.getElementById('password-input').value === VALID_PASSWORD) {
@@ -206,30 +224,21 @@ function showDashboard() {
   initDashboard();
 }
 
-// ── Date filtering ──
+// ── Filtering ──
 let currentRange = 'today';
 
-document.querySelectorAll('[data-range]').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('[data-range]').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    currentRange = btn.dataset.range;
-    document.getElementById('date-from').value = '';
-    document.getElementById('date-to').value = '';
-    applyFilter();
-  });
-});
-
-document.getElementById('date-from').addEventListener('change', () => {
-  document.querySelectorAll('[data-range]').forEach(b => b.classList.remove('active'));
-  currentRange = 'custom';
+// Date range dropdown
+document.getElementById('date-range').addEventListener('change', function() {
+  currentRange = this.value;
+  const custom = currentRange === 'custom';
+  document.getElementById('date-from').style.display = custom ? '' : 'none';
+  document.getElementById('date-to').style.display = custom ? '' : 'none';
   applyFilter();
 });
-document.getElementById('date-to').addEventListener('change', () => {
-  document.querySelectorAll('[data-range]').forEach(b => b.classList.remove('active'));
-  currentRange = 'custom';
-  applyFilter();
-});
+document.getElementById('date-from').addEventListener('change', applyFilter);
+document.getElementById('date-to').addEventListener('change', applyFilter);
+document.getElementById('filter-utm').addEventListener('change', applyFilter);
+document.getElementById('filter-city').addEventListener('change', applyFilter);
 
 function getDateRange() {
   const now = new Date();
@@ -252,11 +261,32 @@ function getDateRange() {
   }
 }
 
+function populateFilterDropdowns() {
+  // UTM sources
+  const utmSelect = document.getElementById('filter-utm');
+  const sources = [...new Set(allOrders.map(o => o.utm_source || getUtmFromUrl(o.thank_you_url) || '').filter(Boolean))].sort();
+  utmSelect.innerHTML = '<option value="">All Sources</option>' + sources.map(s => `<option value="${s}">${s}</option>`).join('');
+
+  // Cities
+  const citySelect = document.getElementById('filter-city');
+  const cities = [...new Set(allOrders.map(o => o.city || '').filter(Boolean))].sort();
+  citySelect.innerHTML = '<option value="">All Cities</option>' + cities.map(c => `<option value="${c}">${c}</option>`).join('');
+}
+
 function applyFilter() {
   const [from, to] = getDateRange();
-  filteredOrders = allOrders.filter(o => o.order_date >= from && o.order_date <= to);
-  const filteredLineItemIds = new Set(filteredOrders.map(o => o.id));
-  const filteredLI = allLineItems.filter(li => filteredLineItemIds.has(li.order_id));
+  const utmFilter = document.getElementById('filter-utm').value;
+  const cityFilter = document.getElementById('filter-city').value;
+
+  filteredOrders = allOrders.filter(o => {
+    if (o.order_date < from || o.order_date > to) return false;
+    if (utmFilter && (o.utm_source || getUtmFromUrl(o.thank_you_url) || '') !== utmFilter) return false;
+    if (cityFilter && o.city !== cityFilter) return false;
+    return true;
+  });
+
+  const filteredOrderIds = new Set(filteredOrders.map(o => o.id));
+  const filteredLI = allLineItems.filter(li => filteredOrderIds.has(li.order_id));
   renderAll(filteredOrders, filteredLI);
 }
 
@@ -281,6 +311,7 @@ async function initDashboard() {
 
   allOrders = ordersRes.data || [];
   allLineItems = liRes.data || [];
+  populateFilterDropdowns();
   applyFilter();
 }
 
@@ -292,6 +323,7 @@ function renderAll(orders, lineItems) {
   renderProductsChart(lineItems);
   renderUTM(orders);
   renderHeatmap(orders);
+  renderMap(orders);
   renderOrdersTable();
 }
 
@@ -318,6 +350,18 @@ function renderStats(orders, lineItems) {
   // Unique emails in filtered period
   const periodEmails = new Set(orders.map(o => o.email).filter(Boolean));
 
+  // Magnet product — most common first line item per order
+  const firstItems = {};
+  orders.forEach(o => {
+    const items = allLineItems.filter(li => li.order_id === o.id).sort((a, b) => a.id - b.id);
+    if (items.length > 0) {
+      const name = items[0].description || items[0].sku || 'Unknown';
+      firstItems[name] = (firstItems[name] || 0) + 1;
+    }
+  });
+  const magnetEntries = Object.entries(firstItems).sort((a, b) => b[1] - a[1]);
+  const magnetProduct = magnetEntries.length > 0 ? magnetEntries[0] : ['None', 0];
+
   const stats = [
     { label: 'Revenue', value: fmt_money(revenue), sub: `${orderCount} orders`, color: 'var(--green)' },
     { label: 'Orders', value: orderCount, sub: `${periodEmails.size} customers`, color: 'var(--blue)' },
@@ -329,6 +373,7 @@ function renderStats(orders, lineItems) {
     { label: 'Discounts Given', value: fmt_money(sum(orders, 'discount_applied')), sub: `${orders.filter(o => Number(o.discount_applied) > 0).length} orders`, color: 'var(--red)' },
     { label: 'Top Customer (Spend)', value: topCustomer(allOrders, 'total_value').name, sub: fmt_money(topCustomer(allOrders, 'total_value').total), color: 'var(--lime)' },
     { label: 'Top Customer (Orders)', value: topCustomer(allOrders, 'count').name, sub: `${topCustomer(allOrders, 'count').total} orders`, color: 'var(--amber)' },
+    { label: 'Magnet Product', value: magnetProduct[0], sub: `${magnetProduct[1]} orders as first item`, color: 'var(--cyan)' },
   ];
 
   document.getElementById('stats-grid').innerHTML = stats.map(s => `
@@ -390,11 +435,14 @@ function renderHoursChart(orders) {
 }
 
 // ── Top products ──
+let currentLineItems = [];
 function renderProductsChart(lineItems) {
+  currentLineItems = lineItems;
+  const view = document.getElementById('product-view').value;
   const products = {};
   lineItems.forEach(li => {
-    const name = li.description || li.sku || 'Unknown';
-    products[name] = (products[name] || 0) + li.quantity;
+    const key = view === 'sku' ? (li.sku || 'Unknown') : (li.description || li.sku || 'Unknown');
+    products[key] = (products[key] || 0) + li.quantity;
   });
 
   const sorted = Object.entries(products).sort((a, b) => b[1] - a[1]).slice(0, 10);
@@ -525,11 +573,16 @@ function openOrderModal(orderId) {
 
   document.getElementById('modal-title').textContent = `Order — ${order.customer_name || order.email}`;
 
+  const statusOptions = ['Ordered - Paid', 'Processing', 'Shipped', 'Delivered', 'Refunded', 'Incorrect Order', 'Cancelled'];
+  const statusSelect = `<select id="modal-status" data-order-id="${orderId}" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:3px 8px;font-size:0.85rem;">
+    ${statusOptions.map(s => `<option value="${s}" ${s === order.status ? 'selected' : ''}>${s}</option>`).join('')}
+  </select>`;
+
   const rows = [
     ['Date', order.order_date],
     ['Email', order.email],
     ['Phone', order.phone || '-'],
-    ['Status', order.status],
+    ['Status', statusSelect],
     ['Total', '$' + Number(order.total_value || 0).toFixed(2)],
     ['Shipping Cost', '$' + Number(order.shipping_cost || 0).toFixed(2)],
     ['Discount', '$' + Number(order.discount_applied || 0).toFixed(2)],
@@ -556,6 +609,20 @@ function openOrderModal(orderId) {
 
   document.getElementById('modal-body').innerHTML = html;
   document.getElementById('order-modal').classList.add('open');
+
+  // Status change handler
+  document.getElementById('modal-status').addEventListener('change', async function() {
+    const newStatus = this.value;
+    const oid = Number(this.dataset.orderId);
+    const { error } = await sb.from('orders').update({ status: newStatus }).eq('id', oid);
+    if (error) {
+      alert('Failed to update status: ' + error.message);
+    } else {
+      const order = allOrders.find(o => o.id === oid);
+      if (order) order.status = newStatus;
+      renderOrdersTable();
+    }
+  });
 }
 
 function closeModal() {
@@ -563,6 +630,110 @@ function closeModal() {
 }
 
 // ── Helpers ──
+// ── Geographic Map ──
+const NZ_CITIES = {
+  'auckland':[-36.85,174.76],'wellington':[-41.29,174.78],'christchurch':[-43.53,172.64],
+  'hamilton':[-37.79,175.28],'tauranga':[-37.69,176.17],'napier':[-39.49,176.91],
+  'hastings':[-39.64,176.85],'dunedin':[-45.87,170.50],'palmerston north':[-40.35,175.61],
+  'nelson':[-41.27,173.28],'rotorua':[-38.14,176.25],'new plymouth':[-39.07,174.08],
+  'whangarei':[-35.73,174.32],'invercargill':[-46.41,168.35],'whanganui':[-39.93,175.05],
+  'gisborne':[-38.66,178.02],'blenheim':[-41.51,173.95],'timaru':[-44.40,171.25],
+  'taupo':[-38.69,176.08],'masterton':[-40.95,175.66],'levin':[-40.63,175.28],
+  'ashburton':[-43.90,171.75],'cambridge':[-37.88,175.47],'tokoroa':[-38.23,175.87],
+  'te awamutu':[-38.01,175.32],'hawera':[-39.59,174.28],'oamaru':[-45.10,170.97],
+  'kapiti':[-40.91,174.98],'paraparaumu':[-40.91,174.98],'waihi':[-37.39,175.83],
+  'thames':[-37.14,175.54],'matamata':[-37.81,175.77],'morrinsville':[-37.65,175.53],
+  'te kuiti':[-38.33,175.16],'kaikoura':[-42.40,173.68],'greymouth':[-42.45,171.21],
+  'queenstown':[-45.03,168.66],'wanaka':[-44.70,169.13],'rangiora':[-43.31,172.60],
+  'rolleston':[-43.59,172.38],'pukekohe':[-37.20,174.90],'manukau':[-36.99,174.88],
+  'north shore':[-36.80,174.76],'waitakere':[-36.85,174.54],'lower hutt':[-41.21,174.91],
+  'upper hutt':[-41.12,175.07],'porirua':[-41.13,174.84],'petone':[-41.23,174.87],
+  'papakura':[-37.07,174.95],'takanini':[-37.05,174.93],'whangaparaoa':[-36.62,174.74],
+  'orewa':[-36.59,174.69],'silverdale':[-36.61,174.67],'hibiscus coast':[-36.60,174.70],
+  'te puke':[-37.78,176.32],'katikati':[-37.55,175.92],'whakatane':[-37.95,176.99],
+  'opotiki':[-38.01,177.29],'kawerau':[-38.08,176.70],'mount maunganui':[-37.64,176.18],
+  'papamoa':[-37.72,176.28],'kerikeri':[-35.23,174.00],'kaitaia':[-35.11,173.26],
+  'dargaville':[-35.93,173.88],'paihia':[-35.28,174.09],'mangawhai':[-36.13,174.58],
+  'snells beach':[-36.42,174.73],'warkworth':[-36.40,174.66],'helensville':[-36.68,174.45],
+  'kumeu':[-36.78,174.56],'huapai':[-36.77,174.54],'taupiri':[-37.67,175.27],
+  'huntly':[-37.56,175.16],'ngaruawahia':[-37.67,175.16],'raglan':[-37.80,174.88],
+  'gore':[-46.10,168.94],'balclutha':[-46.23,169.73],'alexandra':[-45.25,169.38],
+  'cromwell':[-45.05,169.20],'mosgiel':[-45.87,170.35],'milton':[-46.12,169.97],
+  'waimate':[-44.73,171.05],'geraldine':[-44.10,171.24],'temuka':[-44.24,171.28],
+  'hokitika':[-42.45,170.97],'westport':[-41.76,171.60],'reefton':[-42.12,171.86],
+  'picton':[-41.29,174.00],'seddon':[-41.67,174.07],'ward':[-41.83,174.17],
+  'kaiapoi':[-43.38,172.66],'woodend':[-43.32,172.67],'pegasus':[-43.30,172.69],
+  'lincoln':[-43.65,172.49],'darfield':[-43.49,172.11],'leeston':[-43.77,172.30],
+  'haruru':[-35.27,174.07],'haruru falls':[-35.27,174.07],
+};
+
+let mapInstance = null;
+let heatLayer = null;
+
+function renderMap(orders) {
+  const container = document.getElementById('order-map');
+
+  // Count orders per city and get coordinates
+  const cityOrders = {};
+  orders.forEach(o => {
+    const city = (o.city || '').toLowerCase().trim();
+    if (!city) return;
+    if (!cityOrders[city]) cityOrders[city] = { count: 0, revenue: 0, name: o.city };
+    cityOrders[city].count++;
+    cityOrders[city].revenue += Number(o.total_value || 0);
+  });
+
+  // Build heat data points
+  const heatData = [];
+  const markers = [];
+  Object.entries(cityOrders).forEach(([city, data]) => {
+    const coords = NZ_CITIES[city];
+    if (!coords) return;
+    // Add multiple points for intensity
+    for (let i = 0; i < data.count; i++) {
+      heatData.push([coords[0], coords[1], 1]);
+    }
+    markers.push({ coords, ...data });
+  });
+
+  if (!mapInstance) {
+    mapInstance = L.map('order-map', { scrollWheelZoom: false }).setView([-41.0, 174.0], 5);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '',
+      maxZoom: 18,
+    }).addTo(mapInstance);
+  }
+
+  // Remove old heat layer
+  if (heatLayer) mapInstance.removeLayer(heatLayer);
+
+  if (heatData.length > 0) {
+    heatLayer = L.heatLayer(heatData, {
+      radius: 25,
+      blur: 20,
+      maxZoom: 10,
+      gradient: { 0.2: '#3b82f6', 0.4: '#8b5cf6', 0.6: '#ec4899', 0.8: '#f59e0b', 1.0: '#f43f5e' },
+    }).addTo(mapInstance);
+  }
+
+  // Add circle markers with tooltips
+  // Clear old markers
+  mapInstance.eachLayer(l => { if (l instanceof L.CircleMarker) mapInstance.removeLayer(l); });
+  markers.forEach(m => {
+    L.circleMarker(m.coords, {
+      radius: Math.min(4 + m.count * 2, 20),
+      color: 'var(--blue)',
+      fillColor: '#3b82f6',
+      fillOpacity: 0.6,
+      weight: 1,
+    }).bindTooltip(`<b>${m.name}</b><br>${m.count} orders<br>$${m.revenue.toFixed(2)}`, { className: '' })
+      .addTo(mapInstance);
+  });
+
+  // Invalidate size in case container was hidden
+  setTimeout(() => mapInstance.invalidateSize(), 200);
+}
+
 function sum(arr, key) { return arr.reduce((s, o) => s + Number(o[key] || 0), 0); }
 function fmt_money(v) { return '$' + v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
 function fmt_date(d) { return d.toISOString().split('T')[0]; }
