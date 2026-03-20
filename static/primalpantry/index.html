@@ -155,6 +155,17 @@
     .loading { text-align: center; padding: 2rem; color: var(--dim); }
 
     /* Hamburger nav */
+    @keyframes deploy-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+    .deploy-pill { display:inline-flex;align-items:center;gap:0.3rem;padding:0.2rem 0.5rem;border-radius:20px;font-size:0.65rem;font-weight:600;cursor:default;border:1px solid var(--border);background:var(--card);color:var(--dim);transition:all 0.3s; }
+    .deploy-pill .dp-dot { width:6px;height:6px;border-radius:50%;display:inline-block;background:var(--dim);transition:background 0.3s; }
+    .deploy-pill.dp-ready { border-color:rgba(140,180,122,0.3);color:var(--sage); }
+    .deploy-pill.dp-ready .dp-dot { background:var(--sage); }
+    .deploy-pill.dp-building { border-color:rgba(212,168,75,0.3);color:var(--honey); }
+    .deploy-pill.dp-building .dp-dot { background:var(--honey);animation:deploy-pulse 1.5s ease-in-out infinite; }
+    .deploy-pill.dp-enqueued { border-color:rgba(212,168,75,0.2);color:var(--honey); }
+    .deploy-pill.dp-enqueued .dp-dot { background:var(--honey);opacity:0.6; }
+    .deploy-pill.dp-error { border-color:rgba(224,96,80,0.3);color:var(--red); }
+    .deploy-pill.dp-error .dp-dot { background:var(--red); }
     .nav-hamburger { background: var(--card); border: 1px solid var(--border); color: var(--muted); width: 38px; height: 38px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; flex-shrink: 0; }
     .nav-hamburger:hover { border-color: var(--sage); color: var(--text); }
     .nav-hamburger svg { width: 18px; height: 18px; }
@@ -358,6 +369,22 @@
       100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0); }
     }
 
+    /* Dummy data (pink) */
+    .dummy-data { color: #ff69b4 !important; }
+    .dummy-data-bg { background: rgba(255,105,180,0.15) !important; }
+    .dummy-badge { padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
+    .dummy-badge.approved { background: rgba(140,180,122,0.15); color: var(--sage); }
+    .dummy-badge.disapproved { background: rgba(224,96,80,0.15); color: var(--red); }
+    .dummy-badge.pending { background: rgba(212,168,75,0.15); color: var(--honey); }
+    .mkt-info-banner { background: rgba(255,105,180,0.08); border: 1px dashed #ff69b4; border-radius: 8px; padding: 0.75rem 1rem; font-size: 0.8rem; color: #ff69b4; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+    .mkt-funnel { display: flex; align-items: stretch; gap: 0; width: 100%; min-height: 60px; margin-top: 0.5rem; }
+    .mkt-funnel-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.5rem 0.25rem; text-align: center; }
+    .mkt-funnel-bar { width: 100%; border-radius: 4px; display: flex; align-items: center; justify-content: center; flex-direction: column; padding: 0.5rem 0.25rem; min-height: 44px; }
+    .mkt-funnel-count { font-size: 1rem; font-weight: 700; color: #fff; }
+    .mkt-funnel-label { font-size: 0.6rem; color: rgba(255,255,255,0.8); text-transform: uppercase; letter-spacing: 0.03em; margin-top: 2px; }
+    .mkt-funnel-drop { font-size: 0.6rem; color: var(--dim); margin-top: 0.25rem; }
+    .mkt-funnel-arrow { display: flex; align-items: center; justify-content: center; color: var(--dim); font-size: 1rem; padding: 0 0.15rem; flex-shrink: 0; }
+
     @media (max-width: 900px) {
       .charts-row { grid-template-columns: 1fr; }
       #pace-map-row { grid-template-columns: 1fr !important; }
@@ -524,6 +551,7 @@
       <button id="stats-eye-btn" title="Show/hide stats" style="background:var(--card);border:1px solid var(--border);color:var(--dim);padding:0.4rem 0.5rem;border-radius:6px;cursor:pointer;line-height:1;display:flex;align-items:center;transition:all 0.15s;"><svg id="stats-eye-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button>
       <button id="refresh-btn" title="Refresh data" style="font-size:1rem;line-height:1;">↻</button>
       <span id="last-refresh" style="font-size:0.7rem;color:var(--dim);"></span>
+      <span id="deploy-pills" style="display:inline-flex;gap:0.3rem;align-items:center;"></span>
       <button class="nav-hamburger" id="nav-hamburger-btn" title="Menu">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
@@ -562,6 +590,10 @@
     <button class="nav-item" data-tab="website">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
       Website Analytics
+    </button>
+    <button class="nav-item" data-tab="marketing">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Marketing
     </button>
     <button class="nav-item" data-tab="finance">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
@@ -1174,7 +1206,117 @@
     </div>
   </div><!-- /tab-website -->
 
+  <div id="tab-marketing" class="tab-content">
+    <div class="stats" id="marketing-stats-grid"></div>
+
+    <div class="charts-row">
+      <div class="chart-card">
+        <h3>Channel Breakdown</h3>
+        <div class="chart-wrap"><canvas id="mkt-channel-chart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Ad Spend vs Revenue</h3>
+        <div class="chart-wrap"><canvas id="mkt-spend-rev-chart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="charts-row">
+      <div class="chart-card">
+        <h3>ROAS Trend</h3>
+        <div class="chart-wrap"><canvas id="mkt-roas-chart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Funnel by Campaign
+          <select id="mkt-funnel-campaign" style="float:right;background:var(--bg);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:0.75rem;" onclick="event.stopPropagation()">
+            <option value="all">All Campaigns</option>
+          </select>
+        </h3>
+        <div id="mkt-funnel-container"></div>
+      </div>
+    </div>
+
+    <div class="orders-card" style="margin-bottom:1.5rem;">
+      <h3>Campaign Performance</h3>
+      <input type="text" class="search-bar" id="mkt-campaign-search" placeholder="Search campaigns...">
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th class="sortable" data-col="campaign">Campaign</th>
+              <th class="sortable" data-col="source">Source</th>
+              <th class="sortable" data-col="medium">Medium</th>
+              <th class="sortable" data-col="spend">Spend</th>
+              <th class="sortable" data-col="revenue">Revenue</th>
+              <th class="sortable" data-col="roas">ROAS</th>
+              <th class="sortable" data-col="orders">Orders</th>
+              <th class="sortable" data-col="cvr">CVR%</th>
+              <th class="sortable" data-col="cpa">CPA</th>
+            </tr>
+          </thead>
+          <tbody id="mkt-campaign-table"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="orders-card" style="margin-bottom:1.5rem;">
+      <h3>Landing Page Performance</h3>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Landing Page</th>
+              <th>Paid Visits</th>
+              <th>ATC Rate</th>
+              <th>CVR%</th>
+              <th>Revenue</th>
+              <th>Bounce Rate</th>
+            </tr>
+          </thead>
+          <tbody id="mkt-landing-table"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="orders-card">
+      <h3>Google Merchant Center Alerts</h3>
+      <div class="mkt-info-banner">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        Webhook not configured — connect Google Merchant Center API to receive real-time disapproval alerts
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>SKU</th>
+              <th>Status</th>
+              <th>Issue</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody id="mkt-gmc-table"></tbody>
+        </table>
+      </div>
+    </div>
+  </div><!-- /tab-marketing -->
+
   <div id="tab-finance" class="tab-content">
+    <!-- Connection banner (hidden when connected) -->
+    <div id="xero-connect-banner" class="orders-card fin-connect" style="display:none;">
+      <h3>Connect Xero Accounting</h3>
+      <p>Link your Xero account to see live financial reports. Read-only access — no data will be modified.</p>
+      <button id="xero-connect-btn" class="team-btn" onclick="xeroStartAuth()">Connect Xero</button>
+    </div>
+
+    <!-- Connection status bar (hidden when not connected) -->
+    <div id="xero-status-bar" style="display:none;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;">
+      <span id="xero-org-label" style="font-size:0.8rem;color:var(--muted);"></span>
+      <div style="display:flex;gap:0.5rem;">
+        <button onclick="xeroRefreshAll()" style="background:none;border:1px solid var(--border);color:var(--muted);padding:0.3rem 0.6rem;border-radius:6px;cursor:pointer;font-size:0.75rem;font-family:'DM Sans',sans-serif;">Refresh</button>
+        <button id="xero-disconnect-btn" onclick="xeroDisconnect()" style="background:none;border:1px solid var(--red);color:var(--red);padding:0.3rem 0.6rem;border-radius:6px;cursor:pointer;font-size:0.75rem;font-family:'DM Sans',sans-serif;">Disconnect</button>
+      </div>
+    </div>
+
     <div class="fin-stats" id="finance-stats"></div>
 
     <div class="wa-panel-tabs" id="fin-sub-tabs">
@@ -3513,7 +3655,7 @@ function topCustomer(orders, mode) {
 const navDrawer = document.getElementById('nav-drawer');
 const navOverlay = document.getElementById('nav-overlay');
 const navLabel = document.getElementById('nav-active-label');
-const navNames = { sales: 'Overview', orders: 'Orders', shipping: 'Shipping', customers: 'Customers', manufacturing: 'Product & Inventory', website: 'Website Analytics', finance: 'Finance' };
+const navNames = { sales: 'Overview', orders: 'Orders', shipping: 'Shipping', customers: 'Customers', manufacturing: 'Product & Inventory', website: 'Website Analytics', marketing: 'Marketing', finance: 'Finance' };
 
 function openNav() { navDrawer.classList.add('open'); navOverlay.classList.add('open'); }
 function closeNav() { navDrawer.classList.remove('open'); navOverlay.classList.remove('open'); }
@@ -3582,6 +3724,8 @@ function loadActiveTab() {
     loadManufacturingTab();
   } else if (activeTab === 'website') {
     waInit();
+  } else if (activeTab === 'marketing') {
+    loadMarketingTab();
   } else if (activeTab === 'finance') {
     loadFinanceTab();
   }
@@ -6908,6 +7052,107 @@ document.querySelectorAll('#fin-sub-tabs .wa-panel-tab').forEach(tab => {
       await new Promise(r => setTimeout(r, 300));
     }
   }
+})();
+
+// ── Deploy Status Pills ──
+(function() {
+  const SITES = ['oso', 'primalpantry', 'reviana'];
+  const LABELS = { oso: 'OSO', primalpantry: 'Primal', reviana: 'Reviana' };
+  const container = document.getElementById('deploy-pills');
+  if (!container) return;
+
+  let deployData = {};
+
+  SITES.forEach(site => {
+    const pill = document.createElement('span');
+    pill.className = 'deploy-pill';
+    pill.id = 'dp-' + site;
+    pill.title = LABELS[site];
+    pill.innerHTML = '<span class="dp-dot"></span>' + LABELS[site];
+    pill.addEventListener('click', () => showDeployPopup(site));
+    container.appendChild(pill);
+  });
+
+  // Popup
+  const popup = document.createElement('div');
+  popup.id = 'deploy-popup';
+  popup.style.cssText = 'display:none;position:fixed;top:60px;right:1.5rem;z-index:2000;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1rem;min-width:280px;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,0.4);';
+  document.body.appendChild(popup);
+
+  document.addEventListener('click', (e) => {
+    if (popup.style.display !== 'none' && !popup.contains(e.target) && !e.target.closest('.deploy-pill')) {
+      popup.style.display = 'none';
+    }
+  });
+
+  function stateClass(state) {
+    if (state === 'ready') return 'dp-ready';
+    if (['building','uploading','uploaded','preparing','prepared','processing'].includes(state)) return 'dp-building';
+    if (state === 'enqueued' || state === 'new') return 'dp-enqueued';
+    if (state === 'error') return 'dp-error';
+    return '';
+  }
+
+  function stateLabel(state) {
+    if (state === 'ready') return 'Live';
+    if (state === 'building') return 'Building';
+    if (state === 'enqueued') return 'Queued';
+    if (state === 'error') return 'Failed';
+    if (state === 'uploading' || state === 'uploaded') return 'Uploading';
+    if (state === 'preparing' || state === 'prepared') return 'Preparing';
+    return state || 'Unknown';
+  }
+
+  function timeAgo(dateStr) {
+    if (!dateStr) return '';
+    const mins = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return mins + 'm ago';
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return hrs + 'h ago';
+    return Math.floor(hrs / 24) + 'd ago';
+  }
+
+  function showDeployPopup(site) {
+    const d = deployData[site];
+    if (!d) { popup.style.display = 'none'; return; }
+    const t = d.published_at || d.created_at;
+    const ago = timeAgo(t);
+    const dt = d.deploy_time ? d.deploy_time + 's' : '';
+    const msg = d.title || '(no commit message)';
+    const err = d.error_message ? '<div style="color:var(--red);margin-top:0.5rem;font-size:0.8rem;">' + d.error_message + '</div>' : '';
+    popup.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;">' +
+        '<span style="font-weight:700;font-size:0.9rem;color:var(--text);">' + LABELS[site] + '</span>' +
+        '<span class="deploy-pill ' + stateClass(d.state) + '" style="pointer-events:none;"><span class="dp-dot"></span>' + stateLabel(d.state) + '</span>' +
+      '</div>' +
+      '<div style="font-size:0.8rem;color:var(--text);margin-bottom:0.4rem;">' + msg + '</div>' +
+      '<div style="font-size:0.7rem;color:var(--dim);">' + (ago ? ago : '') + (dt ? ' · ' + dt : '') + '</div>' +
+      err;
+    popup.style.display = 'block';
+  }
+
+  async function pollDeploys() {
+    const staff = JSON.parse(sessionStorage.getItem('pp_staff') || 'null');
+    if (!staff || !staff.token) return;
+    try {
+      const res = await fetch('/.netlify/functions/deploy-status?token=' + encodeURIComponent(staff.token));
+      if (!res.ok) return;
+      const data = await res.json();
+      deployData = data;
+      SITES.forEach(site => {
+        const pill = document.getElementById('dp-' + site);
+        if (!pill || !data[site]) return;
+        const d = data[site];
+        pill.className = 'deploy-pill ' + stateClass(d.state);
+        const t = d.published_at || d.created_at;
+        pill.title = LABELS[site] + ': ' + stateLabel(d.state) + (timeAgo(t) ? ' · ' + timeAgo(t) : '');
+      });
+    } catch (e) { /* silent */ }
+  }
+
+  pollDeploys();
+  setInterval(pollDeploys, 15000);
 })();
 </script>
 </body>
