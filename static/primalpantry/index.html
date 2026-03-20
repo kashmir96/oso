@@ -2493,7 +2493,7 @@ function renderShipmentsTable() {
     const tracking = o.tracking_number || o.tracking_numbers?.[0] || '';
     const trackUrl = o.tracking_url || (tracking ? '#' : '');
     const date = o.shipped_date || o.order_date || '-';
-    const displayDate = date !== '-' ? date.split('T')[0] : '-';
+    const displayDate = date !== '-' ? new Date(date).toLocaleString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : '-';
 
     return `<tr>
       <td>${o.order_number || '-'}</td>
