@@ -50,10 +50,17 @@ exports.handler = async (event) => {
 
   if (!site) return reply(400, { error: 'Missing site param' });
 
-  const res = await sbFetch('/rest/v1/rpc/analytics_realtime', {
-    method: 'POST',
-    body: JSON.stringify({ p_site: site }),
-  });
-  const data = await res.json();
-  return reply(200, data);
+  const [countRes, pagesRes] = await Promise.all([
+    sbFetch('/rest/v1/rpc/analytics_realtime', {
+      method: 'POST',
+      body: JSON.stringify({ p_site: site }),
+    }),
+    sbFetch('/rest/v1/rpc/analytics_realtime_pages', {
+      method: 'POST',
+      body: JSON.stringify({ p_site: site }),
+    }),
+  ]);
+  const countData = await countRes.json();
+  const pagesData = await pagesRes.json();
+  return reply(200, { ...countData, pages: pagesData || [] });
 };

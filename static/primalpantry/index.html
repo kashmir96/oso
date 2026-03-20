@@ -223,6 +223,9 @@
     .wa-bar-text { position: relative; z-index: 1; }
     .wa-small-panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
     .wa-loading { text-align: center; padding: 2rem; color: var(--dim); }
+    .wa-realtime-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--green); margin-right: 6px; animation: wa-pulse 1.5s infinite; }
+    @keyframes wa-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .wa-realtime.active { border: 1px solid var(--green); }
 
     @media (max-width: 900px) { .charts-row { grid-template-columns: 1fr; } .wa-panels { grid-template-columns: 1fr; } }
     @media (max-width: 600px) { .stats { grid-template-columns: repeat(2, 1fr); } .wa-stats { grid-template-columns: repeat(2, 1fr); } }
@@ -497,12 +500,17 @@
     </div>
 
     <div class="wa-stats">
-      <div class="wa-stat wa-realtime"><div class="wa-val" id="wa-realtime">-</div><div class="wa-lbl">Current Visitors</div></div>
+      <div class="wa-stat wa-realtime" id="wa-realtime-card" style="cursor:pointer;"><div class="wa-val" id="wa-realtime">-</div><div class="wa-lbl">Current Visitors</div></div>
       <div class="wa-stat"><div class="wa-val" id="wa-uniques">-</div><div class="wa-lbl">Unique Visitors</div></div>
       <div class="wa-stat"><div class="wa-val" id="wa-pageviews">-</div><div class="wa-lbl">Pageviews</div></div>
       <div class="wa-stat"><div class="wa-val" id="wa-duration">-</div><div class="wa-lbl">Avg Time on Site</div></div>
       <div class="wa-stat"><div class="wa-val" id="wa-bounce">-</div><div class="wa-lbl">Bounce Rate</div></div>
       <div class="wa-stat"><div class="wa-val" id="wa-events">-</div><div class="wa-lbl">Event Completions</div></div>
+    </div>
+
+    <div id="wa-realtime-panel" class="wa-panel" style="display:none;margin-bottom:1.5rem;">
+      <h3>Active Visitors Right Now</h3>
+      <div id="wa-realtime-pages"></div>
     </div>
 
     <div class="wa-chart-wrap">
@@ -2470,12 +2478,44 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     el.innerHTML = html;
   }
 
+  let waRealtimePages = [];
   async function waLoadRealtime() {
     try {
       const data = await waFetch('analytics-realtime', { site: waSite });
       document.getElementById('wa-realtime').textContent = data.active_visitors || 0;
+      waRealtimePages = data.pages || [];
+      // Update panel if visible
+      const panel = document.getElementById('wa-realtime-panel');
+      if (panel.style.display !== 'none') waRenderRealtimePages();
     } catch {}
   }
+
+  function waRenderRealtimePages() {
+    const el = document.getElementById('wa-realtime-pages');
+    if (!waRealtimePages.length) {
+      el.innerHTML = '<p style="color:var(--dim);text-align:center;padding:1rem;">No active visitors</p>';
+      return;
+    }
+    const max = Math.max(...waRealtimePages.map(p => p.visitors));
+    let html = '<table class="wa-table"><thead><tr><th>Page</th><th>Visitors</th></tr></thead><tbody>';
+    waRealtimePages.forEach(p => {
+      const pct = max > 0 ? (p.visitors / max * 100) : 0;
+      html += `<tr><td class="wa-bar-cell"><div class="wa-bar-bg" style="width:${pct}%;background:rgba(74,222,128,0.15)"></div><span class="wa-bar-text"><span class="wa-realtime-dot"></span>${p.pathname}</span></td><td>${p.visitors}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    el.innerHTML = html;
+  }
+
+  document.getElementById('wa-realtime-card').addEventListener('click', function() {
+    const panel = document.getElementById('wa-realtime-panel');
+    const isOpen = panel.style.display !== 'none';
+    panel.style.display = isOpen ? 'none' : 'block';
+    this.classList.toggle('active', !isOpen);
+    if (!isOpen) {
+      waRenderRealtimePages();
+      waLoadRealtime(); // refresh immediately
+    }
+  });
 
   async function waLoadDashboard() {
     if (!waSite || !waToken()) return;

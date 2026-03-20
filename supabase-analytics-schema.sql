@@ -216,6 +216,19 @@ RETURNS json AS $$
   WHERE site_id = p_site AND created_at >= now() - interval '5 minutes';
 $$ LANGUAGE sql STABLE;
 
+-- Realtime page breakdown (what pages are active visitors on)
+CREATE OR REPLACE FUNCTION analytics_realtime_pages(p_site text)
+RETURNS json AS $$
+  SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (
+    SELECT pathname, COUNT(DISTINCT visitor_hash) AS visitors
+    FROM analytics_pageviews
+    WHERE site_id = p_site AND created_at >= now() - interval '5 minutes'
+    GROUP BY pathname
+    ORDER BY visitors DESC
+    LIMIT 20
+  ) t;
+$$ LANGUAGE sql STABLE;
+
 -- List distinct site IDs
 CREATE OR REPLACE FUNCTION analytics_sites()
 RETURNS json AS $$
