@@ -2,8 +2,7 @@
  * eship-orders.js
  *
  * Netlify function proxy for StarshipIt API.
- * Fetches orders from all tabs (New, Printed, Shipped) sequentially
- * to avoid rate limits, with summary counts for stat cards.
+ * Fetches orders from all tabs (New, Printed, Shipped) with summary counts.
  *
  * Env vars required:
  *   STARSHIPIT_API_KEY
@@ -44,35 +43,29 @@ exports.handler = async (event) => {
   const limit = params.limit || '50';
 
   try {
-    // Batch 1: unshipped + printed (2 calls)
-    const [unshippedRes, printedRes] = await Promise.all([
+    // Batch 1: unshipped + summary (summary returns all counts regardless of order_status param)
+    const [unshippedRes, summaryRes] = await Promise.all([
       fetch(`https://api.starshipit.com/api/orders/unshipped?limit=${limit}&page=${page}${sinceDate ? '&since_order_date=' + sinceDate : ''}`, {
         headers: apiHeaders,
       }),
-      fetch(`https://api.starshipit.com/api/orders?status=Printed&page_size=${limit}&page_number=${page}`, {
-        headers: apiHeaders,
-      }),
+      fetch('https://api.starshipit.com/api/orders/summary?order_status=new', { headers: apiHeaders }),
     ]);
 
     const unshippedData = await unshippedRes.json();
-    const printedData = await printedRes.json();
+    const summaryData = await summaryRes.json();
 
-    // Batch 2: shipped + summary counts (3 calls, slight delay to avoid rate limit)
-    const [shippedRes, summaryNewRes, summaryPrintedRes] = await Promise.all([
+    // Batch 2: printed + shipped
+    const [printedRes, shippedRes] = await Promise.all([
+      fetch(`https://api.starshipit.com/api/orders?status=Printed&page_size=${limit}&page_number=${page}`, {
+        headers: apiHeaders,
+      }),
       fetch(`https://api.starshipit.com/api/orders/shipped?limit=${limit}&page=${page}${sinceDate ? '&since_order_date=' + sinceDate : ''}`, {
         headers: apiHeaders,
       }),
-      fetch('https://api.starshipit.com/api/orders/summary?order_status=new', { headers: apiHeaders }),
-      fetch('https://api.starshipit.com/api/orders/summary?order_status=printed', { headers: apiHeaders }),
     ]);
 
+    const printedData = await printedRes.json();
     const shippedData = await shippedRes.json();
-    const summaryNew = await summaryNewRes.json();
-    const summaryPrinted = await summaryPrintedRes.json();
-
-    // Batch 3: shipped summary
-    const summaryShippedRes = await fetch('https://api.starshipit.com/api/orders/summary?order_status=shipped', { headers: apiHeaders });
-    const summaryShipped = await summaryShippedRes.json();
 
     // Parse order lists
     const unshippedList = Array.isArray(unshippedData.orders) ? unshippedData.orders : [];
@@ -125,19 +118,20 @@ exports.handler = async (event) => {
       return db - da;
     });
 
-    // Extract total counts from summaries
-    const totalNew = summaryNew.order_counts || unshipped.length;
-    const totalPrinted = summaryPrinted.order_counts || printed.length;
-    const totalShipped = summaryShipped.order_counts || (shippedData.total || shipped.length);
+    // Summary has: unprinted_count, printed_count, shipped_count, archived_count, etc.
+    const counts = summaryData.order_counts || summaryData;
 
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
         orders: all,
-        total_new: totalNew,
-        total_printed: totalPrinted,
-        total_shipped: totalShipped,
+        summary: {
+          waiting_to_print: counts.unprinted_count || unshipped.length,
+          printed: counts.printed_count || printed.length,
+          shipped: counts.shipped_count || shipped.length,
+          archived: counts.archived_count || 0,
+        },
       }),
     };
   } catch (err) {

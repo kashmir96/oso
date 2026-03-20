@@ -2389,14 +2389,12 @@ async function loadShippingData() {
   }
 }
 
-let shipSummaryTotals = {};
+let shipSummary = {};
 function renderShippingStats(data) {
-  // Use summary totals from API if available (accurate across all pages)
-  if (data.total_new !== undefined) {
-    shipSummaryTotals = { new: data.total_new, printed: data.total_printed, shipped: data.total_shipped };
-  }
-  const waitingToPrint = shipSummaryTotals.new || allShipments.filter(o => o._shipping_status === 'Waiting to Print').length;
-  const printed = shipSummaryTotals.printed || allShipments.filter(o => o._shipping_status === 'Printed').length;
+  // Use summary from API for accurate total counts across all pages
+  if (data.summary) shipSummary = data.summary;
+  const waitingToPrint = shipSummary.waiting_to_print || allShipments.filter(o => o._shipping_status === 'Waiting to Print').length;
+  const printed = shipSummary.printed || allShipments.filter(o => o._shipping_status === 'Printed').length;
   const inTransit = allShipments.filter(o => o._shipping_status === 'In Transit').length;
   const delivered = allShipments.filter(o => o._shipping_status === 'Delivered').length;
   const exception = allShipments.filter(o => o._shipping_status === 'Exception').length;
