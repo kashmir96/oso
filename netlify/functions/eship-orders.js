@@ -2,12 +2,13 @@
  * eship-orders.js
  *
  * Netlify function proxy for StarshipIt API.
- * Returns unshipped + shipped orders so the dashboard can display
+ * Returns unshipped + printed + shipped orders so the dashboard can display
  * shipping status, tracking numbers, etc.
  *
- * Statuses:
- *   Unshipped: "Waiting to Print" | "Printed"
- *   Shipped:   "In Transit" | "Delivered" | "Exception"
+ * StarshipIt API endpoints used:
+ *   /api/orders/unshipped  – "New" tab orders (waiting to print)
+ *   /api/orders?status=Printed – "Printed" tab orders (labels printed, not yet shipped)
+ *   /api/orders/shipped    – "Shipped" tab orders (dispatched)
  *
  * Env vars required:
  *   STARSHIPIT_API_KEY
@@ -21,7 +22,6 @@ exports.handler = async (event) => {
     'Content-Type': 'application/json',
   };
 
-  // Handle CORS preflight
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers, body: '' };
   }
@@ -43,25 +43,24 @@ exports.handler = async (event) => {
     'Content-Type': 'application/json',
   };
 
-  // Query params from dashboard
   const params = event.queryStringParameters || {};
-  const sinceDate = params.since || '';  // e.g. '2026-01-01'
+  const sinceDate = params.since || '';
   const page = params.page || '1';
   const limit = params.limit || '50';
 
   try {
-    // Fetch unshipped (new), printed, and shipped orders in parallel
+    // Fetch all three tabs in parallel
     const [unshippedRes, printedRes, shippedRes] = await Promise.all([
-      fetch(`https://api.starshipit.com/api/orders?limit=${limit}&page=${page}${sinceDate ? '&since_order_date=' + sinceDate : ''}`, {
-        method: 'GET',
+      // "New" tab — /api/orders/unshipped
+      fetch(`https://api.starshipit.com/api/orders/unshipped?limit=${limit}&page=${page}${sinceDate ? '&since_order_date=' + sinceDate : ''}`, {
         headers: apiHeaders,
       }),
-      fetch(`https://api.starshipit.com/api/orders/printed?limit=${limit}&page=${page}${sinceDate ? '&since_order_date=' + sinceDate : ''}`, {
-        method: 'GET',
+      // "Printed" tab — /api/orders?status=Printed
+      fetch(`https://api.starshipit.com/api/orders?status=Printed&page_size=${limit}&page_number=${page}`, {
         headers: apiHeaders,
       }),
+      // "Shipped" tab — /api/orders/shipped
       fetch(`https://api.starshipit.com/api/orders/shipped?limit=${limit}&page=${page}${sinceDate ? '&since_order_date=' + sinceDate : ''}`, {
-        method: 'GET',
         headers: apiHeaders,
       }),
     ]);
@@ -70,13 +69,12 @@ exports.handler = async (event) => {
     const printedData = await printedRes.json();
     const shippedData = await shippedRes.json();
 
-    // StarshipIt unshipped endpoint returns { data: { orders: [...] } }, shipped returns { orders: [...] }
-    const rawUnshipped = unshippedData.data?.orders || unshippedData.orders || unshippedData.order || [];
-    const unshippedList = Array.isArray(rawUnshipped) ? rawUnshipped : [];
-    const rawPrinted = printedData.data?.orders || printedData.orders || printedData.order || [];
-    const printedList = Array.isArray(rawPrinted) ? rawPrinted : [];
-    const rawShipped = shippedData.orders || shippedData.order || [];
-    const shippedList = Array.isArray(rawShipped) ? rawShipped : [];
+    // /api/orders/unshipped returns { orders: [...] }
+    const unshippedList = Array.isArray(unshippedData.orders) ? unshippedData.orders : [];
+    // /api/orders?status=Printed returns { order: [...] }
+    const printedList = Array.isArray(printedData.order) ? printedData.order : [];
+    // /api/orders/shipped returns { orders: [...] }
+    const shippedList = Array.isArray(shippedData.orders) ? shippedData.orders : [];
 
     const unshipped = unshippedList.map(o => ({
       ...o,
@@ -87,11 +85,10 @@ exports.handler = async (event) => {
     const printed = printedList.map(o => ({
       ...o,
       _shipping_status: 'Printed',
-      _status_group: 'unshipped',
+      _status_group: 'printed',
     }));
 
     const shipped = shippedList.map(o => {
-      // StarshipIt uses tracking_short_status / tracking_full_status rather than status/tracking_events
       const shortStatus = (o.tracking_short_status || '').toLowerCase();
       const fullStatus = (o.tracking_full_status || '').toLowerCase();
       const status = (o.status || '').toLowerCase();
@@ -130,7 +127,8 @@ exports.handler = async (event) => {
       headers,
       body: JSON.stringify({
         orders: all,
-        total_unshipped: (unshippedData.total_records || unshipped.length) + printed.length,
+        total_unshipped: unshippedData.total_pages ? (unshippedData.total_pages * parseInt(limit)) : unshipped.length,
+        total_printed: printedList.length,
         total_shipped: shippedData.total || shipped.length,
       }),
     };
