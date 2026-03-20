@@ -116,7 +116,10 @@
     .customer-meta .val { color: var(--text); font-weight: 600; }
     .customer-orders-list { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border); display: none; }
     .customer-profile.expanded .customer-orders-list { display: block; }
-    .customer-order-row { display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0; border-bottom: 1px solid #111827; font-size: 0.8rem; flex-wrap: wrap; gap: 0.25rem; }
+    .customer-order-row { display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0; border-bottom: 1px solid #111827; font-size: 0.8rem; flex-wrap: wrap; gap: 0.25rem; cursor: pointer; border-radius: 4px; padding: 0.4rem; }
+    .customer-order-row:hover { background: var(--bg); }
+    .delete-btn { background: none; border: 1px solid var(--red); color: var(--red); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.7rem; cursor: pointer; }
+    .delete-btn:hover { background: var(--red); color: white; }
     .customer-order-items { color: var(--dim); font-size: 0.75rem; }
     .customer-sort { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 1rem; }
     .customer-sort select, .customer-sort input { background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.8rem; }
@@ -754,6 +757,10 @@ function openOrderModal(orderId) {
     `).join('');
   }
 
+  html += `<div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border);text-align:right;">
+    <button class="delete-btn" id="modal-delete" data-order-id="${orderId}">Delete Order</button>
+  </div>`;
+
   document.getElementById('modal-body').innerHTML = html;
   document.getElementById('order-modal').classList.add('open');
 
@@ -768,6 +775,24 @@ function openOrderModal(orderId) {
       const order = allOrders.find(o => o.id === oid);
       if (order) order.status = newStatus;
       renderOrdersTable();
+    }
+  });
+
+  // Delete handler
+  document.getElementById('modal-delete').addEventListener('click', async function(e) {
+    e.stopPropagation();
+    const oid = Number(this.dataset.orderId);
+    if (!confirm('Are you sure you want to delete this order? This cannot be undone.')) return;
+    // Delete line items first (cascade should handle it but be safe)
+    await sb.from('order_line_items').delete().eq('order_id', oid);
+    const { error } = await sb.from('orders').delete().eq('id', oid);
+    if (error) {
+      alert('Failed to delete: ' + error.message);
+    } else {
+      allOrders = allOrders.filter(o => o.id !== oid);
+      allLineItems = allLineItems.filter(li => li.order_id !== oid);
+      closeModal();
+      applyFilter();
     }
   });
 }
@@ -1200,7 +1225,7 @@ function renderCustomersTab() {
     const orderItems = c.orders.map(o => {
       const items = allLineItems.filter(li => li.order_id === o.id);
       const itemStr = items.map(li => `${li.quantity}x ${li.description || li.sku || '?'}`).join(', ');
-      return `<div class="customer-order-row">
+      return `<div class="customer-order-row" onclick="event.stopPropagation(); openOrderModal(${o.id});">
         <span>${o.order_date}</span>
         <span class="status-badge">${o.status || '-'}</span>
         <span>$${Number(o.total_value || 0).toFixed(2)}</span>
@@ -1209,6 +1234,7 @@ function renderCustomersTab() {
     }).join('');
 
     const daysSinceFirst = c.orders.length > 1 ? Math.round((new Date(c.lastOrder) - new Date(c.firstOrder)) / 86400000) : 0;
+    const avgFreq = c.orders.length > 1 ? Math.round(daysSinceFirst / (c.orders.length - 1)) : null;
 
     return `<div class="customer-profile" onclick="this.classList.toggle('expanded')">
       <div class="customer-header">
@@ -1220,9 +1246,9 @@ function renderCustomersTab() {
           <span><span class="val">${c.orders.length}</span> orders</span>
           <span><span class="val">${fmt_money(c.totalSpend)}</span> spent</span>
           <span><span class="val">${fmt_money(c.totalSpend / c.orders.length)}</span> AOV</span>
+          ${avgFreq !== null ? `<span>Every <span class="val">${avgFreq}d</span></span>` : ''}
           ${c.city ? `<span>${c.city}${c.country ? ', ' + c.country : ''}</span>` : ''}
           ${c.phone ? `<span>${c.phone}</span>` : ''}
-          ${c.orders.length > 1 ? `<span><span class="val">${daysSinceFirst}d</span> span</span>` : ''}
           <span>Last: ${c.lastOrder}</span>
         </div>
       </div>
