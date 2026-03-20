@@ -2507,10 +2507,34 @@ function renderCustomersTab() {
     const orderItems = c.orders.map(o => {
       const items = allLineItems.filter(li => li.order_id === o.id);
       const itemStr = items.map(li => `${li.quantity}x ${li.description || li.sku || '?'}`).join(', ');
+      const src = o.analytics_source || o.utm_source || getUtmFromUrl(o.thank_you_url, 'utm_source') || '';
+      const magnet = items[0] ? items[0].description : '';
+      const ship = getShipStatus(o);
+      const shipPill = ship ? `<span class="ship-status-badge ${(ship._shipping_status || '').toLowerCase().replace(/\s+/g, '-')}">${ship._shipping_status}</span>` : '';
+
+      // Time to ship: order received → shipped/in-transit (or now)
+      const orderTime = o.created_at ? new Date(o.created_at) : (o.order_date ? new Date(o.order_date) : null);
+      let shipTimeStr = '-';
+      if (orderTime) {
+        const shippedTime = ship?.shipped_date ? new Date(ship.shipped_date) : new Date();
+        const shipHours = ((shippedTime - orderTime) / 3600000).toFixed(1);
+        shipTimeStr = ship?.shipped_date ? `${shipHours}h` : `${shipHours}h <span style="color:var(--dim);font-size:0.65rem;">waiting</span>`;
+      }
+
+      // Wait completed: order received → delivered (or now)
+      let waitStr = '-';
+      if (orderTime) {
+        const deliveredTime = (ship?._shipping_status === 'Delivered' && ship?.delivered_date) ? new Date(ship.delivered_date) : new Date();
+        const waitHours = ((deliveredTime - orderTime) / 3600000).toFixed(1);
+        waitStr = (ship?._shipping_status === 'Delivered') ? `${waitHours}h` : `${waitHours}h <span style="color:var(--dim);font-size:0.65rem;">open</span>`;
+      }
+
       return `<div class="customer-order-row" onclick="event.stopPropagation(); openOrderModal(${o.id});">
         <span>${o.order_date}</span>
-        <span class="status-badge">${o.status || '-'}</span> ${sourcePill(o.utm_source || getUtmFromUrl(o.thank_you_url, 'utm_source') || '')}
         <span>$${Number(o.total_value || 0).toFixed(2)}</span>
+        ${sourcePill(src)} ${magnet ? sourcePill(magnet) : ''} ${shipPill}
+        <span style="font-size:0.7rem;color:var(--muted);" title="Time to ship">Ship: ${shipTimeStr}</span>
+        <span style="font-size:0.7rem;color:var(--muted);" title="Total wait time">Wait: ${waitStr}</span>
         <div class="customer-order-items" style="width:100%;">${itemStr || 'No items'}</div>
       </div>`;
     }).join('');
