@@ -267,6 +267,8 @@
       <input type="date" id="date-to" title="To" style="display:none;">
       <select id="filter-utm"><option value="">All Sources</option></select>
       <select id="filter-city"><option value="">All Cities</option></select>
+      <button id="refresh-btn" title="Refresh data" style="font-size:1rem;line-height:1;">↻ Refresh</button>
+      <span id="last-refresh" style="font-size:0.7rem;color:var(--dim);"></span>
       <button class="manual-order-btn" id="manual-order-btn">+ Manual Order</button>
       <button class="team-btn" id="team-btn" style="display:none;">Team</button>
       <span class="staff-greeting" id="staff-greeting"></span>
@@ -418,8 +420,38 @@
   <div id="tab-manufacturing" class="tab-content">
     <div class="stats" id="manufacturing-stats"></div>
     <div class="orders-card">
-      <h3>Manufacturing</h3>
-      <p style="color:var(--dim);padding:2rem;text-align:center;">Manufacturing tab coming soon.</p>
+      <h3>Manufacturing Batches</h3>
+      <div class="mfg-form" id="mfg-form">
+        <div class="mfg-form-row">
+          <div class="form-group"><label>Date</label><input type="date" id="mfg-date"></div>
+          <div class="form-group"><label>Product SKU</label><input type="text" id="mfg-sku" placeholder="e.g. BB-250"></div>
+          <div class="form-group"><label>Quantity</label><input type="number" id="mfg-qty" min="1" placeholder="0"></div>
+          <div class="form-group"><label>Batch No</label>
+            <div class="mfg-batch-input">
+              <input type="text" id="mfg-batch-a" maxlength="2" placeholder="17" class="batch-part">
+              <span class="batch-sep">-</span>
+              <input type="text" id="mfg-batch-b" maxlength="2" placeholder="13" class="batch-part">
+            </div>
+          </div>
+          <div class="form-group"><label>Exp Date</label><input type="date" id="mfg-exp"></div>
+          <div class="form-group mfg-action-col"><label>&nbsp;</label><button class="mfg-add-btn" id="mfg-add-btn">+ Add Batch</button></div>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Product SKU</th>
+            <th>Quantity</th>
+            <th>Batch No</th>
+            <th>Exp Date</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="mfg-table">
+          <tr><td colspan="6" class="loading">Loading batches...</td></tr>
+        </tbody>
+      </table>
     </div>
   </div><!-- /tab-manufacturing -->
 
@@ -606,6 +638,9 @@ let sb, allOrders = [], allLineItems = [], filteredOrders = [], charts = {};
 let shipmentsPage = 1;
 const PAGE_SIZE = 10;
 let currentStaff = null;
+let activeTab = 'sales';
+let statsRefreshTimer = null;
+const STATS_REFRESH_MS = 15000;
 
 function renderPagination(containerId, currentPage, totalItems, onPageChange) {
   const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
@@ -955,7 +990,16 @@ function applyFilter() {
 
   const filteredOrderIds = new Set(filteredOrders.map(o => o.id));
   const filteredLI = allLineItems.filter(li => filteredOrderIds.has(li.order_id));
-  renderAll(filteredOrders, filteredLI);
+
+  // Only render the active tab's content
+  if (activeTab === 'sales') {
+    renderAll(filteredOrders, filteredLI);
+  } else {
+    // Always update sales stats even when not on sales tab
+    renderStats(filteredOrders, filteredLI);
+    if (activeTab === 'orders') renderOrdersTable();
+    else if (activeTab === 'customers') renderCustomersTab();
+  }
 }
 
 // ── Init ──
@@ -981,7 +1025,82 @@ async function initDashboard() {
   allLineItems = liRes.data || [];
   populateFilterDropdowns();
   applyFilter();
+
+  // Start auto-refresh of stats every 15 seconds
+  startStatsRefresh();
 }
+
+// ── Refresh stats (lightweight: re-fetch data, update stat cards only) ──
+async function refreshStats() {
+  if (!sb) return;
+  try {
+    const [ordersRes, liRes] = await Promise.all([
+      sb.from('orders').select('*').order('created_at', { ascending: false }),
+      sb.from('order_line_items').select('*'),
+    ]);
+    if (ordersRes.error) return;
+    allOrders = ordersRes.data || [];
+    allLineItems = liRes.data || [];
+
+    // Re-apply filters and update stats only
+    const [from, to] = getDateRange();
+    const utmFilter = document.getElementById('filter-utm').value;
+    const cityFilter = document.getElementById('filter-city').value;
+    filteredOrders = allOrders.filter(o => {
+      if (o.order_date < from || o.order_date > to) return false;
+      if (utmFilter && (o.utm_source || getUtmFromUrl(o.thank_you_url) || '') !== utmFilter) return false;
+      if (cityFilter && o.city !== cityFilter) return false;
+      return true;
+    });
+    const filteredOrderIds = new Set(filteredOrders.map(o => o.id));
+    const filteredLI = allLineItems.filter(li => filteredOrderIds.has(li.order_id));
+    renderStats(filteredOrders, filteredLI);
+    updateRefreshTime();
+  } catch (e) {
+    // Silent fail on auto-refresh
+  }
+}
+
+function updateRefreshTime() {
+  const el = document.getElementById('last-refresh');
+  if (el) el.textContent = 'Updated ' + new Date().toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function startStatsRefresh() {
+  if (statsRefreshTimer) clearInterval(statsRefreshTimer);
+  statsRefreshTimer = setInterval(refreshStats, STATS_REFRESH_MS);
+}
+
+// ── Full refresh (stats + active tab tables/charts) ──
+async function fullRefresh() {
+  const btn = document.getElementById('refresh-btn');
+  btn.disabled = true;
+  btn.textContent = '↻ Refreshing...';
+  try {
+    const [ordersRes, liRes] = await Promise.all([
+      sb.from('orders').select('*').order('created_at', { ascending: false }),
+      sb.from('order_line_items').select('*'),
+    ]);
+    if (ordersRes.error) throw ordersRes.error;
+    allOrders = ordersRes.data || [];
+    allLineItems = liRes.data || [];
+    populateFilterDropdowns();
+    applyFilter();
+
+    // Also refresh shipping if it was loaded
+    if (shippingLoaded && activeTab === 'shipping') {
+      shippingLoaded = false;
+      loadShippingData();
+    }
+  } catch (e) {
+    console.error('Refresh error:', e);
+  }
+  btn.disabled = false;
+  btn.textContent = '↻ Refresh';
+  updateRefreshTime();
+}
+
+document.getElementById('refresh-btn').addEventListener('click', fullRefresh);
 
 // ── Render all ──
 function renderAll(orders, lineItems) {
@@ -996,7 +1115,6 @@ function renderAll(orders, lineItems) {
   renderBoughtTogether(orders);
   renderTrending(orders);
   renderNewVsReturning(orders);
-  renderOrdersTable();
 }
 
 // ── Stats ──
@@ -1770,19 +1888,25 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
     this.classList.add('active');
-    document.getElementById('tab-' + this.dataset.tab).classList.add('active');
-    // Load tab data on click
-    if (this.dataset.tab === 'shipping' && !shippingLoaded) {
-      loadShippingData();
-    }
-    if (this.dataset.tab === 'customers') {
-      renderCustomersTab();
-    }
-    if (this.dataset.tab === 'website') {
-      waInit();
-    }
+    activeTab = this.dataset.tab;
+    document.getElementById('tab-' + activeTab).classList.add('active');
+    loadActiveTab();
   });
 });
+
+function loadActiveTab() {
+  if (activeTab === 'sales') {
+    renderAll(filteredOrders, allLineItems.filter(li => new Set(filteredOrders.map(o => o.id)).has(li.order_id)));
+  } else if (activeTab === 'orders') {
+    renderOrdersTable();
+  } else if (activeTab === 'shipping' && !shippingLoaded) {
+    loadShippingData();
+  } else if (activeTab === 'customers') {
+    renderCustomersTab();
+  } else if (activeTab === 'website') {
+    waInit();
+  }
+}
 
 // ── Customers Tab ──
 function renderCustomersTab() {
