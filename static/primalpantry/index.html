@@ -167,8 +167,35 @@
     .pagination button:hover:not(:disabled) { border-color: var(--blue); color: var(--text); }
     .pagination button:disabled { opacity: 0.35; cursor: not-allowed; }
 
-    @media (max-width: 900px) { .charts-row { grid-template-columns: 1fr; } }
-    @media (max-width: 600px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+    /* Website analytics tab */
+    .wa-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
+    .wa-stat { background: var(--card); border-radius: 10px; padding: 1rem; text-align: center; }
+    .wa-stat .wa-val { font-size: 1.6rem; font-weight: 700; }
+    .wa-stat .wa-lbl { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.15rem; }
+    .wa-realtime .wa-val { color: var(--green); }
+    .wa-controls { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; }
+    .wa-controls select, .wa-controls input[type="date"] { background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.8rem; }
+    .wa-chart-wrap { background: var(--card); border-radius: 10px; padding: 1rem; margin-bottom: 1.5rem; }
+    .wa-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.5rem; }
+    .wa-panel { background: var(--card); border-radius: 10px; padding: 1rem; }
+    .wa-panel h3 { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 0.75rem; }
+    .wa-panel-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 0.75rem; }
+    .wa-panel-tab { padding: 0.4rem 0.75rem; border: none; background: none; color: var(--dim); font-size: 0.75rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; }
+    .wa-panel-tab:hover { color: var(--text); }
+    .wa-panel-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+    .wa-table { width: 100%; border-collapse: collapse; }
+    .wa-table th { text-align: left; padding: 0.35rem 0.5rem; font-size: 0.65rem; color: var(--dim); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+    .wa-table th:not(:first-child) { text-align: right; }
+    .wa-table td { padding: 0.35rem 0.5rem; font-size: 0.8rem; border-bottom: 1px solid #111827; }
+    .wa-table td:not(:first-child) { text-align: right; color: var(--muted); }
+    .wa-bar-cell { position: relative; }
+    .wa-bar-bg { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(99,102,241,0.15); border-radius: 3px; z-index: 0; }
+    .wa-bar-text { position: relative; z-index: 1; }
+    .wa-small-panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
+    .wa-loading { text-align: center; padding: 2rem; color: var(--dim); }
+
+    @media (max-width: 900px) { .charts-row { grid-template-columns: 1fr; } .wa-panels { grid-template-columns: 1fr; } }
+    @media (max-width: 600px) { .stats { grid-template-columns: repeat(2, 1fr); } .wa-stats { grid-template-columns: repeat(2, 1fr); } }
   </style>
 </head>
 <body>
@@ -221,6 +248,7 @@
     <button class="tab-btn" data-tab="shipping">Shipping</button>
     <button class="tab-btn" data-tab="customers">Customers</button>
     <button class="tab-btn" data-tab="manufacturing">Manufacturing</button>
+    <button class="tab-btn" data-tab="website">Website</button>
   </div>
 
   <div id="tab-sales" class="tab-content active">
@@ -362,6 +390,88 @@
       <p style="color:var(--dim);padding:2rem;text-align:center;">Manufacturing tab coming soon.</p>
     </div>
   </div><!-- /tab-manufacturing -->
+
+  <div id="tab-website" class="tab-content">
+    <div class="wa-controls">
+      <select id="wa-site"><option value="">Loading sites...</option></select>
+      <select id="wa-range">
+        <option value="today" selected>Today</option>
+        <option value="yesterday">Yesterday</option>
+        <option value="7d">Last 7 Days</option>
+        <option value="30d">Last 30 Days</option>
+        <option value="custom">Custom Range</option>
+      </select>
+      <input type="date" id="wa-from" style="display:none;">
+      <input type="date" id="wa-to" style="display:none;">
+    </div>
+
+    <div class="wa-stats">
+      <div class="wa-stat wa-realtime"><div class="wa-val" id="wa-realtime">-</div><div class="wa-lbl">Current Visitors</div></div>
+      <div class="wa-stat"><div class="wa-val" id="wa-uniques">-</div><div class="wa-lbl">Unique Visitors</div></div>
+      <div class="wa-stat"><div class="wa-val" id="wa-pageviews">-</div><div class="wa-lbl">Pageviews</div></div>
+      <div class="wa-stat"><div class="wa-val" id="wa-duration">-</div><div class="wa-lbl">Avg Time on Site</div></div>
+      <div class="wa-stat"><div class="wa-val" id="wa-bounce">-</div><div class="wa-lbl">Bounce Rate</div></div>
+      <div class="wa-stat"><div class="wa-val" id="wa-events">-</div><div class="wa-lbl">Event Completions</div></div>
+    </div>
+
+    <div class="wa-chart-wrap">
+      <canvas id="wa-timeseries" height="80"></canvas>
+    </div>
+
+    <div class="wa-panels">
+      <div class="wa-panel">
+        <div class="wa-panel-tabs">
+          <button class="wa-panel-tab active" data-wa-panel="pages" data-wa-metric="pages">Pages</button>
+          <button class="wa-panel-tab" data-wa-panel="pages" data-wa-metric="entry_pages">Entry Pages</button>
+          <button class="wa-panel-tab" data-wa-panel="pages" data-wa-metric="exit_pages">Exit Pages</button>
+        </div>
+        <div id="wa-pages-table"><div class="wa-loading">Loading...</div></div>
+      </div>
+      <div class="wa-panel">
+        <div class="wa-panel-tabs">
+          <button class="wa-panel-tab active" data-wa-panel="referrers" data-wa-metric="referrers">Referrers</button>
+          <button class="wa-panel-tab" data-wa-panel="referrers" data-wa-metric="campaigns" data-wa-col="utm_source">Sources</button>
+        </div>
+        <div id="wa-referrers-table"><div class="wa-loading">Loading...</div></div>
+      </div>
+    </div>
+
+    <div class="wa-small-panels">
+      <div class="wa-panel">
+        <h3>Device Types</h3>
+        <div id="wa-devices-table"><div class="wa-loading">Loading...</div></div>
+      </div>
+      <div class="wa-panel">
+        <h3>Browsers</h3>
+        <div id="wa-browsers-table"><div class="wa-loading">Loading...</div></div>
+      </div>
+      <div class="wa-panel">
+        <h3>Countries</h3>
+        <div id="wa-countries-table"><div class="wa-loading">Loading...</div></div>
+      </div>
+      <div class="wa-panel">
+        <h3>Operating Systems</h3>
+        <div id="wa-os-table"><div class="wa-loading">Loading...</div></div>
+      </div>
+    </div>
+
+    <div class="wa-panels">
+      <div class="wa-panel">
+        <h3>Events</h3>
+        <div id="wa-events-table"><div class="wa-loading">Loading...</div></div>
+      </div>
+      <div class="wa-panel">
+        <div class="wa-panel-tabs">
+          <button class="wa-panel-tab active" data-wa-panel="campaigns" data-wa-metric="campaigns" data-wa-col="utm_campaign">Campaign</button>
+          <button class="wa-panel-tab" data-wa-panel="campaigns" data-wa-metric="campaigns" data-wa-col="utm_source">Source</button>
+          <button class="wa-panel-tab" data-wa-panel="campaigns" data-wa-metric="campaigns" data-wa-col="utm_medium">Medium</button>
+          <button class="wa-panel-tab" data-wa-panel="campaigns" data-wa-metric="campaigns" data-wa-col="utm_content">Content</button>
+          <button class="wa-panel-tab" data-wa-panel="campaigns" data-wa-metric="campaigns" data-wa-col="utm_term">Term</button>
+        </div>
+        <div id="wa-campaigns-table"><div class="wa-loading">Loading...</div></div>
+      </div>
+    </div>
+  </div><!-- /tab-website -->
 
 </div><!-- /dashboard -->
 
@@ -986,7 +1096,10 @@ function openOrderModal(orderId) {
 
   document.getElementById('modal-title').textContent = `Order — ${order.customer_name || order.email}`;
 
-  const statusOptions = ['Ordered - Paid', 'Processing', 'Shipped', 'Delivered', 'Refunded', 'Incorrect Order', 'Cancelled'];
+  const isAdmin = currentStaff && (currentStaff.role === 'owner' || currentStaff.role === 'admin');
+  const statusOptions = isAdmin
+    ? ['Ordered - Paid', 'Processing', 'Shipped', 'Delivered', 'Refunded', 'Incorrect Order', 'Cancelled']
+    : ['Ordered - Paid', 'Processing', 'Shipped', 'Delivered'];
   const statusSelect = `<select id="modal-status" data-order-id="${orderId}" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:3px 8px;font-size:0.85rem;">
     ${statusOptions.map(s => `<option value="${s}" ${s === order.status ? 'selected' : ''}>${s}</option>`).join('')}
   </select>`;
@@ -1049,12 +1162,29 @@ function openOrderModal(orderId) {
   });
 
   // Delete handler — refunds Stripe, removes from eShip, deletes from Supabase
-  document.getElementById('modal-delete').addEventListener('click', async function(e) {
+  const deleteBtn = document.getElementById('modal-delete');
+  if (!deleteBtn) return; // staff role doesn't have delete button
+  deleteBtn.addEventListener('click', async function(e) {
     e.stopPropagation();
     const oid = Number(this.dataset.orderId);
     const order = allOrders.find(o => o.id === oid);
     if (!order) return;
-    if (!confirm('This will refund the payment, remove from NZ Post, and permanently delete the order. Continue?')) return;
+
+    // Permission check
+    if (!currentStaff || (currentStaff.role !== 'owner' && currentStaff.role !== 'admin')) {
+      alert('You do not have permission to delete orders.'); return;
+    }
+
+    // First confirmation
+    const isStripeOrder = order.stripe_session_id && !order.stripe_session_id.startsWith('manual_');
+    const warningMsg = isStripeOrder
+      ? 'WARNING: This will:\n\n1. REFUND the customer $' + Number(order.total_value || 0).toFixed(2) + ' on Stripe\n2. CANCEL the NZ Post shipment\n3. PERMANENTLY DELETE the order\n\nThis CANNOT be undone. Continue?'
+      : 'WARNING: This will:\n\n1. Cancel the NZ Post shipment (if exists)\n2. PERMANENTLY DELETE the order\n\nThis CANNOT be undone. Continue?';
+    if (!confirm(warningMsg)) return;
+
+    // Second confirmation — type to confirm
+    const confirmText = prompt('To confirm, type DELETE below:');
+    if (confirmText !== 'DELETE') { alert('Deletion cancelled.'); return; }
 
     const statusMessages = [];
     this.disabled = true;
@@ -1471,6 +1601,9 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     }
     if (this.dataset.tab === 'customers') {
       renderCustomersTab();
+    }
+    if (this.dataset.tab === 'website') {
+      waInit();
     }
   });
 });
