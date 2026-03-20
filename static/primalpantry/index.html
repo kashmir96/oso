@@ -6312,6 +6312,183 @@ document.getElementById('so-status-filter').addEventListener('change', () => { r
 // ── Finance Tab ──
 
 let financeLoaded = false;
+let xeroConnected = false;
+const xeroCache = {};
+const XERO_CACHE_TTL = 5 * 60 * 1000; // 5 min for reports
+const XERO_TXN_CACHE_TTL = 2 * 60 * 1000; // 2 min for transactions
+
+function waToken() {
+  try { return JSON.parse(sessionStorage.getItem('pp_staff')).token; } catch { return ''; }
+}
+
+async function xeroFetch(endpoint, params = {}) {
+  const cacheKey = endpoint + '_' + JSON.stringify(params);
+  const cached = xeroCache[cacheKey];
+  const ttl = endpoint.includes('Transaction') || endpoint === 'Invoices' ? XERO_TXN_CACHE_TTL : XERO_CACHE_TTL;
+  if (cached && Date.now() - cached.at < ttl) return cached.data;
+
+  params.token = waToken();
+  params.endpoint = endpoint;
+  const qs = new URLSearchParams(params).toString();
+  const res = await fetch(`/.netlify/functions/xero-api?${qs}`);
+  if (res.status === 401) { throw new Error('Session expired'); }
+  if (res.status === 403) { xeroConnected = false; throw new Error('Xero not connected'); }
+  if (!res.ok) throw new Error('Xero API error ' + res.status);
+  const data = await res.json();
+  xeroCache[cacheKey] = { data, at: Date.now() };
+  return data;
+}
+
+function xeroStartAuth() {
+  const token = waToken();
+  fetch(`/.netlify/functions/xero-auth?action=authorize&token=${token}`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.url) {
+        const popup = window.open(data.url, 'xero-auth', 'width=600,height=700');
+        window.addEventListener('message', function handler(e) {
+          if (e.data && e.data.xeroConnected) {
+            window.removeEventListener('message', handler);
+            xeroConnected = true;
+            loadFinanceTab();
+          }
+        });
+      } else {
+        alert(data.error || 'Failed to start Xero auth');
+      }
+    })
+    .catch(err => alert('Auth error: ' + err.message));
+}
+
+async function xeroDisconnect() {
+  if (!confirm('Disconnect Xero? You can reconnect later.')) return;
+  const token = waToken();
+  await fetch('/.netlify/functions/xero-disconnect', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token }),
+  });
+  xeroConnected = false;
+  Object.keys(xeroCache).forEach(k => delete xeroCache[k]);
+  loadFinanceTab();
+}
+
+function xeroRefreshAll() {
+  Object.keys(xeroCache).forEach(k => delete xeroCache[k]);
+  loadFinanceTab();
+}
+
+// ── Xero response parsers ──
+
+function parseXeroPnlMonthly(report) {
+  // Xero Reports/ProfitAndLoss with periods=11&timeframe=MONTH returns columns per month
+  const rows = report.Reports ? report.Reports[0].Rows : [];
+  const headers = rows.find(r => r.RowType === 'Header');
+  if (!headers) return null;
+
+  const months = [];
+  const labels = headers.Cells.slice(1).map(c => c.Value); // month labels
+
+  let revenueRow = null, expenseRow = null;
+  for (const section of rows) {
+    if (section.RowType === 'Section') {
+      const title = (section.Title || '').toLowerCase();
+      if (title.includes('revenue') || title.includes('income')) {
+        // Find the section total (last row in Rows array is usually the total)
+        const totalRow = section.Rows ? section.Rows[section.Rows.length - 1] : null;
+        if (totalRow && totalRow.RowType === 'SummaryRow') revenueRow = totalRow;
+      }
+      if (title.includes('expense') || title.includes('operating')) {
+        const totalRow = section.Rows ? section.Rows[section.Rows.length - 1] : null;
+        if (totalRow && totalRow.RowType === 'SummaryRow') expenseRow = totalRow;
+      }
+    }
+  }
+
+  if (!revenueRow || !expenseRow) return null;
+
+  for (let i = 0; i < labels.length; i++) {
+    const rev = Math.abs(parseFloat(revenueRow.Cells[i + 1].Value) || 0);
+    const exp = Math.abs(parseFloat(expenseRow.Cells[i + 1].Value) || 0);
+    months.push({ label: labels[i], revenue: Math.round(rev), expenses: Math.round(exp) });
+  }
+  return months;
+}
+
+function parseXeroPnlDetail(report) {
+  const rows = report.Reports ? report.Reports[0].Rows : [];
+  const detail = [];
+
+  for (const section of rows) {
+    if (section.RowType === 'Section' && section.Title) {
+      detail.push({ type: 'section', label: section.Title });
+      if (section.Rows) {
+        for (const row of section.Rows) {
+          if (row.RowType === 'Row' && row.Cells) {
+            const label = row.Cells[0].Value;
+            const amount = parseFloat(row.Cells[row.Cells.length - 1].Value) || 0;
+            detail.push({ type: 'row', label, amount });
+          } else if (row.RowType === 'SummaryRow' && row.Cells) {
+            const label = row.Cells[0].Value || 'Total';
+            const amount = parseFloat(row.Cells[row.Cells.length - 1].Value) || 0;
+            detail.push({ type: 'total', label, amount });
+          }
+        }
+      }
+    }
+    if (section.RowType === 'Row' && section.Cells) {
+      const label = section.Cells[0].Value;
+      const amount = parseFloat(section.Cells[section.Cells.length - 1].Value) || 0;
+      if (label && label.toLowerCase().includes('profit')) {
+        detail.push({ type: 'total', label, amount });
+      }
+    }
+  }
+  return detail.length > 0 ? detail : null;
+}
+
+function parseXeroBankSummary(report) {
+  const rows = report.Reports ? report.Reports[0].Rows : [];
+  const banks = [];
+  for (const section of rows) {
+    if (section.RowType === 'Section' && section.Rows) {
+      for (const row of section.Rows) {
+        if (row.RowType === 'Row' && row.Cells) {
+          const name = row.Cells[0].Value;
+          const balance = parseFloat(row.Cells[row.Cells.length - 1].Value) || 0;
+          if (name) banks.push({ name, balance });
+        }
+      }
+    }
+  }
+  return banks.length > 0 ? banks : null;
+}
+
+function parseXeroBankTransactions(data) {
+  const txns = (data.BankTransactions || []).slice(0, 30).map(t => ({
+    date: (t.Date || '').replace(/\/Date\((\d+)\)\//, (_, ms) => new Date(+ms).toISOString().split('T')[0]),
+    description: (t.Contact ? t.Contact.Name + ' — ' : '') + ((t.LineItems && t.LineItems[0]) ? t.LineItems[0].Description || '' : ''),
+    account: t.BankAccount ? t.BankAccount.Name : '',
+    amount: t.Type === 'RECEIVE' ? Math.abs(t.Total || 0) : -Math.abs(t.Total || 0),
+  }));
+  return txns.length > 0 ? txns : null;
+}
+
+function parseXeroInvoices(data, type) {
+  const now = new Date();
+  return (data.Invoices || []).map(inv => {
+    const dueDate = (inv.DueDateString || inv.DueDate || '').replace(/\/Date\((\d+)\)\//, (_, ms) => new Date(+ms).toISOString().split('T')[0]);
+    const due = new Date(dueDate);
+    const isOverdue = due < now && inv.AmountDue > 0;
+    return {
+      number: inv.InvoiceNumber || inv.InvoiceID,
+      contact: inv.Contact ? inv.Contact.Name : '',
+      dueDate,
+      amount: inv.AmountDue || 0,
+      status: isOverdue ? 'overdue' : 'current',
+    };
+  });
+}
 
 // Mock data generators (structured to match Xero API responses for easy swap later)
 function getMockPnlData() {
@@ -6468,12 +6645,38 @@ const finChartDefaults = {
   }
 };
 
-function renderFinanceStats() {
-  const pnl = getMockPnlData();
-  const currentMonth = pnl[pnl.length - 1];
-  const banks = getMockBankData();
-  const invoices = getMockInvoices();
-  const bills = getMockBills();
+async function renderFinanceStats() {
+  let banks, invoices, bills, currentMonth;
+  if (xeroConnected) {
+    try {
+      const [bankReport, invData, billData, pnlReport] = await Promise.all([
+        xeroFetch('Reports/BankSummary'),
+        xeroFetch('Invoices', { Statuses: 'AUTHORISED', where: 'Type=="ACCREC"' }),
+        xeroFetch('Invoices', { Statuses: 'AUTHORISED', where: 'Type=="ACCPAY"' }),
+        xeroFetch('Reports/ProfitAndLoss', { fromDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0], toDate: new Date().toISOString().split('T')[0] }),
+      ]);
+      banks = parseXeroBankSummary(bankReport) || getMockBankData();
+      invoices = parseXeroInvoices(invData, 'ACCREC') || getMockInvoices();
+      bills = parseXeroInvoices(billData, 'ACCPAY') || getMockBills();
+      // Parse current month P&L for stats
+      const pnlDetail = parseXeroPnlDetail(pnlReport);
+      if (pnlDetail) {
+        const revTotal = pnlDetail.find(r => r.type === 'total' && r.label.toLowerCase().includes('revenue'));
+        const netTotal = pnlDetail.find(r => r.type === 'total' && r.label.toLowerCase().includes('net') && r.label.toLowerCase().includes('profit'));
+        const rev = revTotal ? Math.abs(revTotal.amount) : 0;
+        const net = netTotal ? netTotal.amount : 0;
+        currentMonth = { revenue: rev, expenses: rev - net };
+      }
+    } catch (e) { console.warn('Xero stats fetch failed, using mock:', e.message); }
+  }
+  if (!currentMonth) {
+    const pnl = getMockPnlData();
+    currentMonth = pnl[pnl.length - 1];
+  }
+  if (!banks) banks = getMockBankData();
+  if (!invoices) invoices = getMockInvoices();
+  if (!bills) bills = getMockBills();
+
   const cashPosition = banks.reduce((s, b) => s + b.balance, 0);
   const receivables = invoices.reduce((s, i) => s + i.amount, 0);
   const payables = bills.reduce((s, b) => s + b.amount, 0);
@@ -6483,7 +6686,7 @@ function renderFinanceStats() {
   const stats = [
     { label: 'Cash Position', value: fmt_money(cashPosition), sub: banks.length + ' accounts' },
     { label: 'Revenue (MTD)', value: fmt_money(currentMonth.revenue), sub: 'This month' },
-    { label: 'Net Profit (MTD)', value: fmt_money(netProfit), sub: ((netProfit / currentMonth.revenue) * 100).toFixed(1) + '% margin' },
+    { label: 'Net Profit (MTD)', value: fmt_money(netProfit), sub: currentMonth.revenue > 0 ? ((netProfit / currentMonth.revenue) * 100).toFixed(1) + '% margin' : '—' },
     { label: 'Receivables', value: fmt_money(receivables), sub: invoices.length + ' invoices' },
     { label: 'Payables', value: fmt_money(payables), sub: bills.length + ' bills' },
     { label: 'Overdue', value: overdue, sub: overdue > 0 ? 'Needs attention' : 'All current' },
@@ -6498,8 +6701,21 @@ function renderFinanceStats() {
   ).join('');
 }
 
-function renderFinancePnl() {
-  const data = getMockPnlData();
+async function renderFinancePnl() {
+  let data = null, detail = null;
+  if (xeroConnected) {
+    try {
+      const now = new Date();
+      const fromDate = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString().split('T')[0];
+      const toDate = now.toISOString().split('T')[0];
+      const report = await xeroFetch('Reports/ProfitAndLoss', { fromDate, toDate, periods: '11', timeframe: 'MONTH' });
+      data = parseXeroPnlMonthly(report);
+      detail = parseXeroPnlDetail(report);
+    } catch (e) { console.warn('Xero P&L fetch failed, using mock:', e.message); }
+  }
+  if (!data) data = getMockPnlData();
+  if (!detail) detail = getMockPnlDetail();
+
   // Revenue vs Expenses chart
   if (charts.xeroRevExp) charts.xeroRevExp.destroy();
   charts.xeroRevExp = new Chart(document.getElementById('xero-rev-exp-chart'), {
@@ -6550,7 +6766,6 @@ function renderFinancePnl() {
   });
 
   // P&L detail table
-  const detail = getMockPnlDetail();
   document.getElementById('pnl-detail-table').innerHTML = detail.map(row => {
     if (row.type === 'section') return `<tr class="fin-section-head"><td colspan="2">${row.label}</td></tr>`;
     if (row.type === 'total') return `<tr class="fin-total"><td>${row.label}</td><td style="text-align:right;color:${row.amount >= 0 ? 'var(--sage)' : 'var(--red)'}">${fmt_money(Math.abs(row.amount))}</td></tr>`;
