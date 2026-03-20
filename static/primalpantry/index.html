@@ -1787,20 +1787,23 @@ function renderStats(orders, lineItems) {
   const priorShippingAvg = priorOrderCount > 0 ? sum(priorOrders, 'shipping_cost') / priorOrderCount : 0;
   const priorDiscounts = sum(priorOrders, 'discount_applied');
 
-  // Build 30-day sparkline data for each metric (use ISO date to match pace chart)
-  function buildSparkline(metricFn) {
-    const now = new Date();
+  // Build 24-hour sparkline data for each metric
+  function buildHourlySpark(hourMetricFn) {
     const points = [];
-    for (let i = 29; i >= 0; i--) {
-      const d = daysAgoLocal(i);
-      points.push(metricFn(d));
-    }
+    for (let h = 0; h < 24; h++) points.push(hourMetricFn(h));
     return points;
   }
-  const sparkRevenue = buildSparkline(d => allOrders.filter(o => o.order_date === d).reduce((s, o) => s + Number(o.total_value || 0), 0));
-  const sparkOrders = buildSparkline(d => allOrders.filter(o => o.order_date === d).length);
-  const sparkAov = buildSparkline(d => { const dayOrders = allOrders.filter(o => o.order_date === d); const r = dayOrders.reduce((s, o) => s + Number(o.total_value || 0), 0); return dayOrders.length > 0 ? r / dayOrders.length : 0; });
+  // Parse order hour in NZ time
+  function orderHourNZ(o) {
+    const d = new Date(o.created_at || o.order_date + 'T00:00:00');
+    const nz = new Date(d.toLocaleString('en-US', { timeZone: 'Pacific/Auckland' }));
+    return nz.getHours();
+  }
+  const sparkRevenue = buildHourlySpark(h => orders.filter(o => orderHourNZ(o) === h).reduce((s, o) => s + Number(o.total_value || 0), 0));
+  const sparkOrders = buildHourlySpark(h => orders.filter(o => orderHourNZ(o) === h).length);
+  const sparkAov = buildHourlySpark(h => { const ho = orders.filter(o => orderHourNZ(o) === h); const r = ho.reduce((s, o) => s + Number(o.total_value || 0), 0); return ho.length > 0 ? r / ho.length : 0; });
 
+  const priorPeriodLabel = { today: 'vs yesterday', yesterday: 'vs day before', '7d': 'vs prev 7 days', '30d': 'vs prev 30 days', month: 'vs last month', all: 'all time', custom: 'vs prev period' }[currentRange] || 'vs prior';
   function fmtDelta(curr, prev, isMoney, isPercent) {
     if (prev === 0 && curr === 0) return '<span class="flat">—</span>';
     const diff = curr - prev;
@@ -1810,7 +1813,7 @@ function renderStats(orders, lineItems) {
     if (isMoney) val = fmt_money(Math.abs(diff));
     else if (isPercent) val = Math.abs(diff).toFixed(1) + '%';
     else val = Math.abs(diff).toFixed(1);
-    return `<span class="${cls}">${arrow} ${val}</span> prior`;
+    return `<span class="${cls}">${arrow} ${val}</span> ${priorPeriodLabel}`;
   }
 
   function renderSparkBars(points, color) {
@@ -1825,7 +1828,7 @@ function renderStats(orders, lineItems) {
   const periodCOGS = orders.reduce((s, o) => s + getOrderCOGS(o.id), 0);
   const priorCOGS = priorOrders.reduce((s, o) => s + getOrderCOGS(o.id), 0);
   const grossMargin = revenue > 0 ? ((revenue - periodCOGS) / revenue * 100).toFixed(1) : '0.0';
-  const sparkCOGS = buildSparkline(d => allOrders.filter(o => o.order_date === d).reduce((s, o) => s + getOrderCOGS(o.id), 0));
+  const sparkCOGS = buildHourlySpark(h => orders.filter(o => orderHourNZ(o) === h).reduce((s, o) => s + getOrderCOGS(o.id), 0));
 
   // Wait-time stats (computed from ALL orders, not just filtered period)
   const waitingOrders = allOrders.filter(o => orderDaysWaiting(o) >= 0);
