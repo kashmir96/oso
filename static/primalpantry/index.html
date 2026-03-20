@@ -107,6 +107,9 @@
     tr.clickable { cursor: pointer; }
     tr.clickable:hover td { background: var(--sage-pale); }
     .status-badge { padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; background: rgba(140,180,122,0.15); color: var(--sage); }
+    .status-icon { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; font-size: 0.65rem; font-weight: 800; margin-left: 0.35rem; vertical-align: middle; }
+    .status-icon.refunded { background: var(--red); color: #fff; }
+    .status-icon.incorrect-order { background: var(--amber); color: #141210; }
     .source-pill { padding: 0.15rem 0.4rem; border-radius: 6px; font-size: 0.7rem; font-weight: 600; }
 
     /* Order detail modal */
@@ -325,39 +328,44 @@
 
 <div id="dashboard">
   <div class="header">
-    <h1>Primal Pantry</h1>
-    <div class="header-controls">
-      <select id="date-range">
-        <option value="today" selected>Today</option>
-        <option value="yesterday">Yesterday</option>
-        <option value="7d">Last 7 Days</option>
-        <option value="30d">Last 30 Days</option>
-        <option value="month">This Month</option>
-        <option value="all">All Time</option>
-        <option value="custom">Custom Range</option>
-      </select>
-      <input type="date" id="date-from" title="From" style="display:none;">
-      <input type="date" id="date-to" title="To" style="display:none;">
-      <select id="filter-utm"><option value="">All Sources</option></select>
-      <select id="filter-utm-medium"><option value="">All Mediums</option></select>
-      <select id="filter-utm-campaign"><option value="">All Campaigns</option></select>
-      <select id="filter-city"><option value="">All Cities</option></select>
-      <button id="refresh-btn" title="Refresh data" style="font-size:1rem;line-height:1;">↻ Refresh</button>
-      <span id="last-refresh" style="font-size:0.7rem;color:var(--dim);"></span>
-      <button class="manual-order-btn" id="manual-order-btn">+ Manual Order</button>
-      <button class="team-btn" id="team-btn" style="display:none;">Team</button>
+    <div style="display:flex;align-items:center;gap:1rem;">
+      <h1>Primal Pantry</h1>
       <span class="staff-greeting" id="staff-greeting"></span>
+    </div>
+    <div class="header-controls">
+      <button id="refresh-btn" title="Refresh data" style="font-size:1rem;line-height:1;">↻</button>
+      <span id="last-refresh" style="font-size:0.7rem;color:var(--dim);"></span>
+      <button class="manual-order-btn" id="manual-order-btn">+ Order</button>
+      <button class="team-btn" id="team-btn" style="display:none;">Team</button>
       <button id="logout-btn">Sign out</button>
     </div>
   </div>
 
   <div class="tab-bar">
-    <button class="tab-btn active" data-tab="sales">Mission Control</button>
+    <button class="tab-btn active" data-tab="sales">Overview</button>
     <button class="tab-btn" data-tab="orders">Orders</button>
     <button class="tab-btn" data-tab="shipping">Shipping</button>
     <button class="tab-btn" data-tab="customers">Customers</button>
     <button class="tab-btn" data-tab="manufacturing">Manufacturing</button>
     <button class="tab-btn" data-tab="website">Website</button>
+  </div>
+
+  <div class="filter-row" style="display:flex;gap:0.5rem;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap;">
+    <select id="date-range" style="background:var(--card);border:1px solid var(--border);color:var(--text);padding:0.45rem 0.6rem;border-radius:6px;font-size:0.8rem;font-family:'DM Sans',sans-serif;">
+      <option value="today" selected>Today</option>
+      <option value="yesterday">Yesterday</option>
+      <option value="7d">Last 7 Days</option>
+      <option value="30d">Last 30 Days</option>
+      <option value="month">This Month</option>
+      <option value="all">All Time</option>
+      <option value="custom">Custom Range</option>
+    </select>
+    <input type="date" id="date-from" title="From" style="display:none;background:var(--card);border:1px solid var(--border);color:var(--text);padding:0.4rem 0.5rem;border-radius:6px;font-size:0.8rem;font-family:'DM Sans',sans-serif;">
+    <input type="date" id="date-to" title="To" style="display:none;background:var(--card);border:1px solid var(--border);color:var(--text);padding:0.4rem 0.5rem;border-radius:6px;font-size:0.8rem;font-family:'DM Sans',sans-serif;">
+    <select id="filter-utm" style="background:var(--card);border:1px solid var(--border);color:var(--muted);padding:0.45rem 0.6rem;border-radius:6px;font-size:0.8rem;font-family:'DM Sans',sans-serif;"><option value="">All Sources</option></select>
+    <select id="filter-utm-medium" style="background:var(--card);border:1px solid var(--border);color:var(--muted);padding:0.45rem 0.6rem;border-radius:6px;font-size:0.8rem;font-family:'DM Sans',sans-serif;"><option value="">All Mediums</option></select>
+    <select id="filter-utm-campaign" style="background:var(--card);border:1px solid var(--border);color:var(--muted);padding:0.45rem 0.6rem;border-radius:6px;font-size:0.8rem;font-family:'DM Sans',sans-serif;"><option value="">All Campaigns</option></select>
+    <select id="filter-city" style="background:var(--card);border:1px solid var(--border);color:var(--muted);padding:0.45rem 0.6rem;border-radius:6px;font-size:0.8rem;font-family:'DM Sans',sans-serif;"><option value="">All Cities</option></select>
   </div>
 
   <div id="tab-sales" class="tab-content active">
@@ -1169,14 +1177,18 @@ function applyFilter() {
   const filteredOrderIds = new Set(filteredOrders.map(o => o.id));
   const filteredLI = allLineItems.filter(li => filteredOrderIds.has(li.order_id));
 
-  // Only render the active tab's content
+  // Re-render the active tab
+  renderStats(filteredOrders, filteredLI);
   if (activeTab === 'sales') {
     renderAll(filteredOrders, filteredLI);
-  } else {
-    // Always update sales stats even when not on sales tab
-    renderStats(filteredOrders, filteredLI);
-    if (activeTab === 'orders') renderOrdersTable();
-    else if (activeTab === 'customers') renderCustomersTab();
+  } else if (activeTab === 'orders') {
+    renderOrdersTable();
+  } else if (activeTab === 'customers') {
+    renderCustomersTab();
+  } else if (activeTab === 'shipping' && shippingLoaded) {
+    renderShipmentsTable();
+  } else if (activeTab === 'manufacturing') {
+    loadManufacturingTab();
   }
 }
 
@@ -1568,6 +1580,14 @@ function shipStatusPill(order) {
   const cls = status.toLowerCase().replace(/\s+/g, '-');
   return `<span class="ship-status-badge ${cls}">${status}</span>`;
 }
+
+function orderStatusIcon(status) {
+  if (!status) return '';
+  const s = status.toLowerCase();
+  if (s === 'refunded') return '<span class="status-icon refunded" title="Refunded">R</span>';
+  if (s === 'incorrect order') return '<span class="status-icon incorrect-order" title="Incorrect Order">IO</span>';
+  return '';
+}
 // ── Orders table ──
 function renderOrdersTable() {
   const tbody = document.getElementById('orders-table');
@@ -1608,7 +1628,7 @@ function renderOrdersTable() {
     return `
     <tr class="clickable" data-id="${o.id}">
       <td>${o.order_date}${o.created_at ? ' ' + new Date(o.created_at).toLocaleTimeString('en-NZ', {hour:'2-digit',minute:'2-digit'}) : ''}</td>
-      <td>${o.customer_name || '-'}</td>
+      <td>${o.customer_name || '-'}${orderStatusIcon(o.status)}</td>
       <td>${o.email || '-'}</td>
       <td>${[o.city, o.country_code].filter(Boolean).join(', ') || '-'}</td>
       <td>$${Number(o.total_value || 0).toFixed(2)}</td>
@@ -1772,11 +1792,26 @@ function openOrderModal(orderId) {
       ? `<a href="${trackingHref}" target="_blank" rel="noopener" style="color:var(--accent);word-break:break-all;font-size:0.8rem;">${trackingNum || 'Track'}</a>`
       : '-';
 
+    // Time to Ship: order created → in transit (shipped_date)
+    let timeToShip = '-';
+    if (order.created_at && shipment.shipped_date) {
+      const diff = (new Date(shipment.shipped_date) - new Date(order.created_at)) / 86400000;
+      if (diff >= 0 && diff < 365) timeToShip = diff < 1 ? Math.round(diff * 24) + 'h' : diff.toFixed(1) + 'd';
+    }
+    // Shipping Wait Time: in transit (shipped_date) → delivered
+    let shippingWait = '-';
+    if (shipment.shipped_date && shipment.delivered_date) {
+      const diff = (new Date(shipment.delivered_date) - new Date(shipment.shipped_date)) / 86400000;
+      if (diff >= 0 && diff < 365) shippingWait = diff < 1 ? Math.round(diff * 24) + 'h' : diff.toFixed(1) + 'd';
+    }
+
     const shipRows = [
       ['Status', `<span style="color:${statusColor};font-weight:700;">${shipment._shipping_status}</span>`],
       ['Carrier', shipment.carrier_name || shipment.carrier || '-'],
       ['Tracking', trackingLink],
       ['Shipped Date', shipment.shipped_date ? new Date(shipment.shipped_date).toLocaleDateString() : '-'],
+      ['Time to Ship', timeToShip],
+      ['Shipping Wait Time', shippingWait],
       ['Destination', [shipment.destination?.city, shipment.destination?.country_code].filter(Boolean).join(', ') || '-'],
     ];
 
@@ -2531,6 +2566,11 @@ function renderShippingStats(data) {
   });
   const avgDeliveryDays = deliveryDays.length > 0 ? (deliveryDays.reduce((a,b)=>a+b,0) / deliveryDays.length).toFixed(2) : '-';
 
+  // IO's this month: orders placed this month with "Incorrect Order" status
+  const now = new Date();
+  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+  const iosThisMonth = allOrders.filter(o => o.order_date >= monthStart && (o.status || '').toLowerCase() === 'incorrect order').length;
+
   const stats = [
     { label: 'Waiting to Print', value: waitingToPrint, sub: 'needs printing', color: 'var(--amber)', filter: 'Waiting to Print' },
     { label: 'Printed', value: printed, sub: 'ready to ship', color: '#facc15', filter: 'Printed' },
@@ -2539,6 +2579,7 @@ function renderShippingStats(data) {
     { label: 'Exception', value: exception, sub: 'needs attention', color: '#fca5a5', filter: 'Exception' },
     { label: 'Avg Ship Time', value: avgShipDays === '-' ? '-' : avgShipDays + 'd', sub: 'order → dispatch', color: 'var(--cyan)', filter: '' },
     { label: 'Avg Delivery', value: avgDeliveryDays === '-' ? '-' : avgDeliveryDays + 'd', sub: 'dispatch → delivered', color: 'var(--green)', filter: '' },
+    { label: "IO's This Month", value: iosThisMonth, sub: 'incorrect orders', color: 'var(--amber)', filter: '' },
   ];
 
   document.getElementById('shipping-stats').innerHTML = stats.map(s => `
