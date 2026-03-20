@@ -161,7 +161,7 @@
 
   <div class="charts-row">
     <div class="chart-card">
-      <h3>Top Products <select id="product-view" style="float:right;background:var(--bg);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:0.75rem;"><option value="name">By Name</option><option value="sku">By SKU</option></select></h3>
+      <h3>Top Products <select id="product-metric" style="float:right;background:var(--bg);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:0.75rem;margin-left:4px;"><option value="qty">By Orders</option><option value="revenue">By Revenue</option></select><select id="product-view" style="float:right;background:var(--bg);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:0.75rem;"><option value="name">By Name</option><option value="sku">By SKU</option></select></h3>
       <canvas id="products-chart"></canvas>
     </div>
     <div class="chart-card">
@@ -286,6 +286,7 @@ document.getElementById('modal-close').addEventListener('click', closeModal);
 document.getElementById('order-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
 document.getElementById('order-search').addEventListener('input', renderOrdersTable);
 document.getElementById('product-view').addEventListener('change', () => renderProductsChart(currentLineItems));
+document.getElementById('product-metric').addEventListener('change', () => renderProductsChart(currentLineItems));
 
 function login() {
   if (document.getElementById('password-input').value === VALID_PASSWORD) {
@@ -547,10 +548,15 @@ let currentLineItems = [];
 function renderProductsChart(lineItems) {
   currentLineItems = lineItems;
   const view = document.getElementById('product-view').value;
+  const metric = document.getElementById('product-metric').value;
   const products = {};
   lineItems.forEach(li => {
     const key = view === 'sku' ? (li.sku || 'Unknown') : (li.description || li.sku || 'Unknown');
-    products[key] = (products[key] || 0) + li.quantity;
+    if (metric === 'revenue') {
+      products[key] = (products[key] || 0) + (li.quantity * Number(li.unit_price || 0));
+    } else {
+      products[key] = (products[key] || 0) + li.quantity;
+    }
   });
 
   const sorted = Object.entries(products).sort((a, b) => b[1] - a[1]).slice(0, 10);
