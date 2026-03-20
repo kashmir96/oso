@@ -86,6 +86,8 @@
     .stat-card .prior .up { color: var(--sage); }
     .stat-card .prior .down { color: var(--red); }
     .stat-card .prior .flat { color: var(--dim); }
+    .stats-hidden .stat-card .value, .stats-hidden .stat-card .sub, .stats-hidden .stat-card .prior, .stats-hidden .stat-card .sparkline { filter: blur(8px); user-select: none; pointer-events: none; }
+    #adspend-banner.stats-hidden #adspend-value { filter: blur(8px); user-select: none; }
     .stat-card .sparkline { margin-top: 0.4rem; height: 24px; display: flex; align-items: flex-end; gap: 1px; }
     .stat-card .sparkline .spark-bar { flex: 1; min-width: 0; border-radius: 1px 1px 0 0; background: var(--border); transition: background 0.2s; }
     .stat-card:hover .sparkline .spark-bar { background: var(--dim); }
@@ -485,6 +487,7 @@
       <span class="nav-active-label" id="nav-active-label">Overview</span>
     </div>
     <div class="header-controls">
+      <button id="stats-eye-btn" title="Show/hide stats" style="background:var(--card);border:1px solid var(--border);color:var(--dim);padding:0.4rem 0.5rem;border-radius:6px;cursor:pointer;line-height:1;display:flex;align-items:center;transition:all 0.15s;"><svg id="stats-eye-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button>
       <button id="refresh-btn" title="Refresh data" style="font-size:1rem;line-height:1;">↻</button>
       <span id="last-refresh" style="font-size:0.7rem;color:var(--dim);"></span>
       <button class="manual-order-btn" id="manual-order-btn">+ Order</button>
@@ -1870,6 +1873,9 @@ function renderStats(orders, lineItems) {
     ].map(renderStatCard).join('');
   }
 
+  // Re-apply stats visibility after rebuild
+  if (typeof applyStatsVisibility === 'function') applyStatsVisibility();
+
   // Confetti on new sale
   if (lastKnownRevenue !== null && revenue > lastKnownRevenue) {
     const revenueCard = document.getElementById('revenue-stat-card');
@@ -3194,6 +3200,23 @@ document.querySelectorAll('.nav-item').forEach(btn => {
     loadActiveTab();
   });
 });
+
+// ── Stats eye toggle (hidden by default) ──
+let statsVisible = false;
+const eyeBtn = document.getElementById('stats-eye-btn');
+const eyeIcon = document.getElementById('stats-eye-icon');
+const eyeOpen = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+const eyeClosed = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>';
+function applyStatsVisibility() {
+  document.getElementById('stats-grid').classList.toggle('stats-hidden', !statsVisible);
+  document.getElementById('orders-stats-grid')?.classList.toggle('stats-hidden', !statsVisible);
+  document.getElementById('adspend-banner').classList.toggle('stats-hidden', !statsVisible);
+  eyeIcon.innerHTML = statsVisible ? eyeOpen : eyeClosed;
+  eyeBtn.style.color = statsVisible ? 'var(--sage)' : 'var(--dim)';
+  eyeBtn.style.borderColor = statsVisible ? 'var(--sage)' : 'var(--border)';
+}
+applyStatsVisibility();
+eyeBtn.addEventListener('click', () => { statsVisible = !statsVisible; applyStatsVisibility(); });
 
 function loadActiveTab() {
   if (activeTab === 'sales') {
