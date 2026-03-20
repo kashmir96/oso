@@ -132,7 +132,7 @@
     .shipping-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
     .shipping-stats .stat-card { cursor: pointer; border: 2px solid transparent; transition: border-color 0.2s; }
     .shipping-stats .stat-card:hover { border-color: var(--border); }
-    .shipping-stats .stat-card.active-filter { border-color: var(--blue); }
+    .shipping-stats .stat-card.active-filter { border-color: var(--bark); }
     .ship-status-badge { padding: 0.15rem 0.5rem; border-radius: 100px; font-size: 0.7rem; font-weight: 600; }
     .ship-status-badge.waiting-to-print { background: #fdf0e6; color: #92400e; }
     .ship-status-badge.printed { background: #f5ecd5; color: #6b5210; }
@@ -718,6 +718,63 @@
 </div>
 
 <script>
+// ── Sortable Tables ──
+function makeTableSortable(table) {
+  if (!table || !table.querySelector('thead')) return;
+  const headers = table.querySelectorAll('thead th');
+  headers.forEach((th, colIdx) => {
+    if (!th.textContent.trim()) return;
+    th.classList.add('sortable');
+    th.addEventListener('click', function() {
+      const tbody = table.querySelector('tbody');
+      if (!tbody) return;
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      if (rows.length <= 1 && rows[0]?.querySelector('.loading')) return;
+      const isAsc = th.classList.contains('sort-asc');
+      headers.forEach(h => h.classList.remove('sort-asc', 'sort-desc'));
+      const dir = isAsc ? 'desc' : 'asc';
+      th.classList.add('sort-' + dir);
+      rows.sort((a, b) => {
+        const aCell = a.cells[colIdx];
+        const bCell = b.cells[colIdx];
+        if (!aCell || !bCell) return 0;
+        let aVal = aCell.textContent.trim();
+        let bVal = bCell.textContent.trim();
+        const aNum = parseFloat(aVal.replace(/[$,%,]/g, ''));
+        const bNum = parseFloat(bVal.replace(/[$,%,]/g, ''));
+        if (!isNaN(aNum) && !isNaN(bNum)) {
+          return dir === 'asc' ? aNum - bNum : bNum - aNum;
+        }
+        const aDate = Date.parse(aVal);
+        const bDate = Date.parse(bVal);
+        if (!isNaN(aDate) && !isNaN(bDate)) {
+          return dir === 'asc' ? aDate - bDate : bDate - aDate;
+        }
+        return dir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      });
+      rows.forEach(r => tbody.appendChild(r));
+    });
+  });
+}
+
+function applySortableToAllTables() {
+  document.querySelectorAll('#dashboard table').forEach(t => {
+    if (!t.dataset.sortable) {
+      t.dataset.sortable = '1';
+      makeTableSortable(t);
+    }
+  });
+}
+
+const sortObserver = new MutationObserver(() => applySortableToAllTables());
+document.addEventListener('DOMContentLoaded', () => {
+  const dashboard = document.getElementById('dashboard');
+  if (dashboard) {
+    sortObserver.observe(dashboard, { childList: true, subtree: true });
+    applySortableToAllTables();
+  }
+});
+
 // Password visibility toggle
 document.querySelectorAll('.pw-toggle').forEach(btn => {
   btn.addEventListener('click', function() {
@@ -967,7 +1024,7 @@ async function loadActivityLog() {
       data.logs.map(l => {
         const t = new Date(l.created_at);
         const timeStr = t.toLocaleDateString('en-NZ', {day:'2-digit',month:'short'}) + ' ' + t.toLocaleTimeString('en-NZ', {hour:'2-digit',minute:'2-digit'});
-        return '<tr><td style="padding:0.3rem 0.5rem;border-bottom:1px solid #111827;white-space:nowrap;">' + timeStr + '</td><td style="padding:0.3rem 0.5rem;border-bottom:1px solid #111827;">' + (l.staff_username || '-') + '</td><td style="padding:0.3rem 0.5rem;border-bottom:1px solid #111827;"><span style="background:var(--bg);padding:0.1rem 0.3rem;border-radius:3px;font-size:0.7rem;">' + l.action + '</span></td><td style="padding:0.3rem 0.5rem;border-bottom:1px solid #111827;">' + (l.detail || '-') + '</td></tr>';
+        return '<tr><td style="padding:0.3rem 0.5rem;border-bottom:1px solid var(--cream-deep);white-space:nowrap;">' + timeStr + '</td><td style="padding:0.3rem 0.5rem;border-bottom:1px solid var(--cream-deep);">' + (l.staff_username || '-') + '</td><td style="padding:0.3rem 0.5rem;border-bottom:1px solid var(--cream-deep);"><span style="background:var(--bg);padding:0.1rem 0.3rem;border-radius:3px;font-size:0.7rem;">' + l.action + '</span></td><td style="padding:0.3rem 0.5rem;border-bottom:1px solid var(--cream-deep);">' + (l.detail || '-') + '</td></tr>';
       }).join('') + '</tbody></table>';
   } catch { container.innerHTML = '<p style="color:var(--red);">Failed to load activity log</p>'; }
 }
@@ -2608,7 +2665,7 @@ document.getElementById('manual-order-modal').addEventListener('click', e => {
 function renderManualForm() {
   const container = document.getElementById('mo-products');
   container.innerHTML = SHOP_PRODUCTS.map((p, i) => `
-    <div style="display:flex;align-items:center;gap:0.5rem;padding:0.35rem 0;border-bottom:1px solid #111827;">
+    <div style="display:flex;align-items:center;gap:0.5rem;padding:0.35rem 0;border-bottom:1px solid var(--cream-deep);">
       <input type="number" id="mo-pqty-${i}" value="0" min="0" style="width:50px;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.3rem;border-radius:4px;font-size:0.85rem;text-align:center;">
       <span style="flex:1;font-size:0.8rem;">${p.desc}</span>
       <span style="font-size:0.8rem;color:var(--muted);">$${p.price.toFixed(2)}</span>

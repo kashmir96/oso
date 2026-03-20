@@ -75,21 +75,31 @@ CREATE POLICY "service_full_access" ON analytics_salt FOR ALL USING (true) WITH 
 -- Helper: build dynamic filter WHERE clause from JSON array
 -- Filters is a JSON array like [{"col":"referrer_domain","val":"google.com"},...]
 -- Returns SQL fragment like: AND referrer_domain = 'google.com' AND browser = 'Chrome'
-CREATE OR REPLACE FUNCTION _analytics_filter_clause(p_filters json DEFAULT NULL)
+-- Special case: event_name filter does a cross-table subquery on analytics_events
+CREATE OR REPLACE FUNCTION _analytics_filter_clause(p_filters json DEFAULT NULL, p_site text DEFAULT NULL, p_from timestamptz DEFAULT NULL, p_to timestamptz DEFAULT NULL)
 RETURNS text AS $$
 DECLARE
   f json;
   clause text := '';
   col_name text;
   col_val text;
-  allowed text[] := ARRAY['pathname','referrer_domain','browser','device_type','country','os','utm_campaign','utm_source','utm_medium','utm_content','utm_term','event_name'];
+  allowed text[] := ARRAY['pathname','referrer_domain','browser','device_type','country','os','utm_campaign','utm_source','utm_medium','utm_content','utm_term'];
 BEGIN
   IF p_filters IS NULL THEN RETURN ''; END IF;
   FOR f IN SELECT json_array_elements(p_filters)
   LOOP
     col_name := f->>'col';
     col_val := f->>'val';
-    IF col_name = ANY(allowed) THEN
+    IF col_name = 'event_name' THEN
+      -- Cross-table filter: find visitor_hashes from events table
+      clause := clause || format(
+        ' AND visitor_hash IN (SELECT DISTINCT visitor_hash FROM analytics_events WHERE event_name = %L AND site_id = %L AND created_at >= %L AND created_at < %L)',
+        col_val,
+        COALESCE(p_site, ''),
+        COALESCE(p_from, now() - interval '30 days'),
+        COALESCE(p_to, now())
+      );
+    ELSIF col_name = ANY(allowed) THEN
       clause := clause || format(' AND %I = %L', col_name, col_val);
     END IF;
   END LOOP;
@@ -105,7 +115,7 @@ DECLARE
   result json;
   fc text;
 BEGIN
-  fc := _analytics_filter_clause(p_filters);
+  fc := _analytics_filter_clause(p_filters, p_site, p_from, p_to);
   EXECUTE format(
     'WITH pv AS (
       SELECT visitor_hash, COUNT(*) AS cnt
@@ -158,7 +168,7 @@ BEGIN
       WHERE site_id = $1 AND created_at >= $2 AND created_at < $3 %s
       GROUP BY period
       ORDER BY period
-    ) t', _analytics_filter_clause(p_filters))
+    ) t', _analytics_filter_clause(p_filters, p_site, p_from, p_to))
   USING p_site, p_from, p_to, p_interval
   INTO result;
   RETURN result;
@@ -183,7 +193,7 @@ BEGIN
       GROUP BY %I
       ORDER BY visitors DESC
       LIMIT 50
-    ) t', p_column, p_column, p_column, _analytics_filter_clause(p_filters), p_column)
+    ) t', p_column, p_column, p_column, _analytics_filter_clause(p_filters, p_site, p_from, p_to), p_column)
   USING p_site, p_from, p_to
   INTO result;
   RETURN result;
@@ -207,7 +217,7 @@ BEGIN
       GROUP BY pathname
       ORDER BY visitors DESC
       LIMIT 50
-    ) t', _analytics_filter_clause(p_filters))
+    ) t', _analytics_filter_clause(p_filters, p_site, p_from, p_to))
   USING p_site, p_from, p_to
   INTO result;
   RETURN result;
@@ -235,7 +245,7 @@ BEGIN
       GROUP BY pathname
       ORDER BY visitors DESC
       LIMIT 50
-    ) t', _analytics_filter_clause(p_filters))
+    ) t', _analytics_filter_clause(p_filters, p_site, p_from, p_to))
   USING p_site, p_from, p_to
   INTO result;
   RETURN result;
@@ -250,7 +260,7 @@ DECLARE
   result json;
   fc text;
 BEGIN
-  fc := _analytics_filter_clause(p_filters);
+  fc := _analytics_filter_clause(p_filters, p_site, p_from, p_to);
   EXECUTE format(
     'WITH ev AS (
       SELECT event_name,
