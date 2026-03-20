@@ -49,8 +49,8 @@ exports.handler = async (event) => {
   const limit = params.limit || '50';
 
   try {
-    // Fetch all three tabs in parallel
-    const [unshippedRes, printedRes, shippedRes] = await Promise.all([
+    // Fetch order lists + summary counts in parallel
+    const [unshippedRes, printedRes, shippedRes, summaryNewRes, summaryPrintedRes, summaryShippedRes] = await Promise.all([
       // "New" tab — /api/orders/unshipped
       fetch(`https://api.starshipit.com/api/orders/unshipped?limit=${limit}&page=${page}${sinceDate ? '&since_order_date=' + sinceDate : ''}`, {
         headers: apiHeaders,
@@ -63,11 +63,18 @@ exports.handler = async (event) => {
       fetch(`https://api.starshipit.com/api/orders/shipped?limit=${limit}&page=${page}${sinceDate ? '&since_order_date=' + sinceDate : ''}`, {
         headers: apiHeaders,
       }),
+      // Summary counts for accurate totals
+      fetch('https://api.starshipit.com/api/orders/summary?order_status=new', { headers: apiHeaders }),
+      fetch('https://api.starshipit.com/api/orders/summary?order_status=printed', { headers: apiHeaders }),
+      fetch('https://api.starshipit.com/api/orders/summary?order_status=shipped', { headers: apiHeaders }),
     ]);
 
     const unshippedData = await unshippedRes.json();
     const printedData = await printedRes.json();
     const shippedData = await shippedRes.json();
+    const summaryNew = await summaryNewRes.json();
+    const summaryPrinted = await summaryPrintedRes.json();
+    const summaryShipped = await summaryShippedRes.json();
 
     // /api/orders/unshipped returns { orders: [...] }
     const unshippedList = Array.isArray(unshippedData.orders) ? unshippedData.orders : [];
@@ -127,7 +134,8 @@ exports.handler = async (event) => {
       headers,
       body: JSON.stringify({
         orders: all,
-        total_unshipped: unshippedData.total_pages ? (unshippedData.total_pages * parseInt(limit)) : unshipped.length,
+        summary: { new: summaryNew, printed: summaryPrinted, shipped: summaryShipped },
+        total_unshipped: unshipped.length,
         total_printed: printedList.length,
         total_shipped: shippedData.total || shipped.length,
       }),
