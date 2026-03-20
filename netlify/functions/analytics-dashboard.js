@@ -84,9 +84,11 @@ exports.handler = async (event) => {
     return reply(400, { error: 'Missing params: site, from, to, metric' });
   }
 
-  const p_from = new Date(from).toISOString();
-  // Add 1 day to 'to' so it includes the full end date
-  const toDate = new Date(to);
+  // Convert NZ dates to UTC — NZ is UTC+12 (NZST) or UTC+13 (NZDT)
+  // Use -11:00 offset so "2026-03-21" → "2026-03-20T11:00:00Z" (start of NZ day in UTC)
+  const p_from = new Date(from + 'T00:00:00+13:00').toISOString();
+  // Add 1 day to 'to' so it includes the full end date in NZ time
+  const toDate = new Date(to + 'T00:00:00+13:00');
   toDate.setDate(toDate.getDate() + 1);
   const p_to = toDate.toISOString();
 

@@ -1342,13 +1342,15 @@ function getDateRange() {
   const now = new Date();
   const today = fmt_date(now);
   const yesterday = fmt_date(new Date(now - 86400000));
+  // NZ time for "this month" calculation
+  const nzNow = new Date(now.toLocaleString('en-US', { timeZone: 'Pacific/Auckland' }));
 
   switch (currentRange) {
     case 'today': return [today, today];
     case 'yesterday': return [yesterday, yesterday];
     case '7d': return [fmt_date(new Date(now - 7 * 86400000)), today];
     case '30d': return [fmt_date(new Date(now - 30 * 86400000)), today];
-    case 'month': return [`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`, today];
+    case 'month': return [`${nzNow.getFullYear()}-${String(nzNow.getMonth() + 1).padStart(2, '0')}-01`, today];
     case 'all': return ['2000-01-01', today];
     case 'custom': {
       const from = document.getElementById('date-from').value || '2000-01-01';
@@ -1387,7 +1389,6 @@ function applyFilter() {
   const mediumFilter = document.getElementById('filter-utm-medium').value;
   const campaignFilter = document.getElementById('filter-utm-campaign').value;
   const cityFilter = document.getElementById('filter-city').value;
-
   filteredOrders = allOrders.filter(o => {
     if (o.order_date < from || o.order_date > to) return false;
     if (utmFilter && (o.utm_source || getUtmFromUrl(o.thank_you_url, 'utm_source') || '') !== utmFilter) return false;
@@ -2951,7 +2952,11 @@ function renderMap(orders) {
 
 function sum(arr, key) { return arr.reduce((s, o) => s + Number(o[key] || 0), 0); }
 function fmt_money(v) { return '$' + v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
-function fmt_date(d) { return d.toISOString().split('T')[0]; }
+function fmt_date(d) {
+  // Use NZ timezone for date calculations
+  const nz = new Date(d.toLocaleString('en-US', { timeZone: 'Pacific/Auckland' }));
+  return nz.getFullYear() + '-' + String(nz.getMonth() + 1).padStart(2, '0') + '-' + String(nz.getDate()).padStart(2, '0');
+}
 
 function topCustomer(orders, mode) {
   const customers = {};
@@ -3375,12 +3380,12 @@ function renderShipmentsTable() {
 
 // ── eShip Print ──
 document.getElementById('eship-print-btn').addEventListener('click', async () => {
-  const waitingCount = allShipments.filter(o => o._shipping_status === 'Waiting to Print').length;
-  if (waitingCount === 0) {
+  const waitingOrders = allShipments.filter(o => o._shipping_status === 'Waiting to Print');
+  if (waitingOrders.length === 0) {
     alert('No orders waiting to print.');
     return;
   }
-  if (!confirm(`Print ${waitingCount} order${waitingCount !== 1 ? 's' : ''} via eShip?\n\nLabels will be sent to the printer connected to the eShip Desktop Agent.`)) return;
+  if (!confirm(`Print ${waitingOrders.length} unprinted order${waitingOrders.length !== 1 ? 's' : ''} via eShip?\n\nLabels will be sent to the printer connected to the eShip Desktop Agent.`)) return;
 
   const btn = document.getElementById('eship-print-btn');
   const origHTML = btn.innerHTML;
@@ -3388,11 +3393,12 @@ document.getElementById('eship-print-btn').addEventListener('click', async () =>
   btn.innerHTML = 'Printing...';
   btn.style.opacity = '0.6';
 
+  const orderIds = waitingOrders.map(o => o.order_id || o.id).filter(Boolean);
   try {
     const res = await fetch('/.netlify/functions/eship-print', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ order_ids: orderIds }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Print failed');
