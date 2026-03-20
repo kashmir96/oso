@@ -20,9 +20,14 @@
     .auth-box h1 { font-size: 1.25rem; margin-bottom: 1.5rem; text-align: center; }
     .auth-box p { font-size: 0.85rem; color: var(--muted); text-align: center; margin-bottom: 1rem; }
     .auth-box input { width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 1rem; margin-bottom: 1rem; }
-    .auth-box button { width: 100%; padding: 0.75rem; border: none; border-radius: 8px; background: var(--blue); color: white; font-size: 1rem; cursor: pointer; font-weight: 600; }
-    .auth-box button:hover { background: #2563eb; }
+    .auth-box button:not(.pw-toggle) { width: 100%; padding: 0.75rem; border: none; border-radius: 8px; background: var(--blue); color: white; font-size: 1rem; cursor: pointer; font-weight: 600; }
+    .auth-box button:not(.pw-toggle):hover { background: #2563eb; }
     .auth-error { color: var(--red); font-size: 0.875rem; text-align: center; margin-top: 0.5rem; display: none; }
+    .pw-wrap { position: relative; }
+    .pw-wrap input { padding-right: 2.5rem; }
+    .pw-toggle { position: absolute; right: 0.6rem; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--dim); cursor: pointer; padding: 0.25rem; margin-bottom: 1rem; line-height: 1; }
+    .pw-toggle:hover { color: var(--text); }
+    .pw-toggle svg { width: 18px; height: 18px; display: block; pointer-events: none; }
 
     /* Team management */
     .team-table { width: 100%; border-collapse: collapse; margin-top: 0.75rem; }
@@ -204,15 +209,24 @@
   <div class="auth-box" id="login-box">
     <h1>Primal Pantry Dashboard</h1>
     <input type="text" id="username-input" placeholder="Username" value="Kashmir" autofocus>
-    <input type="password" id="password-input" placeholder="Password" value="1532Milo2631!">
+    <div class="pw-wrap">
+      <input type="password" id="password-input" placeholder="Password" value="1532Milo2631!">
+      <button type="button" class="pw-toggle" data-target="password-input"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+    </div>
     <button id="login-btn">Sign in</button>
     <div class="auth-error" id="login-error"></div>
   </div>
   <div class="auth-box" id="change-pw-box" style="display:none;">
     <h1>Set Your Password</h1>
     <p>You must change your password before continuing.</p>
-    <input type="password" id="new-pw-input" placeholder="New password (min 6 chars)">
-    <input type="password" id="confirm-pw-input" placeholder="Confirm new password">
+    <div class="pw-wrap">
+      <input type="password" id="new-pw-input" placeholder="New password (min 6 chars)">
+      <button type="button" class="pw-toggle" data-target="new-pw-input"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+    </div>
+    <div class="pw-wrap">
+      <input type="password" id="confirm-pw-input" placeholder="Confirm new password">
+      <button type="button" class="pw-toggle" data-target="confirm-pw-input"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+    </div>
     <button id="change-pw-btn">Set Password</button>
     <div class="auth-error" id="change-pw-error"></div>
   </div>
@@ -574,6 +588,18 @@
 </div>
 
 <script>
+// Password visibility toggle
+document.querySelectorAll('.pw-toggle').forEach(btn => {
+  btn.addEventListener('click', function() {
+    const input = document.getElementById(this.dataset.target);
+    const show = input.type === 'password';
+    input.type = show ? 'text' : 'password';
+    this.innerHTML = show
+      ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
+      : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+  });
+});
+
 const SUPABASE_URL = 'https://yufthilajhcaedudaxkm.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_4qo2PFoiZ0d0ip0Yf3TQFg_Cmc-kSuv';
 let sb, allOrders = [], allLineItems = [], filteredOrders = [], charts = {};

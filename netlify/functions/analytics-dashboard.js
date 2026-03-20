@@ -1,0 +1,152 @@
+/**
+ * analytics-dashboard.js
+ *
+ * Authenticated endpoint that returns aggregated analytics data.
+ * Uses Supabase RPC functions for GROUP BY queries.
+ *
+ * GET ?token=X&site=SITE_ID&from=DATE&to=DATE&metric=METRIC[&col=COLUMN]
+ *
+ * Env vars required: SUPABASE_URL, SUPABASE_SERVICE_KEY
+ */
+
+const HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'Content-Type',
+  'Content-Type': 'application/json',
+};
+
+function reply(statusCode, data) {
+  return { statusCode, headers: HEADERS, body: JSON.stringify(data) };
+}
+
+async function sbFetch(url, opts = {}) {
+  const SUPABASE_URL = process.env.SUPABASE_URL;
+  const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
+  return fetch(`${SUPABASE_URL}${url}`, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      ...opts.headers,
+    },
+  });
+}
+
+async function getStaffByToken(token) {
+  if (!token) return null;
+  const res = await sbFetch(`/rest/v1/staff?session_token=eq.${encodeURIComponent(token)}&select=id`);
+  const rows = await res.json();
+  return rows && rows.length > 0 ? rows[0] : null;
+}
+
+async function callRpc(name, params) {
+  const res = await sbFetch(`/rest/v1/rpc/${name}`, {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+  return res.json();
+}
+
+exports.handler = async (event) => {
+  if (event.httpMethod === 'OPTIONS') return reply(200, '');
+  if (event.httpMethod !== 'GET') return reply(405, { error: 'GET only' });
+
+  const qs = event.queryStringParameters || {};
+  const { token, site, from, to, metric, col } = qs;
+
+  // Auth
+  const staff = await getStaffByToken(token);
+  if (!staff) return reply(401, { error: 'Unauthorized' });
+
+  // Sites list (no date range needed)
+  if (metric === 'sites') {
+    const data = await callRpc('analytics_sites', {});
+    return reply(200, data);
+  }
+
+  if (!site || !from || !to || !metric) {
+    return reply(400, { error: 'Missing params: site, from, to, metric' });
+  }
+
+  const p_from = new Date(from).toISOString();
+  // Add 1 day to 'to' so it includes the full end date
+  const toDate = new Date(to);
+  toDate.setDate(toDate.getDate() + 1);
+  const p_to = toDate.toISOString();
+
+  const baseParams = { p_site: site, p_from, p_to };
+
+  switch (metric) {
+    case 'summary': {
+      const data = await callRpc('analytics_summary', baseParams);
+      return reply(200, data);
+    }
+
+    case 'timeseries': {
+      // Use 'hour' for ranges <= 2 days, 'day' otherwise
+      const diffMs = toDate - new Date(from);
+      const diffDays = diffMs / (1000 * 60 * 60 * 24);
+      const interval = diffDays <= 2 ? 'hour' : 'day';
+      const data = await callRpc('analytics_timeseries', { ...baseParams, p_interval: interval });
+      return reply(200, data);
+    }
+
+    case 'pages': {
+      const data = await callRpc('analytics_grouped', { ...baseParams, p_column: 'pathname' });
+      return reply(200, data);
+    }
+
+    case 'entry_pages': {
+      const data = await callRpc('analytics_entry_pages', baseParams);
+      return reply(200, data);
+    }
+
+    case 'exit_pages': {
+      const data = await callRpc('analytics_exit_pages', baseParams);
+      return reply(200, data);
+    }
+
+    case 'referrers': {
+      const data = await callRpc('analytics_grouped', { ...baseParams, p_column: 'referrer_domain' });
+      return reply(200, data);
+    }
+
+    case 'browsers': {
+      const data = await callRpc('analytics_grouped', { ...baseParams, p_column: 'browser' });
+      return reply(200, data);
+    }
+
+    case 'devices': {
+      const data = await callRpc('analytics_grouped', { ...baseParams, p_column: 'device_type' });
+      return reply(200, data);
+    }
+
+    case 'countries': {
+      const data = await callRpc('analytics_grouped', { ...baseParams, p_column: 'country' });
+      return reply(200, data);
+    }
+
+    case 'os': {
+      const data = await callRpc('analytics_grouped', { ...baseParams, p_column: 'os' });
+      return reply(200, data);
+    }
+
+    case 'events': {
+      const data = await callRpc('analytics_events_summary', baseParams);
+      return reply(200, data);
+    }
+
+    // UTM columns
+    case 'campaigns': {
+      const column = col || 'utm_campaign';
+      const allowed = ['utm_campaign', 'utm_source', 'utm_medium', 'utm_content', 'utm_term'];
+      if (!allowed.includes(column)) return reply(400, { error: 'Invalid column' });
+      const data = await callRpc('analytics_grouped', { ...baseParams, p_column: column });
+      return reply(200, data);
+    }
+
+    default:
+      return reply(400, { error: 'Unknown metric' });
+  }
+};
