@@ -305,6 +305,7 @@
 
     @media (max-width: 900px) {
       .charts-row { grid-template-columns: 1fr; }
+      #pace-map-row { grid-template-columns: 1fr 1fr !important; }
       .wa-panels { grid-template-columns: 1fr; }
       .wa-small-panels { grid-template-columns: 1fr; }
       .mfg-form-row { grid-template-columns: 1fr 1fr; }
@@ -508,7 +509,7 @@
     <div id="heatmap-container"></div>
   </div>
 
-  <div style="display:grid;grid-template-columns:3fr 1fr;gap:0.75rem;margin-bottom:1.5rem;">
+  <div id="pace-map-row" style="display:grid;grid-template-columns:3fr 1fr;gap:0.75rem;margin-bottom:1.5rem;">
     <div class="chart-card">
       <h3>Revenue Pace <select id="pace-mode" style="float:right;background:var(--bg);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:0.75rem;" onclick="event.stopPropagation()"><option value="daily">Today vs Last Week</option><option value="monthly">Monthly Progress</option></select></h3>
       <div class="chart-wrap"><canvas id="cumulative-revenue-chart"></canvas></div>
