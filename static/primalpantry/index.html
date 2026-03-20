@@ -1737,53 +1737,104 @@ function renderRevenueChart(orders) {
 
 // ── Cumulative Monthly Revenue Pace ──
 function renderCumulativeRevenue() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth(); // 0-indexed
-  const today = now.getDate();
+  const mode = (document.getElementById('pace-mode') || {}).value || 'daily';
+  if (mode === 'daily') renderDailyPace(); else renderMonthlyPace();
+}
 
-  // Current month: day 1 through today
+document.getElementById('pace-mode')?.addEventListener('change', renderCumulativeRevenue);
+
+function renderDailyPace() {
+  const now = new Date();
+  const currentHour = now.getHours();
+  const todayStr = now.toISOString().slice(0, 10);
+
+  // Same weekday last week
+  const lastWeek = new Date(now);
+  lastWeek.setDate(lastWeek.getDate() - 7);
+  const lastWeekStr = lastWeek.toISOString().slice(0, 10);
+
+  const todayHourly = Array(24).fill(0);
+  const lastWeekHourly = Array(24).fill(0);
+
+  allOrders.forEach(o => {
+    const val = Number(o.total_value || 0);
+    if (o.order_date === todayStr) {
+      const h = o.created_at ? new Date(o.created_at).getHours() : 0;
+      todayHourly[h] += val;
+    } else if (o.order_date === lastWeekStr) {
+      const h = o.created_at ? new Date(o.created_at).getHours() : 0;
+      lastWeekHourly[h] += val;
+    }
+  });
+
+  const labels = [], cumToday = [], cumLastWeek = [];
+  let runToday = 0, runLW = 0;
+  for (let h = 0; h < 24; h++) {
+    const ampm = h === 0 ? '12am' : h < 12 ? h + 'am' : h === 12 ? '12pm' : (h - 12) + 'pm';
+    labels.push(ampm);
+    runLW += lastWeekHourly[h];
+    cumLastWeek.push(runLW);
+    if (h <= currentHour) { runToday += todayHourly[h]; cumToday.push(runToday); }
+    else cumToday.push(null);
+  }
+
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const todayLabel = 'Today (' + dayNames[now.getDay()] + ')';
+  const lwLabel = 'Last ' + dayNames[lastWeek.getDay()] + ' (' + lastWeekStr.slice(5) + ')';
+
+  if (charts.cumRevenue) charts.cumRevenue.destroy();
+  charts.cumRevenue = new Chart(document.getElementById('cumulative-revenue-chart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: lwLabel, data: cumLastWeek, borderColor: 'rgba(156,146,135,0.35)', backgroundColor: 'rgba(156,146,135,0.05)', fill: true, borderWidth: 1.5, borderDash: [4, 3], tension: 0.3, pointRadius: 0 },
+        { label: todayLabel, data: cumToday, borderColor: '#8CB47A', backgroundColor: 'rgba(140,180,122,0.1)', fill: true, borderWidth: 2.5, tension: 0.3, pointRadius: 0, pointHitRadius: 8 },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: '#9c9287', font: { size: 11, family: 'DM Sans' } } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': $' + (ctx.parsed.y || 0).toFixed(2) } },
+      },
+      scales: {
+        x: { ticks: { color: '#9c9287', maxTicksLimit: 12, font: { size: 10 } }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { color: '#9c9287', callback: v => '$' + (v >= 1000 ? (v/1000).toFixed(1) + 'k' : v) }, grid: { color: 'rgba(51,45,39,0.5)' } },
+      },
+    },
+  });
+}
+
+function renderMonthlyPace() {
+  const now = new Date();
+  const year = now.getFullYear(), month = now.getMonth(), today = now.getDate();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const currentDaily = Array(daysInMonth).fill(0);
   allOrders.forEach(o => {
     const d = new Date(o.order_date + 'T00:00:00');
-    if (d.getFullYear() === year && d.getMonth() === month) {
-      currentDaily[d.getDate() - 1] += Number(o.total_value || 0);
-    }
+    if (d.getFullYear() === year && d.getMonth() === month) currentDaily[d.getDate() - 1] += Number(o.total_value || 0);
   });
 
-  // Last month
   const prevMonth = month === 0 ? 11 : month - 1;
   const prevYear = month === 0 ? year - 1 : year;
   const daysInPrevMonth = new Date(prevYear, prevMonth + 1, 0).getDate();
   const prevDaily = Array(daysInPrevMonth).fill(0);
   allOrders.forEach(o => {
     const d = new Date(o.order_date + 'T00:00:00');
-    if (d.getFullYear() === prevYear && d.getMonth() === prevMonth) {
-      prevDaily[d.getDate() - 1] += Number(o.total_value || 0);
-    }
+    if (d.getFullYear() === prevYear && d.getMonth() === prevMonth) prevDaily[d.getDate() - 1] += Number(o.total_value || 0);
   });
 
-  // Build cumulative arrays
-  const labels = [];
-  const cumCurrent = [];
-  const cumPrev = [];
+  const labels = [], cumCurrent = [], cumPrev = [];
   let runCurrent = 0, runPrev = 0;
   for (let i = 0; i < daysInMonth; i++) {
     labels.push(i + 1);
-    if (i < today) {
-      runCurrent += currentDaily[i];
-      cumCurrent.push(runCurrent);
-    } else {
-      cumCurrent.push(null); // future days
-    }
-    if (i < daysInPrevMonth) {
-      runPrev += prevDaily[i];
-    }
+    if (i < today) { runCurrent += currentDaily[i]; cumCurrent.push(runCurrent); } else cumCurrent.push(null);
+    if (i < daysInPrevMonth) runPrev += prevDaily[i];
     cumPrev.push(runPrev);
   }
 
-  // Month names for legend
   const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const currLabel = monthNames[month] + ' ' + year;
   const prevLabel = monthNames[prevMonth] + ' ' + prevYear;
@@ -1794,54 +1845,20 @@ function renderCumulativeRevenue() {
     data: {
       labels,
       datasets: [
-        {
-          label: prevLabel + ' (pace)',
-          data: cumPrev,
-          borderColor: 'rgba(156,146,135,0.35)',
-          backgroundColor: 'rgba(156,146,135,0.05)',
-          fill: true,
-          borderWidth: 1.5,
-          borderDash: [4, 3],
-          tension: 0.3,
-          pointRadius: 0,
-        },
-        {
-          label: currLabel,
-          data: cumCurrent,
-          borderColor: '#8CB47A',
-          backgroundColor: 'rgba(140,180,122,0.1)',
-          fill: true,
-          borderWidth: 2.5,
-          tension: 0.3,
-          pointRadius: 0,
-          pointHitRadius: 8,
-        },
+        { label: prevLabel + ' (pace)', data: cumPrev, borderColor: 'rgba(156,146,135,0.35)', backgroundColor: 'rgba(156,146,135,0.05)', fill: true, borderWidth: 1.5, borderDash: [4, 3], tension: 0.3, pointRadius: 0 },
+        { label: currLabel, data: cumCurrent, borderColor: '#8CB47A', backgroundColor: 'rgba(140,180,122,0.1)', fill: true, borderWidth: 2.5, tension: 0.3, pointRadius: 0, pointHitRadius: 8 },
       ],
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { labels: { color: '#9c9287', font: { size: 11, family: 'DM Sans' } } },
-        tooltip: {
-          callbacks: {
-            label: ctx => ctx.dataset.label + ': $' + (ctx.parsed.y || 0).toFixed(2),
-            title: items => 'Day ' + items[0].label,
-          },
-        },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': $' + (ctx.parsed.y || 0).toFixed(2), title: items => 'Day ' + items[0].label } },
       },
       scales: {
-        x: {
-          ticks: { color: '#9c9287', maxTicksLimit: 15, font: { size: 10 } },
-          grid: { display: false },
-          title: { display: true, text: 'Day of Month', color: '#6e6259', font: { size: 10 } },
-        },
-        y: {
-          beginAtZero: true,
-          ticks: { color: '#9c9287', callback: v => '$' + (v >= 1000 ? (v/1000).toFixed(1) + 'k' : v) },
-          grid: { color: 'rgba(51,45,39,0.5)' },
-        },
+        x: { ticks: { color: '#9c9287', maxTicksLimit: 15, font: { size: 10 } }, grid: { display: false }, title: { display: true, text: 'Day of Month', color: '#6e6259', font: { size: 10 } } },
+        y: { beginAtZero: true, ticks: { color: '#9c9287', callback: v => '$' + (v >= 1000 ? (v/1000).toFixed(1) + 'k' : v) }, grid: { color: 'rgba(51,45,39,0.5)' } },
       },
     },
   });
