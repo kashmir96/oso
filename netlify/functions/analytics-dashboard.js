@@ -183,6 +183,11 @@ exports.handler = async (event) => {
         return reply(200, data);
       }
 
+      case 'funnel_stages': {
+        const data = await callRpc('analytics_funnel_stages', baseParams);
+        return reply(200, data);
+      }
+
       default:
         return reply(400, { error: 'Unknown metric' });
     }

@@ -4241,13 +4241,17 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
       document.getElementById('wa-bounce').textContent = (s.bounce_rate || 0) + '%';
       document.getElementById('wa-events').textContent = fmtNum(s.event_completions || 0);
 
-      // Funnel metrics from session-based funnel_stages RPC
-      // Each stage only counts visitors who completed ALL prior stages
+      // Funnel metrics — prefer session-based RPC, fallback to event uniques
       const fs = funnelStagesData || {};
-      const fVisitors = fs.visitors || (s.unique_visitors || 0);
-      const fAtc = fs.atc || 0;
-      const fCheckout = fs.checkout || 0;
-      const fPurchased = fs.purchased || 0;
+      const hasFunnelRPC = fs.visitors != null;
+      const uniqueVisitors = s.unique_visitors || 0;
+      const evAtc = ((events || []).find(e => e.event_name === 'add to cart') || {}).uniques || 0;
+      const evCheckout = ((events || []).find(e => e.event_name === 'proceed to checkout') || {}).uniques || 0;
+      const evSale = ((events || []).find(e => e.event_name === 'checkout completed') || {}).uniques || 0;
+      const fVisitors = hasFunnelRPC ? fs.visitors : uniqueVisitors;
+      const fAtc = hasFunnelRPC ? fs.atc : Math.min(evAtc, uniqueVisitors);
+      const fCheckout = hasFunnelRPC ? fs.checkout : Math.min(evCheckout, Math.min(evAtc, uniqueVisitors));
+      const fPurchased = hasFunnelRPC ? fs.purchased : Math.min(evSale, Math.min(evCheckout, Math.min(evAtc, uniqueVisitors)));
       const lpAtc = fVisitors > 0 ? (fAtc / fVisitors * 100).toFixed(1) : '0.0';
       const lpSale = fVisitors > 0 ? (fPurchased / fVisitors * 100).toFixed(1) : '0.0';
       const atcSale = fAtc > 0 ? (fPurchased / fAtc * 100).toFixed(1) : '0.0';
@@ -4506,7 +4510,11 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
       return;
     }
     const counts = {};
-    countriesData.forEach(c => { if (c.name) counts[c.name] = c.visitors || 0; });
+    countriesData.forEach(c => { if (c.name && c.name.trim()) counts[c.name.trim()] = c.visitors || 0; });
+    if (Object.keys(counts).length === 0) {
+      mapEl.innerHTML = '<p style="color:var(--dim);text-align:center;padding:1rem;font-size:0.85rem;">No location data</p>';
+      return;
+    }
     mapEl.innerHTML = '';
     waRenderCountryMap(mapEl, counts, false);
   }
@@ -4568,18 +4576,29 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     const results = await Promise.allSettled(
       dims.map(([_, d]) => waFetch('analytics-dashboard', { ...base, col: d.col }))
     );
-    // Get session-based funnel stages (each stage = subset of prior)
+    // Get session-based funnel stages, fallback to events summary
     const filterParams = { site: waSite, from, to, ...fp };
     if (waFunnelFilterCol && waFunnelFilterVal) {
       filterParams['fc'+extraIdx] = waFunnelFilterCol;
       filterParams['fv'+extraIdx] = waFunnelFilterVal;
     }
-    const fsRes = await waFetch('analytics-dashboard', { ...filterParams, metric: 'funnel_stages' }).catch(() => null);
-    const fs = fsRes || {};
-    const fVisitors = fs.visitors || 0;
-    const fAtc = fs.atc || 0;
-    const fCheckout = fs.checkout || 0;
-    const fPurchased = fs.purchased || 0;
+    const [fsRes, summaryRes, eventsRes] = await Promise.allSettled([
+      waFetch('analytics-dashboard', { ...filterParams, metric: 'funnel_stages' }),
+      waFetch('analytics-dashboard', { ...filterParams, metric: 'summary' }),
+      waFetch('analytics-dashboard', { ...filterParams, metric: 'events' }),
+    ]);
+    const fs = fsRes.status === 'fulfilled' ? fsRes.value : null;
+    const summary = summaryRes.status === 'fulfilled' ? summaryRes.value : {};
+    const evts = eventsRes.status === 'fulfilled' ? eventsRes.value : [];
+    const hasFunnelRPC = fs && fs.visitors != null;
+    const uv = summary.unique_visitors || 0;
+    const evAtc = ((evts || []).find(e => e.event_name === 'add to cart') || {}).uniques || 0;
+    const evCo = ((evts || []).find(e => e.event_name === 'proceed to checkout') || {}).uniques || 0;
+    const evSale = ((evts || []).find(e => e.event_name === 'checkout completed') || {}).uniques || 0;
+    const fVisitors = hasFunnelRPC ? fs.visitors : uv;
+    const fAtc = hasFunnelRPC ? fs.atc : Math.min(evAtc, uv);
+    const fCheckout = hasFunnelRPC ? fs.checkout : Math.min(evCo, Math.min(evAtc, uv));
+    const fPurchased = hasFunnelRPC ? fs.purchased : Math.min(evSale, Math.min(evCo, Math.min(evAtc, uv)));
 
     const funnelStages = [
       { label: 'Visitors', count: fVisitors, color: '#6B8F5B' },
