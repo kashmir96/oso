@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Primal Pantry — Sales Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+
+    /* Login */
+    #login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    #login-box { background: #1e293b; padding: 2.5rem; border-radius: 12px; width: 360px; }
+    #login-box h1 { font-size: 1.25rem; margin-bottom: 1.5rem; text-align: center; }
+    #login-box input { width: 100%; padding: 0.75rem; border: 1px solid #334155; border-radius: 8px; background: #0f172a; color: #e2e8f0; font-size: 1rem; margin-bottom: 1rem; }
+    #login-box button { width: 100%; padding: 0.75rem; border: none; border-radius: 8px; background: #3b82f6; color: white; font-size: 1rem; cursor: pointer; font-weight: 600; }
+    #login-box button:hover { background: #2563eb; }
+    #login-error { color: #f87171; font-size: 0.875rem; text-align: center; margin-top: 0.5rem; display: none; }
+
+    /* Dashboard */
+    #dashboard { display: none; padding: 1.5rem; max-width: 1200px; margin: 0 auto; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+    .header h1 { font-size: 1.5rem; font-weight: 700; }
+    .header button { background: #334155; border: none; color: #94a3b8; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.875rem; }
+
+    /* Stats grid */
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .stat-card { background: #1e293b; border-radius: 12px; padding: 1.25rem; }
+    .stat-card .label { font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
+    .stat-card .value { font-size: 1.75rem; font-weight: 700; }
+    .stat-card .sub { font-size: 0.8rem; color: #64748b; margin-top: 0.25rem; }
+    .green { color: #4ade80; }
+    .blue { color: #60a5fa; }
+
+    /* Charts */
+    .charts { display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; margin-bottom: 2rem; }
+    .chart-card { background: #1e293b; border-radius: 12px; padding: 1.25rem; }
+    .chart-card h3 { font-size: 0.9rem; color: #94a3b8; margin-bottom: 1rem; }
+
+    /* Recent orders */
+    .orders-card { background: #1e293b; border-radius: 12px; padding: 1.25rem; }
+    .orders-card h3 { font-size: 0.9rem; color: #94a3b8; margin-bottom: 1rem; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #64748b; text-transform: uppercase; border-bottom: 1px solid #334155; }
+    td { padding: 0.65rem 0.75rem; font-size: 0.875rem; border-bottom: 1px solid #1e293b; }
+    tr:hover td { background: #334155; }
+    .status-badge { padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; background: #166534; color: #4ade80; }
+
+    .loading { text-align: center; padding: 3rem; color: #64748b; }
+
+    @media (max-width: 768px) {
+      .charts { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Login Screen -->
+<div id="login-screen">
+  <div id="login-box">
+    <h1>Primal Pantry Dashboard</h1>
+    <input type="password" id="password-input" placeholder="Enter password" autofocus>
+    <button onclick="attemptLogin()">Sign in</button>
+    <div id="login-error">Incorrect password</div>
+  </div>
+</div>
+
+<!-- Dashboard -->
+<div id="dashboard">
+  <div class="header">
+    <h1>Sales Dashboard</h1>
+    <button onclick="logout()">Sign out</button>
+  </div>
+
+  <div class="stats">
+    <div class="stat-card">
+      <div class="label">Today</div>
+      <div class="value green" id="stat-today">$0</div>
+      <div class="sub" id="stat-today-orders">0 orders</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">This Week</div>
+      <div class="value" id="stat-week">$0</div>
+      <div class="sub" id="stat-week-orders">0 orders</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">This Month</div>
+      <div class="value" id="stat-month">$0</div>
+      <div class="sub" id="stat-month-orders">0 orders</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">All Time</div>
+      <div class="value blue" id="stat-all">$0</div>
+      <div class="sub" id="stat-all-orders">0 orders</div>
+    </div>
+  </div>
+
+  <div class="charts">
+    <div class="chart-card">
+      <h3>Daily Revenue (Last 30 Days)</h3>
+      <canvas id="revenue-chart"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>Top Products</h3>
+      <canvas id="products-chart"></canvas>
+    </div>
+  </div>
+
+  <div class="orders-card">
+    <h3>Recent Orders</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Customer</th>
+          <th>Email</th>
+          <th>Items</th>
+          <th>Total</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="orders-table">
+        <tr><td colspan="6" class="loading">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  // Config
+  const SUPABASE_URL = 'https://yufthilajhcaedudaxkm.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_4qo2PFoiZ0d0ip0Yf3TQFg_Cmc-kSuv';
+  // SHA-256 hash of the password — never store plaintext
+  const PASSWORD_HASH = 'dfe373bb19a05d135408a7fe7ba814a1e8db5ddc7ab26710b8908ea9b2360dc8';
+
+  let supabase;
+
+  // Hash function
+  async function sha256(text) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(text);
+    const hash = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  // Login
+  async function attemptLogin() {
+    const pw = document.getElementById('password-input').value;
+    const hash = await sha256(pw);
+    if (hash === PASSWORD_HASH) {
+      sessionStorage.setItem('dashboard_auth', 'true');
+      showDashboard();
+    } else {
+      document.getElementById('login-error').style.display = 'block';
+    }
+  }
+
+  document.getElementById('password-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') attemptLogin();
+  });
+
+  function logout() {
+    sessionStorage.removeItem('dashboard_auth');
+    location.reload();
+  }
+
+  function showDashboard() {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    initDashboard();
+  }
+
+  // Check session
+  if (sessionStorage.getItem('dashboard_auth') === 'true') {
+    showDashboard();
+  }
+
+  // Dashboard
+  async function initDashboard() {
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const [orders, lineItems] = await Promise.all([
+      supabase.from('orders').select('*').order('order_date', { ascending: false }),
+      supabase.from('order_line_items').select('*'),
+    ]);
+
+    if (orders.error) {
+      console.error('Failed to load orders:', orders.error);
+      return;
+    }
+
+    const allOrders = orders.data || [];
+    const allLineItems = lineItems.data || [];
+
+    renderStats(allOrders);
+    renderRevenueChart(allOrders);
+    renderProductsChart(allLineItems);
+    renderOrdersTable(allOrders);
+  }
+
+  function renderStats(orders) {
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    const weekAgo = new Date(now - 7 * 86400000).toISOString().split('T')[0];
+    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+
+    const todayOrders = orders.filter(o => o.order_date === today);
+    const weekOrders = orders.filter(o => o.order_date >= weekAgo);
+    const monthOrders = orders.filter(o => o.order_date >= monthStart);
+
+    const sum = (arr) => arr.reduce((s, o) => s + Number(o.total_value || 0), 0);
+    const fmt = (v) => `$${v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
+
+    document.getElementById('stat-today').textContent = fmt(sum(todayOrders));
+    document.getElementById('stat-today-orders').textContent = `${todayOrders.length} orders`;
+    document.getElementById('stat-week').textContent = fmt(sum(weekOrders));
+    document.getElementById('stat-week-orders').textContent = `${weekOrders.length} orders`;
+    document.getElementById('stat-month').textContent = fmt(sum(monthOrders));
+    document.getElementById('stat-month-orders').textContent = `${monthOrders.length} orders`;
+    document.getElementById('stat-all').textContent = fmt(sum(orders));
+    document.getElementById('stat-all-orders').textContent = `${orders.length} orders`;
+  }
+
+  function renderRevenueChart(orders) {
+    const days = {};
+    const now = new Date();
+    // Initialise last 30 days
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(now - i * 86400000).toISOString().split('T')[0];
+      days[d] = 0;
+    }
+    orders.forEach(o => {
+      if (days[o.order_date] !== undefined) {
+        days[o.order_date] += Number(o.total_value || 0);
+      }
+    });
+
+    const labels = Object.keys(days).map(d => {
+      const dt = new Date(d + 'T00:00:00');
+      return `${dt.getDate()}/${dt.getMonth() + 1}`;
+    });
+
+    new Chart(document.getElementById('revenue-chart'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Revenue ($)',
+          data: Object.values(days),
+          backgroundColor: '#3b82f6',
+          borderRadius: 4,
+        }],
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { ticks: { color: '#64748b', callback: v => '$' + v }, grid: { color: '#1e293b' } },
+          x: { ticks: { color: '#64748b', maxRotation: 45 }, grid: { display: false } },
+        },
+      },
+    });
+  }
+
+  function renderProductsChart(lineItems) {
+    const products = {};
+    lineItems.forEach(li => {
+      const name = li.description || li.sku || 'Unknown';
+      products[name] = (products[name] || 0) + li.quantity;
+    });
+
+    const sorted = Object.entries(products).sort((a, b) => b[1] - a[1]).slice(0, 8);
+    const colors = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#f43f5e', '#84cc16'];
+
+    new Chart(document.getElementById('products-chart'), {
+      type: 'doughnut',
+      data: {
+        labels: sorted.map(s => s[0]),
+        datasets: [{
+          data: sorted.map(s => s[1]),
+          backgroundColor: colors.slice(0, sorted.length),
+        }],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 11 }, padding: 8 } },
+        },
+      },
+    });
+  }
+
+  function renderOrdersTable(orders) {
+    const tbody = document.getElementById('orders-table');
+    const recent = orders.slice(0, 50);
+
+    if (recent.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="loading">No orders yet</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = recent.map(o => `
+      <tr>
+        <td>${o.order_date}</td>
+        <td>${o.customer_name || '-'}</td>
+        <td>${o.email || '-'}</td>
+        <td>${o.market || 'NZ'}</td>
+        <td>$${Number(o.total_value || 0).toFixed(2)}</td>
+        <td><span class="status-badge">${o.status}</span></td>
+      </tr>
+    `).join('');
+  }
+</script>
+</body>
+</html>
