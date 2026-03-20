@@ -65,15 +65,15 @@ exports.handler = async (event) => {
     const unshippedData = await unshippedRes.json();
     const shippedData = await shippedRes.json();
 
-    // StarshipIt unshipped endpoint returns { data: [...] }, shipped returns { orders: [...] }
-    const rawUnshipped = unshippedData.data || unshippedData.orders || unshippedData.order || [];
+    // StarshipIt unshipped endpoint returns { data: { orders: [...] } }, shipped returns { orders: [...] }
+    const rawUnshipped = unshippedData.data?.orders || unshippedData.orders || unshippedData.order || [];
     const unshippedList = Array.isArray(rawUnshipped) ? rawUnshipped : [];
     const rawShipped = shippedData.orders || shippedData.order || [];
     const shippedList = Array.isArray(rawShipped) ? rawShipped : [];
 
     const unshipped = unshippedList.map(o => ({
       ...o,
-      _shipping_status: o.printed ? 'Printed' : 'Waiting to Print',
+      _shipping_status: (o.printed || (o.order_status || '').toLowerCase() === 'printed') ? 'Printed' : 'Waiting to Print',
       _status_group: 'unshipped',
     }));
 
@@ -119,9 +119,6 @@ exports.handler = async (event) => {
         orders: all,
         total_unshipped: unshippedData.total_records || unshipped.length,
         total_shipped: shippedData.total || shipped.length,
-        _debug_unshipped_type: typeof (unshippedData.data),
-        _debug_unshipped_keys: Object.keys(unshippedData),
-        _debug_unshipped_data_sample: unshippedData.data ? JSON.stringify(unshippedData.data).slice(0, 500) : 'null',
       }),
     };
   } catch (err) {
