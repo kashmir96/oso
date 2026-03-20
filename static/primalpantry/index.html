@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Primal Pantry — Sales Dashboard</title>
+  <title>Primal Pantry — Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9/dist/leaflet.min.css">
@@ -16,12 +16,29 @@
 
     /* Login */
     #login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-    #login-box { background: var(--card); padding: 2.5rem; border-radius: 12px; width: 360px; }
-    #login-box h1 { font-size: 1.25rem; margin-bottom: 1.5rem; text-align: center; }
-    #login-box input { width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 1rem; margin-bottom: 1rem; }
-    #login-box button { width: 100%; padding: 0.75rem; border: none; border-radius: 8px; background: var(--blue); color: white; font-size: 1rem; cursor: pointer; font-weight: 600; }
-    #login-box button:hover { background: #2563eb; }
-    #login-error { color: var(--red); font-size: 0.875rem; text-align: center; margin-top: 0.5rem; display: none; }
+    .auth-box { background: var(--card); padding: 2.5rem; border-radius: 12px; width: 360px; }
+    .auth-box h1 { font-size: 1.25rem; margin-bottom: 1.5rem; text-align: center; }
+    .auth-box p { font-size: 0.85rem; color: var(--muted); text-align: center; margin-bottom: 1rem; }
+    .auth-box input { width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 1rem; margin-bottom: 1rem; }
+    .auth-box button { width: 100%; padding: 0.75rem; border: none; border-radius: 8px; background: var(--blue); color: white; font-size: 1rem; cursor: pointer; font-weight: 600; }
+    .auth-box button:hover { background: #2563eb; }
+    .auth-error { color: var(--red); font-size: 0.875rem; text-align: center; margin-top: 0.5rem; display: none; }
+
+    /* Team management */
+    .team-table { width: 100%; border-collapse: collapse; margin-top: 0.75rem; }
+    .team-table th { text-align: left; padding: 0.5rem; font-size: 0.7rem; color: var(--dim); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+    .team-table td { padding: 0.5rem; font-size: 0.85rem; border-bottom: 1px solid #111827; }
+    .team-table .role-badge { padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
+    .role-owner { background: #312e81; color: var(--purple); }
+    .role-admin { background: #164e63; color: var(--cyan); }
+    .role-staff { background: #1e3a2f; color: var(--green); }
+    .team-actions button { background: none; border: 1px solid var(--border); color: var(--muted); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.7rem; cursor: pointer; margin-right: 0.25rem; }
+    .team-actions button:hover { border-color: var(--blue); color: var(--text); }
+    .team-actions button.danger { border-color: var(--red); color: var(--red); }
+    .team-actions button.danger:hover { background: var(--red); color: white; }
+    .staff-greeting { font-size: 0.8rem; color: var(--muted); }
+    .team-btn { background: var(--card); border: 1px solid var(--purple); color: var(--purple); padding: 0.4rem 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 600; }
+    .team-btn:hover { background: var(--purple); color: white; }
 
     /* Dashboard */
     #dashboard { display: none; padding: 1.5rem; max-width: 1400px; margin: 0 auto; }
@@ -120,10 +137,35 @@
     .customer-order-row:hover { background: var(--bg); }
     .delete-btn { background: none; border: 1px solid var(--red); color: var(--red); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.7rem; cursor: pointer; }
     .delete-btn:hover { background: var(--red); color: white; }
+
+    /* Manual order form */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .form-grid.full { grid-template-columns: 1fr; }
+    .form-group { display: flex; flex-direction: column; gap: 0.25rem; }
+    .form-group label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; }
+    .form-group input, .form-group select, .form-group textarea { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 0.5rem; border-radius: 6px; font-size: 0.85rem; }
+    .form-group textarea { resize: vertical; min-height: 50px; }
+    .line-item-row { display: flex; gap: 0.5rem; align-items: end; margin-bottom: 0.5rem; }
+    .line-item-row input { flex: 1; }
+    .line-item-row .qty { max-width: 60px; }
+    .line-item-row .price { max-width: 80px; }
+    .add-item-btn { background: none; border: 1px dashed var(--border); color: var(--muted); padding: 0.4rem 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+    .add-item-btn:hover { border-color: var(--blue); color: var(--text); }
+    .submit-order-btn { background: var(--green); color: #000; border: none; padding: 0.6rem 1.5rem; border-radius: 6px; font-size: 0.9rem; font-weight: 700; cursor: pointer; margin-top: 1rem; }
+    .submit-order-btn:hover { opacity: 0.9; }
+    .submit-order-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .manual-order-btn { background: var(--card); border: 1px solid var(--green); color: var(--green); padding: 0.4rem 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 600; }
+    .manual-order-btn:hover { background: var(--green); color: #000; }
     .customer-order-items { color: var(--dim); font-size: 0.75rem; }
     .customer-sort { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 1rem; }
     .customer-sort select, .customer-sort input { background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.8rem; }
     .customer-sort input { width: 250px; }
+
+    /* Pagination */
+    .pagination { display: flex; align-items: center; justify-content: center; gap: 0.75rem; padding: 0.75rem 0 0.25rem; font-size: 0.8rem; color: var(--muted); }
+    .pagination button { background: var(--card); border: 1px solid var(--border); color: var(--muted); padding: 0.35rem 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+    .pagination button:hover:not(:disabled) { border-color: var(--blue); color: var(--text); }
+    .pagination button:disabled { opacity: 0.35; cursor: not-allowed; }
 
     @media (max-width: 900px) { .charts-row { grid-template-columns: 1fr; } }
     @media (max-width: 600px) { .stats { grid-template-columns: repeat(2, 1fr); } }
@@ -132,17 +174,26 @@
 <body>
 
 <div id="login-screen">
-  <div id="login-box">
+  <div class="auth-box" id="login-box">
     <h1>Primal Pantry Dashboard</h1>
-    <input type="password" id="password-input" placeholder="Enter password" autofocus>
+    <input type="text" id="username-input" placeholder="Username" autofocus>
+    <input type="password" id="password-input" placeholder="Password">
     <button id="login-btn">Sign in</button>
-    <div id="login-error">Incorrect password</div>
+    <div class="auth-error" id="login-error"></div>
+  </div>
+  <div class="auth-box" id="change-pw-box" style="display:none;">
+    <h1>Set Your Password</h1>
+    <p>You must change your password before continuing.</p>
+    <input type="password" id="new-pw-input" placeholder="New password (min 6 chars)">
+    <input type="password" id="confirm-pw-input" placeholder="Confirm new password">
+    <button id="change-pw-btn">Set Password</button>
+    <div class="auth-error" id="change-pw-error"></div>
   </div>
 </div>
 
 <div id="dashboard">
   <div class="header">
-    <h1>Sales Dashboard</h1>
+    <h1>Primal Pantry</h1>
     <div class="header-controls">
       <select id="date-range">
         <option value="today" selected>Today</option>
@@ -157,14 +208,19 @@
       <input type="date" id="date-to" title="To" style="display:none;">
       <select id="filter-utm"><option value="">All Sources</option></select>
       <select id="filter-city"><option value="">All Cities</option></select>
+      <button class="manual-order-btn" id="manual-order-btn">+ Manual Order</button>
+      <button class="team-btn" id="team-btn" style="display:none;">Team</button>
+      <span class="staff-greeting" id="staff-greeting"></span>
       <button id="logout-btn">Sign out</button>
     </div>
   </div>
 
   <div class="tab-bar">
-    <button class="tab-btn active" data-tab="sales">Sales</button>
-    <button class="tab-btn" data-tab="customers">Customers</button>
+    <button class="tab-btn active" data-tab="sales">Mission Control</button>
+    <button class="tab-btn" data-tab="orders">Orders</button>
     <button class="tab-btn" data-tab="shipping">Shipping</button>
+    <button class="tab-btn" data-tab="customers">Customers</button>
+    <button class="tab-btn" data-tab="manufacturing">Manufacturing</button>
   </div>
 
   <div id="tab-sales" class="tab-content active">
@@ -225,28 +281,30 @@
     </div>
   </div>
 
-  <div class="orders-card">
-    <h3>Orders</h3>
-    <input type="text" class="search-bar" id="order-search" placeholder="Search by name, email, or product...">
-    <table>
-      <thead>
-        <tr>
-          <th>Date</th>
-          <th>Customer</th>
-          <th>Email</th>
-          <th>Location</th>
-          <th>Total</th>
-          <th>Source</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody id="orders-table">
-        <tr><td colspan="7" class="loading">Loading...</td></tr>
-      </tbody>
-    </table>
-  </div>
-
   </div><!-- /tab-sales -->
+
+  <div id="tab-orders" class="tab-content">
+    <div class="orders-card">
+      <h3>Orders</h3>
+      <input type="text" class="search-bar" id="order-search" placeholder="Search by name, email, or product...">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Customer</th>
+            <th>Email</th>
+            <th>Location</th>
+            <th>Total</th>
+            <th>Source</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="orders-table">
+          <tr><td colspan="7" class="loading">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div><!-- /tab-orders -->
 
   <div id="tab-customers" class="tab-content">
     <div class="stats" id="customer-stats-grid"></div>
@@ -293,8 +351,17 @@
           <tr><td colspan="7" class="loading">Click to load shipping data...</td></tr>
         </tbody>
       </table>
+      <div id="shipments-pagination"></div>
     </div>
   </div><!-- /tab-shipping -->
+
+  <div id="tab-manufacturing" class="tab-content">
+    <div class="stats" id="manufacturing-stats"></div>
+    <div class="orders-card">
+      <h3>Manufacturing</h3>
+      <p style="color:var(--dim);padding:2rem;text-align:center;">Manufacturing tab coming soon.</p>
+    </div>
+  </div><!-- /tab-manufacturing -->
 
 </div><!-- /dashboard -->
 
@@ -307,40 +374,236 @@
   </div>
 </div>
 
+<!-- Manual order modal -->
+<div class="modal-overlay" id="manual-order-modal">
+  <div class="modal" style="max-width:600px;">
+    <button class="modal-close" id="manual-close">&times;</button>
+    <h2>Manual Order</h2>
+    <div class="form-grid">
+      <div class="form-group"><label>Customer Name *</label><input type="text" id="mo-name"></div>
+      <div class="form-group"><label>Email *</label><input type="email" id="mo-email"></div>
+      <div class="form-group"><label>Phone</label><input type="text" id="mo-phone"></div>
+      <div class="form-group"><label>Payment Method</label>
+        <select id="mo-payment"><option>Cash</option><option>Bank Transfer</option><option>Market</option><option>Manual</option></select>
+      </div>
+      <div class="form-group"><label>Street</label><input type="text" id="mo-street"></div>
+      <div class="form-group"><label>Suburb</label><input type="text" id="mo-suburb"></div>
+      <div class="form-group"><label>City *</label><input type="text" id="mo-city"></div>
+      <div class="form-group"><label>Postcode</label><input type="text" id="mo-postcode"></div>
+    </div>
+    <h3 style="margin:1rem 0 0.5rem;font-size:0.85rem;color:var(--muted);">PRODUCTS</h3>
+    <div id="mo-products"></div>
+    <h3 style="margin:1rem 0 0.5rem;font-size:0.85rem;color:var(--muted);">CUSTOM ITEM</h3>
+    <div class="line-item-row">
+      <div class="form-group" style="flex:2;"><input type="text" id="mo-custom-desc" placeholder="Description"></div>
+      <div class="form-group" style="flex:1;"><input type="text" id="mo-custom-sku" placeholder="SKU"></div>
+      <div class="form-group qty"><input type="number" id="mo-custom-qty" value="1" min="1" placeholder="Qty"></div>
+      <div class="form-group price"><input type="number" id="mo-custom-price" step="0.01" placeholder="$"></div>
+      <button class="add-item-btn" id="mo-add-custom">Add</button>
+    </div>
+    <div id="mo-custom-items"></div>
+    <div class="form-grid full" style="margin-top:0.75rem;">
+      <div class="form-group"><label>Shipping Cost</label><input type="number" id="mo-shipping" step="0.01" value="0"></div>
+      <div class="form-group"><label>Notes</label><textarea id="mo-notes" placeholder="Delivery instructions, notes..."></textarea></div>
+    </div>
+    <div id="mo-result" style="margin-top:0.5rem;font-size:0.85rem;"></div>
+    <button class="submit-order-btn" id="mo-submit">Create Order</button>
+  </div>
+</div>
+
+<!-- Team management modal -->
+<div class="modal-overlay" id="team-modal">
+  <div class="modal" style="max-width:650px;">
+    <button class="modal-close" id="team-close">&times;</button>
+    <h2>Team Management</h2>
+    <div id="team-list" style="margin-bottom:1rem;"></div>
+    <div id="team-add-form" style="border-top:1px solid var(--border);padding-top:1rem;">
+      <h3 style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem;">ADD NEW STAFF</h3>
+      <div class="form-grid">
+        <div class="form-group"><label>Username *</label><input type="text" id="team-username"></div>
+        <div class="form-group"><label>Display Name *</label><input type="text" id="team-display"></div>
+        <div class="form-group"><label>Role</label>
+          <select id="team-role"><option value="staff">Staff</option><option value="admin">Admin</option></select>
+        </div>
+        <div class="form-group" style="display:flex;align-items:center;gap:0.5rem;padding-top:1.5rem;">
+          <input type="checkbox" id="team-manage"> <label for="team-manage" style="font-size:0.85rem;">Can manage users</label>
+        </div>
+      </div>
+      <button class="submit-order-btn" id="team-add-btn" style="margin-top:0.5rem;">Add Staff Member</button>
+      <div id="team-result" style="margin-top:0.5rem;font-size:0.85rem;"></div>
+    </div>
+  </div>
+</div>
+
 <script>
 const SUPABASE_URL = 'https://yufthilajhcaedudaxkm.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_4qo2PFoiZ0d0ip0Yf3TQFg_Cmc-kSuv';
-const VALID_PASSWORD = 'MoreSales01!';
-
 let sb, allOrders = [], allLineItems = [], filteredOrders = [], charts = {};
+let shipmentsPage = 1;
+const PAGE_SIZE = 10;
+let currentStaff = null;
+
+function renderPagination(containerId, currentPage, totalItems, onPageChange) {
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  if (totalItems <= PAGE_SIZE) { container.innerHTML = ''; return; }
+  container.innerHTML = `
+    <div class="pagination">
+      <button id="${containerId}-prev" ${currentPage <= 1 ? 'disabled' : ''}>← Prev</button>
+      <span>Page ${currentPage} of ${totalPages} (${totalItems} total)</span>
+      <button id="${containerId}-next" ${currentPage >= totalPages ? 'disabled' : ''}>Next →</button>
+    </div>`;
+  document.getElementById(`${containerId}-prev`).addEventListener('click', () => { if (currentPage > 1) onPageChange(currentPage - 1); });
+  document.getElementById(`${containerId}-next`).addEventListener('click', () => { if (currentPage < totalPages) onPageChange(currentPage + 1); });
+}
 
 // ── Auth ──
-document.getElementById('login-btn').addEventListener('click', login);
-document.getElementById('password-input').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
-document.getElementById('logout-btn').addEventListener('click', () => { sessionStorage.removeItem('pp_auth'); location.reload(); });
+document.getElementById('login-btn').addEventListener('click', doLogin);
+document.getElementById('username-input').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('password-input').focus(); });
+document.getElementById('password-input').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+document.getElementById('change-pw-btn').addEventListener('click', doChangePassword);
+document.getElementById('confirm-pw-input').addEventListener('keydown', e => { if (e.key === 'Enter') doChangePassword(); });
+document.getElementById('logout-btn').addEventListener('click', () => { sessionStorage.removeItem('pp_staff'); location.reload(); });
 document.getElementById('modal-close').addEventListener('click', closeModal);
 document.getElementById('order-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
 document.getElementById('order-search').addEventListener('input', renderOrdersTable);
 document.getElementById('product-view').addEventListener('change', () => renderProductsChart(currentLineItems));
 document.getElementById('product-metric').addEventListener('change', () => renderProductsChart(currentLineItems));
+document.getElementById('team-btn').addEventListener('click', openTeamModal);
+document.getElementById('team-close').addEventListener('click', () => document.getElementById('team-modal').classList.remove('open'));
+document.getElementById('team-modal').addEventListener('click', e => { if (e.target === e.currentTarget) document.getElementById('team-modal').classList.remove('open'); });
+document.getElementById('team-add-btn').addEventListener('click', addStaffMember);
 
-function login() {
-  if (document.getElementById('password-input').value === VALID_PASSWORD) {
-    sessionStorage.setItem('pp_auth', '1');
-    showDashboard();
-  } else {
-    const el = document.getElementById('login-error');
-    el.textContent = 'Incorrect password';
-    el.style.display = 'block';
+async function doLogin() {
+  const username = document.getElementById('username-input').value.trim();
+  const password = document.getElementById('password-input').value;
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  if (!username || !password) { errEl.textContent = 'Enter username and password'; errEl.style.display = 'block'; return; }
+  document.getElementById('login-btn').disabled = true;
+  document.getElementById('login-btn').textContent = 'Signing in...';
+  try {
+    const res = await fetch('/.netlify/functions/staff-auth', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'login', username, password }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      errEl.textContent = data.error || 'Login failed'; errEl.style.display = 'block';
+      document.getElementById('login-btn').disabled = false; document.getElementById('login-btn').textContent = 'Sign in'; return;
+    }
+    currentStaff = { ...data.staff, token: data.token };
+    if (data.staff.must_change_password) {
+      document.getElementById('login-box').style.display = 'none';
+      document.getElementById('change-pw-box').style.display = 'block';
+    } else {
+      sessionStorage.setItem('pp_staff', JSON.stringify(currentStaff));
+      showDashboard();
+    }
+  } catch (err) {
+    errEl.textContent = 'Connection error'; errEl.style.display = 'block';
+    document.getElementById('login-btn').disabled = false; document.getElementById('login-btn').textContent = 'Sign in';
   }
 }
 
-if (sessionStorage.getItem('pp_auth') === '1') showDashboard();
+async function doChangePassword() {
+  const newPw = document.getElementById('new-pw-input').value;
+  const confirmPw = document.getElementById('confirm-pw-input').value;
+  const errEl = document.getElementById('change-pw-error');
+  errEl.style.display = 'none';
+  if (newPw.length < 6) { errEl.textContent = 'Min 6 characters'; errEl.style.display = 'block'; return; }
+  if (newPw !== confirmPw) { errEl.textContent = 'Passwords do not match'; errEl.style.display = 'block'; return; }
+  try {
+    const res = await fetch('/.netlify/functions/staff-auth', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'change-password', token: currentStaff.token, new_password: newPw }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) { errEl.textContent = data.error || 'Failed'; errEl.style.display = 'block'; return; }
+    currentStaff.must_change_password = false;
+    sessionStorage.setItem('pp_staff', JSON.stringify(currentStaff));
+    showDashboard();
+  } catch { errEl.textContent = 'Connection error'; errEl.style.display = 'block'; }
+}
+
+const savedStaff = sessionStorage.getItem('pp_staff');
+if (savedStaff) { try { currentStaff = JSON.parse(savedStaff); showDashboard(); } catch { sessionStorage.removeItem('pp_staff'); } }
 
 function showDashboard() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('dashboard').style.display = 'block';
+  if (currentStaff) {
+    document.getElementById('staff-greeting').textContent = currentStaff.display_name;
+    if (currentStaff.can_manage_users) document.getElementById('team-btn').style.display = '';
+  }
   initDashboard();
+}
+
+// ── Team Management ──
+async function openTeamModal() {
+  if (!currentStaff || !currentStaff.can_manage_users) return;
+  document.getElementById('team-modal').classList.add('open');
+  document.getElementById('team-list').innerHTML = '<div class="loading">Loading team...</div>';
+  document.getElementById('team-result').textContent = '';
+  try {
+    const res = await fetch('/.netlify/functions/staff-auth', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'list-users', token: currentStaff.token }),
+    });
+    const data = await res.json();
+    if (!data.success) { document.getElementById('team-list').innerHTML = '<p style="color:var(--red);">' + data.error + '</p>'; return; }
+    let html = '<table class="team-table"><thead><tr><th>Username</th><th>Name</th><th>Role</th><th>Manage Users</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+    data.users.forEach(u => {
+      const roleCls = u.role === 'owner' ? 'role-owner' : u.role === 'admin' ? 'role-admin' : 'role-staff';
+      html += '<tr><td>' + u.username + '</td><td>' + u.display_name + '</td><td><span class="role-badge ' + roleCls + '">' + u.role + '</span></td><td>' + (u.can_manage_users ? 'Yes' : 'No') + '</td><td>' + (u.must_change_password ? '<span style="color:var(--amber);">Needs password</span>' : '<span style="color:var(--green);">Active</span>') + '</td><td class="team-actions"><button onclick="resetStaffPassword(' + u.id + ')">Reset PW</button>' + (u.id !== currentStaff.id ? '<button class="danger" onclick="deleteStaffMember(' + u.id + ',\'' + u.username + '\')">Remove</button>' : '') + '</td></tr>';
+    });
+    html += '</tbody></table>';
+    document.getElementById('team-list').innerHTML = html;
+  } catch { document.getElementById('team-list').innerHTML = '<p style="color:var(--red);">Failed to load team</p>'; }
+}
+async function addStaffMember() {
+  const username = document.getElementById('team-username').value.trim();
+  const display_name = document.getElementById('team-display').value.trim();
+  const role = document.getElementById('team-role').value;
+  const can_manage_users = document.getElementById('team-manage').checked;
+  const resultEl = document.getElementById('team-result');
+  if (!username || !display_name) { resultEl.textContent = 'Username and display name required'; resultEl.style.color = 'var(--red)'; return; }
+  try {
+    const res = await fetch('/.netlify/functions/staff-auth', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'create-user', token: currentStaff.token, username, display_name, role, can_manage_users }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      resultEl.innerHTML = '<span style="color:var(--green);">Added ' + username + '. Temp password: <strong>' + data.temp_password + '</strong></span>';
+      document.getElementById('team-username').value = ''; document.getElementById('team-display').value = ''; document.getElementById('team-manage').checked = false;
+      openTeamModal();
+    } else { resultEl.textContent = data.error || 'Failed'; resultEl.style.color = 'var(--red)'; }
+  } catch { resultEl.textContent = 'Connection error'; resultEl.style.color = 'var(--red)'; }
+}
+async function resetStaffPassword(userId) {
+  if (!confirm('Reset password? They will need to set a new one on next login.')) return;
+  try {
+    const res = await fetch('/.netlify/functions/staff-auth', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'update-user', token: currentStaff.token, user_id: userId, reset_password: true }),
+    });
+    const data = await res.json();
+    if (data.success) { alert('Password reset. Temp password: ' + data.password_reset); openTeamModal(); }
+    else alert(data.error || 'Failed');
+  } catch { alert('Connection error'); }
+}
+async function deleteStaffMember(userId, username) {
+  if (!confirm('Remove ' + username + ' from the team?')) return;
+  try {
+    const res = await fetch('/.netlify/functions/staff-auth', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete-user', token: currentStaff.token, user_id: userId }),
+    });
+    const data = await res.json();
+    if (data.success) openTeamModal(); else alert(data.error || 'Failed');
+  } catch { alert('Connection error'); }
 }
 
 // ── Filtering ──
@@ -757,9 +1020,14 @@ function openOrderModal(orderId) {
     `).join('');
   }
 
-  html += `<div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border);text-align:right;">
-    <button class="delete-btn" id="modal-delete" data-order-id="${orderId}">Delete Order</button>
-  </div>`;
+  // Only owner/admin can see delete button
+  if (currentStaff && (currentStaff.role === 'owner' || currentStaff.role === 'admin')) {
+    html += `<div style="margin-top:1.5rem;padding-top:1rem;border-top:2px solid var(--red);background:rgba(244,63,94,0.08);border-radius:0 0 8px 8px;padding:1rem;">
+      <div style="color:var(--red);font-weight:700;font-size:0.85rem;margin-bottom:0.5rem;">DANGER ZONE</div>
+      <div style="color:var(--muted);font-size:0.78rem;margin-bottom:0.75rem;">Deleting will issue a Stripe refund, cancel the NZ Post shipment, and permanently remove the order. This cannot be undone.</div>
+      <button class="delete-btn" id="modal-delete" data-order-id="${orderId}" style="padding:0.4rem 1rem;font-size:0.8rem;">Delete &amp; Refund Order</button>
+    </div>`;
+  }
 
   document.getElementById('modal-body').innerHTML = html;
   document.getElementById('order-modal').classList.add('open');
@@ -776,43 +1044,89 @@ function openOrderModal(orderId) {
       if (order) order.status = newStatus;
       renderOrdersTable();
 
-      // If refunded, try to remove from eShip (unshipped only)
-      if (newStatus.toLowerCase().includes('refund') && order && order.stripe_session_id) {
-        try {
-          const cancelRes = await fetch('/.netlify/functions/eship-cancel', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ order_number: order.stripe_session_id }),
-          });
-          const cancelData = await cancelRes.json();
-          if (cancelRes.ok) {
-            alert('Order removed from eShip.');
-          } else {
-            console.log('eShip cancel note:', cancelData.error);
-          }
-        } catch (e) {
-          console.log('eShip cancel skipped:', e.message);
-        }
-      }
+      // Refund status just marks the record — use Delete to actually refund + remove from eShip
     }
   });
 
-  // Delete handler
+  // Delete handler — refunds Stripe, removes from eShip, deletes from Supabase
   document.getElementById('modal-delete').addEventListener('click', async function(e) {
     e.stopPropagation();
     const oid = Number(this.dataset.orderId);
-    if (!confirm('Are you sure you want to delete this order? This cannot be undone.')) return;
-    // Delete line items first (cascade should handle it but be safe)
+    const order = allOrders.find(o => o.id === oid);
+    if (!order) return;
+    if (!confirm('This will refund the payment, remove from NZ Post, and permanently delete the order. Continue?')) return;
+
+    const statusMessages = [];
+    this.disabled = true;
+    this.textContent = 'Deleting...';
+
+    // 1. Refund via Stripe (skip manual orders)
+    if (order.stripe_session_id && !order.stripe_session_id.startsWith('manual_')) {
+      try {
+        const refundRes = await fetch('/.netlify/functions/stripe-refund', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ stripe_session_id: order.stripe_session_id }),
+        });
+        const refundData = await refundRes.json();
+        if (refundRes.ok && refundData.success) {
+          statusMessages.push('Stripe refund issued');
+        } else {
+          statusMessages.push('Stripe refund failed: ' + (refundData.error || 'unknown'));
+        }
+      } catch (err) {
+        statusMessages.push('Stripe refund error: ' + err.message);
+      }
+    } else {
+      statusMessages.push('No Stripe payment to refund');
+    }
+
+    // 2. Remove from eShip / NZ Post (if it exists)
+    if (order.stripe_session_id) {
+      try {
+        const cancelRes = await fetch('/.netlify/functions/eship-cancel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order_number: order.stripe_session_id }),
+        });
+        const cancelData = await cancelRes.json();
+        if (cancelRes.ok && cancelData.success) {
+          statusMessages.push('Removed from NZ Post');
+        } else {
+          statusMessages.push('NZ Post: ' + (cancelData.error || 'not found'));
+        }
+      } catch (err) {
+        statusMessages.push('NZ Post cancel skipped');
+      }
+    }
+
+    // 3. Delete from Supabase
     await sb.from('order_line_items').delete().eq('order_id', oid);
     const { error } = await sb.from('orders').delete().eq('id', oid);
     if (error) {
-      alert('Failed to delete: ' + error.message);
-    } else {
-      allOrders = allOrders.filter(o => o.id !== oid);
-      allLineItems = allLineItems.filter(li => li.order_id !== oid);
-      closeModal();
-      applyFilter();
+      alert('Failed to delete from database: ' + error.message);
+      this.disabled = false;
+      this.textContent = 'Delete Order';
+      return;
     }
+
+    // 4. Remove from local state
+    const deletedEmail = order.email;
+    allOrders = allOrders.filter(o => o.id !== oid);
+    allLineItems = allLineItems.filter(li => li.order_id !== oid);
+
+    // 5. If customer has no more orders, delete their orders (they're already gone from local state)
+    // Check if any orders remain for this customer
+    if (deletedEmail) {
+      const remainingOrders = allOrders.filter(o => o.email === deletedEmail);
+      if (remainingOrders.length === 0) {
+        statusMessages.push('Customer removed (no remaining orders)');
+      }
+    }
+
+    closeModal();
+    applyFilter();
+    alert(statusMessages.join('\n'));
   });
 }
 
@@ -1277,6 +1591,7 @@ function renderCustomersTab() {
       </div>
     </div>`;
   }).join('');
+
 }
 
 // Attach customer tab events
@@ -1293,7 +1608,7 @@ async function loadShippingData() {
   tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading shipping data...</td></tr>';
 
   try {
-    const res = await fetch(ESHIP_PROXY + '?limit=100');
+    const res = await fetch(ESHIP_PROXY + '?limit=500');
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     allShipments = data.orders || [];
@@ -1304,7 +1619,7 @@ async function loadShippingData() {
     renderShipmentsTable();
 
     // Attach search handler
-    document.getElementById('shipment-search').addEventListener('input', renderShipmentsTable);
+    document.getElementById('shipment-search').addEventListener('input', () => { shipmentsPage = 1; renderShipmentsTable(); });
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="7" class="loading">Error loading shipping data: ${err.message}</td></tr>`;
   }
@@ -1413,10 +1728,12 @@ function renderShipmentsTable() {
 
   if (orders.length === 0) {
     tbody.innerHTML = '<tr><td colspan="7" class="loading">No shipments found</td></tr>';
+    renderPagination('shipments-pagination', 1, 0, () => {});
     return;
   }
 
-  tbody.innerHTML = orders.slice(0, 100).map(o => {
+  const start = (shipmentsPage - 1) * PAGE_SIZE;
+  tbody.innerHTML = orders.slice(start, start + PAGE_SIZE).map(o => {
     const dest = o.destination || {};
     const status = o._shipping_status || o.status || '-';
     const statusClass = status.toLowerCase().includes('ship') ? 'shipped' : 'unshipped';
@@ -1436,7 +1753,148 @@ function renderShipmentsTable() {
       <td>${displayDate}</td>
     </tr>`;
   }).join('');
+
+  renderPagination('shipments-pagination', shipmentsPage, orders.length, p => { shipmentsPage = p; renderShipmentsTable(); });
 }
+
+// ── Manual Order ──
+const SHOP_PRODUCTS = [
+  { desc: 'Tallow Balm - Vanilla Rose 60ml', sku: 'Balm-VR60', price: 18.95 },
+  { desc: 'Tallow Balm - Vanilla Rose 120ml', sku: 'Balm-VR120', price: 29.95 },
+  { desc: 'Whipped Tallow Balm - Frankincense 250ml', sku: 'F250', price: 39.95 },
+  { desc: 'Tallow & Honey Balm - Manuka & Vanilla Bean 120ml', sku: 'Balm-PG-VM120', price: 29.95 },
+  { desc: 'Tallow Balm Trio - VVV 120ml', sku: 'trio-VVV-120', price: 47.95 },
+  { desc: 'Tallow Balm Trio - VFL 120ml', sku: 'balm-trio-VFL120', price: 47.95 },
+  { desc: 'Tallow Balm Trio - VVL 120ml', sku: 'trio-VVL-120', price: 47.95 },
+  { desc: 'Tallow Shampoo Bar', sku: 'shampoo', price: 17.95 },
+  { desc: 'Tallow Shampoo - Fresh Geranium - Bottle 500ml', sku: 'shampoo-bottle', price: 34.95 },
+  { desc: 'Tallow Eye Cream', sku: 'eye-c', price: 34.95 },
+  { desc: 'Day n Night Duo (Sunrise Glow + Midnight Mousse)', sku: 'day-night-duo', price: 54.95 },
+  { desc: 'Night Cream 50ml - Reviana', sku: 'reviana-night', price: 49.95 },
+  { desc: 'Complexion Bundle - Reviana', sku: 'reviana-complexion', price: 149.95 },
+];
+
+let manualCustomItems = [];
+
+document.getElementById('manual-order-btn').addEventListener('click', () => {
+  manualCustomItems = [];
+  renderManualForm();
+  document.getElementById('manual-order-modal').classList.add('open');
+});
+document.getElementById('manual-close').addEventListener('click', () => {
+  document.getElementById('manual-order-modal').classList.remove('open');
+});
+document.getElementById('manual-order-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) document.getElementById('manual-order-modal').classList.remove('open');
+});
+
+function renderManualForm() {
+  const container = document.getElementById('mo-products');
+  container.innerHTML = SHOP_PRODUCTS.map((p, i) => `
+    <div style="display:flex;align-items:center;gap:0.5rem;padding:0.35rem 0;border-bottom:1px solid #111827;">
+      <input type="number" id="mo-pqty-${i}" value="0" min="0" style="width:50px;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.3rem;border-radius:4px;font-size:0.85rem;text-align:center;">
+      <span style="flex:1;font-size:0.8rem;">${p.desc}</span>
+      <span style="font-size:0.8rem;color:var(--muted);">$${p.price.toFixed(2)}</span>
+    </div>
+  `).join('');
+
+  document.getElementById('mo-custom-items').innerHTML = '';
+  document.getElementById('mo-result').innerHTML = '';
+}
+
+document.getElementById('mo-add-custom').addEventListener('click', () => {
+  const desc = document.getElementById('mo-custom-desc').value.trim();
+  const sku = document.getElementById('mo-custom-sku').value.trim();
+  const qty = Number(document.getElementById('mo-custom-qty').value) || 1;
+  const price = Number(document.getElementById('mo-custom-price').value) || 0;
+  if (!desc) return;
+  manualCustomItems.push({ desc, sku, qty, price });
+  document.getElementById('mo-custom-desc').value = '';
+  document.getElementById('mo-custom-sku').value = '';
+  document.getElementById('mo-custom-qty').value = '1';
+  document.getElementById('mo-custom-price').value = '';
+  const container = document.getElementById('mo-custom-items');
+  container.innerHTML = manualCustomItems.map((item, i) => `
+    <div style="display:flex;align-items:center;gap:0.5rem;padding:0.3rem 0;font-size:0.8rem;">
+      <span>${item.qty}x ${item.desc} (${item.sku || 'no sku'}) — $${item.price.toFixed(2)}</span>
+      <button onclick="manualCustomItems.splice(${i},1);this.parentElement.remove();" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:0.9rem;">&times;</button>
+    </div>
+  `).join('');
+});
+
+document.getElementById('mo-submit').addEventListener('click', async function() {
+  const btn = this;
+  btn.disabled = true;
+  btn.textContent = 'Creating...';
+  const resultDiv = document.getElementById('mo-result');
+  resultDiv.innerHTML = '';
+
+  // Gather items from product picker
+  const items = [];
+  SHOP_PRODUCTS.forEach((p, i) => {
+    const qty = Number(document.getElementById('mo-pqty-' + i)?.value) || 0;
+    if (qty > 0) items.push({ description: p.desc, sku: p.sku, quantity: qty, unit_price: p.price });
+  });
+  // Add custom items
+  manualCustomItems.forEach(ci => {
+    items.push({ description: ci.desc, sku: ci.sku, quantity: ci.qty, unit_price: ci.price });
+  });
+
+  if (items.length === 0) {
+    resultDiv.innerHTML = '<span style="color:var(--red);">Add at least one item</span>';
+    btn.disabled = false;
+    btn.textContent = 'Create Order';
+    return;
+  }
+
+  const payload = {
+    customer_name: document.getElementById('mo-name').value.trim(),
+    email: document.getElementById('mo-email').value.trim(),
+    phone: document.getElementById('mo-phone').value.trim(),
+    payment_method: document.getElementById('mo-payment').value,
+    street: document.getElementById('mo-street').value.trim(),
+    suburb: document.getElementById('mo-suburb').value.trim(),
+    city: document.getElementById('mo-city').value.trim(),
+    postcode: document.getElementById('mo-postcode').value.trim(),
+    shipping_cost: Number(document.getElementById('mo-shipping').value) || 0,
+    notes: document.getElementById('mo-notes').value.trim(),
+    items,
+  };
+
+  if (!payload.customer_name || !payload.email || !payload.city) {
+    resultDiv.innerHTML = '<span style="color:var(--red);">Name, email, and city are required</span>';
+    btn.disabled = false;
+    btn.textContent = 'Create Order';
+    return;
+  }
+
+  try {
+    const res = await fetch('/.netlify/functions/manual-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+
+    let msg = '';
+    if (data.supabase?.success) msg += '<span style="color:var(--green);">Saved to database.</span> ';
+    else msg += `<span style="color:var(--red);">DB error: ${data.supabase?.error || 'unknown'}</span> `;
+    if (data.eship?.success) msg += '<span style="color:var(--green);">Pushed to eShip.</span>';
+    else msg += `<span style="color:var(--amber);">eShip: ${data.eship?.error || 'skipped'}</span>`;
+
+    resultDiv.innerHTML = msg;
+
+    if (data.supabase?.success) {
+      // Refresh dashboard data
+      setTimeout(() => { initDashboard(); }, 1000);
+    }
+  } catch (err) {
+    resultDiv.innerHTML = `<span style="color:var(--red);">Error: ${err.message}</span>`;
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Create Order';
+});
 </script>
 </body>
 </html>
