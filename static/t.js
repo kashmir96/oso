@@ -1,7 +1,7 @@
 (function(){
   var s=document.currentScript,d=s&&s.dataset.site;
   if(!d)return;
-  var e=s.src?new URL(s.src).origin:'',
+  var e=s.src?new URL(s.src).origin.replace('://www.','://'):'',
       u=e+'/.netlify/functions/analytics-collect',
       p=location.pathname,
       q=new URLSearchParams(location.search),
