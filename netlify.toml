@@ -1,0 +1,6 @@
+[build]
+  publish = "public"
+  command = "hugo --minify"
+
+[functions]
+  directory = "functions"

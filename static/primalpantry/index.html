@@ -87,6 +87,23 @@
 
     .loading { text-align: center; padding: 2rem; color: var(--dim); }
 
+    /* Tabs */
+    .tab-bar { display: flex; gap: 0; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
+    .tab-btn { padding: 0.6rem 1.25rem; border: none; background: none; color: var(--muted); font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { color: var(--blue); border-bottom-color: var(--blue); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* Shipping tab */
+    .shipping-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
+    .ship-status-badge { padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
+    .ship-status-badge.shipped { background: #166534; color: var(--green); }
+    .ship-status-badge.unshipped { background: #92400e; color: var(--amber); }
+    .ship-status-badge.delivered { background: #1e40af; color: var(--blue); }
+    .tracking-link { color: var(--cyan); text-decoration: none; font-size: 0.8rem; }
+    .tracking-link:hover { text-decoration: underline; }
+
     @media (max-width: 900px) { .charts-row { grid-template-columns: 1fr; } }
     @media (max-width: 600px) { .stats { grid-template-columns: repeat(2, 1fr); } }
   </style>
@@ -123,6 +140,12 @@
     </div>
   </div>
 
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="sales">Sales</button>
+    <button class="tab-btn" data-tab="shipping">Shipping</button>
+  </div>
+
+  <div id="tab-sales" class="tab-content active">
   <div class="stats" id="stats-grid"></div>
 
   <div class="charts-row">
@@ -158,9 +181,26 @@
     </div>
   </div>
 
-  <div class="chart-card" style="margin-bottom:1.5rem;">
-    <h3>Magnet Products (Most Common First Item in Cart)</h3>
-    <div id="magnet-container"></div>
+  <div class="charts-row">
+    <div class="chart-card">
+      <h3>Magnet Products (Most Common First Item in Cart)</h3>
+      <div id="magnet-container"></div>
+    </div>
+    <div class="chart-card">
+      <h3>Frequently Bought Together</h3>
+      <div id="bundles-container"></div>
+    </div>
+  </div>
+
+  <div class="charts-row">
+    <div class="chart-card">
+      <h3>Trending Products <span style="font-size:0.65rem;color:var(--dim);font-weight:400;">(vs prior period)</span></h3>
+      <div id="trending-container"></div>
+    </div>
+    <div class="chart-card">
+      <h3>New vs Returning Customers</h3>
+      <canvas id="newret-chart"></canvas>
+    </div>
   </div>
 
   <div class="orders-card">
@@ -183,7 +223,44 @@
       </tbody>
     </table>
   </div>
-</div>
+
+  </div><!-- /tab-sales -->
+
+  <div id="tab-shipping" class="tab-content">
+    <div class="shipping-stats" id="shipping-stats"></div>
+    <div class="charts-row">
+      <div class="chart-card">
+        <h3>Shipping Status Breakdown</h3>
+        <canvas id="shipping-status-chart"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Avg Days to Ship <span style="font-size:0.65rem;color:var(--dim);font-weight:400;">(order → shipped)</span></h3>
+        <canvas id="ship-time-chart"></canvas>
+      </div>
+    </div>
+    <div class="orders-card">
+      <h3>Shipments</h3>
+      <input type="text" class="search-bar" id="shipment-search" placeholder="Search by name, tracking number, or order...">
+      <table>
+        <thead>
+          <tr>
+            <th>Order #</th>
+            <th>Customer</th>
+            <th>Destination</th>
+            <th>Carrier</th>
+            <th>Tracking</th>
+            <th>Status</th>
+            <th>Date</th>
+          </tr>
+        </thead>
+        <tbody id="shipments-table">
+          <tr><td colspan="7" class="loading">Click to load shipping data...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div><!-- /tab-shipping -->
+
+</div><!-- /dashboard -->
 
 <!-- Order detail modal -->
 <div class="modal-overlay" id="order-modal">
@@ -330,6 +407,9 @@ function renderAll(orders, lineItems) {
   renderHeatmap(orders);
   renderMap(orders);
   renderMagnetProducts(orders);
+  renderBoughtTogether(orders);
+  renderTrending(orders);
+  renderNewVsReturning(orders);
   renderOrdersTable();
 }
 
@@ -356,13 +436,48 @@ function renderStats(orders, lineItems) {
   // Unique emails in filtered period
   const periodEmails = new Set(orders.map(o => o.email).filter(Boolean));
 
+  // Refund rate
+  const refundedOrders = orders.filter(o => (o.status || '').toLowerCase().includes('refund'));
+  const refundRate = orderCount > 0 ? (refundedOrders.length / orderCount * 100).toFixed(1) : '0.0';
+
+  // Revenue growth (current period vs same-length prior period)
+  const [from, to] = getDateRange();
+  const periodDays = Math.max(1, Math.round((new Date(to) - new Date(from)) / 86400000) + 1);
+  const priorFrom = fmt_date(new Date(new Date(from) - periodDays * 86400000));
+  const priorTo = fmt_date(new Date(new Date(from) - 86400000));
+  const priorOrders = allOrders.filter(o => o.order_date >= priorFrom && o.order_date <= priorTo);
+  const priorRevenue = sum(priorOrders, 'total_value');
+  const growthPct = priorRevenue > 0 ? ((revenue - priorRevenue) / priorRevenue * 100).toFixed(1) : (revenue > 0 ? '100.0' : '0.0');
+  const growthSign = Number(growthPct) >= 0 ? '+' : '';
+
+  // Avg days between repeat orders
+  const customerOrders = {};
+  allOrders.forEach(o => {
+    if (!o.email) return;
+    if (!customerOrders[o.email]) customerOrders[o.email] = [];
+    customerOrders[o.email].push(o.order_date);
+  });
+  let totalGaps = 0, gapCount = 0;
+  Object.values(customerOrders).forEach(dates => {
+    if (dates.length < 2) return;
+    dates.sort();
+    for (let i = 1; i < dates.length; i++) {
+      const gap = (new Date(dates[i]) - new Date(dates[i - 1])) / 86400000;
+      totalGaps += gap;
+      gapCount++;
+    }
+  });
+  const avgReorderDays = gapCount > 0 ? (totalGaps / gapCount).toFixed(0) : '-';
+
   const stats = [
-    { label: 'Revenue', value: fmt_money(revenue), sub: `${orderCount} orders`, color: 'var(--green)' },
+    { label: 'Revenue', value: fmt_money(revenue), sub: `${growthSign}${growthPct}% vs prior period`, color: 'var(--green)' },
     { label: 'Orders', value: orderCount, sub: `${periodEmails.size} customers`, color: 'var(--blue)' },
     { label: 'AOV', value: fmt_money(aov), sub: 'avg order value', color: 'var(--purple)' },
     { label: 'Repeat Customers', value: repeatCustomers, sub: `of ${totalCustomers} total`, color: 'var(--amber)' },
     { label: 'CLV', value: fmt_money(clv), sub: 'lifetime value', color: 'var(--cyan)' },
     { label: 'Avg Items/Order', value: avgJars.toFixed(1), sub: 'line items', color: 'var(--pink)' },
+    { label: 'Avg Reorder', value: avgReorderDays === '-' ? '-' : `${avgReorderDays}d`, sub: 'days between orders', color: 'var(--blue)' },
+    { label: 'Refund Rate', value: `${refundRate}%`, sub: `${refundedOrders.length} refunded`, color: 'var(--red)' },
     { label: 'Avg Shipping', value: fmt_money(orderCount > 0 ? sum(orders, 'shipping_cost') / orderCount : 0), sub: 'per order', color: 'var(--dim)' },
     { label: 'Discounts Given', value: fmt_money(sum(orders, 'discount_applied')), sub: `${orders.filter(o => Number(o.discount_applied) > 0).length} orders`, color: 'var(--red)' },
     { label: 'Top Customer (Spend)', value: topCustomer(allOrders, 'total_value').name, sub: fmt_money(topCustomer(allOrders, 'total_value').total), color: 'var(--lime)' },
@@ -659,6 +774,151 @@ function renderMagnetProducts(orders) {
   </table>`;
 }
 
+// ── Frequently Bought Together ──
+function renderBoughtTogether(orders) {
+  const pairCounts = {};
+  orders.forEach(o => {
+    const items = allLineItems.filter(li => li.order_id === o.id);
+    const names = [...new Set(items.map(li => li.description || li.sku || '').filter(Boolean))].sort();
+    // Generate all pairs
+    for (let i = 0; i < names.length; i++) {
+      for (let j = i + 1; j < names.length; j++) {
+        const key = `${names[i]} + ${names[j]}`;
+        pairCounts[key] = (pairCounts[key] || 0) + 1;
+      }
+    }
+  });
+
+  const sorted = Object.entries(pairCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const max = sorted.length > 0 ? sorted[0][1] : 1;
+  const container = document.getElementById('bundles-container');
+
+  if (sorted.length === 0) {
+    container.innerHTML = '<p style="color:var(--dim);font-size:0.85rem;">Need multi-item orders to show pairs</p>';
+    return;
+  }
+
+  container.innerHTML = `<table class="utm-table">
+    <thead><tr><th>Product Pair</th><th>Orders</th><th></th></tr></thead>
+    <tbody>${sorted.map(([pair, count]) => `
+      <tr>
+        <td style="font-size:0.75rem;">${pair}</td>
+        <td>${count}</td>
+        <td><span class="utm-bar" style="width:${(count / max) * 100}px;background:var(--purple);"></span></td>
+      </tr>
+    `).join('')}</tbody>
+  </table>`;
+}
+
+// ── Trending Products ──
+function renderTrending(orders) {
+  const [from, to] = getDateRange();
+  const periodDays = Math.max(1, Math.round((new Date(to) - new Date(from)) / 86400000) + 1);
+  const priorFrom = fmt_date(new Date(new Date(from) - periodDays * 86400000));
+  const priorTo = fmt_date(new Date(new Date(from) - 86400000));
+
+  // Current period product quantities
+  const currentProducts = {};
+  const currentOrderIds = new Set(orders.map(o => o.id));
+  allLineItems.filter(li => currentOrderIds.has(li.order_id)).forEach(li => {
+    const name = li.description || li.sku || 'Unknown';
+    currentProducts[name] = (currentProducts[name] || 0) + li.quantity;
+  });
+
+  // Prior period product quantities
+  const priorProducts = {};
+  const priorOrders = allOrders.filter(o => o.order_date >= priorFrom && o.order_date <= priorTo);
+  const priorOrderIds = new Set(priorOrders.map(o => o.id));
+  allLineItems.filter(li => priorOrderIds.has(li.order_id)).forEach(li => {
+    const name = li.description || li.sku || 'Unknown';
+    priorProducts[name] = (priorProducts[name] || 0) + li.quantity;
+  });
+
+  // Calculate growth
+  const allProducts = new Set([...Object.keys(currentProducts), ...Object.keys(priorProducts)]);
+  const trends = [];
+  allProducts.forEach(name => {
+    const curr = currentProducts[name] || 0;
+    const prev = priorProducts[name] || 0;
+    const change = prev > 0 ? ((curr - prev) / prev * 100) : (curr > 0 ? 100 : 0);
+    if (curr > 0 || prev > 0) trends.push({ name, curr, prev, change });
+  });
+
+  trends.sort((a, b) => b.change - a.change);
+  const container = document.getElementById('trending-container');
+
+  if (trends.length === 0) {
+    container.innerHTML = '<p style="color:var(--dim);font-size:0.85rem;">No data yet</p>';
+    return;
+  }
+
+  container.innerHTML = `<table class="utm-table">
+    <thead><tr><th>Product</th><th>Now</th><th>Prior</th><th>Change</th></tr></thead>
+    <tbody>${trends.slice(0, 10).map(t => {
+      const color = t.change > 0 ? 'var(--green)' : t.change < 0 ? 'var(--red)' : 'var(--dim)';
+      const arrow = t.change > 0 ? '↑' : t.change < 0 ? '↓' : '→';
+      return `<tr>
+        <td>${t.name}</td>
+        <td>${t.curr}</td>
+        <td>${t.prev}</td>
+        <td style="color:${color};font-weight:600;">${arrow} ${Math.abs(t.change).toFixed(0)}%</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
+}
+
+// ── New vs Returning Customers ──
+function renderNewVsReturning(orders) {
+  // Build first-order date per email from ALL orders
+  const firstOrderDate = {};
+  allOrders.slice().sort((a, b) => a.order_date.localeCompare(b.order_date)).forEach(o => {
+    if (o.email && !firstOrderDate[o.email]) firstOrderDate[o.email] = o.order_date;
+  });
+
+  // For filtered orders, classify as new or returning
+  const [from, to] = getDateRange();
+  const days = {};
+  const start = new Date(from + 'T00:00:00');
+  const end = new Date(to + 'T00:00:00');
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    days[fmt_date(d)] = { new: 0, returning: 0 };
+  }
+
+  orders.forEach(o => {
+    if (!o.email || !days[o.order_date]) return;
+    if (firstOrderDate[o.email] === o.order_date) {
+      days[o.order_date].new++;
+    } else {
+      days[o.order_date].returning++;
+    }
+  });
+
+  const labels = Object.keys(days).map(d => {
+    const dt = new Date(d + 'T00:00:00');
+    return `${dt.getDate()}/${dt.getMonth() + 1}`;
+  });
+
+  if (charts.newret) charts.newret.destroy();
+  charts.newret = new Chart(document.getElementById('newret-chart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'New', data: Object.values(days).map(d => d.new), backgroundColor: 'var(--cyan)', borderRadius: 3 },
+        { label: 'Returning', data: Object.values(days).map(d => d.returning), backgroundColor: 'var(--purple)', borderRadius: 3 },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } },
+      scales: {
+        y: { stacked: true, ticks: { color: '#64748b' }, grid: { color: '#111827' } },
+        x: { stacked: true, ticks: { color: '#64748b', maxRotation: 45, maxTicksLimit: 15 }, grid: { display: false } },
+      },
+    },
+  });
+}
+
 // ── Geographic Map ──
 const NZ_CITIES = {
   'auckland':[-36.85,174.76],'wellington':[-41.29,174.78],'christchurch':[-43.53,172.64],
@@ -799,6 +1059,175 @@ function topCustomer(orders, mode) {
   }
   entries.sort((a, b) => b.spend - a.spend);
   return { name: entries[0].name, total: entries[0].spend };
+}
+
+// ── Tab switching ──
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    this.classList.add('active');
+    document.getElementById('tab-' + this.dataset.tab).classList.add('active');
+    // Load shipping data on first click
+    if (this.dataset.tab === 'shipping' && !shippingLoaded) {
+      loadShippingData();
+    }
+  });
+});
+
+// ── Shipping Tab ──
+const ESHIP_PROXY = '/.netlify/functions/eship-orders';
+let shippingLoaded = false;
+let allShipments = [];
+
+async function loadShippingData() {
+  const tbody = document.getElementById('shipments-table');
+  tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading shipping data...</td></tr>';
+
+  try {
+    const res = await fetch(ESHIP_PROXY + '?limit=100');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    allShipments = data.orders || [];
+    shippingLoaded = true;
+    renderShippingStats(data);
+    renderShippingStatusChart();
+    renderShipTimeChart();
+    renderShipmentsTable();
+
+    // Attach search handler
+    document.getElementById('shipment-search').addEventListener('input', renderShipmentsTable);
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7" class="loading">Error loading shipping data: ${err.message}</td></tr>`;
+  }
+}
+
+function renderShippingStats(data) {
+  const total = allShipments.length;
+  const shipped = allShipments.filter(o => o._shipping_status === 'Shipped').length;
+  const unshipped = allShipments.filter(o => o._shipping_status === 'Unshipped').length;
+
+  // Count unique carriers
+  const carriers = {};
+  allShipments.forEach(o => {
+    const c = o.carrier_name || o.carrier || 'Unknown';
+    carriers[c] = (carriers[c] || 0) + 1;
+  });
+  const topCarrier = Object.entries(carriers).sort((a,b) => b[1] - a[1])[0];
+
+  // Avg days to ship (where we have both order_date and shipped_date)
+  let shipDays = [];
+  allShipments.forEach(o => {
+    if (o.order_date && o.shipped_date) {
+      const diff = (new Date(o.shipped_date) - new Date(o.order_date)) / 86400000;
+      if (diff >= 0 && diff < 365) shipDays.push(diff);
+    }
+  });
+  const avgShipDays = shipDays.length > 0 ? (shipDays.reduce((a,b)=>a+b,0) / shipDays.length).toFixed(1) : '-';
+
+  const stats = [
+    { label: 'Total Orders', value: total, sub: `${data.total_shipped || shipped} shipped`, color: 'var(--blue)' },
+    { label: 'Shipped', value: shipped, sub: 'dispatched', color: 'var(--green)' },
+    { label: 'Unshipped', value: unshipped, sub: 'awaiting dispatch', color: 'var(--amber)' },
+    { label: 'Avg Days to Ship', value: avgShipDays === '-' ? '-' : avgShipDays + 'd', sub: 'order to dispatch', color: 'var(--cyan)' },
+    { label: 'Top Carrier', value: topCarrier ? topCarrier[0] : '-', sub: topCarrier ? topCarrier[1] + ' shipments' : '', color: 'var(--purple)' },
+  ];
+
+  document.getElementById('shipping-stats').innerHTML = stats.map(s => `
+    <div class="stat-card">
+      <div class="label">${s.label}</div>
+      <div class="value" style="color:${s.color}">${s.value}</div>
+      <div class="sub">${s.sub}</div>
+    </div>
+  `).join('');
+}
+
+function renderShippingStatusChart() {
+  const statusCounts = {};
+  allShipments.forEach(o => {
+    const s = o._shipping_status || o.status || 'Unknown';
+    statusCounts[s] = (statusCounts[s] || 0) + 1;
+  });
+
+  const labels = Object.keys(statusCounts);
+  const data = Object.values(statusCounts);
+  const colors = ['#4ade80', '#f59e0b', '#3b82f6', '#ec4899', '#8b5cf6', '#06b6d4'];
+
+  if (charts.shipStatus) charts.shipStatus.destroy();
+  charts.shipStatus = new Chart(document.getElementById('shipping-status-chart'), {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data, backgroundColor: colors.slice(0, labels.length) }] },
+    options: { responsive: true, plugins: { legend: { position: 'right', labels: { color: '#94a3b8', font: { size: 11 }, padding: 6, boxWidth: 12 } } } },
+  });
+}
+
+function renderShipTimeChart() {
+  // Show distribution of days-to-ship as a bar chart
+  const buckets = { '0': 0, '1': 0, '2': 0, '3': 0, '4': 0, '5+': 0 };
+  allShipments.forEach(o => {
+    if (o.order_date && o.shipped_date) {
+      const diff = Math.floor((new Date(o.shipped_date) - new Date(o.order_date)) / 86400000);
+      if (diff < 0 || diff > 365) return;
+      if (diff >= 5) buckets['5+']++;
+      else buckets[String(diff)]++;
+    }
+  });
+
+  if (charts.shipTime) charts.shipTime.destroy();
+  charts.shipTime = new Chart(document.getElementById('ship-time-chart'), {
+    type: 'bar',
+    data: {
+      labels: Object.keys(buckets).map(k => k + (k !== '5+' ? ' day' + (k !== '1' ? 's' : '') : '')),
+      datasets: [{ label: 'Orders', data: Object.values(buckets), backgroundColor: 'var(--cyan)', borderRadius: 3 }],
+    },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: {
+      y: { ticks: { color: '#64748b' }, grid: { color: '#111827' } },
+      x: { ticks: { color: '#64748b' }, grid: { display: false } },
+    }},
+  });
+}
+
+function renderShipmentsTable() {
+  const tbody = document.getElementById('shipments-table');
+  const query = (document.getElementById('shipment-search').value || '').toLowerCase();
+
+  let orders = allShipments;
+  if (query) {
+    orders = orders.filter(o => {
+      const fields = [
+        o.order_number, o.name, o.destination?.name,
+        o.destination?.city, o.tracking_number,
+        o.carrier_name, o.carrier,
+      ].filter(Boolean).join(' ').toLowerCase();
+      return fields.includes(query);
+    });
+  }
+
+  if (orders.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="loading">No shipments found</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = orders.slice(0, 100).map(o => {
+    const dest = o.destination || {};
+    const status = o._shipping_status || o.status || '-';
+    const statusClass = status.toLowerCase().includes('ship') ? 'shipped' : 'unshipped';
+    const carrier = o.carrier_name || o.carrier || '-';
+    const tracking = o.tracking_number || o.tracking_numbers?.[0] || '';
+    const trackUrl = o.tracking_url || (tracking ? '#' : '');
+    const date = o.shipped_date || o.order_date || '-';
+    const displayDate = date !== '-' ? date.split('T')[0] : '-';
+
+    return `<tr>
+      <td>${o.order_number || '-'}</td>
+      <td>${dest.name || o.name || '-'}</td>
+      <td>${[dest.city, dest.country_code || dest.country].filter(Boolean).join(', ') || '-'}</td>
+      <td>${carrier}</td>
+      <td>${tracking ? `<a class="tracking-link" href="${trackUrl}" target="_blank" rel="noopener">${tracking}</a>` : '-'}</td>
+      <td><span class="ship-status-badge ${statusClass}">${status}</span></td>
+      <td>${displayDate}</td>
+    </tr>`;
+  }).join('');
 }
 </script>
 </body>
