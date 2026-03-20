@@ -229,6 +229,51 @@ RETURNS json AS $$
   ) t;
 $$ LANGUAGE sql STABLE;
 
+-- Realtime visitor journeys (per-visitor page sequence for active visitors)
+CREATE OR REPLACE FUNCTION analytics_realtime_visitors(p_site text)
+RETURNS json AS $$
+  WITH active AS (
+    SELECT DISTINCT visitor_hash
+    FROM analytics_pageviews
+    WHERE site_id = p_site AND created_at >= now() - interval '5 minutes'
+  ),
+  journeys AS (
+    SELECT
+      pv.visitor_hash,
+      pv.pathname,
+      pv.duration,
+      pv.created_at,
+      pv.referrer_domain,
+      pv.browser,
+      pv.device_type,
+      pv.country,
+      pv.entry_page
+    FROM analytics_pageviews pv
+    JOIN active a ON a.visitor_hash = pv.visitor_hash
+    WHERE pv.site_id = p_site
+      AND pv.created_at >= now() - interval '30 minutes'
+    ORDER BY pv.visitor_hash, pv.created_at ASC
+  )
+  SELECT COALESCE(json_agg(row_to_json(v)), '[]'::json) FROM (
+    SELECT
+      visitor_hash,
+      json_agg(json_build_object(
+        'page', pathname,
+        'duration', duration,
+        'time', created_at
+      ) ORDER BY created_at ASC) AS pages,
+      MIN(CASE WHEN entry_page THEN referrer_domain END) AS referrer,
+      MIN(browser) AS browser,
+      MIN(device_type) AS device,
+      MIN(country) AS country,
+      MAX(created_at) AS last_seen
+    FROM journeys
+    GROUP BY visitor_hash
+    ORDER BY last_seen DESC
+    LIMIT 30
+  ) v;
+$$ LANGUAGE sql STABLE;
+
 -- List distinct site IDs
 CREATE OR REPLACE FUNCTION analytics_sites()
 RETURNS json AS $$

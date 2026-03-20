@@ -226,6 +226,16 @@
     .wa-realtime-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--green); margin-right: 6px; animation: wa-pulse 1.5s infinite; }
     @keyframes wa-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
     .wa-realtime.active { border: 1px solid var(--green); }
+    .wa-visitor { background: var(--bg); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.5rem; border: 1px solid var(--border); }
+    .wa-visitor-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.4rem; }
+    .wa-visitor-meta { display: flex; gap: 0.75rem; font-size: 0.7rem; color: var(--dim); }
+    .wa-visitor-meta span { display: inline-flex; align-items: center; gap: 3px; }
+    .wa-journey { display: flex; align-items: center; gap: 0; flex-wrap: wrap; }
+    .wa-journey-step { font-size: 0.75rem; padding: 0.2rem 0.5rem; background: var(--card); border-radius: 4px; white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+    .wa-journey-step.wa-entry { border-left: 2px solid var(--green); }
+    .wa-journey-step.wa-current { border-left: 2px solid var(--blue); background: rgba(59,130,246,0.15); }
+    .wa-journey-arrow { color: var(--dim); font-size: 0.65rem; padding: 0 0.25rem; }
+    .wa-journey-dur { font-size: 0.6rem; color: var(--dim); margin-left: 2px; }
 
     @media (max-width: 900px) { .charts-row { grid-template-columns: 1fr; } .wa-panels { grid-template-columns: 1fr; } }
     @media (max-width: 600px) { .stats { grid-template-columns: repeat(2, 1fr); } .wa-stats { grid-template-columns: repeat(2, 1fr); } }
@@ -2478,42 +2488,84 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     el.innerHTML = html;
   }
 
-  let waRealtimePages = [];
+  let waRealtimePages = [], waRealtimeVisitors = [];
+  let waRealtimePanelOpen = false;
+
   async function waLoadRealtime() {
     try {
-      const data = await waFetch('analytics-realtime', { site: waSite });
+      const params = { site: waSite };
+      if (waRealtimePanelOpen) params.detail = '1';
+      const data = await waFetch('analytics-realtime', params);
       document.getElementById('wa-realtime').textContent = data.active_visitors || 0;
       waRealtimePages = data.pages || [];
-      // Update panel if visible
-      const panel = document.getElementById('wa-realtime-panel');
-      if (panel.style.display !== 'none') waRenderRealtimePages();
+      waRealtimeVisitors = data.visitors || [];
+      if (waRealtimePanelOpen) waRenderRealtimePanel();
     } catch {}
   }
 
-  function waRenderRealtimePages() {
+  function waTimeAgo(iso) {
+    const diff = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
+    if (diff < 60) return diff + 's ago';
+    return Math.floor(diff / 60) + 'm ago';
+  }
+
+  function waRenderRealtimePanel() {
     const el = document.getElementById('wa-realtime-pages');
-    if (!waRealtimePages.length) {
+    if (!waRealtimeVisitors.length && !waRealtimePages.length) {
       el.innerHTML = '<p style="color:var(--dim);text-align:center;padding:1rem;">No active visitors</p>';
       return;
     }
-    const max = Math.max(...waRealtimePages.map(p => p.visitors));
-    let html = '<table class="wa-table"><thead><tr><th>Page</th><th>Visitors</th></tr></thead><tbody>';
-    waRealtimePages.forEach(p => {
-      const pct = max > 0 ? (p.visitors / max * 100) : 0;
-      html += `<tr><td class="wa-bar-cell"><div class="wa-bar-bg" style="width:${pct}%;background:rgba(74,222,128,0.15)"></div><span class="wa-bar-text"><span class="wa-realtime-dot"></span>${p.pathname}</span></td><td>${p.visitors}</td></tr>`;
-    });
-    html += '</tbody></table>';
+
+    let html = '';
+
+    // Visitor journey cards
+    if (waRealtimeVisitors.length) {
+      waRealtimeVisitors.forEach(v => {
+        const pages = typeof v.pages === 'string' ? JSON.parse(v.pages) : v.pages;
+        const meta = [];
+        if (v.referrer) meta.push('<span>via ' + v.referrer + '</span>');
+        if (v.country) meta.push('<span>' + v.country + '</span>');
+        if (v.browser) meta.push('<span>' + v.browser + '</span>');
+        if (v.device) meta.push('<span>' + v.device + '</span>');
+
+        html += '<div class="wa-visitor">';
+        html += '<div class="wa-visitor-header">';
+        html += '<div class="wa-visitor-meta">' + meta.join('') + '</div>';
+        html += '<span style="font-size:0.65rem;color:var(--dim);">' + waTimeAgo(v.last_seen) + '</span>';
+        html += '</div>';
+        html += '<div class="wa-journey">';
+        pages.forEach((p, i) => {
+          const isFirst = i === 0;
+          const isLast = i === pages.length - 1;
+          const cls = isFirst ? 'wa-entry' : (isLast ? 'wa-current' : '');
+          html += '<span class="wa-journey-step ' + cls + '" title="' + p.page + '">' + p.page + '</span>';
+          if (p.duration > 0) html += '<span class="wa-journey-dur">' + p.duration + 's</span>';
+          if (!isLast) html += '<span class="wa-journey-arrow">&rarr;</span>';
+        });
+        html += '</div>';
+        html += '</div>';
+      });
+    } else if (waRealtimePages.length) {
+      // Fallback to page summary if visitor detail not loaded yet
+      const max = Math.max(...waRealtimePages.map(p => p.visitors));
+      html = '<table class="wa-table"><thead><tr><th>Page</th><th>Visitors</th></tr></thead><tbody>';
+      waRealtimePages.forEach(p => {
+        const pct = max > 0 ? (p.visitors / max * 100) : 0;
+        html += '<tr><td class="wa-bar-cell"><div class="wa-bar-bg" style="width:' + pct + '%;background:rgba(74,222,128,0.15)"></div><span class="wa-bar-text"><span class="wa-realtime-dot"></span>' + p.pathname + '</span></td><td>' + p.visitors + '</td></tr>';
+      });
+      html += '</tbody></table>';
+    }
+
     el.innerHTML = html;
   }
 
   document.getElementById('wa-realtime-card').addEventListener('click', function() {
     const panel = document.getElementById('wa-realtime-panel');
-    const isOpen = panel.style.display !== 'none';
-    panel.style.display = isOpen ? 'none' : 'block';
-    this.classList.toggle('active', !isOpen);
-    if (!isOpen) {
-      waRenderRealtimePages();
-      waLoadRealtime(); // refresh immediately
+    waRealtimePanelOpen = panel.style.display === 'none';
+    panel.style.display = waRealtimePanelOpen ? 'block' : 'none';
+    this.classList.toggle('active', waRealtimePanelOpen);
+    if (waRealtimePanelOpen) {
+      waLoadRealtime(); // refresh with detail=1
     }
   });
 
