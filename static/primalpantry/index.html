@@ -152,11 +152,24 @@
 
     .loading { text-align: center; padding: 2rem; color: var(--dim); }
 
-    /* Tabs */
-    .tab-bar { display: flex; gap: 0; margin-bottom: 1.5rem; border-bottom: 2px solid var(--border); }
-    .tab-btn { padding: 0.6rem 1.25rem; border: none; background: none; color: var(--muted); font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; margin-bottom: -2px; font-family: 'DM Sans', sans-serif; }
-    .tab-btn:hover { color: var(--text); }
-    .tab-btn.active { color: var(--sage); border-bottom-color: var(--sage); }
+    /* Hamburger nav */
+    .nav-hamburger { background: var(--card); border: 1px solid var(--border); color: var(--muted); width: 38px; height: 38px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; flex-shrink: 0; }
+    .nav-hamburger:hover { border-color: var(--sage); color: var(--text); }
+    .nav-hamburger svg { width: 18px; height: 18px; }
+    .nav-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 999; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
+    .nav-overlay.open { opacity: 1; pointer-events: all; }
+    .nav-drawer { position: fixed; top: 0; left: -280px; width: 260px; height: 100%; background: var(--card); border-right: 1px solid var(--border); z-index: 1000; transition: left 0.25s cubic-bezier(0.4,0,0.2,1); display: flex; flex-direction: column; padding: 1.5rem 0; }
+    .nav-drawer.open { left: 0; }
+    .nav-drawer-header { padding: 0 1.25rem 1rem; border-bottom: 1px solid var(--border); margin-bottom: 0.5rem; }
+    .nav-drawer-header h2 { font-size: 1rem; color: var(--text); margin: 0; font-family: 'DM Sans', sans-serif; }
+    .nav-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.7rem 1.25rem; border: none; background: none; color: var(--muted); font-size: 0.9rem; font-weight: 500; cursor: pointer; width: 100%; text-align: left; transition: all 0.15s; font-family: 'DM Sans', sans-serif; }
+    .nav-item:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+    .nav-item.active { color: var(--sage); background: rgba(168,187,147,0.1); border-right: 3px solid var(--sage); }
+    .nav-item svg { width: 18px; height: 18px; opacity: 0.6; flex-shrink: 0; }
+    .nav-item.active svg { opacity: 1; }
+    .nav-active-label { font-size: 0.8rem; color: var(--sage); font-weight: 600; margin-left: 0.25rem; }
+    .tab-bar { display: none; }
+    .tab-btn { display: none; }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
 
@@ -342,9 +355,7 @@
       .header-controls { flex-wrap: wrap; }
       .stats { grid-template-columns: repeat(2, 1fr); }
       .wa-stats { grid-template-columns: repeat(2, 1fr); }
-      .tab-bar { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; white-space: nowrap; }
-      .tab-bar::-webkit-scrollbar { display: none; }
-      .tab-btn { flex-shrink: 0; padding: 0.5rem 0.85rem; font-size: 0.8rem; }
+      .nav-drawer { width: 240px; }
       .filter-bar { gap: 0.5rem; }
       .filter-select, .filter-date { font-size: 0.75rem; padding: 0.35rem 0.4rem; min-width: 0; }
       .filter-label { font-size: 0.6rem; }
@@ -466,8 +477,12 @@
 
 <div id="dashboard">
   <div class="header">
-    <div style="display:flex;align-items:center;gap:1rem;">
-      <h1>Primal Pantry</h1>
+    <div style="display:flex;align-items:center;gap:0.75rem;">
+      <button class="nav-hamburger" id="nav-hamburger-btn" title="Menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <h1 style="margin:0;">Primal Pantry</h1>
+      <span class="nav-active-label" id="nav-active-label">Overview</span>
     </div>
     <div class="header-controls">
       <button id="refresh-btn" title="Refresh data" style="font-size:1rem;line-height:1;">↻</button>
@@ -483,14 +498,35 @@
     <span id="adspend-value" style="font-size:1.5rem;font-weight:700;color:var(--honey);">—</span>
   </div>
 
-  <div class="tab-bar">
-    <button class="tab-btn active" data-tab="sales">Overview</button>
-    <button class="tab-btn" data-tab="orders">Orders</button>
-    <button class="tab-btn" data-tab="shipping">Shipping</button>
-    <button class="tab-btn" data-tab="customers">Customers</button>
-    <button class="tab-btn" data-tab="manufacturing">Manufacturing</button>
-    <button class="tab-btn" data-tab="website">Website</button>
-  </div>
+  <!-- Nav drawer -->
+  <div class="nav-overlay" id="nav-overlay"></div>
+  <nav class="nav-drawer" id="nav-drawer">
+    <div class="nav-drawer-header"><h2>Primal Pantry</h2></div>
+    <button class="nav-item active" data-tab="sales">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      Overview
+    </button>
+    <button class="nav-item" data-tab="orders">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      Orders
+    </button>
+    <button class="nav-item" data-tab="shipping">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+      Shipping
+    </button>
+    <button class="nav-item" data-tab="customers">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Customers
+    </button>
+    <button class="nav-item" data-tab="manufacturing">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20h20"/><path d="M5 20V8l5 4V8l5 4V4l5 4v12"/></svg>
+      Manufacturing
+    </button>
+    <button class="nav-item" data-tab="website">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      Website Analytics
+    </button>
+  </nav>
 
   <div class="filter-bar">
     <div class="filter-group">
@@ -3121,14 +3157,29 @@ function topCustomer(orders, mode) {
   return { name: entries[0].name, total: entries[0].spend };
 }
 
-// ── Tab switching ──
-document.querySelectorAll('.tab-btn').forEach(btn => {
+// ── Nav drawer ──
+const navDrawer = document.getElementById('nav-drawer');
+const navOverlay = document.getElementById('nav-overlay');
+const navLabel = document.getElementById('nav-active-label');
+const navNames = { sales: 'Overview', orders: 'Orders', shipping: 'Shipping', customers: 'Customers', manufacturing: 'Manufacturing', website: 'Website Analytics' };
+
+function openNav() { navDrawer.classList.add('open'); navOverlay.classList.add('open'); }
+function closeNav() { navDrawer.classList.remove('open'); navOverlay.classList.remove('open'); }
+
+document.getElementById('nav-hamburger-btn').addEventListener('click', () => {
+  navDrawer.classList.contains('open') ? closeNav() : openNav();
+});
+navOverlay.addEventListener('click', closeNav);
+
+document.querySelectorAll('.nav-item').forEach(btn => {
   btn.addEventListener('click', function() {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
     this.classList.add('active');
     activeTab = this.dataset.tab;
     document.getElementById('tab-' + activeTab).classList.add('active');
+    navLabel.textContent = navNames[activeTab] || activeTab;
+    closeNav();
     // Hide irrelevant filters on manufacturing tab
     const hideOnMfg = activeTab === 'manufacturing';
     document.querySelectorAll('.filter-bar .filter-group').forEach((g, i) => {
@@ -5005,7 +5056,7 @@ document.querySelectorAll('#mfg-sub-tabs .wa-panel-tab').forEach(tab => {
     const lines = [];
 
     // Active tab
-    const activeTabBtn = document.querySelector('.tab-btn.active');
+    const activeTabBtn = document.querySelector('.nav-item.active');
     if (activeTabBtn) lines.push(`Active tab: ${activeTabBtn.textContent.trim()}`);
 
     // Date range
@@ -5119,7 +5170,7 @@ document.querySelectorAll('#mfg-sub-tabs .wa-panel-tab').forEach(tab => {
   function executeDashboardAction(toolName, toolInput) {
     switch (toolName) {
       case 'switch_tab': {
-        const btn = document.querySelector(`.tab-btn[data-tab="${toolInput.tab}"]`);
+        const btn = document.querySelector(`.nav-item[data-tab="${toolInput.tab}"]`);
         if (btn) { btn.click(); return `Switched to ${btn.textContent.trim()} tab.`; }
         return `Tab "${toolInput.tab}" not found.`;
       }
