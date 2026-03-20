@@ -86,8 +86,8 @@
     .stat-card .prior .up { color: var(--sage); }
     .stat-card .prior .down { color: var(--red); }
     .stat-card .prior .flat { color: var(--dim); }
-    .stats-hidden .stat-card .value, .stats-hidden .stat-card .sub, .stats-hidden .stat-card .prior, .stats-hidden .stat-card .sparkline { filter: blur(8px); user-select: none; pointer-events: none; }
-    #adspend-banner.stats-hidden #adspend-value { filter: blur(8px); user-select: none; }
+    .stat-card.blurred .value, .stat-card.blurred .sub, .stat-card.blurred .prior, .stat-card.blurred .sparkline { filter: blur(8px); user-select: none; pointer-events: none; }
+    .chart-card.blurred .chart-wrap, .chart-card.blurred .heatmap-grid { filter: blur(8px); user-select: none; pointer-events: none; }
     .stat-card .sparkline { margin-top: 0.4rem; height: 24px; display: flex; align-items: flex-end; gap: 1px; }
     .stat-card .sparkline .spark-bar { flex: 1; min-width: 0; border-radius: 1px 1px 0 0; background: var(--border); transition: background 0.2s; }
     .stat-card:hover .sparkline .spark-bar { background: var(--dim); }
@@ -523,7 +523,7 @@
     </button>
     <button class="nav-item" data-tab="manufacturing">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20h20"/><path d="M5 20V8l5 4V8l5 4V4l5 4v12"/></svg>
-      Manufacturing
+      Product
     </button>
     <button class="nav-item" data-tab="website">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
@@ -573,7 +573,7 @@
         <h3>Order Heatmap (Day x Hour)</h3>
         <div id="heatmap-container"></div>
       </div>
-      <div class="chart-card" style="flex:1;">
+      <div class="chart-card sensitive-chart" id="pace-chart-card" style="flex:1;">
         <h3>Revenue Pace <select id="pace-mode" style="float:right;background:var(--bg);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:0.75rem;" onclick="event.stopPropagation()"><option value="daily">Today vs Last Week</option><option value="monthly">Monthly Progress</option></select></h3>
         <div class="chart-wrap"><canvas id="cumulative-revenue-chart"></canvas></div>
       </div>
@@ -689,6 +689,12 @@
         <div class="chart-wrap"><canvas id="ship-time-chart"></canvas></div>
       </div>
     </div>
+    <div class="charts-row">
+      <div class="chart-card" style="grid-column:1/-1;">
+        <h3>Fulfillment Time Trend <span style="font-size:0.65rem;color:var(--dim);font-weight:400;">(avg days to ship per week)</span></h3>
+        <div class="chart-wrap"><canvas id="fulfillment-trend-chart"></canvas></div>
+      </div>
+    </div>
     <div class="orders-card">
       <h3>Shipments</h3>
       <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.5rem;">
@@ -731,6 +737,7 @@
     <div class="wa-panel-tabs" id="mfg-sub-tabs">
       <button class="wa-panel-tab active" data-mfg-panel="batches">Batches</button>
       <button class="wa-panel-tab" data-mfg-panel="unit-costs">Unit Costs</button>
+      <button class="wa-panel-tab" data-mfg-panel="sku-performance">SKU Performance</button>
     </div>
 
     <div id="mfg-panel-batches">
@@ -794,6 +801,30 @@
         </div>
       </div>
     </div>
+    <div id="mfg-panel-sku-performance" style="display:none;">
+      <div class="orders-card">
+        <h3>SKU Performance</h3>
+        <p style="font-size:0.8rem;color:var(--muted);margin-bottom:0.75rem;">Units sold, revenue, and refund rate per SKU across filtered orders.</p>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th class="sortable" data-sku-sort="sku">SKU</th>
+                <th>Product</th>
+                <th class="sortable" data-sku-sort="units" style="text-align:right;">Units Sold</th>
+                <th class="sortable" data-sku-sort="revenue" style="text-align:right;">Revenue</th>
+                <th class="sortable" data-sku-sort="refunds" style="text-align:right;">Refunds</th>
+                <th class="sortable" data-sku-sort="refund_rate" style="text-align:right;">Refund Rate</th>
+              </tr>
+            </thead>
+            <tbody id="sku-performance-table">
+              <tr><td colspan="6" class="loading">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /tab-manufacturing -->
 
   <div id="tab-website" class="tab-content">
@@ -1854,7 +1885,8 @@ function renderStats(orders, lineItems) {
   ];
 
   function renderStatCard(s) {
-    return `<div class="stat-card" ${s.label === 'Revenue' ? 'id="revenue-stat-card"' : ''}>
+    const sensitive = s.label === 'Revenue' || s.label === 'Orders';
+    return `<div class="stat-card${sensitive ? ' sensitive-stat' : ''}" ${s.label === 'Revenue' ? 'id="revenue-stat-card"' : ''}>
       <div class="label">${s.label}</div>
       <div class="value" style="color:${s.color}">${s.value}</div>
       <div class="sub">${s.sub}</div>
@@ -3175,7 +3207,7 @@ function topCustomer(orders, mode) {
 const navDrawer = document.getElementById('nav-drawer');
 const navOverlay = document.getElementById('nav-overlay');
 const navLabel = document.getElementById('nav-active-label');
-const navNames = { sales: 'Overview', orders: 'Orders', shipping: 'Shipping', customers: 'Customers', manufacturing: 'Manufacturing', website: 'Website Analytics' };
+const navNames = { sales: 'Overview', orders: 'Orders', shipping: 'Shipping', customers: 'Customers', manufacturing: 'Product', website: 'Website Analytics' };
 
 function openNav() { navDrawer.classList.add('open'); navOverlay.classList.add('open'); }
 function closeNav() { navDrawer.classList.remove('open'); navOverlay.classList.remove('open'); }
@@ -3211,9 +3243,8 @@ const eyeIcon = document.getElementById('stats-eye-icon');
 const eyeOpen = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
 const eyeClosed = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>';
 function applyStatsVisibility() {
-  document.getElementById('stats-grid').classList.toggle('stats-hidden', !statsVisible);
-  document.getElementById('orders-stats-grid')?.classList.toggle('stats-hidden', !statsVisible);
-  document.getElementById('adspend-banner').classList.toggle('stats-hidden', !statsVisible);
+  document.querySelectorAll('.sensitive-stat').forEach(el => el.classList.toggle('blurred', !statsVisible));
+  document.querySelectorAll('.sensitive-chart').forEach(el => el.classList.toggle('blurred', !statsVisible));
   eyeIcon.innerHTML = statsVisible ? eyeOpen : eyeClosed;
   eyeBtn.style.color = statsVisible ? 'var(--sage)' : 'var(--dim)';
   eyeBtn.style.borderColor = statsVisible ? 'var(--sage)' : 'var(--border)';
@@ -3419,6 +3450,7 @@ async function loadShippingData() {
     renderShippingStats(data);
     renderShippingStatusChart();
     renderShipTimeChart();
+    renderFulfillmentTrend();
     renderShipmentsTable();
 
     // Attach search + filter handlers
@@ -3543,6 +3575,62 @@ function renderShipTimeChart() {
       y: { ticks: { color: '#9c9287' }, grid: { color: '#252220' } },
       x: { ticks: { color: '#9c9287' }, grid: { display: false } },
     }},
+  });
+}
+
+function renderFulfillmentTrend() {
+  // Group shipments by week and calculate avg days to ship per week
+  const weekData = {};
+  allShipments.forEach(o => {
+    if (!o.order_date || !o.shipped_date) return;
+    const diff = (new Date(o.shipped_date) - new Date(o.order_date)) / 86400000;
+    if (diff < 0 || diff > 365) return;
+    // Get ISO week start (Monday)
+    const d = new Date(o.shipped_date);
+    const day = d.getDay();
+    const mondayOffset = day === 0 ? -6 : 1 - day;
+    const weekStart = new Date(d);
+    weekStart.setDate(d.getDate() + mondayOffset);
+    const key = weekStart.toISOString().split('T')[0];
+    if (!weekData[key]) weekData[key] = { total: 0, count: 0 };
+    weekData[key].total += diff;
+    weekData[key].count++;
+  });
+
+  const sortedWeeks = Object.keys(weekData).sort();
+  if (sortedWeeks.length < 2) return; // Need at least 2 weeks for a trend
+
+  const labels = sortedWeeks.map(w => {
+    const d = new Date(w);
+    return d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
+  });
+  const avgDays = sortedWeeks.map(w => +(weekData[w].total / weekData[w].count).toFixed(2));
+
+  if (charts.fulfillmentTrend) charts.fulfillmentTrend.destroy();
+  charts.fulfillmentTrend = new Chart(document.getElementById('fulfillment-trend-chart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Avg Days to Ship',
+        data: avgDays,
+        borderColor: '#8CB47A',
+        backgroundColor: 'rgba(140,180,122,0.1)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3,
+        pointBackgroundColor: '#8CB47A',
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { title: { display: true, text: 'Days', color: '#9c9287', font: { size: 11, family: 'DM Sans' } }, ticks: { color: '#9c9287' }, grid: { color: '#252220' } },
+        x: { ticks: { color: '#9c9287', maxRotation: 45 }, grid: { display: false } },
+      },
+    },
   });
 }
 
@@ -5074,6 +5162,90 @@ function getOrderCOGS(orderId) {
   return cogs;
 }
 
+// SKU Performance table
+let skuPerfSortCol = 'revenue';
+let skuPerfSortAsc = false;
+
+function renderSkuPerformance() {
+  const tbody = document.getElementById('sku-performance-table');
+
+  // Build per-SKU aggregates from filtered orders
+  const filteredIds = new Set(filteredOrders.map(o => o.id));
+  const refundedIds = new Set(filteredOrders.filter(o => (o.status || '').toLowerCase().includes('refund')).map(o => o.id));
+
+  const skuMap = {};
+  allLineItems.forEach(li => {
+    if (!filteredIds.has(li.order_id)) return;
+    const sku = li.sku || 'Unknown';
+    if (!skuMap[sku]) skuMap[sku] = { sku, name: li.description || sku, units: 0, revenue: 0, refundUnits: 0, orderIds: new Set(), refundOrderIds: new Set() };
+    const qty = li.quantity || 1;
+    skuMap[sku].units += qty;
+    skuMap[sku].revenue += qty * Number(li.unit_price || 0);
+    skuMap[sku].orderIds.add(li.order_id);
+    if (refundedIds.has(li.order_id)) {
+      skuMap[sku].refundUnits += qty;
+      skuMap[sku].refundOrderIds.add(li.order_id);
+    }
+  });
+
+  let rows = Object.values(skuMap).map(s => ({
+    sku: s.sku,
+    name: s.name,
+    units: s.units,
+    revenue: s.revenue,
+    refunds: s.refundOrderIds.size,
+    refund_rate: s.orderIds.size > 0 ? (s.refundOrderIds.size / s.orderIds.size * 100) : 0,
+  }));
+
+  // Sort
+  rows.sort((a, b) => {
+    let av = a[skuPerfSortCol], bv = b[skuPerfSortCol];
+    if (typeof av === 'string') { av = av.toLowerCase(); bv = bv.toLowerCase(); }
+    if (av < bv) return skuPerfSortAsc ? -1 : 1;
+    if (av > bv) return skuPerfSortAsc ? 1 : -1;
+    return 0;
+  });
+
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="loading">No SKU data for this period.</td></tr>';
+    return;
+  }
+
+  const maxRevenue = Math.max(...rows.map(r => r.revenue));
+  tbody.innerHTML = rows.map(r => {
+    const barW = maxRevenue > 0 ? (r.revenue / maxRevenue * 100) : 0;
+    const rateColor = r.refund_rate > 10 ? 'var(--red)' : r.refund_rate > 5 ? 'var(--amber)' : 'var(--sage)';
+    return `<tr>
+      <td style="font-weight:600;white-space:nowrap;">${r.sku}</td>
+      <td>${r.name}</td>
+      <td style="text-align:right;">${r.units.toLocaleString()}</td>
+      <td style="text-align:right;"><div style="display:flex;align-items:center;justify-content:flex-end;gap:0.5rem;">$${r.revenue.toFixed(2)} <span class="utm-bar" style="width:${barW}%;max-width:60px;"></span></div></td>
+      <td style="text-align:right;">${r.refunds}</td>
+      <td style="text-align:right;color:${rateColor};font-weight:600;">${r.refund_rate.toFixed(1)}%</td>
+    </tr>`;
+  }).join('');
+
+  // Update sort indicators
+  document.querySelectorAll('#sku-performance-table').forEach(() => {
+    document.querySelectorAll('[data-sku-sort]').forEach(th => {
+      th.classList.remove('sort-asc', 'sort-desc');
+      if (th.dataset.skuSort === skuPerfSortCol) {
+        th.classList.add(skuPerfSortAsc ? 'sort-asc' : 'sort-desc');
+      }
+    });
+  });
+}
+
+// SKU performance sort click handlers
+document.querySelectorAll('[data-sku-sort]').forEach(th => {
+  th.addEventListener('click', function() {
+    const col = this.dataset.skuSort;
+    if (skuPerfSortCol === col) skuPerfSortAsc = !skuPerfSortAsc;
+    else { skuPerfSortCol = col; skuPerfSortAsc = col === 'sku'; }
+    renderSkuPerformance();
+  });
+});
+
 // Manufacturing sub-tab switching
 document.querySelectorAll('#mfg-sub-tabs .wa-panel-tab').forEach(tab => {
   tab.addEventListener('click', function() {
@@ -5082,7 +5254,9 @@ document.querySelectorAll('#mfg-sub-tabs .wa-panel-tab').forEach(tab => {
     const panel = this.dataset.mfgPanel;
     document.getElementById('mfg-panel-batches').style.display = panel === 'batches' ? '' : 'none';
     document.getElementById('mfg-panel-unit-costs').style.display = panel === 'unit-costs' ? '' : 'none';
+    document.getElementById('mfg-panel-sku-performance').style.display = panel === 'sku-performance' ? '' : 'none';
     if (panel === 'unit-costs') { loadUnitCosts().then(function() { renderUnitCostsTable(); }); }
+    if (panel === 'sku-performance') { renderSkuPerformance(); }
   });
 });
 </script>
