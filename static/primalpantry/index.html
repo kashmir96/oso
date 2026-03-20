@@ -775,6 +775,25 @@ function openOrderModal(orderId) {
       const order = allOrders.find(o => o.id === oid);
       if (order) order.status = newStatus;
       renderOrdersTable();
+
+      // If refunded, try to remove from eShip (unshipped only)
+      if (newStatus.toLowerCase().includes('refund') && order && order.stripe_session_id) {
+        try {
+          const cancelRes = await fetch('/.netlify/functions/eship-cancel', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order_number: order.stripe_session_id }),
+          });
+          const cancelData = await cancelRes.json();
+          if (cancelRes.ok) {
+            alert('Order removed from eShip.');
+          } else {
+            console.log('eShip cancel note:', cancelData.error);
+          }
+        } catch (e) {
+          console.log('eShip cancel skipped:', e.message);
+        }
+      }
     }
   });
 
