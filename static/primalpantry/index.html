@@ -919,6 +919,11 @@
       <h3>Conversion Journeys</h3>
       <div id="wa-conversions"><div class="wa-loading">Loading...</div></div>
     </div>
+
+    <div class="wa-panel" style="margin-bottom:1.5rem;">
+      <h3>Checkout Errors</h3>
+      <div id="wa-checkout-errors"><div class="wa-loading">Loading...</div></div>
+    </div>
   </div><!-- /tab-website -->
 
 </div><!-- /dashboard -->
@@ -4359,6 +4364,9 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
         .then(conv => waRenderConversions(conv || []))
         .catch(() => waRenderConversions([]));
 
+      // Checkout errors (from Supabase directly)
+      waLoadCheckoutErrors();
+
     } catch (err) {
       console.error('WA load error:', err);
     }
@@ -4452,6 +4460,40 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
       }
     });
   });
+
+  // ── Checkout Errors ──
+  async function waLoadCheckoutErrors() {
+    const el = document.getElementById('wa-checkout-errors');
+    if (!el) return;
+    try {
+      const { data, error } = await sb.from('checkout_errors').select('*').order('created_at', { ascending: false }).limit(50);
+      if (error || !data || !data.length) {
+        el.innerHTML = '<p style="color:var(--dim);text-align:center;padding:1rem;font-size:0.85rem;">No checkout errors</p>';
+        return;
+      }
+      let html = '<table class="wa-table"><thead><tr><th>Time</th><th>Error</th><th>Code</th><th>Cart</th><th>Device</th><th>Browser</th><th>Country</th><th>Type</th></tr></thead><tbody>';
+      data.forEach(e => {
+        const time = new Date(e.created_at).toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+        let cartStr = '';
+        try { const items = JSON.parse(e.cart || '[]'); cartStr = items.map(i => `${i.qty}x ${(i.id || '').slice(-8)}`).join(', '); } catch { cartStr = e.cart || ''; }
+        const typeLabel = e.is_card_decline ? '<span style="color:var(--dim);">Card decline</span>' : '<span style="color:var(--red);">Error</span>';
+        html += `<tr>
+          <td style="white-space:nowrap;font-size:0.75rem;">${time}</td>
+          <td style="font-size:0.75rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;" title="${(e.error_message || '').replace(/"/g, '&quot;')}">${e.error_message || '-'}</td>
+          <td style="font-size:0.75rem;">${e.error_code || '-'}</td>
+          <td style="font-size:0.75rem;">${cartStr || '-'}</td>
+          <td style="font-size:0.75rem;">${e.device || '-'}</td>
+          <td style="font-size:0.75rem;">${e.browser || '-'}</td>
+          <td style="font-size:0.75rem;">${e.country || '-'}</td>
+          <td style="font-size:0.75rem;">${typeLabel}</td>
+        </tr>`;
+      });
+      html += '</tbody></table>';
+      el.innerHTML = html;
+    } catch (err) {
+      el.innerHTML = '<p style="color:var(--dim);text-align:center;padding:1rem;font-size:0.85rem;">No checkout errors</p>';
+    }
+  }
 
   // ── Country Heatmap ──
   // Simplified world map using country code → [lat, lng] centroids
