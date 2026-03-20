@@ -71,6 +71,10 @@
     .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
     .stat-card { background: var(--card); border-radius: 10px; padding: 1rem; cursor: pointer; transition: border 0.2s; border: 1px solid var(--border); }
     .stat-card:hover { border-color: var(--sage); }
+    .stat-card.celebrate { animation: sale-glow 1.5s ease-out; }
+    @keyframes sale-glow { 0% { box-shadow: 0 0 20px rgba(140,180,122,0.6); border-color: var(--sage); } 100% { box-shadow: none; } }
+    .confetti-piece { position: fixed; width: 8px; height: 8px; border-radius: 2px; pointer-events: none; z-index: 9999; animation: confetti-fall linear forwards; }
+    @keyframes confetti-fall { 0% { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(100vh) rotate(720deg) scale(0.3); } }
     .stat-card .label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.2rem; }
     .stat-card .value { font-size: 1.5rem; font-weight: 700; }
     .stat-card .sub { font-size: 0.75rem; color: var(--dim); margin-top: 0.15rem; }
@@ -480,6 +484,13 @@
   </div>
 
   <div class="charts-row">
+    <div class="chart-card" style="grid-column:1/-1;">
+      <h3>Landing Page Revenue</h3>
+      <div id="landing-rev-container"></div>
+    </div>
+  </div>
+
+  <div class="charts-row">
     <div class="chart-card">
       <h3>Magnet Products (Most Common First Item in Cart)</h3>
       <div id="magnet-container"></div>
@@ -881,11 +892,13 @@ let magnetPage = 1;
 let bundlesPage = 1;
 let ordersPage = 1;
 let customersPage = 1;
+let landingRevPage = 1;
 const PAGE_SIZE = 10;
 let currentStaff = null;
 let activeTab = 'sales';
 let statsRefreshTimer = null;
-const STATS_REFRESH_MS = 15000;
+const STATS_REFRESH_MS = 60000;
+let lastKnownRevenue = null;
 
 function renderPagination(containerId, currentPage, totalItems, onPageChange) {
   const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
@@ -1391,7 +1404,7 @@ document.getElementById('refresh-btn').addEventListener('click', fullRefresh);
 
 // ── Render all ──
 function renderAll(orders, lineItems) {
-  trendingPage = 1; utmPage = 1; magnetPage = 1; bundlesPage = 1; ordersPage = 1; customersPage = 1;
+  trendingPage = 1; utmPage = 1; magnetPage = 1; bundlesPage = 1; ordersPage = 1; customersPage = 1; landingRevPage = 1;
   renderStats(orders, lineItems);
   renderRevenueChart(orders);
   renderHoursChart(orders);
@@ -1399,10 +1412,39 @@ function renderAll(orders, lineItems) {
   renderUTM(orders);
   renderHeatmap(orders);
   renderMap(orders);
+  renderLandingRevenue(orders);
   renderMagnetProducts(orders);
   renderBoughtTogether(orders);
   renderTrending(orders);
   renderNewVsReturning(orders);
+}
+
+// ── Confetti burst from a target element ──
+function fireConfetti(targetEl) {
+  const rect = targetEl.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const colors = ['#8CB47A', '#D4A84B', '#DBBFA8', '#a3c995', '#e8e2da', '#6B8F5B'];
+  for (let i = 0; i < 40; i++) {
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    piece.style.left = cx + 'px';
+    piece.style.top = cy + 'px';
+    piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+    piece.style.width = (4 + Math.random() * 6) + 'px';
+    piece.style.height = (4 + Math.random() * 6) + 'px';
+    piece.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+    const angle = (Math.random() - 0.5) * 120;
+    const dist = 60 + Math.random() * 120;
+    const dx = Math.sin(angle * Math.PI / 180) * dist;
+    piece.style.setProperty('--dx', dx + 'px');
+    piece.style.animationDuration = (1.2 + Math.random() * 1.2) + 's';
+    piece.style.animationDelay = (Math.random() * 0.3) + 's';
+    document.body.appendChild(piece);
+    setTimeout(() => piece.remove(), 3000);
+  }
+  targetEl.classList.add('celebrate');
+  setTimeout(() => targetEl.classList.remove('celebrate'), 1500);
 }
 
 // ── Stats ──
@@ -2115,6 +2157,50 @@ function openOrderModal(orderId) {
 
 function closeModal() {
   document.getElementById('order-modal').classList.remove('open');
+}
+
+// ── Landing Page Revenue ──
+function renderLandingRevenue(orders) {
+  const landingData = {};
+  orders.forEach(o => {
+    let lp = o.landing_page || '';
+    if (!lp) return;
+    // Clean up: strip protocol/domain if it's our own site, keep path only
+    try {
+      const u = new URL(lp, 'https://primalpantry.co.nz');
+      if (u.hostname.includes('primalpantry')) lp = u.pathname;
+    } catch {}
+    if (!landingData[lp]) landingData[lp] = { count: 0, revenue: 0 };
+    landingData[lp].count++;
+    landingData[lp].revenue += Number(o.total_value || 0);
+  });
+  const sorted = Object.entries(landingData).sort((a, b) => b[1].revenue - a[1].revenue);
+  const maxRev = sorted.length > 0 ? sorted[0][1].revenue : 1;
+  const container = document.getElementById('landing-rev-container');
+
+  if (sorted.length === 0) {
+    container.innerHTML = '<p style="color:var(--dim);font-size:0.85rem;">No landing page data</p>';
+    return;
+  }
+
+  const start = (landingRevPage - 1) * PAGE_SIZE;
+  const page = sorted.slice(start, start + PAGE_SIZE);
+  const totalRev = orders.reduce((s, o) => s + Number(o.total_value || 0), 0);
+
+  container.innerHTML = `<table class="utm-table">
+    <thead><tr><th>Landing Page</th><th>Orders</th><th>Revenue</th><th>AOV</th><th>% Rev</th><th></th></tr></thead>
+    <tbody>${page.map(([lp, data]) => `
+      <tr>
+        <td style="font-size:0.75rem;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${lp}">${lp}</td>
+        <td>${data.count}</td>
+        <td>${fmt_money(data.revenue)}</td>
+        <td>${fmt_money(data.count > 0 ? data.revenue / data.count : 0)}</td>
+        <td>${totalRev > 0 ? (data.revenue / totalRev * 100).toFixed(1) : 0}%</td>
+        <td><span class="utm-bar" style="width:${(data.revenue / maxRev) * 120}px;background:var(--honey);"></span></td>
+      </tr>
+    `).join('')}</tbody>
+  </table><div id="landing-rev-pagination"></div>`;
+  renderPagination('landing-rev-pagination', landingRevPage, sorted.length, p => { landingRevPage = p; renderLandingRevenue(orders); });
 }
 
 // ── Helpers ──
@@ -3833,6 +3919,7 @@ function getMfgSkuList() {
       trending_products: '#trending-body',
       utm_campaigns: '#utm-body',
       bought_together: '#together-body',
+      landing_revenue: '#landing-rev-container tbody',
       magnet_products: '#magnet-body',
       shipping: '#shipping-table-body',
       customers: '.customer-profile',
