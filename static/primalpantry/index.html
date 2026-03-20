@@ -1062,6 +1062,8 @@ if (savedStaff) { try { currentStaff = JSON.parse(savedStaff); showDashboard(); 
 function showDashboard() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('dashboard').style.display = 'block';
+  const claudeFab = document.getElementById('claude-fab');
+  if (claudeFab) claudeFab.style.display = 'flex';
   if (currentStaff) {
     document.getElementById('staff-greeting').textContent = currentStaff.display_name;
     if (currentStaff.can_manage_users) document.getElementById('team-btn').style.display = '';
@@ -3882,12 +3884,6 @@ function getMfgSkuList() {
 
   let chatMessages = []; // API message history
   let isSending = false;
-
-  // Show FAB only when logged in (dashboard visible)
-  const dashObserver = new MutationObserver(() => {
-    fab.style.display = document.getElementById('dashboard').style.display === 'none' ? 'none' : 'flex';
-  });
-  dashObserver.observe(document.getElementById('dashboard'), { attributes: true, attributeFilter: ['style'] });
 
   // Toggle panel
   fab.addEventListener('click', () => {
