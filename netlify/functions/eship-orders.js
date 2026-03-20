@@ -9,6 +9,20 @@
  *   STARSHIPIT_SUBSCRIPTION_KEY
  */
 
+const wait = (ms) => new Promise(r => setTimeout(r, ms));
+
+async function apiFetch(url, headers) {
+  const res = await fetch(url, { headers });
+  const data = await res.json();
+  // If rate limited, wait and retry once
+  if (data.statusCode === 429) {
+    await wait(1500);
+    const retry = await fetch(url, { headers });
+    return retry.json();
+  }
+  return data;
+}
+
 exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -43,27 +57,25 @@ exports.handler = async (event) => {
   const limit = params.limit || '50';
 
   try {
-    // Sequential API calls to avoid rate limits
+    // Sequential API calls with rate-limit retry
 
-    // 1. Summary (gives counts + printed orders list)
-    const summaryRes = await fetch('https://api.starshipit.com/api/orders/summary?order_status=printed', { headers: apiHeaders });
-    const summaryData = await summaryRes.json();
+    // 1. Summary for printed tab (gives counts + printed orders list)
+    const summaryData = await apiFetch('https://api.starshipit.com/api/orders/summary?order_status=printed', apiHeaders);
 
     // 2. Unshipped orders (New tab)
-    const unshippedRes = await fetch(`https://api.starshipit.com/api/orders/unshipped?limit=${limit}&page=${page}${sinceDate ? '&since_order_date=' + sinceDate : ''}`, {
-      headers: apiHeaders,
-    });
-    const unshippedData = await unshippedRes.json();
+    const unshippedData = await apiFetch(
+      `https://api.starshipit.com/api/orders/unshipped?limit=${limit}&page=${page}${sinceDate ? '&since_order_date=' + sinceDate : ''}`,
+      apiHeaders
+    );
 
     // 3. Shipped orders
-    const shippedRes = await fetch(`https://api.starshipit.com/api/orders/shipped?limit=${limit}&page=${page}${sinceDate ? '&since_order_date=' + sinceDate : ''}`, {
-      headers: apiHeaders,
-    });
-    const shippedData = await shippedRes.json();
+    const shippedData = await apiFetch(
+      `https://api.starshipit.com/api/orders/shipped?limit=${limit}&page=${page}${sinceDate ? '&since_order_date=' + sinceDate : ''}`,
+      apiHeaders
+    );
 
     // Parse order lists
     const unshippedList = Array.isArray(unshippedData.orders) ? unshippedData.orders : [];
-    // Summary endpoint returns printed orders in the "orders" array
     const printedList = Array.isArray(summaryData.orders) ? summaryData.orders : [];
     const shippedList = Array.isArray(shippedData.orders) ? shippedData.orders : [];
 
