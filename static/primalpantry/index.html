@@ -114,7 +114,7 @@
     .utm-bar { height: 6px; border-radius: 3px; background: var(--sage); display: inline-block; }
 
     /* Map */
-    #order-map { height: 400px; border-radius: 8px; z-index: 1; position: relative; }
+    #order-map { height: 100%; min-height: 250px; border-radius: 8px; z-index: 1; position: relative; }
 
     /* Orders table */
     .orders-card { background: var(--card); border-radius: 10px; padding: 1rem; border: 1px solid var(--border); box-shadow: none; }
@@ -504,40 +504,36 @@
   <div class="stats" id="stats-grid"></div>
 
   <div class="chart-card" style="margin-bottom:1.5rem;">
-    <h3>Revenue Pace <select id="pace-mode" style="float:right;background:var(--bg);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:0.75rem;" onclick="event.stopPropagation()"><option value="daily">Today vs Last Week</option><option value="monthly">Monthly Progress</option></select></h3>
-    <div class="chart-wrap"><canvas id="cumulative-revenue-chart"></canvas></div>
+    <h3>Order Heatmap (Day x Hour)</h3>
+    <div id="heatmap-container"></div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:3fr 1fr;gap:0.75rem;margin-bottom:1.5rem;">
+    <div class="chart-card">
+      <h3>Revenue Pace <select id="pace-mode" style="float:right;background:var(--bg);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:0.75rem;" onclick="event.stopPropagation()"><option value="daily">Today vs Last Week</option><option value="monthly">Monthly Progress</option></select></h3>
+      <div class="chart-wrap"><canvas id="cumulative-revenue-chart"></canvas></div>
+    </div>
+    <div class="chart-card" style="min-height:0;">
+      <h3>Order Locations</h3>
+      <div id="order-map" style="height:100%;min-height:250px;"></div>
+    </div>
   </div>
 
   <div class="charts-row">
-    <div class="chart-card">
-      <h3>Revenue</h3>
-      <div class="chart-wrap"><canvas id="revenue-chart"></canvas></div>
-    </div>
     <div class="chart-card">
       <h3>Orders by Hour</h3>
       <div class="chart-wrap"><canvas id="hours-chart"></canvas></div>
     </div>
-  </div>
-
-  <div class="charts-row">
     <div class="chart-card">
       <h3>Top Products <select id="product-metric" style="float:right;background:var(--bg);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:0.75rem;margin-left:4px;" onclick="event.stopPropagation()"><option value="qty">By Orders</option><option value="revenue">By Revenue</option></select><select id="product-view" style="float:right;background:var(--bg);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:0.75rem;" onclick="event.stopPropagation()"><option value="name">By Name</option><option value="sku">By SKU</option></select></h3>
       <div class="chart-wrap"><canvas id="products-chart"></canvas></div>
     </div>
-    <div class="chart-card">
-      <h3>UTM Sources</h3>
-      <div id="utm-container"></div>
-    </div>
   </div>
 
   <div class="charts-row">
-    <div class="chart-card">
-      <h3>Order Heatmap (Day x Hour)</h3>
-      <div class="chart-wrap"><div id="heatmap-container"></div></div>
-    </div>
-    <div class="chart-card">
-      <h3>Order Locations</h3>
-      <div class="chart-wrap" style="max-height:200px;"><div id="order-map"></div></div>
+    <div class="chart-card" style="grid-column:1/-1;">
+      <h3>UTM Sources</h3>
+      <div id="utm-container"></div>
     </div>
   </div>
 
@@ -573,6 +569,7 @@
   </div><!-- /tab-sales -->
 
   <div id="tab-orders" class="tab-content">
+    <div class="stats" id="orders-stats-grid"></div>
     <div class="orders-card">
       <h3>Orders</h3>
       <input type="text" class="search-bar" id="order-search" placeholder="Search by name, email, or product...">
@@ -1511,7 +1508,6 @@ function renderAll(orders, lineItems) {
   trendingPage = 1; utmPage = 1; magnetPage = 1; bundlesPage = 1; ordersPage = 1; customersPage = 1; landingRevPage = 1;
   renderStats(orders, lineItems);
   renderCumulativeRevenue();
-  renderRevenueChart(orders);
   renderHoursChart(orders);
   renderProductsChart(lineItems);
   renderUTM(orders);
@@ -1675,30 +1671,35 @@ function renderStats(orders, lineItems) {
     }).join('') + '</div>';
   }
 
+  // Sales tab stats
   const stats = [
     { label: 'Revenue', value: fmt_money(revenue), sub: `${growthSign}${growthPct}% vs prior period`, prior: fmtDelta(revenue, priorRevenue, true), spark: renderSparkBars(sparkRevenue, 'var(--sage)'), color: 'var(--green)' },
     { label: 'Orders', value: orderCount, sub: `${periodEmails.size} customers`, prior: fmtDelta(orderCount, priorOrderCount), spark: renderSparkBars(sparkOrders, 'var(--blue)'), color: 'var(--blue)' },
     { label: 'AOV', value: fmt_money(aov), sub: 'avg order value', prior: fmtDelta(aov, priorAov, true), spark: renderSparkBars(sparkAov, 'var(--purple)'), color: 'var(--purple)' },
-    { label: 'Repeat Customers', value: repeatCustomers, sub: `of ${totalCustomers} total`, color: 'var(--amber)' },
-    { label: 'CLV', value: fmt_money(clv), sub: 'lifetime value', color: 'var(--cyan)' },
+    { label: 'Website Visitors', value: '<span id="wa-visitors-count">-</span>', sub: 'across all sites', color: 'var(--cyan)' },
     { label: 'Avg Items/Order', value: avgJars.toFixed(1), sub: 'line items', prior: fmtDelta(avgJars, priorAvgJars), color: 'var(--pink)' },
-    { label: 'Avg Reorder', value: avgReorderDays === '-' ? '-' : `${avgReorderDays}d`, sub: 'days between orders', color: 'var(--blue)' },
-    { label: 'Refund Rate', value: `${refundRate}%`, sub: `${refundedOrders.length} refunded`, prior: fmtDelta(Number(refundRate), Number(priorRefundRate), false, true), color: 'var(--red)' },
-    { label: 'Avg Shipping', value: fmt_money(orderCount > 0 ? sum(orders, 'shipping_cost') / orderCount : 0), sub: 'per order', prior: fmtDelta(orderCount > 0 ? sum(orders, 'shipping_cost') / orderCount : 0, priorShippingAvg, true), color: 'var(--dim)' },
     { label: 'Discounts Given', value: fmt_money(sum(orders, 'discount_applied')), sub: `${orders.filter(o => Number(o.discount_applied) > 0).length} orders`, prior: fmtDelta(sum(orders, 'discount_applied'), priorDiscounts, true), color: 'var(--red)' },
-    { label: 'Top Customer (Spend)', value: topCustomer(allOrders, 'total_value').name, sub: fmt_money(topCustomer(allOrders, 'total_value').total), color: 'var(--lime)' },
-    { label: 'Top Customer (Orders)', value: topCustomer(allOrders, 'count').name, sub: `${topCustomer(allOrders, 'count').total} orders`, color: 'var(--amber)' },
   ];
 
-  document.getElementById('stats-grid').innerHTML = stats.map(s => `
-    <div class="stat-card" ${s.label === 'Revenue' ? 'id="revenue-stat-card"' : ''}>
+  function renderStatCard(s) {
+    return `<div class="stat-card" ${s.label === 'Revenue' ? 'id="revenue-stat-card"' : ''}>
       <div class="label">${s.label}</div>
       <div class="value" style="color:${s.color}">${s.value}</div>
       <div class="sub">${s.sub}</div>
       ${s.prior ? `<div class="prior">${s.prior}</div>` : ''}
       ${s.spark || ''}
-    </div>
-  `).join('');
+    </div>`;
+  }
+
+  document.getElementById('stats-grid').innerHTML = stats.map(renderStatCard).join('');
+
+  // Orders tab stats (refund rate)
+  const ordersTabEl = document.getElementById('orders-stats-grid');
+  if (ordersTabEl) {
+    ordersTabEl.innerHTML = [
+      { label: 'Refund Rate', value: `${refundRate}%`, sub: `${refundedOrders.length} refunded`, prior: fmtDelta(Number(refundRate), Number(priorRefundRate), false, true), color: 'var(--red)' },
+    ].map(renderStatCard).join('');
+  }
 
   // Confetti on new sale
   if (lastKnownRevenue !== null && revenue > lastKnownRevenue) {
@@ -1706,6 +1707,18 @@ function renderStats(orders, lineItems) {
     if (revenueCard) { fireConfetti(revenueCard); playSaleSound(); }
   }
   lastKnownRevenue = revenue;
+
+  // Async: fetch website visitors from analytics
+  if (currentStaff && currentStaff.token) {
+    const [waFrom, waTo] = getDateRange();
+    fetch(`/.netlify/functions/analytics-dashboard?metric=summary&site=reviora&from=${waFrom}&to=${waTo}&token=${currentStaff.token}`)
+      .then(r => r.json())
+      .then(s => {
+        const el = document.getElementById('wa-visitors-count');
+        const v = s.unique_visitors || 0;
+        if (el) el.textContent = v >= 1000 ? (v / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : v;
+      }).catch(() => {});
+  }
 }
 
 // ── Revenue chart ──
@@ -2932,6 +2945,7 @@ function renderCustomersTab() {
     { label: 'Repeat Rate', value: totalCustomers > 0 ? (repeatCustomers / totalCustomers * 100).toFixed(1) + '%' : '0%', sub: `${repeatCustomers} of ${totalCustomers}`, color: 'var(--green)' },
     { label: 'Avg Orders/Customer', value: avgOrdersPerCustomer, sub: 'all time', color: 'var(--purple)' },
     { label: 'Avg Spend/Customer', value: fmt_money(avgSpend), sub: 'lifetime', color: 'var(--cyan)' },
+    { label: 'CLV', value: fmt_money(avgSpend), sub: 'lifetime value', color: 'var(--cyan)' },
     { label: 'Top Spender', value: topSpender ? topSpender.name : '-', sub: topSpender ? fmt_money(topSpender.totalSpend) : '', color: 'var(--lime)' },
     { label: 'Most Orders', value: topOrderer ? topOrderer.name : '-', sub: topOrderer ? topOrderer.orders.length + ' orders' : '', color: 'var(--amber)' },
   ].map(s => `
