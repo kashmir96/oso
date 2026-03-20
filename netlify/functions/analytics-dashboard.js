@@ -45,7 +45,12 @@ async function callRpc(name, params) {
     method: 'POST',
     body: JSON.stringify(params),
   });
-  return res.json();
+  const data = await res.json();
+  if (!res.ok) {
+    console.error(`RPC ${name} failed:`, data);
+    throw new Error(`RPC ${name}: ${data.message || res.status}`);
+  }
+  return data;
 }
 
 exports.handler = async (event) => {
@@ -91,82 +96,87 @@ exports.handler = async (event) => {
     baseParams.p_filters = filters; // Supabase RPC will serialize as JSON
   }
 
-  switch (metric) {
-    case 'summary': {
-      const data = await callRpc('analytics_summary', baseParams);
-      return reply(200, data);
-    }
+  try {
+    switch (metric) {
+      case 'summary': {
+        const data = await callRpc('analytics_summary', baseParams);
+        return reply(200, data);
+      }
 
-    case 'timeseries': {
-      // Use 'hour' for ranges <= 2 days, 'day' otherwise
-      const diffMs = toDate - new Date(from);
-      const diffDays = diffMs / (1000 * 60 * 60 * 24);
-      const interval = diffDays <= 2 ? 'hour' : 'day';
-      const data = await callRpc('analytics_timeseries', { ...baseParams, p_interval: interval });
-      return reply(200, data);
-    }
+      case 'timeseries': {
+        // Use 'hour' for ranges <= 2 days, 'day' otherwise
+        const diffMs = toDate - new Date(from);
+        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+        const interval = diffDays <= 2 ? 'hour' : 'day';
+        const data = await callRpc('analytics_timeseries', { ...baseParams, p_interval: interval });
+        return reply(200, data);
+      }
 
-    case 'pages': {
-      const data = await callRpc('analytics_grouped', { ...baseParams, p_column: 'pathname' });
-      return reply(200, data);
-    }
+      case 'pages': {
+        const data = await callRpc('analytics_grouped', { ...baseParams, p_column: 'pathname' });
+        return reply(200, data);
+      }
 
-    case 'entry_pages': {
-      const data = await callRpc('analytics_entry_pages', baseParams);
-      return reply(200, data);
-    }
+      case 'entry_pages': {
+        const data = await callRpc('analytics_entry_pages', baseParams);
+        return reply(200, data);
+      }
 
-    case 'exit_pages': {
-      const data = await callRpc('analytics_exit_pages', baseParams);
-      return reply(200, data);
-    }
+      case 'exit_pages': {
+        const data = await callRpc('analytics_exit_pages', baseParams);
+        return reply(200, data);
+      }
 
-    case 'referrers': {
-      const data = await callRpc('analytics_grouped', { ...baseParams, p_column: 'referrer_domain' });
-      return reply(200, data);
-    }
+      case 'referrers': {
+        const data = await callRpc('analytics_grouped', { ...baseParams, p_column: 'referrer_domain' });
+        return reply(200, data);
+      }
 
-    case 'browsers': {
-      const data = await callRpc('analytics_grouped', { ...baseParams, p_column: 'browser' });
-      return reply(200, data);
-    }
+      case 'browsers': {
+        const data = await callRpc('analytics_grouped', { ...baseParams, p_column: 'browser' });
+        return reply(200, data);
+      }
 
-    case 'devices': {
-      const data = await callRpc('analytics_grouped', { ...baseParams, p_column: 'device_type' });
-      return reply(200, data);
-    }
+      case 'devices': {
+        const data = await callRpc('analytics_grouped', { ...baseParams, p_column: 'device_type' });
+        return reply(200, data);
+      }
 
-    case 'countries': {
-      const data = await callRpc('analytics_grouped', { ...baseParams, p_column: 'country' });
-      return reply(200, data);
-    }
+      case 'countries': {
+        const data = await callRpc('analytics_grouped', { ...baseParams, p_column: 'country' });
+        return reply(200, data);
+      }
 
-    case 'os': {
-      const data = await callRpc('analytics_grouped', { ...baseParams, p_column: 'os' });
-      return reply(200, data);
-    }
+      case 'os': {
+        const data = await callRpc('analytics_grouped', { ...baseParams, p_column: 'os' });
+        return reply(200, data);
+      }
 
-    case 'events': {
-      const data = await callRpc('analytics_events_summary', baseParams);
-      return reply(200, data);
-    }
+      case 'events': {
+        const data = await callRpc('analytics_events_summary', baseParams);
+        return reply(200, data);
+      }
 
-    // UTM columns
-    case 'campaigns': {
-      const column = col || 'utm_campaign';
-      const allowed = ['utm_campaign', 'utm_source', 'utm_medium', 'utm_content', 'utm_term'];
-      if (!allowed.includes(column)) return reply(400, { error: 'Invalid column' });
-      const data = await callRpc('analytics_grouped', { ...baseParams, p_column: column });
-      return reply(200, data);
-    }
+      // UTM columns
+      case 'campaigns': {
+        const column = col || 'utm_campaign';
+        const allowed = ['utm_campaign', 'utm_source', 'utm_medium', 'utm_content', 'utm_term'];
+        if (!allowed.includes(column)) return reply(400, { error: 'Invalid column' });
+        const data = await callRpc('analytics_grouped', { ...baseParams, p_column: column });
+        return reply(200, data);
+      }
 
-    case 'conversions': {
-      const thankYou = qs.thank_you || '/pages/thank-you/';
-      const data = await callRpc('analytics_conversions', { ...baseParams, p_thank_you: thankYou });
-      return reply(200, data);
-    }
+      case 'conversions': {
+        const thankYou = qs.thank_you || '/pages/thank-you/';
+        const data = await callRpc('analytics_conversions', { ...baseParams, p_thank_you: thankYou });
+        return reply(200, data);
+      }
 
-    default:
-      return reply(400, { error: 'Unknown metric' });
+      default:
+        return reply(400, { error: 'Unknown metric' });
+    }
+  } catch (err) {
+    console.error('Dashboard error:', err.message);
+    return reply(500, { error: err.message });
   }
 };

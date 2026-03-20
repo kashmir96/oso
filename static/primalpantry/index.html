@@ -3009,7 +3009,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
 
   function waRenderTable(containerId, rows, cols, opts = {}) {
     const el = document.getElementById(containerId);
-    if (!rows || rows.length === 0) {
+    if (!Array.isArray(rows) || rows.length === 0) {
       el.innerHTML = '<p style="color:var(--dim);text-align:center;padding:1rem;font-size:0.85rem;">No data</p>';
       return;
     }
@@ -3230,7 +3230,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
       waFilters.forEach((f, i) => { fp['fc' + i] = f.col; fp['fv' + i] = f.val; });
       const base = { site: waSite, from, to, ...fp };
 
-      const [summary, timeseries, pages, referrers, browsers, devices, countries, os, events, campaigns] = await Promise.all([
+      const results = await Promise.allSettled([
         waFetch('analytics-dashboard', { ...base, metric: 'summary' }),
         waFetch('analytics-dashboard', { ...base, metric: 'timeseries' }),
         waFetch('analytics-dashboard', { ...base, metric: 'pages' }),
@@ -3242,13 +3242,20 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
         waFetch('analytics-dashboard', { ...base, metric: 'events' }),
         waFetch('analytics-dashboard', { ...base, metric: 'campaigns', col: 'utm_campaign' }),
       ]);
+      const v = results.map((r, i) => {
+        if (r.status === 'fulfilled') return r.value;
+        console.error('WA metric failed:', ['summary','timeseries','pages','referrers','browsers','devices','countries','os','events','campaigns'][i], r.reason);
+        return null;
+      });
+      const [summary, timeseries, pages, referrers, browsers, devices, countries, os, events, campaigns] = v;
 
       // Stats
-      document.getElementById('wa-uniques').textContent = fmtNum(summary.unique_visitors || 0);
-      document.getElementById('wa-pageviews').textContent = fmtNum(summary.total_pageviews || 0);
-      document.getElementById('wa-duration').textContent = fmtDuration(summary.avg_duration || 0);
-      document.getElementById('wa-bounce').textContent = (summary.bounce_rate || 0) + '%';
-      document.getElementById('wa-events').textContent = fmtNum(summary.event_completions || 0);
+      const s = summary || {};
+      document.getElementById('wa-uniques').textContent = fmtNum(s.unique_visitors || 0);
+      document.getElementById('wa-pageviews').textContent = fmtNum(s.total_pageviews || 0);
+      document.getElementById('wa-duration').textContent = fmtDuration(s.avg_duration || 0);
+      document.getElementById('wa-bounce').textContent = (s.bounce_rate || 0) + '%';
+      document.getElementById('wa-events').textContent = fmtNum(s.event_completions || 0);
 
       // Timeseries chart
       waRenderTimeseries(timeseries || []);
@@ -3289,7 +3296,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
   function waRenderTimeseries(data) {
     const ctx = document.getElementById('wa-timeseries');
     if (waChart) { waChart.destroy(); waChart = null; }
-    if (!data || data.length === 0) return;
+    if (!Array.isArray(data) || data.length === 0) return;
 
     const labels = data.map(d => {
       const dt = new Date(d.period);
