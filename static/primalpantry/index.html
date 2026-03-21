@@ -538,9 +538,9 @@
 <div id="login-screen">
   <div class="auth-box" id="login-box">
     <h1>Primal Pantry Dashboard</h1>
-    <input type="text" id="username-input" placeholder="Username" value="Curtis" autofocus>
+    <input type="text" id="username-input" placeholder="Username" autofocus>
     <div class="pw-wrap">
-      <input type="password" id="password-input" placeholder="Password" value="1532Milo2631!">
+      <input type="password" id="password-input" placeholder="Password">
       <button type="button" class="pw-toggle" data-target="password-input"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
     </div>
     <button id="login-btn">Sign in</button>
@@ -6767,7 +6767,60 @@ function mktPill(p) { const c = { facebook: { bg:'rgba(66,103,178,0.15)', fg:'#6
 function renderMktFunnel(vi,at,ch,pu) { const cols = ['var(--sage)','#a3c995','var(--honey)','var(--blush)']; const st = [{l:'Visitors',c:vi},{l:'Add to Cart',c:at},{l:'Checkout',c:ch},{l:'Purchase',c:pu}]; let h = '<div class="mkt-funnel">'; st.forEach((s,i) => { const dr = i > 0 ? ((1-s.c/st[i-1].c)*100).toFixed(0)+'% drop' : ''; h += '<div class="mkt-funnel-stage"><div class="mkt-funnel-bar" style="background:'+cols[i]+'"><span class="mkt-funnel-count" style="color:#fff">'+s.c.toLocaleString()+'</span><span class="mkt-funnel-label">'+s.l+'</span></div>'+(dr?'<div class="mkt-funnel-drop">'+dr+'</div>':'')+'</div>'; if(i<st.length-1) h+='<div class="mkt-funnel-arrow">\u2192</div>'; }); return h+'</div>'; }
 function renderMktCT(filter) { const fl = filter ? mktAllCampaigns.filter(c => (c.name+c.platform).toLowerCase().includes(filter)) : mktAllCampaigns; document.getElementById('mkt-campaign-table').innerHTML = fl.map(c => { const roas = c.spend>0?(c.conversions_value/c.spend).toFixed(1)+'x':'-'; const cpa = c.conversions>0&&c.spend>0?'$'+(c.spend/c.conversions).toFixed(2):'-'; return '<tr><td>'+c.name+'</td><td>'+mktPill(c.platform)+'</td><td>$'+c.spend.toFixed(2)+'</td><td>'+(c.impressions||0).toLocaleString()+'</td><td>'+(c.clicks||0).toLocaleString()+'</td><td>$'+c.conversions_value.toFixed(2)+'</td><td>'+roas+'</td><td>'+(c.conversions||0)+'</td><td>'+cpa+'</td></tr>'; }).join('') || '<tr><td colspan="9" class="loading">No campaign data</td></tr>'; }
 async function loadMarketingTab() {
-  if (mktLoaded) return; mktLoaded = true;
+  const [from, to] = getDateRange();
+  if (!mktInited) {
+    mktInited = true;
+    document.getElementById('mkt-campaign-search').addEventListener('input', function() { renderMktCT(this.value.toLowerCase().trim()); });
+    document.getElementById('mkt-google-connect-btn').addEventListener('click', () => { mktApi('google-auth', { action: 'authorize' }).then(d => { if (d.url) window.open(d.url, 'google-auth', 'width=600,height=700'); }); });
+    window.addEventListener('message', e => { if (e.data && e.data.googleConnected) loadMarketingTab(); });
+    document.getElementById('mkt-save-ids-btn').addEventListener('click', () => { mktApi('google-auth', { action: 'save_ids', ads_customer_id: document.getElementById('mkt-ads-customer-id').value.trim(), merchant_id: document.getElementById('mkt-merchant-id').value.trim() }).then(() => loadMarketingTab()); });
+    document.getElementById('mkt-google-disconnect-btn').addEventListener('click', () => { if (!confirm('Disconnect Google?')) return; mktApi('google-auth', { action: 'disconnect' }).then(() => loadMarketingTab()); });
+    document.querySelectorAll('#tab-marketing .chart-card').forEach(card => { card.addEventListener('click', function(e) { if (e.target.tagName === 'SELECT' || e.target.tagName === 'OPTION') return; this.classList.toggle('expanded'); const canvas = this.querySelector('canvas'); if (canvas) { const ci = Object.values(charts).find(c => c.canvas === canvas); if (ci) setTimeout(() => ci.resize(), 350); } }); });
+  }
+  document.getElementById('marketing-stats-grid').innerHTML = '<div class="loading" style="grid-column:1/-1;">Loading marketing data\u2026</div>';
+  document.getElementById('mkt-campaign-table').innerHTML = '<tr><td colspan="9" class="loading">Loading\u2026</td></tr>';
+  const gSt = await mktApi('google-auth', { action: 'status' }).catch(() => ({ connected: false }));
+  const gBanner = document.getElementById('mkt-google-banner'), gIds = document.getElementById('mkt-google-ids');
+  if (gSt.connected) { gBanner.style.display = 'none'; gIds.style.display = 'block'; document.getElementById('mkt-google-status').innerHTML = '<span style="color:var(--sage);">\u25cf Connected</span>'; if (gSt.adsCustomerId) document.getElementById('mkt-ads-customer-id').value = gSt.adsCustomerId; if (gSt.merchantId) document.getElementById('mkt-merchant-id').value = gSt.merchantId; }
+  else { gBanner.style.display = 'flex'; gIds.style.display = 'none'; document.getElementById('mkt-google-status').innerHTML = '<span style="color:var(--dim);">\u25cb Not connected</span>'; }
+  const [fbC, gC, fbD, gD, gmcD] = await Promise.all([
+    mktApi('facebook-campaigns', { from, to }).catch(() => ({ campaigns: [] })),
+    gSt.connected && gSt.adsCustomerId ? mktApi('google-ads', { from, to }).catch(() => ({ campaigns: [] })) : { campaigns: [] },
+    mktApi('facebook-campaigns', { from, to, daily: '1' }).catch(() => ({ daily: [] })),
+    gSt.connected && gSt.adsCustomerId ? mktApi('google-ads', { from, to, daily: '1' }).catch(() => ({ daily: [] })) : { daily: [] },
+    gSt.connected && gSt.merchantId ? mktApi('google-merchant', {}).catch(() => ({ products: [] })) : { products: [] },
+  ]);
+  mktAllCampaigns = [...(fbC.campaigns||[]).map(c=>({...c,platform:'facebook'})), ...(gC.campaigns||[]).map(c=>({...c,platform:'google'}))].sort((a,b)=>b.spend-a.spend);
+  const tSpend = mktAllCampaigns.reduce((s,c)=>s+c.spend,0), tRev = mktAllCampaigns.reduce((s,c)=>s+c.conversions_value,0);
+  const tClicks = mktAllCampaigns.reduce((s,c)=>s+c.clicks,0), tConv = mktAllCampaigns.reduce((s,c)=>s+c.conversions,0);
+  const tImpr = mktAllCampaigns.reduce((s,c)=>s+c.impressions,0);
+  const byDate = {}; (fbD.daily||[]).concat(gD.daily||[]).forEach(d => { if (!byDate[d.date]) byDate[d.date] = {spend:0,rev:0}; byDate[d.date].spend += d.spend; byDate[d.date].rev += d.conversions_value; });
+  const sortedDates = Object.keys(byDate).sort();
+  const spSpark = sortedDates.map(d=>byDate[d].spend), rvSpark = sortedDates.map(d=>byDate[d].rev), roSpark = sortedDates.map(d=>byDate[d].spend>0?byDate[d].rev/byDate[d].spend:0);
+  document.getElementById('marketing-stats-grid').innerHTML = [
+    mktStatCard('Total Ad Spend','$'+tSpend.toFixed(2),tImpr.toLocaleString()+' impressions',spSpark.length>1?spSpark:[0],'var(--honey)'),
+    mktStatCard('ROAS',tSpend>0?(tRev/tSpend).toFixed(1)+'x':'-','return on ad spend',roSpark.length>1?roSpark:[0],'var(--sage)'),
+    mktStatCard('CAC',tConv>0?'$'+(tSpend/tConv).toFixed(2):'-',tConv+' conversions',spSpark.length>1?spSpark:[0],'var(--blush)'),
+    mktStatCard('Paid Revenue','$'+tRev.toFixed(2),tClicks.toLocaleString()+' clicks',rvSpark.length>1?rvSpark:[0],'var(--green)'),
+    mktStatCard('Blended CVR',tClicks>0?(tConv/tClicks*100).toFixed(1)+'%':'-','clicks to conversion',roSpark.length>1?roSpark:[0],'var(--cyan)'),
+    mktStatCard('Avg CPC',tClicks>0?'$'+(tSpend/tClicks).toFixed(2):'-','cost per click',spSpark.length>1?spSpark:[0],'var(--purple)'),
+  ].join('');
+  const fbSp=(fbC.campaigns||[]).reduce((s,c)=>s+c.spend,0),gSp=(gC.campaigns||[]).reduce((s,c)=>s+c.spend,0);const chL=[],chD=[],chC=[];if(fbSp>0){chL.push('Facebook');chD.push(fbSp);chC.push('#4267B2');}if(gSp>0){chL.push('Google Ads');chD.push(gSp);chC.push('#4285F4');}if(!chL.length){chL.push('No data');chD.push(1);chC.push('#332d27');}
+  if(charts.mktChannel)charts.mktChannel.destroy();
+  charts.mktChannel = new Chart(document.getElementById('mkt-channel-chart'),{type:'doughnut',data:{labels:chL,datasets:[{data:chD,backgroundColor:chC,borderColor:'#1e1b18',borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#9c9287',font:{size:11,family:'DM Sans'},padding:12}},tooltip:{callbacks:{label:ctx=>ctx.label+': $'+ctx.parsed.toLocaleString(undefined,{minimumFractionDigits:2})}}}}});
+  const lbls=sortedDates.map(d=>{const dt=new Date(d+'T00:00:00');return dt.toLocaleDateString('en-NZ',{day:'numeric',month:'short'});});
+  if(charts.mktSpendRev)charts.mktSpendRev.destroy();
+  charts.mktSpendRev = new Chart(document.getElementById('mkt-spend-rev-chart'),{type:'line',data:{labels:lbls,datasets:[{label:'Ad Spend',data:spSpark,borderColor:'var(--honey)',backgroundColor:'rgba(212,168,75,0.15)',fill:true,tension:0.4,pointRadius:2,borderWidth:2,yAxisID:'y'},{label:'Revenue',data:rvSpark,borderColor:'var(--sage)',backgroundColor:'transparent',fill:false,tension:0.4,pointRadius:2,borderWidth:2,borderDash:[5,3],yAxisID:'y1'}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:'#9c9287',font:{size:11,family:'DM Sans'}}}},scales:{y:{type:'linear',position:'left',ticks:{color:'#9c9287',callback:v=>'$'+v.toFixed(0)},grid:{color:'#252220'},title:{display:true,text:'Spend',color:'#6e6259',font:{size:10}}},y1:{type:'linear',position:'right',ticks:{color:'#9c9287',callback:v=>'$'+v.toFixed(0)},grid:{display:false},title:{display:true,text:'Revenue',color:'#6e6259',font:{size:10}}},x:{ticks:{color:'#9c9287',maxTicksLimit:10,font:{size:10}},grid:{display:false}}}}});
+  if(charts.mktRoas)charts.mktRoas.destroy();
+  charts.mktRoas = new Chart(document.getElementById('mkt-roas-chart'),{type:'line',data:{labels:lbls,datasets:[{label:'ROAS',data:roSpark,borderColor:'var(--sage)',backgroundColor:'rgba(140,180,122,0.15)',fill:true,tension:0.4,pointRadius:2,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>'ROAS: '+ctx.parsed.y.toFixed(1)+'x'}}},scales:{y:{ticks:{color:'#9c9287',callback:v=>v.toFixed(1)+'x'},grid:{color:'#252220'}},x:{ticks:{color:'#9c9287',maxTicksLimit:10,font:{size:10}},grid:{display:false}}}}});
+  try{const fr=await mktApi('analytics-dashboard',{site:'PrimalPantry.co.nz',from,to,metric:'funnel_stages'});if(Array.isArray(fr)&&fr.length>0){const f=fr[0];document.getElementById('mkt-funnel-container').innerHTML=renderMktFunnel(f.visitors||0,f.add_to_cart||0,f.checkout||0,f.purchase||0);}else{document.getElementById('mkt-funnel-container').innerHTML='<div class="loading">No funnel data</div>';}}catch(e){document.getElementById('mkt-funnel-container').innerHTML='<div class="loading">Funnel unavailable</div>';}
+  renderMktCT('');
+  try{const lr=await mktApi('analytics-dashboard',{site:'PrimalPantry.co.nz',from,to,metric:'entry_pages'});if(Array.isArray(lr)&&lr.length>0){document.getElementById('mkt-landing-table').innerHTML=lr.slice(0,10).map(l=>'<tr><td>'+(l.value||l.pathname||'-')+'</td><td>'+(l.visitors||l.count||0)+'</td><td>-</td><td>-</td><td>-</td><td>'+(l.bounce_rate?l.bounce_rate.toFixed(1)+'%':'-')+'</td></tr>').join('');}}catch(e){}
+  const gmcP=gmcD.products||[];const gmcTbl=document.getElementById('mkt-gmc-table'),gmcWrap=document.getElementById('mkt-gmc-table-wrap'),gmcLoad=document.getElementById('mkt-gmc-loading');
+  if(gmcP.length>0){gmcWrap.style.display='table';gmcLoad.style.display='none';gmcTbl.innerHTML=gmcP.map(p=>{const iss=p.issues.length>0?p.issues.map(i=>i.description).join('; '):'-';const rc=p.status==='disapproved'?' style="background:rgba(224,96,80,0.08);"':'';return '<tr'+rc+'><td>'+p.title+'</td><td><span class="dummy-badge '+p.status+'">'+p.status.charAt(0).toUpperCase()+p.status.slice(1)+'</span></td><td>'+iss+'</td></tr>';}).join('');}
+  else if(gSt.connected&&gSt.merchantId){gmcLoad.textContent=gmcD.error||'No products found';gmcLoad.style.display='block';gmcWrap.style.display='none';}
+  else{gmcLoad.textContent=gSt.connected?'Enter your Merchant Center ID above':'Connect Google to view product statuses';gmcLoad.style.display='block';gmcWrap.style.display='none';}
+  // REPLACED_DUMMY_DATA_MARKER
   const PK = '#ff69b4', PK15 = 'rgba(255,105,180,0.15)';
   function msc(label, value, sub, sp) {
     const mx = Math.max(...sp, 0.01);
