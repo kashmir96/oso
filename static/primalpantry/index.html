@@ -6362,8 +6362,8 @@ const xeroCache = {};
 const XERO_CACHE_TTL = 5 * 60 * 1000; // 5 min for reports
 const XERO_TXN_CACHE_TTL = 2 * 60 * 1000; // 2 min for transactions
 
-function waToken() {
-  try { return JSON.parse(sessionStorage.getItem('pp_staff')).token; } catch { return ''; }
+function finToken() {
+  return currentStaff ? currentStaff.token : '';
 }
 
 async function xeroFetch(endpoint, params = {}) {
@@ -6372,7 +6372,7 @@ async function xeroFetch(endpoint, params = {}) {
   const ttl = endpoint.includes('Transaction') || endpoint === 'Invoices' ? XERO_TXN_CACHE_TTL : XERO_CACHE_TTL;
   if (cached && Date.now() - cached.at < ttl) return cached.data;
 
-  params.token = waToken();
+  params.token = finToken();
   params.endpoint = endpoint;
   const qs = new URLSearchParams(params).toString();
   const res = await fetch(`/.netlify/functions/xero-api?${qs}`);
@@ -6385,7 +6385,7 @@ async function xeroFetch(endpoint, params = {}) {
 }
 
 function xeroStartAuth() {
-  const token = waToken();
+  const token = finToken();
   fetch(`/.netlify/functions/xero-auth?action=authorize&token=${token}`)
     .then(r => r.json())
     .then(data => {
@@ -6407,7 +6407,7 @@ function xeroStartAuth() {
 
 async function xeroDisconnect() {
   if (!confirm('Disconnect Xero? You can reconnect later.')) return;
-  const token = waToken();
+  const token = finToken();
   await fetch('/.netlify/functions/xero-disconnect', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -6700,9 +6700,9 @@ async function renderFinanceStats() {
         xeroFetch('Invoices', { Statuses: 'AUTHORISED', where: 'Type=="ACCPAY"' }),
         xeroFetch('Reports/ProfitAndLoss', { fromDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0], toDate: new Date().toISOString().split('T')[0] }),
       ]);
-      banks = parseXeroBankSummary(bankReport) || getMockBankData();
-      invoices = parseXeroInvoices(invData, 'ACCREC') || getMockInvoices();
-      bills = parseXeroInvoices(billData, 'ACCPAY') || getMockBills();
+      banks = parseXeroBankSummary(bankReport) || [];
+      invoices = parseXeroInvoices(invData, 'ACCREC') || [];
+      bills = parseXeroInvoices(billData, 'ACCPAY') || [];
       // Parse current month P&L for stats
       const pnlDetail = parseXeroPnlDetail(pnlReport);
       if (pnlDetail) {
@@ -6712,15 +6712,12 @@ async function renderFinanceStats() {
         const net = netTotal ? netTotal.amount : 0;
         currentMonth = { revenue: rev, expenses: rev - net };
       }
-    } catch (e) { console.warn('Xero stats fetch failed, using mock:', e.message); }
+    } catch (e) { console.error('Xero stats fetch failed:', e.message); }
   }
-  if (!currentMonth) {
-    const pnl = getMockPnlData();
-    currentMonth = pnl[pnl.length - 1];
-  }
-  if (!banks) banks = getMockBankData();
-  if (!invoices) invoices = getMockInvoices();
-  if (!bills) bills = getMockBills();
+  if (!currentMonth) currentMonth = { revenue: 0, expenses: 0 };
+  if (!banks) banks = [];
+  if (!invoices) invoices = [];
+  if (!bills) bills = [];
 
   const cashPosition = banks.reduce((s, b) => s + b.balance, 0);
   const receivables = invoices.reduce((s, i) => s + i.amount, 0);
@@ -6756,10 +6753,10 @@ async function renderFinancePnl() {
       const report = await xeroFetch('Reports/ProfitAndLoss', { fromDate, toDate, periods: '11', timeframe: 'MONTH' });
       data = parseXeroPnlMonthly(report);
       detail = parseXeroPnlDetail(report);
-    } catch (e) { console.warn('Xero P&L fetch failed, using mock:', e.message); }
+    } catch (e) { console.error('Xero P&L fetch failed:', e.message); }
   }
-  if (!data) data = getMockPnlData();
-  if (!detail) detail = getMockPnlDetail();
+  if (!data) data = [];
+  if (!detail) detail = [];
 
   // Revenue vs Expenses chart
   if (charts.xeroRevExp) charts.xeroRevExp.destroy();
@@ -6849,9 +6846,9 @@ async function renderFinanceCashflow() {
         });
         cfData = Object.values(dayMap).map(d => ({ label: d.label, moneyIn: Math.round(d.moneyIn), moneyOut: Math.round(d.moneyOut) }));
       }
-    } catch (e) { console.warn('Xero cashflow fetch failed, using mock:', e.message); }
+    } catch (e) { console.error('Xero cashflow fetch failed:', e.message); }
   }
-  if (!banks) banks = getMockBankData();
+  if (!banks) banks = [];
   // Bank balances chart
   if (charts.xeroBank) charts.xeroBank.destroy();
   charts.xeroBank = new Chart(document.getElementById('xero-bank-chart'), {
@@ -6877,7 +6874,7 @@ async function renderFinanceCashflow() {
   });
 
   // Cash flow chart
-  if (!cfData) cfData = getMockCashflowData();
+  if (!cfData) cfData = [];
   if (charts.xeroCashflow) charts.xeroCashflow.destroy();
   charts.xeroCashflow = new Chart(document.getElementById('xero-cashflow-chart'), {
     type: 'line',
@@ -6899,7 +6896,7 @@ async function renderFinanceCashflow() {
   });
 
   // Bank transactions table
-  if (!txns) txns = getMockBankTransactions();
+  if (!txns) txns = [];
   document.getElementById('bank-txn-table').innerHTML = txns.map(t =>
     `<tr>
       <td>${t.date}</td>
@@ -6945,10 +6942,10 @@ async function renderFinanceInvoices() {
       const parsedBills = parseXeroInvoices(billData, 'ACCPAY');
       if (parsedInv && parsedInv.length > 0) invoices = parsedInv;
       if (parsedBills && parsedBills.length > 0) bills = parsedBills;
-    } catch (e) { console.warn('Xero invoices fetch failed, using mock:', e.message); }
+    } catch (e) { console.error('Xero invoices fetch failed:', e.message); }
   }
-  if (!invoices) invoices = getMockInvoices();
-  if (!bills) bills = getMockBills();
+  if (!invoices) invoices = [];
+  if (!bills) bills = [];
 
   // AR aging chart
   renderAgingChart('xero-ar-chart', 'xeroAR', getMockAgingData(invoices), 'Receivables');
@@ -6982,7 +6979,7 @@ async function renderFinanceInvoices() {
 async function loadFinanceTab() {
   // Check Xero connection status
   try {
-    const token = waToken();
+    const token = finToken();
     if (token) {
       const res = await fetch(`/.netlify/functions/xero-status?token=${token}`);
       const status = await res.json();
