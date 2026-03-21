@@ -4113,14 +4113,28 @@ async function loadOrderJourney(order) {
       let label = step.pathname || '';
       if (isEvent) label = step.event_name || 'Event';
 
+      // Source pill for the first entry step
+      let sourcePill = '';
+      if (isEntry && i === journey.findIndex(s => s.entry_page)) {
+        const parts = [];
+        if (step.utm_source) parts.push(step.utm_source);
+        const detail = step.utm_campaign || step.utm_adgroup || step.utm_content || '';
+        if (detail) parts.push(detail);
+        if (parts.length) {
+          sourcePill = `<span style="display:inline-block;background:var(--sage);color:var(--bg);font-size:0.65rem;font-weight:600;padding:0.15rem 0.5rem;border-radius:9999px;margin-bottom:0.3rem;">${parts.join(' – ')}</span>`;
+        } else if (step.referrer_domain) {
+          sourcePill = `<span style="display:inline-block;background:var(--border);color:var(--text);font-size:0.65rem;font-weight:600;padding:0.15rem 0.5rem;border-radius:9999px;margin-bottom:0.3rem;">${step.referrer_domain}</span>`;
+        }
+      }
+
       // Extra info
       let extra = '';
       if (isEntry && step.referrer_domain) extra = `from ${step.referrer_domain}`;
       if (step.duration > 0) extra += (extra ? ' · ' : '') + step.duration + 's';
-      if (isEntry && step.utm_source) extra += (extra ? ' · ' : '') + step.utm_source;
 
       html += `<div style="position:relative;margin-bottom:0.6rem;padding-left:0.5rem;">
         <div style="position:absolute;left:-1.15rem;top:0.25rem;width:8px;height:8px;border-radius:50%;background:${dotColor};"></div>
+        ${sourcePill}
         <div style="display:flex;justify-content:space-between;align-items:baseline;gap:0.5rem;">
           <span style="color:${isEvent ? 'var(--honey)' : isThankYou ? 'var(--sage)' : 'var(--text)'};font-weight:${isEntry || isThankYou || isEvent ? '600' : '400'};">${label}</span>
           <span style="color:var(--dim);font-size:0.7rem;white-space:nowrap;">${time}</span>
@@ -5404,13 +5418,22 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     let html = '';
     data.forEach(c => {
       html += '<div class="wa-conversion">';
+      // Source pill
+      const srcParts = [];
+      if (c.utm_source) srcParts.push(c.utm_source);
+      const srcDetail = c.utm_campaign || c.utm_adgroup || c.utm_content || '';
+      if (srcDetail) srcParts.push(srcDetail);
+      if (srcParts.length) {
+        html += '<span style="display:inline-block;background:var(--sage);color:var(--bg);font-size:0.6rem;font-weight:600;padding:0.1rem 0.4rem;border-radius:9999px;margin-right:0.3rem;">' + srcParts.join(' – ') + '</span>';
+      } else if (c.referrer) {
+        html += '<span style="display:inline-block;background:var(--border);color:var(--text);font-size:0.6rem;font-weight:600;padding:0.1rem 0.4rem;border-radius:9999px;margin-right:0.3rem;">' + c.referrer + '</span>';
+      }
       html += '<span class="wa-conv-page wa-landing" title="Landing">' + (c.landing_page || '?') + '</span>';
       html += '<span class="wa-journey-arrow">→</span>';
       html += '<span class="wa-conv-page wa-sale" title="Sale page">' + (c.sale_page || '?') + '</span>';
       html += '<span class="wa-journey-arrow">→</span>';
       html += '<span class="wa-conv-page wa-thankyou">✓ converted</span>';
       const meta = [];
-      if (c.referrer) meta.push('via ' + c.referrer);
       if (c.country) meta.push(c.country);
       if (c.device) meta.push(c.device);
       html += '<span class="wa-conv-meta">' + meta.join(' · ') + '</span>';
