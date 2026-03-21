@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leave a Review — Primal Pantry</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #f8f5f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #2d2a26; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+    .container { max-width: 480px; width: 100%; }
+    .brand { text-align: center; margin-bottom: 1.5rem; }
+    .brand h1 { font-size: 1.4rem; color: #2d2a26; }
+    .card { background: #fff; border-radius: 12px; padding: 2rem; border: 1px solid #e8e2da; }
+    .card h2 { font-size: 1.1rem; margin-bottom: 0.5rem; }
+    .card p { font-size: 0.9rem; color: #6e6259; line-height: 1.5; margin-bottom: 1.5rem; }
+    .stars { display: flex; gap: 0.4rem; justify-content: center; margin-bottom: 1.5rem; }
+    .star { font-size: 2rem; cursor: pointer; color: #ddd; transition: color 0.15s; user-select: none; }
+    .star.active { color: #d4a84b; }
+    .star:hover { color: #d4a84b; }
+    label { display: block; font-size: 0.75rem; color: #9c9287; text-transform: uppercase; margin-bottom: 0.25rem; font-weight: 600; }
+    input, textarea { width: 100%; background: #f8f5f0; border: 1px solid #e8e2da; color: #2d2a26; padding: 0.6rem 0.75rem; border-radius: 8px; font-size: 0.9rem; font-family: inherit; margin-bottom: 1rem; }
+    input:focus, textarea:focus { outline: none; border-color: #8CB47A; box-shadow: 0 0 0 3px rgba(140,180,122,0.2); }
+    textarea { resize: vertical; min-height: 100px; }
+    .submit-btn { width: 100%; background: #8CB47A; color: #141210; border: none; padding: 0.75rem; border-radius: 8px; font-size: 0.95rem; font-weight: 700; cursor: pointer; font-family: inherit; }
+    .submit-btn:hover { opacity: 0.9; }
+    .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .thank-you { text-align: center; padding: 2rem 0; }
+    .thank-you h2 { color: #8CB47A; margin-bottom: 0.5rem; }
+    .error { color: #e06050; font-size: 0.85rem; margin-bottom: 1rem; display: none; }
+    .footer { text-align: center; font-size: 0.75rem; color: #9c9287; margin-top: 1.5rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="brand"><h1>Primal Pantry</h1></div>
+
+    <div class="card" id="review-form">
+      <h2>How was your experience?</h2>
+      <p>We'd love to hear your thoughts on your Primal Pantry products. Your review helps us improve and helps others find the right products.</p>
+
+      <div class="stars" id="stars">
+        <span class="star" data-v="1">&#9733;</span>
+        <span class="star" data-v="2">&#9733;</span>
+        <span class="star" data-v="3">&#9733;</span>
+        <span class="star" data-v="4">&#9733;</span>
+        <span class="star" data-v="5">&#9733;</span>
+      </div>
+
+      <label for="name">Your Name</label>
+      <input type="text" id="name" placeholder="e.g. Sarah">
+
+      <label for="review">Your Review</label>
+      <textarea id="review" placeholder="Tell us about your experience..."></textarea>
+
+      <div class="error" id="error"></div>
+      <button class="submit-btn" id="submit" disabled>Submit Review</button>
+    </div>
+
+    <div class="card thank-you" id="thank-you" style="display:none;">
+      <h2>Thank you!</h2>
+      <p>We really appreciate you taking the time to share your experience. Your feedback helps us continue making natural skincare products you'll love.</p>
+    </div>
+
+    <div class="footer">Primal Pantry — Natural skincare, made in New Zealand</div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const orderId = params.get('order_id');
+    const email = params.get('email');
+
+    let selectedRating = 0;
+
+    // Star rating interaction
+    document.querySelectorAll('.star').forEach(star => {
+      star.addEventListener('click', () => {
+        selectedRating = Number(star.dataset.v);
+        document.querySelectorAll('.star').forEach(s => {
+          s.classList.toggle('active', Number(s.dataset.v) <= selectedRating);
+        });
+        document.getElementById('submit').disabled = false;
+      });
+      star.addEventListener('mouseenter', () => {
+        const v = Number(star.dataset.v);
+        document.querySelectorAll('.star').forEach(s => {
+          s.classList.toggle('active', Number(s.dataset.v) <= v);
+        });
+      });
+    });
+    document.getElementById('stars').addEventListener('mouseleave', () => {
+      document.querySelectorAll('.star').forEach(s => {
+        s.classList.toggle('active', Number(s.dataset.v) <= selectedRating);
+      });
+    });
+
+    // Submit
+    document.getElementById('submit').addEventListener('click', async () => {
+      const btn = document.getElementById('submit');
+      const errEl = document.getElementById('error');
+      errEl.style.display = 'none';
+
+      if (selectedRating < 1) { errEl.textContent = 'Please select a star rating.'; errEl.style.display = 'block'; return; }
+
+      btn.disabled = true;
+      btn.textContent = 'Submitting...';
+
+      try {
+        const res = await fetch('/.netlify/functions/save-review', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            order_id: orderId ? Number(orderId) : null,
+            email: email || null,
+            customer_name: document.getElementById('name').value.trim() || null,
+            rating: selectedRating,
+            review_text: document.getElementById('review').value.trim() || null,
+          }),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          document.getElementById('review-form').style.display = 'none';
+          document.getElementById('thank-you').style.display = 'block';
+        } else {
+          errEl.textContent = data.error || 'Something went wrong. Please try again.';
+          errEl.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'Submit Review';
+        }
+      } catch (err) {
+        errEl.textContent = 'Network error. Please try again.';
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Submit Review';
+      }
+    });
+  </script>
+</body>
+</html>

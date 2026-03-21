@@ -36,6 +36,7 @@ exports.handler = async (event) => {
     street, suburb, city, postcode,
     items, // [{ description, sku, quantity, unit_price }]
     shipping_cost, payment_method, notes,
+    eship_only, order_number, // eship_only mode: skip Supabase, use existing order_number
   } = body;
 
   if (!customer_name || !email || !city || !items || items.length === 0) {
@@ -61,10 +62,12 @@ exports.handler = async (event) => {
     orderDate = new Date().toISOString().split('T')[0];
     orderHour = new Date().getUTCHours();
   }
-  const manualId = 'manual_' + Date.now();
+  const manualId = eship_only ? order_number : ('manual_' + Date.now());
 
-  // ── 1. Save to Supabase ──
-  try {
+  // ── 1. Save to Supabase (skip in eship_only mode) ──
+  if (eship_only) {
+    results.supabase = { success: true, skipped: true };
+  } else try {
     // Insert order
     const orderRes = await fetch(`${SUPABASE_URL}/rest/v1/orders`, {
       method: 'POST',
