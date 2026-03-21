@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Leave a Review — Primal Pantry</title>
+  <title>How did we do? — Primal Pantry</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #f8f5f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #2d2a26; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem; }
@@ -13,10 +13,11 @@
     .card { background: #fff; border-radius: 12px; padding: 2rem; border: 1px solid #e8e2da; }
     .card h2 { font-size: 1.1rem; margin-bottom: 0.5rem; }
     .card p { font-size: 0.9rem; color: #6e6259; line-height: 1.5; margin-bottom: 1.5rem; }
-    .stars { display: flex; gap: 0.4rem; justify-content: center; margin-bottom: 1.5rem; }
-    .star { font-size: 2rem; cursor: pointer; color: #ddd; transition: color 0.15s; user-select: none; }
-    .star.active { color: #d4a84b; }
-    .star:hover { color: #d4a84b; }
+    .nps-row { display: flex; gap: 4px; justify-content: center; margin-bottom: 0.5rem; }
+    .nps-btn { width: 36px; height: 36px; border-radius: 8px; border: 1px solid #e8e2da; background: #f8f5f0; color: #2d2a26; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.15s; font-family: inherit; }
+    .nps-btn:hover { border-color: #8CB47A; background: rgba(140,180,122,0.1); }
+    .nps-btn.selected { background: #8CB47A; color: #141210; border-color: #8CB47A; }
+    .nps-labels { display: flex; justify-content: space-between; font-size: 0.7rem; color: #9c9287; margin-bottom: 1.5rem; padding: 0 2px; }
     label { display: block; font-size: 0.75rem; color: #9c9287; text-transform: uppercase; margin-bottom: 0.25rem; font-weight: 600; }
     input, textarea { width: 100%; background: #f8f5f0; border: 1px solid #e8e2da; color: #2d2a26; padding: 0.6rem 0.75rem; border-radius: 8px; font-size: 0.9rem; font-family: inherit; margin-bottom: 1rem; }
     input:focus, textarea:focus { outline: none; border-color: #8CB47A; box-shadow: 0 0 0 3px rgba(140,180,122,0.2); }
@@ -24,7 +25,13 @@
     .submit-btn { width: 100%; background: #8CB47A; color: #141210; border: none; padding: 0.75rem; border-radius: 8px; font-size: 0.95rem; font-weight: 700; cursor: pointer; font-family: inherit; }
     .submit-btn:hover { opacity: 0.9; }
     .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-    .thank-you { text-align: center; padding: 2rem 0; }
+    .trustpilot-btn { width: 100%; background: #00b67a; color: #fff; border: none; padding: 0.75rem; border-radius: 8px; font-size: 0.95rem; font-weight: 700; cursor: pointer; font-family: inherit; text-decoration: none; display: inline-block; text-align: center; }
+    .trustpilot-btn:hover { opacity: 0.9; }
+    .skip-link { display: block; text-align: center; margin-top: 1rem; font-size: 0.8rem; color: #9c9287; cursor: pointer; text-decoration: underline; }
+    .skip-link:hover { color: #6e6259; }
+    .step { display: none; }
+    .step.active { display: block; }
+    .thank-you { text-align: center; padding: 1.5rem 0; }
     .thank-you h2 { color: #8CB47A; margin-bottom: 0.5rem; }
     .error { color: #e06050; font-size: 0.85rem; margin-bottom: 1rem; display: none; }
     .footer { text-align: center; font-size: 0.75rem; color: #9c9287; margin-top: 1.5rem; }
@@ -34,31 +41,64 @@
   <div class="container">
     <div class="brand"><h1>Primal Pantry</h1></div>
 
-    <div class="card" id="review-form">
-      <h2>How was your experience?</h2>
-      <p>We'd love to hear your thoughts on your Primal Pantry products. Your review helps us improve and helps others find the right products.</p>
+    <div class="card">
+      <!-- Step 1: NPS Score -->
+      <div class="step active" id="step-nps">
+        <h2>How likely are you to recommend Primal Pantry to a friend?</h2>
+        <p>On a scale of 0 to 10, with 10 being most likely.</p>
 
-      <div class="stars" id="stars">
-        <span class="star" data-v="1">&#9733;</span>
-        <span class="star" data-v="2">&#9733;</span>
-        <span class="star" data-v="3">&#9733;</span>
-        <span class="star" data-v="4">&#9733;</span>
-        <span class="star" data-v="5">&#9733;</span>
+        <div class="nps-row" id="nps-row">
+          <button class="nps-btn" data-v="0">0</button>
+          <button class="nps-btn" data-v="1">1</button>
+          <button class="nps-btn" data-v="2">2</button>
+          <button class="nps-btn" data-v="3">3</button>
+          <button class="nps-btn" data-v="4">4</button>
+          <button class="nps-btn" data-v="5">5</button>
+          <button class="nps-btn" data-v="6">6</button>
+          <button class="nps-btn" data-v="7">7</button>
+          <button class="nps-btn" data-v="8">8</button>
+          <button class="nps-btn" data-v="9">9</button>
+          <button class="nps-btn" data-v="10">10</button>
+        </div>
+        <div class="nps-labels">
+          <span>Not likely</span>
+          <span>Extremely likely</span>
+        </div>
+
+        <button class="submit-btn" id="nps-continue" disabled>Continue</button>
       </div>
 
-      <label for="name">Your Name</label>
-      <input type="text" id="name" placeholder="e.g. Sarah">
+      <!-- Step 2a: Low score (0-7) → Feedback form -->
+      <div class="step" id="step-feedback">
+        <h2>Thank you for your honesty.</h2>
+        <p>We'd love to understand how we can improve. Your feedback stays private and goes directly to our team.</p>
 
-      <label for="review">Your Review</label>
-      <textarea id="review" placeholder="Tell us about your experience..."></textarea>
+        <label for="feedback-name">Your Name</label>
+        <input type="text" id="feedback-name" placeholder="e.g. Sarah">
 
-      <div class="error" id="error"></div>
-      <button class="submit-btn" id="submit" disabled>Submit Review</button>
-    </div>
+        <label for="feedback-text">What could we have done better?</label>
+        <textarea id="feedback-text" placeholder="Tell us what we can improve..."></textarea>
 
-    <div class="card thank-you" id="thank-you" style="display:none;">
-      <h2>Thank you!</h2>
-      <p>We really appreciate you taking the time to share your experience. Your feedback helps us continue making natural skincare products you'll love.</p>
+        <div class="error" id="feedback-error"></div>
+        <button class="submit-btn" id="feedback-submit">Submit Feedback</button>
+      </div>
+
+      <!-- Step 2b: High score (8-10) → Trustpilot -->
+      <div class="step" id="step-trustpilot">
+        <h2>We're so glad you love Primal Pantry!</h2>
+        <p>Would you mind taking a moment to share your experience on Trustpilot? It helps other people discover us and means the world to our small team.</p>
+
+        <a class="trustpilot-btn" href="https://nz.trustpilot.com/review/primalpantry.co.nz" target="_blank" rel="noopener" id="trustpilot-link">Leave a Review on Trustpilot &#8599;</a>
+        <span class="skip-link" id="trustpilot-skip">No thanks</span>
+      </div>
+
+      <!-- Thank you (shown after feedback submit or Trustpilot skip) -->
+      <div class="step" id="step-thanks">
+        <div class="thank-you">
+          <h2>Thank you!</h2>
+          <p id="thanks-message">We really appreciate you taking the time to share your thoughts.</p>
+        </div>
+      </div>
     </div>
 
     <div class="footer">Primal Pantry — Natural skincare, made in New Zealand</div>
@@ -68,42 +108,78 @@
     const params = new URLSearchParams(window.location.search);
     const orderId = params.get('order_id');
     const email = params.get('email');
+    const customerName = params.get('name');
 
-    let selectedRating = 0;
+    let npsScore = -1;
+    const PROMOTER_THRESHOLD = 8;
 
-    // Star rating interaction
-    document.querySelectorAll('.star').forEach(star => {
-      star.addEventListener('click', () => {
-        selectedRating = Number(star.dataset.v);
-        document.querySelectorAll('.star').forEach(s => {
-          s.classList.toggle('active', Number(s.dataset.v) <= selectedRating);
-        });
-        document.getElementById('submit').disabled = false;
-      });
-      star.addEventListener('mouseenter', () => {
-        const v = Number(star.dataset.v);
-        document.querySelectorAll('.star').forEach(s => {
-          s.classList.toggle('active', Number(s.dataset.v) <= v);
-        });
+    // Pre-fill name if provided
+    if (customerName) {
+      document.getElementById('feedback-name').value = decodeURIComponent(customerName);
+    }
+
+    function showStep(id) {
+      document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+
+    // NPS button interaction
+    document.querySelectorAll('.nps-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        npsScore = Number(btn.dataset.v);
+        document.querySelectorAll('.nps-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        document.getElementById('nps-continue').disabled = false;
       });
     });
-    document.getElementById('stars').addEventListener('mouseleave', () => {
-      document.querySelectorAll('.star').forEach(s => {
-        s.classList.toggle('active', Number(s.dataset.v) <= selectedRating);
-      });
+
+    // Continue button — route based on score
+    document.getElementById('nps-continue').addEventListener('click', async () => {
+      if (npsScore < 0) return;
+
+      if (npsScore >= PROMOTER_THRESHOLD) {
+        // Save NPS score silently, then show Trustpilot prompt
+        saveNps(npsScore, null);
+        showStep('step-trustpilot');
+      } else {
+        showStep('step-feedback');
+      }
     });
 
-    // Submit
-    document.getElementById('submit').addEventListener('click', async () => {
-      const btn = document.getElementById('submit');
-      const errEl = document.getElementById('error');
+    // Feedback submit (detractors/passives)
+    document.getElementById('feedback-submit').addEventListener('click', async () => {
+      const btn = document.getElementById('feedback-submit');
+      const errEl = document.getElementById('feedback-error');
       errEl.style.display = 'none';
-
-      if (selectedRating < 1) { errEl.textContent = 'Please select a star rating.'; errEl.style.display = 'block'; return; }
 
       btn.disabled = true;
       btn.textContent = 'Submitting...';
 
+      const feedbackText = document.getElementById('feedback-text').value.trim();
+      const name = document.getElementById('feedback-name').value.trim();
+
+      const ok = await saveNps(npsScore, feedbackText, name);
+      if (ok) {
+        document.getElementById('thanks-message').textContent =
+          "We really appreciate your honesty — your feedback helps us improve.";
+        showStep('step-thanks');
+      } else {
+        errEl.textContent = 'Something went wrong. Please try again.';
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Submit Feedback';
+      }
+    });
+
+    // Trustpilot skip
+    document.getElementById('trustpilot-skip').addEventListener('click', () => {
+      document.getElementById('thanks-message').textContent =
+        "No worries — thanks for letting us know how we're doing!";
+      showStep('step-thanks');
+    });
+
+    // Save NPS score to backend
+    async function saveNps(score, feedbackText, name) {
       try {
         const res = await fetch('/.netlify/functions/save-review', {
           method: 'POST',
@@ -111,28 +187,17 @@
           body: JSON.stringify({
             order_id: orderId ? Number(orderId) : null,
             email: email || null,
-            customer_name: document.getElementById('name').value.trim() || null,
-            rating: selectedRating,
-            review_text: document.getElementById('review').value.trim() || null,
+            customer_name: name || customerName || null,
+            nps_score: score,
+            feedback_text: feedbackText || null,
           }),
         });
         const data = await res.json();
-        if (res.ok && data.success) {
-          document.getElementById('review-form').style.display = 'none';
-          document.getElementById('thank-you').style.display = 'block';
-        } else {
-          errEl.textContent = data.error || 'Something went wrong. Please try again.';
-          errEl.style.display = 'block';
-          btn.disabled = false;
-          btn.textContent = 'Submit Review';
-        }
-      } catch (err) {
-        errEl.textContent = 'Network error. Please try again.';
-        errEl.style.display = 'block';
-        btn.disabled = false;
-        btn.textContent = 'Submit Review';
+        return res.ok && data.success;
+      } catch {
+        return false;
       }
-    });
+    }
   </script>
 </body>
 </html>

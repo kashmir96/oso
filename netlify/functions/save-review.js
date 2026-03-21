@@ -1,10 +1,10 @@
 /**
  * save-review.js
  *
- * Public endpoint — saves a customer review submitted from the review page.
+ * Public endpoint — saves an NPS score and optional feedback from customers.
  *
  * POST body:
- *   { order_id, email, customer_name, rating, review_text }
+ *   { order_id, email, customer_name, nps_score, feedback_text }
  *
  * Env vars required:
  *   SUPABASE_URL
@@ -24,24 +24,24 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: JSON.stringify({ error: 'POST only' }) };
 
   try {
-    const { order_id, email, customer_name, rating, review_text } = JSON.parse(event.body);
+    const { order_id, email, customer_name, nps_score, feedback_text } = JSON.parse(event.body);
 
-    if (!email || !rating) {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: 'email and rating required' }) };
+    if (nps_score === undefined || nps_score === null) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'nps_score required' }) };
     }
 
-    if (rating < 1 || rating > 5) {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: 'rating must be 1-5' }) };
+    if (nps_score < 0 || nps_score > 10) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'nps_score must be 0-10' }) };
     }
 
     const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
     const { data, error } = await sb.from('customer_reviews').insert({
       order_id: order_id || null,
-      email,
+      email: email || null,
       customer_name: customer_name || null,
-      rating: Number(rating),
-      review_text: review_text || null,
+      nps_score: Number(nps_score),
+      feedback_text: feedback_text || null,
       created_at: new Date().toISOString(),
     }).select().single();
 

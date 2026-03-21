@@ -55,16 +55,16 @@ exports.handler = async (event) => {
     <div style="background:#fff;border-radius:12px;padding:32px;border:1px solid #e8e2da;">
       <h2 style="font-size:18px;color:#2d2a26;margin:0 0 16px;">Hey ${firstName},</h2>
       <p style="font-size:14px;color:#6e6259;line-height:1.6;margin:0 0 12px;">
-        We hope you're loving your Primal Pantry products! Your feedback means the world to us and helps other customers discover what works best for them.
+        We hope you're enjoying your Primal Pantry products! We'd love to hear how we did — it takes about 30 seconds.
       </p>
       <p style="font-size:14px;color:#6e6259;line-height:1.6;margin:0 0 24px;">
-        Would you mind taking a moment to share your experience?
+        Your honest feedback helps our small team keep improving.
       </p>
       <div style="text-align:center;margin:24px 0;">
-        <a href="${reviewUrl}" style="display:inline-block;background:#8CB47A;color:#141210;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Leave a Review</a>
+        <a href="${reviewUrl}" style="display:inline-block;background:#8CB47A;color:#141210;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Share Your Experience</a>
       </div>
       <p style="font-size:13px;color:#9c9287;line-height:1.5;margin:16px 0 0;text-align:center;">
-        It only takes a minute — we truly appreciate it!
+        Just one quick question — we truly appreciate it!
       </p>
     </div>
     <p style="text-align:center;font-size:12px;color:#9c9287;margin-top:20px;">
@@ -84,7 +84,7 @@ exports.handler = async (event) => {
       body: JSON.stringify({
         from: process.env.RESEND_FROM_EMAIL || 'Primal Pantry <hello@primalpantry.co.nz>',
         to: [email],
-        subject: `${firstName}, how are you enjoying your Primal Pantry products?`,
+        subject: `${firstName}, how did we do?`,
         html,
       }),
     });
