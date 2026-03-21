@@ -3002,6 +3002,13 @@ function openOrderModal(orderId) {
     `).join('');
   }
 
+  // Customer Journey section
+  html += `<h3 style="margin:1rem 0 0.5rem;font-size:0.9rem;color:var(--muted)">Customer Journey</h3>
+  <div id="modal-journey" style="padding:0.5rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:0.8rem;color:var(--dim);">Loading journey...</div>`;
+
+  // Load journey data async
+  setTimeout(() => loadOrderJourney(order), 50);
+
   // Shipping status button
   html += `<div style="margin-top:1rem;text-align:center;">
     <button id="modal-shipping-btn" data-order-id="${orderId}" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:0.5rem 1.2rem;font-size:0.85rem;cursor:pointer;font-weight:600;">Shipping Status</button>
@@ -4050,6 +4057,83 @@ function topCustomer(orders, mode) {
   }
   entries.sort((a, b) => b.spend - a.spend);
   return { name: entries[0].name, total: entries[0].spend };
+}
+
+// ── Customer Journey in Order Modal ──
+async function loadOrderJourney(order) {
+  const el = document.getElementById('modal-journey');
+  if (!el) return;
+
+  const token = currentStaff ? currentStaff.token : '';
+  if (!token) { el.textContent = 'Not authenticated'; return; }
+
+  const site = 'PrimalPantry.co.nz';
+  const orderTime = order.created_at || order.order_date;
+  if (!orderTime) { el.textContent = 'No order timestamp available'; return; }
+
+  const params = new URLSearchParams({
+    token,
+    site,
+    order_time: new Date(orderTime).toISOString(),
+  });
+  if (order.visitor_hash) params.set('visitor_hash', order.visitor_hash);
+  if (order.utm_source) params.set('utm_source', order.utm_source);
+  if (order.landing_page) params.set('landing_page', order.landing_page);
+  if (order.client_browser) params.set('browser', order.client_browser);
+  if (order.country_code) params.set('country', order.country_code);
+
+  try {
+    const res = await fetch(`/.netlify/functions/analytics-journey?${params}`);
+    if (!res.ok) throw new Error('API error ' + res.status);
+    const journey = await res.json();
+
+    if (!journey || journey.length === 0) {
+      el.innerHTML = '<span style="color:var(--dim);">No journey data found for this order</span>';
+      return;
+    }
+
+    // Render timeline
+    let html = '<div style="position:relative;padding-left:1.5rem;">';
+    // Vertical line
+    html += '<div style="position:absolute;left:0.45rem;top:0.4rem;bottom:0.4rem;width:2px;background:var(--border);"></div>';
+
+    journey.forEach((step, i) => {
+      const time = new Date(step.event_time).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Pacific/Auckland' });
+      const isEntry = step.entry_page;
+      const isEvent = step.event_type === 'event';
+      const isThankYou = (step.pathname || '').includes('thank-you');
+
+      // Dot color
+      let dotColor = 'var(--dim)';
+      if (isEntry) dotColor = 'var(--sage)';
+      else if (isEvent) dotColor = 'var(--honey)';
+      else if (isThankYou) dotColor = 'var(--sage)';
+
+      // Label
+      let label = step.pathname || '';
+      if (isEvent) label = step.event_name || 'Event';
+
+      // Extra info
+      let extra = '';
+      if (isEntry && step.referrer_domain) extra = `from ${step.referrer_domain}`;
+      if (step.duration > 0) extra += (extra ? ' · ' : '') + step.duration + 's';
+      if (isEntry && step.utm_source) extra += (extra ? ' · ' : '') + step.utm_source;
+
+      html += `<div style="position:relative;margin-bottom:0.6rem;padding-left:0.5rem;">
+        <div style="position:absolute;left:-1.15rem;top:0.25rem;width:8px;height:8px;border-radius:50%;background:${dotColor};"></div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:0.5rem;">
+          <span style="color:${isEvent ? 'var(--honey)' : isThankYou ? 'var(--sage)' : 'var(--text)'};font-weight:${isEntry || isThankYou || isEvent ? '600' : '400'};">${label}</span>
+          <span style="color:var(--dim);font-size:0.7rem;white-space:nowrap;">${time}</span>
+        </div>
+        ${extra ? `<div style="font-size:0.7rem;color:var(--dim);margin-top:0.1rem;">${extra}</div>` : ''}
+      </div>`;
+    });
+
+    html += '</div>';
+    el.innerHTML = html;
+  } catch (e) {
+    el.innerHTML = `<span style="color:var(--red);">Failed to load journey: ${e.message}</span>`;
+  }
 }
 
 // ── Nav drawer ──
