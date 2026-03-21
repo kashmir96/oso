@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
   <title>Primal Pantry — Dashboard</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <!-- Supabase JS removed — all queries go through authenticated proxy -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9/dist/leaflet.min.css">
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9/dist/leaflet.min.js"></script>
@@ -1622,9 +1622,35 @@ document.querySelectorAll('.pw-toggle').forEach(btn => {
   });
 });
 
-const SUPABASE_URL = 'https://yufthilajhcaedudaxkm.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_4qo2PFoiZ0d0ip0Yf3TQFg_Cmc-kSuv';
-let sb, allOrders = [], allLineItems = [], filteredOrders = [], charts = {};
+// Authenticated data proxy — all Supabase queries go through the backend
+const db = {
+  from(table) {
+    let _op, _params = {};
+    const chain = {
+      select(cols) { _op = 'select'; _params.select = cols || '*'; return chain; },
+      insert(data) { _op = 'insert'; _params.data = data; return chain; },
+      update(data) { _op = 'update'; _params.data = data; return chain; },
+      delete() { _op = 'delete'; return chain; },
+      upsert(data, opts) { _op = 'upsert'; _params.data = data; if (opts?.onConflict) _params.onConflict = opts.onConflict; return chain; },
+      eq(col, val) { _params.filters = _params.filters || []; _params.filters.push({ col, op: 'eq', val }); return chain; },
+      order(col, opts) { _params.order = { col, ascending: opts?.ascending ?? true }; return chain; },
+      limit(n) { _params.limit = n; return chain; },
+      single() { _params.single = true; return chain; },
+      then(resolve, reject) {
+        return fetch('/.netlify/functions/dashboard-data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: currentStaff?.token, table, operation: _op, params: _params }),
+        })
+        .then(r => r.json())
+        .then(result => resolve(result))
+        .catch(reject);
+      },
+    };
+    return chain;
+  }
+};
+let allOrders = [], allLineItems = [], filteredOrders = [], charts = {};
 let customerTags = {}; // email → Set of tags
 let shipmentsPage = 1;
 let trendingPage = 1;
@@ -2056,16 +2082,16 @@ async function loadAdSpend() {
 }
 
 async function initDashboard() {
+  if (!currentStaff?.token) return; // Prevent unauthenticated access
   try {
-    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   } catch (err) {
     document.getElementById('orders-table').innerHTML = `<tr><td colspan="8">Supabase error: ${err.message}</td></tr>`;
     return;
   }
 
   const [ordersRes, liRes] = await Promise.all([
-    sb.from('orders').select('*').order('created_at', { ascending: false }),
-    sb.from('order_line_items').select('*'),
+    db.from('orders').select('*').order('created_at', { ascending: false }),
+    db.from('order_line_items').select('*'),
   ]);
 
   if (ordersRes.error) {
@@ -2092,8 +2118,8 @@ async function refreshStats() {
   if (!sb) return;
   try {
     const [ordersRes, liRes] = await Promise.all([
-      sb.from('orders').select('*').order('created_at', { ascending: false }),
-      sb.from('order_line_items').select('*'),
+      db.from('orders').select('*').order('created_at', { ascending: false }),
+      db.from('order_line_items').select('*'),
     ]);
     if (ordersRes.error) return;
     allOrders = ordersRes.data || [];
@@ -2138,8 +2164,8 @@ async function autoRefresh() {
   if (!sb) return;
   try {
     const [ordersRes, liRes] = await Promise.all([
-      sb.from('orders').select('*').order('created_at', { ascending: false }),
-      sb.from('order_line_items').select('*'),
+      db.from('orders').select('*').order('created_at', { ascending: false }),
+      db.from('order_line_items').select('*'),
     ]);
     if (ordersRes.error) return;
     allOrders = ordersRes.data || [];
@@ -2160,8 +2186,8 @@ async function fullRefresh() {
   btn.textContent = '↻ Refreshing...';
   try {
     const [ordersRes, liRes] = await Promise.all([
-      sb.from('orders').select('*').order('created_at', { ascending: false }),
-      sb.from('order_line_items').select('*'),
+      db.from('orders').select('*').order('created_at', { ascending: false }),
+      db.from('order_line_items').select('*'),
     ]);
     if (ordersRes.error) throw ordersRes.error;
     allOrders = ordersRes.data || [];
@@ -2766,11 +2792,11 @@ async function syncDeliveredOrders() {
     if (st === 'Delivered' && !skipStatuses.includes((order.status || '').toLowerCase())) toDeliver.push(order);
   });
   for (const { order, shipped_date } of toShip) {
-    const { error } = await sb.from('orders').update({ shipped_at: shipped_date }).eq('id', order.id);
+    const { error } = await db.from('orders').update({ shipped_at: shipped_date }).eq('id', order.id);
     if (!error) { order.shipped_at = shipped_date; }
   }
   for (const order of toDeliver) {
-    const { error } = await sb.from('orders').update({ status: 'Delivered' }).eq('id', order.id);
+    const { error } = await db.from('orders').update({ status: 'Delivered' }).eq('id', order.id);
     if (!error) { order.status = 'Delivered'; }
   }
   if (toShip.length || toDeliver.length) renderOrdersTable();
@@ -3054,7 +3080,7 @@ function openOrderModal(orderId) {
   document.getElementById('modal-status').addEventListener('change', async function() {
     const newStatus = this.value;
     const oid = Number(this.dataset.orderId);
-    const { error } = await sb.from('orders').update({ status: newStatus }).eq('id', oid);
+    const { error } = await db.from('orders').update({ status: newStatus }).eq('id', oid);
     if (error) {
       alert('Failed to update status: ' + error.message);
     } else {
@@ -3286,7 +3312,7 @@ function openOrderModal(orderId) {
         refund_reason: reason,
         refund_date: new Date().toISOString(),
       };
-      await sb.from('orders').update(updateData).eq('id', oid);
+      await db.from('orders').update(updateData).eq('id', oid);
       if (order) {
         order.status = newStatus;
         order.refund_amount = refundAmount;
@@ -3399,8 +3425,8 @@ function openOrderModal(orderId) {
     }
 
     // 3. Delete from Supabase
-    await sb.from('order_line_items').delete().eq('order_id', oid);
-    const { error } = await sb.from('orders').delete().eq('id', oid);
+    await db.from('order_line_items').delete().eq('order_id', oid);
+    const { error } = await db.from('orders').delete().eq('id', oid);
     if (error) {
       alert('Failed to delete from database: ' + error.message);
       this.disabled = false;
@@ -3565,7 +3591,7 @@ async function saveOrderEdits(orderId) {
     const shippingCost = Number(document.getElementById('edit-shipping-cost').value) || 0;
 
     // Update order in Supabase
-    const { error: orderErr } = await sb.from('orders').update({
+    const { error: orderErr } = await db.from('orders').update({
       ...editedCustomer,
       total_value: newTotal,
       shipping_cost: shippingCost,
@@ -3574,7 +3600,7 @@ async function saveOrderEdits(orderId) {
     if (orderErr) { alert('Failed to update order: ' + orderErr.message); saveBtn.disabled = false; saveBtn.textContent = 'Save Changes'; return; }
 
     // Replace line items
-    await sb.from('order_line_items').delete().eq('order_id', orderId);
+    await db.from('order_line_items').delete().eq('order_id', orderId);
     const lineItemRows = editedItems.map(item => ({
       order_id: orderId,
       description: item.description,
@@ -3582,7 +3608,7 @@ async function saveOrderEdits(orderId) {
       quantity: item.quantity,
       unit_price: item.unit_price,
     }));
-    await sb.from('order_line_items').insert(lineItemRows);
+    await db.from('order_line_items').insert(lineItemRows);
 
     // eShip logic
     const ship = getShipStatus(order);
@@ -4251,7 +4277,7 @@ const TAG_PRESETS = ['VIP', 'Wholesale', 'Influencer', 'Staff', 'Flagged'];
 function tagClass(t) { return TAG_PRESETS.includes(t) ? 'tag-' + t.toLowerCase() : 'tag-custom'; }
 
 async function loadCustomerTags() {
-  const { data, error } = await sb.from('customer_tags').select('*');
+  const { data, error } = await db.from('customer_tags').select('*');
   if (error) { console.error('Failed to load tags:', error); return; }
   customerTags = {};
   (data || []).forEach(row => {
@@ -4262,7 +4288,7 @@ async function loadCustomerTags() {
 
 async function addTag(email, tag) {
   if (!tag) return;
-  const { error } = await sb.from('customer_tags').insert({ email, tag });
+  const { error } = await db.from('customer_tags').insert({ email, tag });
   if (error && !error.message.includes('duplicate')) { alert('Error adding tag: ' + error.message); return; }
   if (!customerTags[email]) customerTags[email] = new Set();
   customerTags[email].add(tag);
@@ -4270,7 +4296,7 @@ async function addTag(email, tag) {
 }
 
 async function removeTag(email, tag) {
-  const { error } = await sb.from('customer_tags').delete().eq('email', email).eq('tag', tag);
+  const { error } = await db.from('customer_tags').delete().eq('email', email).eq('tag', tag);
   if (error) { alert('Error removing tag: ' + error.message); return; }
   if (customerTags[email]) customerTags[email].delete(tag);
   renderCustomersTab();
@@ -5634,7 +5660,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     const el = document.getElementById('wa-checkout-errors');
     if (!el) return;
     try {
-      const { data, error } = await sb.from('checkout_errors').select('*').order('created_at', { ascending: false }).limit(50);
+      const { data, error } = await db.from('checkout_errors').select('*').order('created_at', { ascending: false }).limit(50);
       if (error || !data || !data.length) {
         el.innerHTML = '<p style="color:var(--dim);text-align:center;padding:1rem;font-size:0.85rem;">No checkout errors</p>';
         return;
@@ -6090,7 +6116,7 @@ function formatDate(d) {
 
 async function loadManufacturingTab() {
   if (mfgLoaded) return;
-  const { data, error } = await sb.from('manufacturing_batches').select('*').order('created_at', { ascending: false });
+  const { data, error } = await db.from('manufacturing_batches').select('*').order('created_at', { ascending: false });
   if (error) {
     document.getElementById('mfg-table').innerHTML = `<tr><td colspan="6" class="loading">Error: ${error.message}</td></tr>`;
     return;
@@ -6176,7 +6202,7 @@ async function saveMfgEdit(id) {
   const exp = row.querySelector('[data-field="exp"]').value;
   const batchNo = `${ba}-${bb}`;
 
-  const { error } = await sb.from('manufacturing_batches').update({
+  const { error } = await db.from('manufacturing_batches').update({
     production_date: date, product_sku: sku, quantity: qty, batch_no: batchNo, expiry_date: exp
   }).eq('id', id);
 
@@ -6203,7 +6229,7 @@ document.getElementById('mfg-add-btn').addEventListener('click', async function(
   this.disabled = true;
   this.textContent = 'Adding...';
 
-  const { data, error } = await sb.from('manufacturing_batches').insert({
+  const { data, error } = await db.from('manufacturing_batches').insert({
     production_date: date, product_sku: sku, quantity: qty, batch_no: batchNo, expiry_date: exp
   }).select().single();
 
@@ -6284,7 +6310,7 @@ let unitCostEditingSku = null;
 async function loadUnitCosts() {
   if (unitCostsLoaded) return;
   try {
-    const { data, error } = await sb.from('product_unit_costs').select('*');
+    const { data, error } = await db.from('product_unit_costs').select('*');
     if (error) { console.error('Unit costs error:', error); return; }
     unitCosts = {};
     (data || []).forEach(row => { unitCosts[row.sku] = row; });
@@ -6346,7 +6372,7 @@ async function saveUnitCost(sku) {
   const ingredients = parseFloat(row.querySelector('[data-field="ingredients"]').value) || 0;
   const labor = parseFloat(row.querySelector('[data-field="labor"]').value) || 0;
   const packaging = parseFloat(row.querySelector('[data-field="packaging"]').value) || 0;
-  const { data, error } = await sb.from('product_unit_costs')
+  const { data, error } = await db.from('product_unit_costs')
     .upsert({ sku, ingredients, labor, packaging, updated_at: new Date().toISOString() }, { onConflict: 'sku' })
     .select().single();
   if (error) { alert('Save failed: ' + error.message); return; }
@@ -6476,8 +6502,8 @@ async function loadInventory() {
   if (invLoaded) { renderInventory(); return; }
   try {
     const [blRes, rpRes] = await Promise.all([
-      sb.from('inventory_baselines').select('*').order('counted_at', { ascending: false }),
-      sb.from('inventory_reorder_points').select('*'),
+      db.from('inventory_baselines').select('*').order('counted_at', { ascending: false }),
+      db.from('inventory_reorder_points').select('*'),
     ]);
     // Keep only the latest baseline per SKU
     invBaselines = {};
@@ -6599,7 +6625,7 @@ document.getElementById('inv-stock-count-btn').addEventListener('click', functio
   const quantity = parseInt(qty, 10);
   if (isNaN(quantity) || quantity < 0) { alert('Invalid quantity.'); return; }
   const notes = prompt('Notes (optional):') || '';
-  sb.from('inventory_baselines').insert({ sku, quantity, notes }).then(({ error }) => {
+  db.from('inventory_baselines').insert({ sku, quantity, notes }).then(({ error }) => {
     if (error) { alert('Error: ' + error.message); return; }
     invBaselines[sku] = { sku, quantity, counted_at: new Date().toISOString(), notes };
     renderInventory();
@@ -6614,7 +6640,7 @@ function editReorderPoint(sku) {
   if (isNaN(point) || point < 0) { alert('Invalid number.'); return; }
   const reorderQty = prompt('Reorder quantity (how many to order):', current ? current.reorder_qty : '50');
   const qty = parseInt(reorderQty, 10) || 50;
-  sb.from('inventory_reorder_points').upsert({ sku, reorder_point: point, reorder_qty: qty }, { onConflict: 'sku' }).then(({ error }) => {
+  db.from('inventory_reorder_points').upsert({ sku, reorder_point: point, reorder_qty: qty }, { onConflict: 'sku' }).then(({ error }) => {
     if (error) { alert('Error: ' + error.message); return; }
     invReorderPoints[sku] = { sku, reorder_point: point, reorder_qty: qty };
     renderInventory();
@@ -6629,7 +6655,7 @@ let soEditingId = null;
 async function loadSupplierOrders() {
   if (soLoaded) { renderSupplierOrders(); return; }
   try {
-    const { data, error } = await sb.from('supplier_orders').select('*').order('requested_at', { ascending: false });
+    const { data, error } = await db.from('supplier_orders').select('*').order('requested_at', { ascending: false });
     if (error) throw error;
     supplierOrders = data || [];
     soLoaded = true;
@@ -6730,7 +6756,7 @@ async function saveSupplierEdit(id) {
   if (status === 'ordered' && !supplierOrders.find(o => o.id === id)?.ordered_at) updates.ordered_at = new Date().toISOString();
   if (status === 'received' && !supplierOrders.find(o => o.id === id)?.received_at) updates.received_at = new Date().toISOString();
 
-  const { error } = await sb.from('supplier_orders').update(updates).eq('id', id);
+  const { error } = await db.from('supplier_orders').update(updates).eq('id', id);
   if (error) { alert('Error: ' + error.message); return; }
   const order = supplierOrders.find(o => o.id === id);
   if (order) Object.assign(order, updates);
@@ -6747,7 +6773,7 @@ document.getElementById('so-add-btn').addEventListener('click', async function()
   if (!item_name) { alert('Item name is required.'); return; }
 
   const requested_by = currentStaff ? currentStaff.name : 'Unknown';
-  const { data, error } = await sb.from('supplier_orders').insert({ item_name, supplier_name, quantity, notes, requested_by }).select().single();
+  const { data, error } = await db.from('supplier_orders').insert({ item_name, supplier_name, quantity, notes, requested_by }).select().single();
   if (error) { alert('Error: ' + error.message); return; }
   supplierOrders.unshift(data);
   document.getElementById('so-item').value = '';
