@@ -4,7 +4,10 @@
  * Returns today's total Facebook ad spend from the Marketing API.
  * Authenticated via staff session token (same pattern as analytics-dashboard).
  *
- * GET ?token=X
+ * GET ?token=X[&from=YYYY-MM-DD&to=YYYY-MM-DD]
+ *
+ * If from/to are provided, returns spend for that date range.
+ * Otherwise defaults to today.
  *
  * Env vars required:
  *   SUPABASE_URL, SUPABASE_SERVICE_KEY
@@ -41,7 +44,7 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return reply(200, '');
   if (event.httpMethod !== 'GET') return reply(405, { error: 'GET only' });
 
-  const { token } = event.queryStringParameters || {};
+  const { token, from, to } = event.queryStringParameters || {};
 
   const staff = await getStaffByToken(token);
   if (!staff) return reply(401, { error: 'Unauthorized' });
@@ -54,7 +57,13 @@ exports.handler = async (event) => {
   }
 
   try {
-    const url = `https://graph.facebook.com/v21.0/act_${accountId}/insights?fields=spend&date_preset=today&access_token=${accessToken}`;
+    let url;
+    if (from && to) {
+      const timeRange = JSON.stringify({ since: from, until: to });
+      url = `https://graph.facebook.com/v21.0/act_${accountId}/insights?fields=spend&time_range=${encodeURIComponent(timeRange)}&access_token=${accessToken}`;
+    } else {
+      url = `https://graph.facebook.com/v21.0/act_${accountId}/insights?fields=spend&date_preset=today&access_token=${accessToken}`;
+    }
     const res = await fetch(url);
     const json = await res.json();
 
