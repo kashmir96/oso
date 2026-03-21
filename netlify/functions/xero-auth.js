@@ -49,7 +49,7 @@ async function getStaffByToken(token) {
   return rows && rows.length > 0 ? rows[0] : null;
 }
 
-const SCOPES = 'openid offline_access accounting.invoices.read accounting.banktransactions.read accounting.contacts.read accounting.settings.read';
+const SCOPES = 'openid offline_access accounting.invoices.read accounting.banktransactions.read accounting.contacts.read accounting.settings.read accounting.reports.profitandloss.read accounting.reports.banksummary.read';
 
 function getRedirectUri() {
   return 'https://oso.nz/.netlify/functions/xero-auth';
