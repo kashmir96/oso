@@ -589,6 +589,10 @@
     </div>
     <div class="header-controls">
       <button id="stats-eye-btn" title="Show/hide stats" style="background:var(--card);border:1px solid var(--border);color:var(--dim);padding:0.4rem 0.5rem;border-radius:6px;cursor:pointer;line-height:1;display:flex;align-items:center;transition:all 0.15s;"><svg id="stats-eye-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button>
+      <span id="attr-toggle" style="display:inline-flex;align-items:center;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;font-size:0.65rem;">
+        <button id="attr-first" class="attr-btn active" style="padding:0.3rem 0.5rem;border:none;cursor:pointer;font-size:0.65rem;font-family:'DM Sans',sans-serif;transition:all 0.15s;background:var(--sage);color:#141210;">First click</button>
+        <button id="attr-last" class="attr-btn" style="padding:0.3rem 0.5rem;border:none;border-left:1px solid var(--border);cursor:pointer;font-size:0.65rem;font-family:'DM Sans',sans-serif;transition:all 0.15s;background:var(--card);color:var(--muted);">Last click</button>
+      </span>
       <button id="refresh-btn" title="Refresh data" style="font-size:1rem;line-height:1;">↻</button>
       <span id="last-refresh" style="font-size:0.7rem;color:var(--dim);"></span>
       <span id="deploy-pills" style="display:inline-flex;gap:0.3rem;align-items:center;"></span>
@@ -1663,6 +1667,7 @@ let landingRevPage = 1;
 const PAGE_SIZE = 10;
 let currentStaff = null;
 let activeTab = 'sales';
+let attributionModel = localStorage.getItem('oso_attr_model') || 'first';
 let statsRefreshTimer = null;
 const STATS_REFRESH_MS = 60000;
 let lastKnownRevenue = null;
@@ -2210,6 +2215,24 @@ async function fullRefresh() {
 }
 
 document.getElementById('refresh-btn').addEventListener('click', fullRefresh);
+
+// ── Attribution model toggle (dashboard-wide) ──
+(function() {
+  const firstBtn = document.getElementById('attr-first');
+  const lastBtn = document.getElementById('attr-last');
+  function setAttrModel(model) {
+    attributionModel = model;
+    localStorage.setItem('oso_attr_model', model);
+    firstBtn.style.background = model === 'first' ? 'var(--sage)' : 'var(--card)';
+    firstBtn.style.color = model === 'first' ? '#141210' : 'var(--muted)';
+    lastBtn.style.background = model === 'last' ? 'var(--sage)' : 'var(--card)';
+    lastBtn.style.color = model === 'last' ? '#141210' : 'var(--muted)';
+  }
+  firstBtn.addEventListener('click', () => { setAttrModel('first'); fullRefresh(); });
+  lastBtn.addEventListener('click', () => { setAttrModel('last'); fullRefresh(); });
+  // Restore saved state on load
+  setAttrModel(attributionModel);
+})();
 
 // ── Render all ──
 function renderAll(orders, lineItems) {
@@ -5226,6 +5249,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
 
   async function waFetch(fn, params) {
     params.token = waToken();
+    if (params.metric === 'campaigns') params.attr = attributionModel;
     const qs = new URLSearchParams(params).toString();
     const res = await fetch(`${WA_API}/${fn}?${qs}`);
     if (res.status === 401) { sessionStorage.removeItem('pp_staff'); location.reload(); throw new Error('Session expired'); }

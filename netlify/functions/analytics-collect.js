@@ -147,6 +147,15 @@ exports.handler = async (event) => {
       duration: 0,
       is_unique: unique,
       entry_page: unique, // first page = entry page
+      persistent_id: body.vid || '',
+      ft_source: body.ft_src || '',
+      ft_campaign: body.ft_cam || '',
+      ft_medium: body.ft_med || '',
+      lt_source: body.lt_src || '',
+      lt_campaign: body.lt_cam || '',
+      lt_medium: body.lt_med || '',
+      gclid: body.gclid || '',
+      fbclid: body.fbclid || '',
     };
 
     await sbFetch('/rest/v1/analytics_pageviews', {

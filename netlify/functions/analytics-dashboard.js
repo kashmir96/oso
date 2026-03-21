@@ -58,10 +58,10 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'GET') return reply(405, { error: 'GET only' });
 
   const qs = event.queryStringParameters || {};
-  const { token, site, from, to, metric, col } = qs;
+  const { token, site, from, to, metric, col, attr } = qs;
 
   // Parse filters: fc0/fv0, fc1/fv1, etc.
-  const allowed_filter_cols = ['pathname','referrer_domain','browser','device_type','country','os','utm_campaign','utm_source','utm_medium','utm_content','utm_term','event_name'];
+  const allowed_filter_cols = ['pathname','referrer_domain','browser','device_type','country','os','utm_campaign','utm_source','utm_medium','utm_content','utm_term','event_name','ft_source','ft_campaign','ft_medium','lt_source','lt_campaign','lt_medium'];
   const filters = [];
   for (let i = 0; i < 5; i++) {
     const fc = qs['fc' + i], fv = qs['fv' + i];
@@ -161,9 +161,15 @@ exports.handler = async (event) => {
 
       // UTM columns
       case 'campaigns': {
-        const column = col || 'utm_campaign';
+        let column = col || 'utm_campaign';
         const allowed = ['utm_campaign', 'utm_source', 'utm_medium', 'utm_content', 'utm_term'];
         if (!allowed.includes(column)) return reply(400, { error: 'Invalid column' });
+        // Map to first/last touch columns when attribution model is set
+        if (attr === 'first' || attr === 'last') {
+          const prefix = attr === 'first' ? 'ft_' : 'lt_';
+          const attrMap = { utm_source: prefix + 'source', utm_campaign: prefix + 'campaign', utm_medium: prefix + 'medium' };
+          if (attrMap[column]) column = attrMap[column];
+        }
         const data = await callRpc('analytics_grouped', { ...baseParams, p_column: column });
         return reply(200, data);
       }
