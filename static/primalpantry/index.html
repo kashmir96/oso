@@ -225,6 +225,26 @@
     .delete-btn { background: none; border: 1px solid var(--red); color: var(--red); padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.7rem; cursor: pointer; }
     .delete-btn:hover { background: var(--red); color: white; }
 
+    /* Customer timeline */
+    .tl-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 0.5rem; margin-bottom: 1rem; }
+    .tl-stat { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.75rem; text-align: center; }
+    .tl-stat .label { font-size: 0.6rem; color: var(--dim); text-transform: uppercase; letter-spacing: 0.05em; }
+    .tl-stat .value { font-size: 1.1rem; font-weight: 700; color: var(--text); margin-top: 0.15rem; }
+    .tl-stat .sub { font-size: 0.65rem; color: var(--muted); }
+    .tl-line { position: relative; padding-left: 2rem; }
+    .tl-line::before { content: ''; position: absolute; left: 0.55rem; top: 0; bottom: 0; width: 2px; background: var(--border); }
+    .tl-node { position: relative; margin-bottom: 1rem; }
+    .tl-node .tl-dot { position: absolute; left: -1.55rem; top: 0.35rem; width: 10px; height: 10px; border-radius: 50%; }
+    .tl-date-sep { font-size: 0.7rem; color: var(--dim); font-weight: 600; margin: 1.25rem 0 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; position: relative; }
+    .tl-date-sep::before { content: ''; position: absolute; left: -1.55rem; top: 0.25rem; width: 10px; height: 10px; border-radius: 50%; background: var(--border); border: 2px solid var(--card); }
+    .tl-order-card { background: var(--bg); border: 1px solid var(--sage); border-radius: 8px; padding: 0.75rem; cursor: pointer; transition: border 0.15s; }
+    .tl-order-card:hover { border-color: var(--honey); }
+    .tl-session-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.75rem; font-size: 0.75rem; }
+    .tl-pages { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.3rem; }
+    .tl-page { background: var(--card); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.65rem; color: var(--muted); }
+    .tl-btn { background: none; border: 1px solid var(--sage); color: var(--sage); padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.7rem; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+    .tl-btn:hover { background: var(--sage); color: #141210; }
+
     /* Manual order form */
     .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
     .form-grid.full { grid-template-columns: 1fr; }
@@ -1506,6 +1526,15 @@
     <button class="modal-close" id="modal-close">&times;</button>
     <h2 id="modal-title">Order Details</h2>
     <div id="modal-body"></div>
+  </div>
+</div>
+
+<!-- Customer Timeline modal -->
+<div class="modal-overlay" id="customer-timeline-modal">
+  <div class="modal" style="max-width:720px;max-height:90vh;overflow-y:auto;">
+    <button class="modal-close" id="timeline-close">&times;</button>
+    <div id="timeline-header"></div>
+    <div id="timeline-body" style="margin-top:1rem;"></div>
   </div>
 </div>
 
@@ -4629,6 +4658,7 @@ function renderCustomersTab() {
           ${c.city ? `<span>${c.city}${c.country ? ', ' + c.country : ''}</span>` : ''}
           ${c.phone ? `<span>${c.phone}</span>` : ''}
           <span>Last: ${c.lastOrder}</span>
+          <button class="tl-btn" onclick="event.stopPropagation(); openCustomerTimeline('${c.email.replace(/'/g, "\\'")}')">Timeline</button>
         </div>
       </div>
       <div class="customer-orders-list">
@@ -4639,6 +4669,201 @@ function renderCustomersTab() {
   }).join('');
 
   renderPagination('customers-pagination', customersPage, customerList.length, p => { customersPage = p; renderCustomersTab(); });
+}
+
+// ── Customer Timeline Modal ──
+document.getElementById('timeline-close').addEventListener('click', () => {
+  document.getElementById('customer-timeline-modal').classList.remove('open');
+});
+document.getElementById('customer-timeline-modal').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.remove('open');
+});
+
+async function openCustomerTimeline(email) {
+  const modal = document.getElementById('customer-timeline-modal');
+  const header = document.getElementById('timeline-header');
+  const body = document.getElementById('timeline-body');
+  modal.classList.add('open');
+  header.innerHTML = '<h2 style="margin:0;">Loading...</h2>';
+  body.innerHTML = '';
+
+  // Gather customer data from orders
+  const custOrders = allOrders.filter(o => o.email === email).sort((a, b) => (a.created_at || a.order_date).localeCompare(b.created_at || b.order_date));
+  if (!custOrders.length) { header.innerHTML = '<h2>No orders found</h2>'; return; }
+
+  const name = custOrders[custOrders.length - 1].customer_name || email;
+  const totalSpend = custOrders.reduce((s, o) => s + Number(o.total_value || 0), 0);
+  const aov = totalSpend / custOrders.length;
+  const firstDate = custOrders[0].order_date;
+  const lastDate = custOrders[custOrders.length - 1].order_date;
+  const daysBetween = custOrders.length > 1 ? Math.round((new Date(lastDate) - new Date(firstDate)) / 86400000) : 0;
+  const avgFreq = custOrders.length > 1 ? Math.round(daysBetween / (custOrders.length - 1)) : null;
+
+  // Favourite product
+  const productCount = {};
+  custOrders.forEach(o => {
+    const items = allLineItems.filter(li => li.order_id === o.id);
+    items.forEach(li => {
+      const name = li.description || li.sku || '?';
+      productCount[name] = (productCount[name] || 0) + li.quantity;
+    });
+  });
+  const favProduct = Object.entries(productCount).sort((a, b) => b[1] - a[1])[0];
+
+  // Header stats
+  header.innerHTML = `
+    <h2 style="margin:0 0 0.5rem;">${name}</h2>
+    <div style="font-size:0.8rem;color:var(--muted);margin-bottom:0.75rem;">${email}</div>
+    <div class="tl-stats">
+      <div class="tl-stat"><div class="label">Orders</div><div class="value">${custOrders.length}</div><div class="sub">since ${firstDate}</div></div>
+      <div class="tl-stat"><div class="label">Total Spend</div><div class="value">${fmt_money(totalSpend)}</div><div class="sub">lifetime</div></div>
+      <div class="tl-stat"><div class="label">AOV</div><div class="value">${fmt_money(aov)}</div><div class="sub">avg order</div></div>
+      <div class="tl-stat"><div class="label">Frequency</div><div class="value">${avgFreq !== null ? avgFreq + 'd' : '—'}</div><div class="sub">${avgFreq !== null ? 'between orders' : 'single order'}</div></div>
+      <div class="tl-stat"><div class="label">Favourite</div><div class="value" style="font-size:0.8rem;">${favProduct ? favProduct[0] : '—'}</div><div class="sub">${favProduct ? favProduct[1] + 'x purchased' : ''}</div></div>
+    </div>
+  `;
+
+  // Fetch analytics sessions for this customer
+  let sessions = [];
+  try {
+    const token = currentStaff ? currentStaff.token : '';
+    // Try to find sessions by matching visitor hashes from orders
+    const visitorHashes = custOrders.map(o => o.visitor_hash).filter(Boolean);
+    const persistentIds = custOrders.map(o => o.persistent_id).filter(Boolean);
+
+    // Also try fetching journey data for each order
+    const journeyPromises = custOrders.map(async o => {
+      try {
+        const params = new URLSearchParams({ token, site: 'PrimalPantry.co.nz', order_time: new Date(o.created_at || o.order_date).toISOString() });
+        if (o.visitor_hash) params.set('visitor_hash', o.visitor_hash);
+        if (o.utm_source) params.set('utm_source', o.utm_source);
+        if (o.country_code) params.set('country', o.country_code);
+        const res = await fetch(`/.netlify/functions/analytics-journey?${params}`);
+        if (!res.ok) return [];
+        return await res.json();
+      } catch { return []; }
+    });
+    const journeyResults = await Promise.all(journeyPromises);
+
+    // Build timeline events combining orders and sessions
+    const timelineEvents = [];
+
+    // Add orders
+    custOrders.forEach((o, idx) => {
+      const items = allLineItems.filter(li => li.order_id === o.id);
+      const journey = journeyResults[idx] || [];
+      const src = o.analytics_source || o.utm_source || getUtmFromUrl(o.thank_you_url, 'utm_source') || '';
+      const campaign = o.utm_campaign || getUtmFromUrl(o.thank_you_url, 'utm_campaign') || '';
+      const content = o.utm_content || '';
+
+      // Add session pages before the order
+      if (journey.length) {
+        const sessionPages = journey.filter(j => j.event_type === 'pageview' && !(j.pathname || '').includes('thank-you'));
+        const entryStep = journey.find(j => j.entry_page);
+        const sessionSrc = entryStep?.utm_source || src;
+        const sessionCamp = entryStep?.utm_campaign || campaign;
+        const sessionContent = entryStep?.utm_content || content;
+
+        if (sessionPages.length) {
+          timelineEvents.push({
+            type: 'session',
+            time: journey[0].event_time,
+            source: sessionSrc,
+            campaign: sessionCamp,
+            content: sessionContent,
+            referrer: entryStep?.referrer_domain || '',
+            pages: sessionPages.map(p => p.pathname),
+            duration: sessionPages.reduce((s, p) => s + (p.duration || 0), 0),
+          });
+        }
+      }
+
+      // Add order
+      timelineEvents.push({
+        type: 'order',
+        time: o.created_at || o.order_date,
+        order: o,
+        items,
+        source: src,
+        campaign,
+        content,
+      });
+    });
+
+    // Sort by time
+    timelineEvents.sort((a, b) => new Date(a.time) - new Date(b.time));
+
+    // Render timeline
+    let html = '<div class="tl-line">';
+    let lastDateStr = '';
+
+    timelineEvents.forEach(ev => {
+      const date = new Date(ev.time);
+      const dateStr = date.toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Pacific/Auckland' });
+      const timeStr = date.toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit', timeZone: 'Pacific/Auckland' });
+
+      if (dateStr !== lastDateStr) {
+        html += `<div class="tl-date-sep">${dateStr}</div>`;
+        lastDateStr = dateStr;
+      }
+
+      // Source pill
+      const srcParts = [];
+      if (ev.source) srcParts.push(ev.source);
+      const detail = ev.campaign || ev.content || '';
+      if (detail) srcParts.push(detail);
+      const pill = srcParts.length
+        ? `<span style="display:inline-block;background:var(--sage);color:var(--bg);font-size:0.6rem;font-weight:600;padding:0.1rem 0.4rem;border-radius:9999px;">${srcParts.join(' – ')}</span>`
+        : ev.referrer
+          ? `<span style="display:inline-block;background:var(--border);color:var(--text);font-size:0.6rem;font-weight:600;padding:0.1rem 0.4rem;border-radius:9999px;">${ev.referrer}</span>`
+          : '';
+
+      if (ev.type === 'session') {
+        html += `<div class="tl-node">
+          <div class="tl-dot" style="background:var(--dim);"></div>
+          <div class="tl-session-card">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+              <span style="color:var(--muted);">Website visit</span>
+              ${pill}
+              <span style="color:var(--dim);font-size:0.65rem;">${timeStr}${ev.duration ? ' · ' + ev.duration + 's' : ''}</span>
+            </div>
+            <div class="tl-pages">${ev.pages.map(p => `<span class="tl-page">${p}</span>`).join('')}</div>
+          </div>
+        </div>`;
+      } else {
+        const items = ev.items;
+        const itemStr = items.map(li => `<span style="font-size:0.75rem;">${li.quantity}x ${li.description || li.sku || '?'}</span>`).join('<br>');
+        const ship = getShipStatus(ev.order);
+        const shipPill = ship ? `<span class="ship-status-badge ${(ship._shipping_status || '').toLowerCase().replace(/\\s+/g, '-')}" style="font-size:0.6rem;">${ship._shipping_status}</span>` : '';
+
+        html += `<div class="tl-node">
+          <div class="tl-dot" style="background:var(--sage);"></div>
+          <div class="tl-order-card" onclick="document.getElementById('customer-timeline-modal').classList.remove('open'); openOrderModal(${ev.order.id});">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.4rem;">
+              <span style="font-weight:700;color:var(--sage);">Order #${ev.order.id}</span>
+              ${pill}
+              ${shipPill}
+              <span style="color:var(--dim);font-size:0.65rem;">${timeStr}</span>
+            </div>
+            <div style="margin-bottom:0.3rem;">${itemStr}</div>
+            <div style="font-weight:700;font-size:0.9rem;color:var(--text);">$${Number(ev.order.total_value || 0).toFixed(2)}</div>
+          </div>
+        </div>`;
+      }
+    });
+
+    html += '</div>';
+
+    // Total at bottom
+    html += `<div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-size:0.8rem;color:var(--muted);">Lifetime Total</span>
+      <span style="font-size:1.25rem;font-weight:700;color:var(--sage);">${fmt_money(totalSpend)}</span>
+    </div>`;
+
+    body.innerHTML = html;
+  } catch (e) {
+    body.innerHTML = `<span style="color:var(--red);">Failed to load timeline: ${e.message}</span>`;
+  }
 }
 
 // Attach customer tab events
