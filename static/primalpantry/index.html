@@ -263,6 +263,45 @@
     .seg-btn-clear:hover { background: var(--red); color: white; }
     .seg-count { font-size: 0.7rem; color: var(--muted); white-space: nowrap; }
 
+    /* Customer tags */
+    .tag-pills { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; align-items: center; margin-left: 0.5rem; }
+    .tag-pill { display: inline-flex; align-items: center; gap: 2px; padding: 0.1rem 0.45rem; border-radius: 10px; font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
+    .tag-pill .tag-x { cursor: pointer; opacity: 0.5; margin-left: 2px; font-size: 0.7rem; }
+    .tag-pill .tag-x:hover { opacity: 1; }
+    .tag-vip { background: rgba(212,168,75,0.18); color: var(--honey); }
+    .tag-wholesale { background: rgba(140,180,122,0.18); color: var(--sage); }
+    .tag-influencer { background: rgba(200,120,180,0.18); color: #c878b4; }
+    .tag-staff { background: rgba(160,130,200,0.18); color: #a082c8; }
+    .tag-flagged { background: rgba(224,96,80,0.15); color: var(--red); }
+    .tag-custom { background: rgba(255,255,255,0.06); color: var(--muted); border: 1px solid var(--border); }
+    .tag-add-btn { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; border: 1px dashed var(--border); color: var(--muted); font-size: 0.7rem; cursor: pointer; background: none; line-height: 1; padding: 0; font-family: 'DM Sans', sans-serif; }
+    .tag-add-btn:hover { border-color: var(--sage); color: var(--sage); }
+    .tag-picker { position: absolute; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 0.4rem; z-index: 60; min-width: 120px; box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+    .tag-picker-item { padding: 0.3rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.75rem; color: var(--text); }
+    .tag-picker-item:hover { background: var(--sage-pale); }
+    .tag-picker-item.active { opacity: 0.4; pointer-events: none; }
+
+    /* Order edit mode */
+    .edit-input { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 0.35rem 0.5rem; border-radius: 6px; font-size: 0.85rem; font-family: 'DM Sans', sans-serif; width: 100%; box-sizing: border-box; }
+    .edit-input:focus { outline: none; border-color: var(--sage); box-shadow: 0 0 0 3px rgba(140,180,122,0.2); }
+    .edit-line-item { display: flex; gap: 0.4rem; align-items: center; padding: 0.35rem 0; border-bottom: 1px solid var(--cream-deep); }
+    .edit-line-item .edit-qty { width: 50px; text-align: center; }
+    .edit-line-item .edit-price { width: 70px; text-align: right; }
+    .edit-line-item .edit-desc { flex: 1; }
+    .edit-line-item .edit-remove { background: none; border: 1px solid var(--red); color: var(--red); border-radius: 4px; padding: 0.15rem 0.4rem; font-size: 0.65rem; cursor: pointer; }
+    .edit-line-item .edit-remove:hover { background: var(--red); color: white; }
+    .edit-warning-banner { background: rgba(212,168,75,0.12); border-left: 3px solid var(--amber); padding: 0.6rem 0.75rem; border-radius: 0 6px 6px 0; font-size: 0.8rem; color: var(--honey); margin: 0.75rem 0; }
+    .edit-actions { display: flex; gap: 0.5rem; margin-top: 1rem; justify-content: flex-end; }
+    .edit-save-btn { background: var(--sage); color: #141210; border: none; padding: 0.5rem 1.2rem; border-radius: 6px; font-size: 0.85rem; font-weight: 700; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+    .edit-save-btn:hover { opacity: 0.85; }
+    .edit-save-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .edit-cancel-btn { background: none; border: 1px solid var(--border); color: var(--muted); padding: 0.5rem 1.2rem; border-radius: 6px; font-size: 0.85rem; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+    .edit-cancel-btn:hover { border-color: var(--sage); color: var(--text); }
+    .edit-add-row { display: flex; gap: 0.4rem; align-items: center; padding: 0.35rem 0; }
+    .edit-add-btn { background: none; border: 1px dashed var(--border); color: var(--muted); padding: 0.3rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.75rem; font-family: 'DM Sans', sans-serif; }
+    .edit-add-btn:hover { border-color: var(--sage); color: var(--text); }
+    .edit-total { font-size: 1rem; font-weight: 700; color: var(--text); text-align: right; padding: 0.5rem 0; }
+
     /* Pagination */
     .pagination { display: flex; align-items: center; justify-content: center; gap: 0.75rem; padding: 0.75rem 0 0.25rem; font-size: 0.8rem; color: var(--muted); }
     .pagination button { background: var(--card); border: 1px solid var(--border); color: var(--muted); padding: 0.35rem 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-family: 'DM Sans', sans-serif; }
@@ -717,15 +756,15 @@
       <table>
         <thead>
           <tr>
-            <th style="width:3rem;">Wait</th>
-            <th>Date</th>
-            <th>Customer</th>
-            <th>Email</th>
-            <th>Location</th>
-            <th>Total</th>
-            <th>COGS</th>
-            <th>Margin</th>
-            <th>Source</th>
+            <th class="sortable" data-order-sort="wait" style="width:3rem;">Wait</th>
+            <th class="sortable sort-desc" data-order-sort="date">Date</th>
+            <th class="sortable" data-order-sort="customer">Customer</th>
+            <th class="sortable" data-order-sort="email">Email</th>
+            <th class="sortable" data-order-sort="location">Location</th>
+            <th class="sortable" data-order-sort="total">Total</th>
+            <th class="sortable" data-order-sort="cogs">COGS</th>
+            <th class="sortable" data-order-sort="margin">Margin</th>
+            <th class="sortable" data-order-sort="source">Source</th>
             <th>Items Ordered</th>
             <th>Shipping</th>
           </tr>
@@ -770,6 +809,14 @@
         </select>
         <select id="seg-city"></select>
         <select id="seg-source"></select>
+        <select id="seg-tag">
+          <option value="">All Tags</option>
+          <option value="VIP">VIP</option>
+          <option value="Wholesale">Wholesale</option>
+          <option value="Influencer">Influencer</option>
+          <option value="Staff">Staff</option>
+          <option value="Flagged">Flagged</option>
+        </select>
       </div>
       <div class="segment-actions">
         <select id="seg-saved"><option value="">Saved Segments…</option></select>
@@ -1243,13 +1290,13 @@
           <thead>
             <tr>
               <th class="sortable" data-col="campaign">Campaign</th>
-              <th class="sortable" data-col="source">Source</th>
-              <th class="sortable" data-col="medium">Medium</th>
+              <th class="sortable" data-col="platform">Platform</th>
               <th class="sortable" data-col="spend">Spend</th>
+              <th class="sortable" data-col="impressions">Impr.</th>
+              <th class="sortable" data-col="clicks">Clicks</th>
               <th class="sortable" data-col="revenue">Revenue</th>
               <th class="sortable" data-col="roas">ROAS</th>
-              <th class="sortable" data-col="orders">Orders</th>
-              <th class="sortable" data-col="cvr">CVR%</th>
+              <th class="sortable" data-col="conversions">Conv.</th>
               <th class="sortable" data-col="cpa">CPA</th>
             </tr>
           </thead>
@@ -1277,23 +1324,28 @@
       </div>
     </div>
 
-    <div class="orders-card">
-      <h3>Google Merchant Center Alerts</h3>
-      <div class="mkt-info-banner">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-        Webhook not configured — connect Google Merchant Center API to receive real-time disapproval alerts
+    <div class="orders-card" id="mkt-google-section">
+      <h3 style="display:flex;justify-content:space-between;align-items:center;">Google Integration <span id="mkt-google-status" style="font-size:0.7rem;font-weight:400;text-transform:none;letter-spacing:0;"></span></h3>
+      <div id="mkt-google-connect" style="margin-bottom:1rem;">
+        <div class="mkt-info-banner" id="mkt-google-banner">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <span id="mkt-google-banner-text">Connect Google to pull Ads campaign data and Merchant Center product statuses</span>
+          <button id="mkt-google-connect-btn" class="manual-order-btn" style="margin-left:auto;white-space:nowrap;">Connect Google</button>
+        </div>
+        <div id="mkt-google-ids" style="display:none;margin-top:0.75rem;">
+          <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:end;">
+            <div class="form-group" style="flex:1;min-width:200px;"><label>Google Ads Customer ID</label><input type="text" id="mkt-ads-customer-id" placeholder="123-456-7890" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;"></div>
+            <div class="form-group" style="flex:1;min-width:200px;"><label>Merchant Center ID</label><input type="text" id="mkt-merchant-id" placeholder="123456789" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;"></div>
+            <button id="mkt-save-ids-btn" class="manual-order-btn" style="height:fit-content;">Save IDs</button>
+            <button id="mkt-google-disconnect-btn" class="delete-btn" style="height:fit-content;">Disconnect</button>
+          </div>
+        </div>
       </div>
+      <h3 style="margin-top:1rem;">Merchant Center Product Statuses</h3>
+      <div id="mkt-gmc-loading" class="loading">Connect Google to view product statuses</div>
       <div style="overflow-x:auto;">
-        <table>
-          <thead>
-            <tr>
-              <th>Product</th>
-              <th>SKU</th>
-              <th>Status</th>
-              <th>Issue</th>
-              <th>Date</th>
-            </tr>
-          </thead>
+        <table id="mkt-gmc-table-wrap" style="display:none;">
+          <thead><tr><th>Product</th><th>Status</th><th>Issues</th></tr></thead>
           <tbody id="mkt-gmc-table"></tbody>
         </table>
       </div>
@@ -1572,6 +1624,7 @@ document.querySelectorAll('.pw-toggle').forEach(btn => {
 const SUPABASE_URL = 'https://yufthilajhcaedudaxkm.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_4qo2PFoiZ0d0ip0Yf3TQFg_Cmc-kSuv';
 let sb, allOrders = [], allLineItems = [], filteredOrders = [], charts = {};
+let customerTags = {}; // email → Set of tags
 let shipmentsPage = 1;
 let trendingPage = 1;
 let utmPage = 1;
@@ -2025,6 +2078,7 @@ async function initDashboard() {
   populateFilterDropdowns();
   populateSegmentDropdowns();
   renderSavedSegments();
+  await loadCustomerTags();
   applyFilter();
   loadAdSpend();
 
@@ -2751,6 +2805,24 @@ function orderStatusIcon(status) {
   return '';
 }
 // ── Orders table ──
+let orderSortCol = 'date';
+let orderSortAsc = false; // default: most recent first
+
+function getOrderSortValue(o, col, orderLineItemMap) {
+  switch (col) {
+    case 'wait': return orderDaysWaiting(o);
+    case 'date': return o.created_at || o.order_date || '';
+    case 'customer': return (o.customer_name || '').toLowerCase();
+    case 'email': return (o.email || '').toLowerCase();
+    case 'location': return [o.city, o.country_code].filter(Boolean).join(', ').toLowerCase();
+    case 'total': return Number(o.total_value || 0);
+    case 'cogs': return getOrderCOGS(o.id);
+    case 'margin': { const cg = getOrderCOGS(o.id); const tv = Number(o.total_value || 0); return cg > 0 && tv > 0 ? (tv - cg) / tv : -1; }
+    case 'source': return (o.analytics_source || o.utm_source || getUtmFromUrl(o.thank_you_url, 'utm_source') || '').toLowerCase();
+    default: return '';
+  }
+}
+
 function renderOrdersTable() {
   const tbody = document.getElementById('orders-table');
   const query = (document.getElementById('order-search').value || '').toLowerCase();
@@ -2769,11 +2841,22 @@ function renderOrdersTable() {
       return fields.includes(query) || liText.includes(query);
     });
   }
-  // Sort: days waiting desc, then total value desc
+  // Sort by selected column
   orders.sort((a, b) => {
-    const da = orderDaysWaiting(a), db = orderDaysWaiting(b);
-    if (da !== db) return db - da;
-    return Number(b.total_value || 0) - Number(a.total_value || 0);
+    const va = getOrderSortValue(a, orderSortCol, orderLineItemMap);
+    const vb = getOrderSortValue(b, orderSortCol, orderLineItemMap);
+    let cmp = 0;
+    if (typeof va === 'number' && typeof vb === 'number') cmp = va - vb;
+    else cmp = String(va).localeCompare(String(vb));
+    return orderSortAsc ? cmp : -cmp;
+  });
+
+  // Update header sort indicators
+  document.querySelectorAll('[data-order-sort]').forEach(th => {
+    th.classList.remove('sort-asc', 'sort-desc');
+    if (th.dataset.orderSort === orderSortCol) {
+      th.classList.add(orderSortAsc ? 'sort-asc' : 'sort-desc');
+    }
   });
 
   if (orders.length === 0) {
@@ -2816,6 +2899,17 @@ function renderOrdersTable() {
   renderPagination('orders-pagination', ordersPage, orders.length, p => { ordersPage = p; renderOrdersTable(); });
 }
 
+// Orders table sort click handlers
+document.querySelectorAll('[data-order-sort]').forEach(th => {
+  th.addEventListener('click', function() {
+    const col = this.dataset.orderSort;
+    if (orderSortCol === col) orderSortAsc = !orderSortAsc;
+    else { orderSortCol = col; orderSortAsc = col === 'customer' || col === 'email' || col === 'location' || col === 'source'; }
+    ordersPage = 1;
+    renderOrdersTable();
+  });
+});
+
 // ── Order modal ──
 function openOrderModal(orderId) {
   const order = allOrders.find(o => o.id === orderId);
@@ -2834,6 +2928,12 @@ function openOrderModal(orderId) {
   pillsHtml += '</div>';
 
   const isAdmin = currentStaff && (currentStaff.role === 'owner' || currentStaff.role === 'admin');
+  if (isAdmin) {
+    pillsHtml = `<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px;">
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">${pillsHtml.replace(/<\/?div[^>]*>/g, '')}</div>
+      <button id="modal-edit-btn" data-order-id="${orderId}" style="background:none;border:1px solid var(--sage);color:var(--sage);border-radius:6px;padding:0.3rem 0.7rem;font-size:0.75rem;cursor:pointer;font-weight:600;font-family:'DM Sans',sans-serif;white-space:nowrap;">Edit Order</button>
+    </div>`;
+  }
   const statusOptions = isAdmin
     ? ['Ordered - Paid', 'Processing', 'Shipped', 'Delivered', 'Refunded', 'Incorrect Order', 'Cancelled']
     : ['Ordered - Paid', 'Processing', 'Shipped', 'Delivered'];
@@ -2880,6 +2980,22 @@ function openOrderModal(orderId) {
     <button id="modal-shipping-btn" data-order-id="${orderId}" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:0.5rem 1.2rem;font-size:0.85rem;cursor:pointer;font-weight:600;">Shipping Status</button>
   </div>
   <div id="modal-shipping-detail" style="display:none;margin-top:0.75rem;padding:0.75rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;"></div>`;
+
+  // Review prompt button (only for delivered orders)
+  const isDelivered = (order.status || '').toLowerCase().includes('delivered');
+  const alreadyPrompted = !!order.review_prompted_at;
+  if (isDelivered) {
+    if (alreadyPrompted) {
+      const promptDate = new Date(order.review_prompted_at).toLocaleDateString('en-NZ', { timeZone: 'Pacific/Auckland' });
+      html += `<div style="margin-top:0.75rem;text-align:center;">
+        <span style="background:rgba(140,180,122,0.15);color:var(--sage);padding:0.3rem 0.8rem;border-radius:6px;font-size:0.8rem;font-weight:600;">Review Requested ${promptDate}</span>
+      </div>`;
+    } else {
+      html += `<div style="margin-top:0.75rem;text-align:center;">
+        <button id="modal-review-btn" data-order-id="${orderId}" style="background:var(--honey);color:#141210;border:none;border-radius:6px;padding:0.5rem 1.2rem;font-size:0.85rem;cursor:pointer;font-weight:600;font-family:'DM Sans',sans-serif;">Request Review</button>
+      </div>`;
+    }
+  }
 
   // Only owner/admin can see refund/delete buttons
   if (currentStaff && (currentStaff.role === 'owner' || currentStaff.role === 'admin')) {
@@ -3041,6 +3157,56 @@ function openOrderModal(orderId) {
       } else {
         refundTypeLabel.textContent = 'PARTIAL REFUND';
         refundTypeLabel.style.color = 'var(--accent)';
+      }
+    });
+  }
+
+  // Edit order handler
+  const editBtn = document.getElementById('modal-edit-btn');
+  if (editBtn) {
+    editBtn.addEventListener('click', function() {
+      enterEditMode(Number(this.dataset.orderId));
+    });
+  }
+
+  // Review prompt handler
+  const reviewBtn = document.getElementById('modal-review-btn');
+  if (reviewBtn) {
+    reviewBtn.addEventListener('click', async function() {
+      const oid = Number(this.dataset.orderId);
+      const order = allOrders.find(o => o.id === oid);
+      if (!order) return;
+      if (!confirm(`Send review request to ${order.email}?`)) return;
+
+      this.disabled = true;
+      this.textContent = 'Sending...';
+
+      try {
+        const res = await fetch('/.netlify/functions/send-review-prompt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: order.email,
+            customer_name: order.customer_name,
+            order_id: oid,
+            token: currentStaff?.token,
+          }),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          order.review_prompted_at = new Date().toISOString();
+          const promptDate = new Date().toLocaleDateString('en-NZ', { timeZone: 'Pacific/Auckland' });
+          this.outerHTML = `<span style="background:rgba(140,180,122,0.15);color:var(--sage);padding:0.3rem 0.8rem;border-radius:6px;font-size:0.8rem;font-weight:600;">Review Requested ${promptDate}</span>`;
+          logFrontendActivity('review_prompt', `Sent review request for order #${oid} to ${order.email}`);
+        } else {
+          alert('Failed: ' + (data.error || 'unknown'));
+          this.disabled = false;
+          this.textContent = 'Request Review';
+        }
+      } catch (err) {
+        alert('Error: ' + err.message);
+        this.disabled = false;
+        this.textContent = 'Request Review';
       }
     });
   }
@@ -3259,6 +3425,214 @@ function openOrderModal(orderId) {
     logFrontendActivity('order_delete', `Deleted order #${oid} (${order.customer_name || order.email || '?'}) — $${Number(order.total_value || 0).toFixed(2)}. ${statusMessages.join('. ')}`);
     alert(statusMessages.join('\n'));
   });
+}
+
+// ── Order Edit Mode ──
+function enterEditMode(orderId) {
+  const order = allOrders.find(o => o.id === orderId);
+  if (!order) return;
+  const items = allLineItems.filter(li => li.order_id === orderId);
+
+  document.getElementById('modal-title').textContent = `Edit Order — ${order.customer_name || order.email}`;
+
+  // Check shipping status for warning
+  const ship = getShipStatus(order);
+  const shipStatus = ship?._shipping_status || '';
+  let warningHtml = '';
+  if (['Printed', 'In Transit', 'Delivered'].includes(shipStatus)) {
+    warningHtml = `<div class="edit-warning-banner">This order is "${shipStatus}" — changes will update the database but the shipping label will NOT be updated.</div>`;
+  }
+
+  let html = warningHtml;
+
+  // Customer details
+  html += `<div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;margin-bottom:0.5rem;margin-top:0.5rem;">Customer Details</div>`;
+  html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:1rem;">
+    <div><label style="font-size:0.65rem;color:var(--muted);">Name</label><input class="edit-input" id="edit-name" value="${(order.customer_name || '').replace(/"/g, '&quot;')}"></div>
+    <div><label style="font-size:0.65rem;color:var(--muted);">Email</label><input class="edit-input" id="edit-email" value="${(order.email || '').replace(/"/g, '&quot;')}"></div>
+    <div><label style="font-size:0.65rem;color:var(--muted);">Phone</label><input class="edit-input" id="edit-phone" value="${(order.phone || '').replace(/"/g, '&quot;')}"></div>
+    <div><label style="font-size:0.65rem;color:var(--muted);">City</label><input class="edit-input" id="edit-city" value="${(order.city || '').replace(/"/g, '&quot;')}"></div>
+    <div><label style="font-size:0.65rem;color:var(--muted);">Street</label><input class="edit-input" id="edit-street" value="${(order.street_address || '').replace(/"/g, '&quot;')}"></div>
+    <div><label style="font-size:0.65rem;color:var(--muted);">Suburb</label><input class="edit-input" id="edit-suburb" value="${(order.suburb || '').replace(/"/g, '&quot;')}"></div>
+    <div><label style="font-size:0.65rem;color:var(--muted);">Postcode</label><input class="edit-input" id="edit-postcode" value="${(order.postcode || '').replace(/"/g, '&quot;')}"></div>
+    <div><label style="font-size:0.65rem;color:var(--muted);">Shipping Cost</label><input class="edit-input" id="edit-shipping-cost" type="number" step="0.01" value="${Number(order.shipping_cost || 0).toFixed(2)}"></div>
+  </div>`;
+
+  // Line items
+  html += `<div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;margin-bottom:0.5rem;">Line Items</div>`;
+  html += `<div id="edit-items">`;
+  items.forEach((li, i) => {
+    html += `<div class="edit-line-item" data-sku="${(li.sku || '').replace(/"/g, '&quot;')}">
+      <input class="edit-input edit-qty" type="number" min="1" value="${li.quantity}" onchange="recalcEditTotal()">
+      <input class="edit-input edit-desc" value="${(li.description || li.sku || '').replace(/"/g, '&quot;')}">
+      <input class="edit-input edit-price" type="number" step="0.01" value="${Number(li.unit_price || 0).toFixed(2)}" onchange="recalcEditTotal()">
+      <button class="edit-remove" onclick="this.parentElement.remove(); recalcEditTotal();">&times;</button>
+    </div>`;
+  });
+  html += `</div>`;
+
+  // Add item row
+  html += `<div class="edit-add-row">
+    <input class="edit-input edit-desc" id="add-item-desc" placeholder="Description" style="flex:1;">
+    <input class="edit-input edit-qty" id="add-item-qty" type="number" min="1" value="1" style="width:50px;">
+    <input class="edit-input edit-price" id="add-item-price" type="number" step="0.01" placeholder="Price" style="width:70px;">
+    <button class="edit-add-btn" onclick="addEditItem()">+ Add</button>
+  </div>`;
+
+  // Total
+  html += `<div class="edit-total" id="edit-total">Total: $${items.reduce((s, li) => s + li.quantity * li.unit_price, 0).toFixed(2)}</div>`;
+
+  // Actions
+  html += `<div class="edit-actions">
+    <button class="edit-cancel-btn" onclick="openOrderModal(${orderId})">Cancel</button>
+    <button class="edit-save-btn" id="edit-save-btn" onclick="saveOrderEdits(${orderId})">Save Changes</button>
+  </div>`;
+
+  document.getElementById('modal-body').innerHTML = html;
+}
+
+function addEditItem() {
+  const desc = document.getElementById('add-item-desc').value.trim();
+  const qty = Number(document.getElementById('add-item-qty').value) || 1;
+  const price = Number(document.getElementById('add-item-price').value) || 0;
+  if (!desc) { alert('Enter a description.'); return; }
+
+  const row = document.createElement('div');
+  row.className = 'edit-line-item';
+  row.dataset.sku = '';
+  row.innerHTML = `
+    <input class="edit-input edit-qty" type="number" min="1" value="${qty}" onchange="recalcEditTotal()">
+    <input class="edit-input edit-desc" value="${desc.replace(/"/g, '&quot;')}">
+    <input class="edit-input edit-price" type="number" step="0.01" value="${price.toFixed(2)}" onchange="recalcEditTotal()">
+    <button class="edit-remove" onclick="this.parentElement.remove(); recalcEditTotal();">&times;</button>`;
+  document.getElementById('edit-items').appendChild(row);
+
+  document.getElementById('add-item-desc').value = '';
+  document.getElementById('add-item-qty').value = '1';
+  document.getElementById('add-item-price').value = '';
+  recalcEditTotal();
+}
+
+function recalcEditTotal() {
+  let total = 0;
+  document.querySelectorAll('.edit-line-item').forEach(row => {
+    const qty = Number(row.querySelector('.edit-qty').value) || 0;
+    const price = Number(row.querySelector('.edit-price').value) || 0;
+    total += qty * price;
+  });
+  const el = document.getElementById('edit-total');
+  if (el) el.textContent = `Total: $${total.toFixed(2)}`;
+}
+
+async function saveOrderEdits(orderId) {
+  const order = allOrders.find(o => o.id === orderId);
+  if (!order) return;
+
+  const saveBtn = document.getElementById('edit-save-btn');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving...';
+
+  try {
+    // Gather customer fields
+    const editedCustomer = {
+      customer_name: document.getElementById('edit-name').value.trim(),
+      email: document.getElementById('edit-email').value.trim(),
+      phone: document.getElementById('edit-phone').value.trim(),
+      street_address: document.getElementById('edit-street').value.trim(),
+      suburb: document.getElementById('edit-suburb').value.trim(),
+      city: document.getElementById('edit-city').value.trim(),
+      postcode: document.getElementById('edit-postcode').value.trim(),
+    };
+
+    if (!editedCustomer.customer_name || !editedCustomer.email) {
+      alert('Name and email are required.'); saveBtn.disabled = false; saveBtn.textContent = 'Save Changes'; return;
+    }
+
+    // Gather line items
+    const editedItems = [];
+    document.querySelectorAll('.edit-line-item').forEach(row => {
+      const qty = Number(row.querySelector('.edit-qty').value);
+      const desc = row.querySelector('.edit-desc').value.trim();
+      const sku = row.dataset.sku || '';
+      const price = Number(row.querySelector('.edit-price').value);
+      if (qty > 0 && desc) editedItems.push({ description: desc, sku, quantity: qty, unit_price: price });
+    });
+
+    if (editedItems.length === 0) { alert('Order must have at least one item.'); saveBtn.disabled = false; saveBtn.textContent = 'Save Changes'; return; }
+
+    const newTotal = editedItems.reduce((s, i) => s + i.quantity * i.unit_price, 0);
+    const shippingCost = Number(document.getElementById('edit-shipping-cost').value) || 0;
+
+    // Update order in Supabase
+    const { error: orderErr } = await sb.from('orders').update({
+      ...editedCustomer,
+      total_value: newTotal,
+      shipping_cost: shippingCost,
+    }).eq('id', orderId);
+
+    if (orderErr) { alert('Failed to update order: ' + orderErr.message); saveBtn.disabled = false; saveBtn.textContent = 'Save Changes'; return; }
+
+    // Replace line items
+    await sb.from('order_line_items').delete().eq('order_id', orderId);
+    const lineItemRows = editedItems.map(item => ({
+      order_id: orderId,
+      description: item.description,
+      sku: item.sku,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+    }));
+    await sb.from('order_line_items').insert(lineItemRows);
+
+    // eShip logic
+    const ship = getShipStatus(order);
+    const eshipStatus = ship?._shipping_status || '';
+
+    if (eshipStatus === 'Waiting to Print') {
+      try {
+        await fetch('/.netlify/functions/eship-cancel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order_number: order.stripe_session_id }),
+        });
+        await fetch('/.netlify/functions/manual-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            eship_only: true,
+            order_number: order.stripe_session_id,
+            customer_name: editedCustomer.customer_name,
+            email: editedCustomer.email,
+            phone: editedCustomer.phone,
+            street: editedCustomer.street_address,
+            suburb: editedCustomer.suburb,
+            city: editedCustomer.city,
+            postcode: editedCustomer.postcode,
+            items: editedItems,
+            shipping_cost: shippingCost,
+          }),
+        });
+      } catch (err) {
+        console.error('eShip update error:', err);
+      }
+    } else if (['Printed', 'In Transit', 'Delivered'].includes(eshipStatus)) {
+      alert('Note: This order is "' + eshipStatus + '". The shipping label has NOT been updated.');
+    }
+
+    // Update local state
+    Object.assign(order, editedCustomer, { total_value: newTotal, shipping_cost: shippingCost });
+    allLineItems = allLineItems.filter(li => li.order_id !== orderId);
+    lineItemRows.forEach(li => allLineItems.push(li));
+
+    // Re-render
+    renderOrdersTable();
+    openOrderModal(orderId);
+
+    logFrontendActivity('order_edit', `Edited order #${orderId} (${editedCustomer.customer_name}) — new total $${newTotal.toFixed(2)}`);
+  } catch (err) {
+    alert('Error saving: ' + err.message);
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save Changes';
+  }
 }
 
 function closeModal() {
@@ -3741,6 +4115,7 @@ function getSegmentFilters() {
     recency: document.getElementById('seg-recency').value,
     city: document.getElementById('seg-city').value,
     source: document.getElementById('seg-source').value,
+    tag: document.getElementById('seg-tag').value,
   };
 }
 
@@ -3782,6 +4157,11 @@ function applySegmentFilters(customerList) {
       const firstOrder = c.orders[c.orders.length - 1];
       const src = firstOrder?.utm_source || firstOrder?.analytics_source || getUtmFromUrl(firstOrder?.thank_you_url, 'utm_source') || '';
       if (src !== f.source) return false;
+    }
+    // Tag
+    if (f.tag) {
+      const tags = customerTags[c.email] || new Set();
+      if (!tags.has(f.tag)) return false;
     }
     return true;
   });
@@ -3845,6 +4225,7 @@ function loadSegment(name) {
   document.getElementById('seg-recency').value = f.recency || '';
   document.getElementById('seg-city').value = f.city || '';
   document.getElementById('seg-source').value = f.source || '';
+  document.getElementById('seg-tag').value = f.tag || '';
   customersPage = 1;
   renderCustomersTab();
 }
@@ -3857,11 +4238,78 @@ function deleteSegment(name) {
 }
 
 function clearSegmentFilters() {
-  ['seg-type', 'seg-spend', 'seg-orders', 'seg-recency', 'seg-city', 'seg-source', 'seg-saved'].forEach(id => {
+  ['seg-type', 'seg-spend', 'seg-orders', 'seg-recency', 'seg-city', 'seg-source', 'seg-tag', 'seg-saved'].forEach(id => {
     document.getElementById(id).value = '';
   });
   customersPage = 1;
   renderCustomersTab();
+}
+
+// ── Customer Tags ──
+const TAG_PRESETS = ['VIP', 'Wholesale', 'Influencer', 'Staff', 'Flagged'];
+function tagClass(t) { return TAG_PRESETS.includes(t) ? 'tag-' + t.toLowerCase() : 'tag-custom'; }
+
+async function loadCustomerTags() {
+  const { data, error } = await sb.from('customer_tags').select('*');
+  if (error) { console.error('Failed to load tags:', error); return; }
+  customerTags = {};
+  (data || []).forEach(row => {
+    if (!customerTags[row.email]) customerTags[row.email] = new Set();
+    customerTags[row.email].add(row.tag);
+  });
+}
+
+async function addTag(email, tag) {
+  if (!tag) return;
+  const { error } = await sb.from('customer_tags').insert({ email, tag });
+  if (error && !error.message.includes('duplicate')) { alert('Error adding tag: ' + error.message); return; }
+  if (!customerTags[email]) customerTags[email] = new Set();
+  customerTags[email].add(tag);
+  renderCustomersTab();
+}
+
+async function removeTag(email, tag) {
+  const { error } = await sb.from('customer_tags').delete().eq('email', email).eq('tag', tag);
+  if (error) { alert('Error removing tag: ' + error.message); return; }
+  if (customerTags[email]) customerTags[email].delete(tag);
+  renderCustomersTab();
+}
+
+function toggleTagPicker(email, btn) {
+  // Close any existing picker
+  const existing = document.querySelector('.tag-picker');
+  if (existing) { existing.remove(); return; }
+
+  const tags = customerTags[email] || new Set();
+  const picker = document.createElement('div');
+  picker.className = 'tag-picker';
+  picker.innerHTML = TAG_PRESETS.map(t =>
+    `<div class="tag-picker-item ${tags.has(t) ? 'active' : ''}" onclick="event.stopPropagation(); this.parentElement.remove(); addTag('${email}', '${t}')">${t}</div>`
+  ).join('') +
+    `<div class="tag-picker-item" onclick="event.stopPropagation(); this.parentElement.remove(); const t=prompt('Custom tag:'); if(t) addTag('${email}', t.trim());">+ Custom…</div>`;
+
+  // Position relative to button
+  btn.style.position = 'relative';
+  picker.style.top = '22px';
+  picker.style.left = '0';
+  btn.appendChild(picker);
+
+  // Close on outside click
+  setTimeout(() => {
+    const close = (e) => { if (!picker.contains(e.target)) { picker.remove(); document.removeEventListener('click', close); } };
+    document.addEventListener('click', close);
+  }, 0);
+}
+
+function renderTagPills(email) {
+  const tags = customerTags[email] || new Set();
+  let html = '<span class="tag-pills">';
+  tags.forEach(t => {
+    html += `<span class="tag-pill ${tagClass(t)}">${t}<span class="tag-x" onclick="event.stopPropagation(); removeTag('${email}', '${t}')">&times;</span></span>`;
+  });
+  html += `<button class="tag-add-btn" onclick="event.stopPropagation(); toggleTagPicker('${email}', this)">+</button>`;
+  html += '</span>';
+  return html;
 }
 
 function renderCustomersTab() {
@@ -3999,6 +4447,7 @@ function renderCustomersTab() {
         <div>
           <span class="customer-name">${c.name}</span>
           <span class="customer-email">${c.email}</span>
+          ${renderTagPills(c.email)}
         </div>
         <div class="customer-meta">
           <span><span class="val">${c.orders.length}</span> orders</span>
@@ -4025,7 +4474,7 @@ document.getElementById('customer-search').addEventListener('input', () => { cus
 document.getElementById('customer-sort').addEventListener('change', () => { customersPage = 1; renderCustomersTab(); });
 
 // Segment filter events
-['seg-type', 'seg-spend', 'seg-orders', 'seg-recency', 'seg-city', 'seg-source'].forEach(id => {
+['seg-type', 'seg-spend', 'seg-orders', 'seg-recency', 'seg-city', 'seg-source', 'seg-tag'].forEach(id => {
   document.getElementById(id).addEventListener('change', () => { customersPage = 1; renderCustomersTab(); });
 });
 document.getElementById('seg-saved').addEventListener('change', (e) => loadSegment(e.target.value));
@@ -6310,8 +6759,14 @@ document.getElementById('so-add-btn').addEventListener('click', async function()
 document.getElementById('so-status-filter').addEventListener('change', () => { renderSupplierOrders(); });
 
 // ── Marketing Tab ──
-let mktLoaded = false;
-function loadMarketingTab() {
+let mktInited = false;
+let mktAllCampaigns = [];
+function mktApi(ep, p) { p = p || {}; p.token = currentStaff.token; return fetch('/.netlify/functions/' + ep + '?' + new URLSearchParams(p)).then(r => r.json()); }
+function mktStatCard(label, value, sub, sp, color) { color = color || 'var(--sage)'; const mx = Math.max(...sp, 0.01); const sk = '<div class="sparkline">' + sp.map(v => '<div class="spark-bar" style="height:' + Math.max(1,(v/mx)*24) + 'px;background:' + (v > 0 ? color : 'var(--border)') + '"></div>').join('') + '</div>'; return '<div class="stat-card"><div class="label">' + label + '</div><div class="value" style="color:' + color + '">' + value + '</div><div class="sub" style="color:var(--dim);">' + sub + '</div>' + sk + '</div>'; }
+function mktPill(p) { const c = { facebook: { bg:'rgba(66,103,178,0.15)', fg:'#6d8dc7' }, google: { bg:'rgba(66,133,244,0.15)', fg:'#6ba3f7' }, instagram: { bg:'rgba(225,48,108,0.15)', fg:'#e1306c' }, email: { bg:'rgba(140,180,122,0.15)', fg:'var(--sage)' } }; const x = c[p] || { bg:'rgba(156,146,135,0.15)', fg:'var(--muted)' }; return '<span class="source-pill" style="background:' + x.bg + ';color:' + x.fg + '">' + p + '</span>'; }
+function renderMktFunnel(vi,at,ch,pu) { const cols = ['var(--sage)','#a3c995','var(--honey)','var(--blush)']; const st = [{l:'Visitors',c:vi},{l:'Add to Cart',c:at},{l:'Checkout',c:ch},{l:'Purchase',c:pu}]; let h = '<div class="mkt-funnel">'; st.forEach((s,i) => { const dr = i > 0 ? ((1-s.c/st[i-1].c)*100).toFixed(0)+'% drop' : ''; h += '<div class="mkt-funnel-stage"><div class="mkt-funnel-bar" style="background:'+cols[i]+'"><span class="mkt-funnel-count" style="color:#fff">'+s.c.toLocaleString()+'</span><span class="mkt-funnel-label">'+s.l+'</span></div>'+(dr?'<div class="mkt-funnel-drop">'+dr+'</div>':'')+'</div>'; if(i<st.length-1) h+='<div class="mkt-funnel-arrow">\u2192</div>'; }); return h+'</div>'; }
+function renderMktCT(filter) { const fl = filter ? mktAllCampaigns.filter(c => (c.name+c.platform).toLowerCase().includes(filter)) : mktAllCampaigns; document.getElementById('mkt-campaign-table').innerHTML = fl.map(c => { const roas = c.spend>0?(c.conversions_value/c.spend).toFixed(1)+'x':'-'; const cpa = c.conversions>0&&c.spend>0?'$'+(c.spend/c.conversions).toFixed(2):'-'; return '<tr><td>'+c.name+'</td><td>'+mktPill(c.platform)+'</td><td>$'+c.spend.toFixed(2)+'</td><td>'+(c.impressions||0).toLocaleString()+'</td><td>'+(c.clicks||0).toLocaleString()+'</td><td>$'+c.conversions_value.toFixed(2)+'</td><td>'+roas+'</td><td>'+(c.conversions||0)+'</td><td>'+cpa+'</td></tr>'; }).join('') || '<tr><td colspan="9" class="loading">No campaign data</td></tr>'; }
+async function loadMarketingTab() {
   if (mktLoaded) return; mktLoaded = true;
   const PK = '#ff69b4', PK15 = 'rgba(255,105,180,0.15)';
   function msc(label, value, sub, sp) {
