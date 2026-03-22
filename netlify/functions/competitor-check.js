@@ -216,7 +216,7 @@ function diffSnapshots(prev, curr, competitorName) {
 
 async function verifyToken(token) {
   if (!token) return false;
-  const res = await sbFetch(`/rest/v1/staff_sessions?token=eq.${encodeURIComponent(token)}&select=id`);
+  const res = await sbFetch(`/rest/v1/staff?session_token=eq.${encodeURIComponent(token)}&select=id`);
   const rows = await res.json();
   return Array.isArray(rows) && rows.length > 0;
 }
