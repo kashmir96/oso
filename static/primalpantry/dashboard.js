@@ -181,7 +181,7 @@ document.getElementById('totp-setup-btn').addEventListener('click', doTOTPSetup)
 document.getElementById('totp-setup-code').addEventListener('input', e => { if (e.target.value.length === 6) doTOTPSetup(); });
 document.getElementById('totp-verify-btn').addEventListener('click', doTOTPVerify);
 document.getElementById('totp-verify-code').addEventListener('input', e => { if (e.target.value.length === 6) doTOTPVerify(); });
-document.getElementById('logout-btn').addEventListener('click', () => { sessionStorage.removeItem('pp_staff'); location.reload(); });
+document.getElementById('logout-btn').addEventListener('click', () => { localStorage.removeItem('pp_staff'); localStorage.removeItem('pp_staff_ts'); location.reload(); });
 document.getElementById('modal-close').addEventListener('click', closeModal);
 document.getElementById('order-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
 document.getElementById('order-search').addEventListener('input', () => { ordersPage = 1; renderOrdersTable(); });
@@ -239,7 +239,7 @@ async function doLogin() {
       document.getElementById('totp-verify-box').style.display = 'block';
       document.getElementById('totp-verify-code').focus();
     } else {
-      sessionStorage.setItem('pp_staff', JSON.stringify(currentStaff));
+      localStorage.setItem('pp_staff', JSON.stringify(currentStaff)); localStorage.setItem('pp_staff_ts', String(Date.now()));
       showDashboard();
     }
   } catch (err) {
@@ -287,7 +287,7 @@ async function doTOTPSetup() {
     const data = await res.json();
     if (!res.ok || !data.success) { errEl.textContent = data.error || 'Invalid code'; errEl.style.display = 'block'; document.getElementById('totp-setup-code').value = ''; return; }
     localStorage.setItem('pp_totp_remembered', String(Date.now()));
-    sessionStorage.setItem('pp_staff', JSON.stringify(currentStaff));
+    localStorage.setItem('pp_staff', JSON.stringify(currentStaff)); localStorage.setItem('pp_staff_ts', String(Date.now()));
     showDashboard();
   } catch { errEl.textContent = 'Connection error'; errEl.style.display = 'block'; }
 }
@@ -305,13 +305,19 @@ async function doTOTPVerify() {
     const data = await res.json();
     if (!res.ok || !data.success) { errEl.textContent = data.error || 'Invalid code'; errEl.style.display = 'block'; document.getElementById('totp-verify-code').value = ''; return; }
     localStorage.setItem('pp_totp_remembered', String(Date.now()));
-    sessionStorage.setItem('pp_staff', JSON.stringify(currentStaff));
+    localStorage.setItem('pp_staff', JSON.stringify(currentStaff)); localStorage.setItem('pp_staff_ts', String(Date.now()));
     showDashboard();
   } catch { errEl.textContent = 'Connection error'; errEl.style.display = 'block'; }
 }
 
-const savedStaff = sessionStorage.getItem('pp_staff');
-if (savedStaff) { try { currentStaff = JSON.parse(savedStaff); showDashboard(); } catch { sessionStorage.removeItem('pp_staff'); } }
+const savedStaff = localStorage.getItem('pp_staff');
+const staffTs = Number(localStorage.getItem('pp_staff_ts') || 0);
+const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+if (savedStaff && (Date.now() - staffTs) < SEVEN_DAYS) {
+  try { currentStaff = JSON.parse(savedStaff); showDashboard(); } catch { localStorage.removeItem('pp_staff'); localStorage.removeItem('pp_staff_ts'); }
+} else if (savedStaff) {
+  localStorage.removeItem('pp_staff'); localStorage.removeItem('pp_staff_ts');
+}
 
 // Tab access by role
 const ROLE_TABS = {
@@ -5253,7 +5259,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     if (params.metric === 'campaigns') params.attr = attributionModel;
     const qs = new URLSearchParams(params).toString();
     const res = await fetch(`${WA_API}/${fn}?${qs}`);
-    if (res.status === 401) { sessionStorage.removeItem('pp_staff'); location.reload(); throw new Error('Session expired'); }
+    if (res.status === 401) { localStorage.removeItem('pp_staff'); localStorage.removeItem('pp_staff_ts'); location.reload(); throw new Error('Session expired'); }
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}));
       throw new Error('API error ' + res.status + ': ' + (errBody.error || ''));
