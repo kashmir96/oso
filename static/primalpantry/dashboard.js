@@ -2130,10 +2130,22 @@ function openOrderModal(orderId) {
       // Toggle menu on button click
       reprintBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        reprintMenu.style.display = reprintMenu.style.display === 'none' ? 'block' : 'none';
+        e.preventDefault();
+        const isOpen = reprintMenu.style.display === 'block';
+        reprintMenu.style.display = isOpen ? 'none' : 'block';
+        if (!isOpen) {
+          // Close menu when clicking anywhere else
+          setTimeout(() => {
+            const closeHandler = (ev) => {
+              if (!reprintMenu.contains(ev.target) && ev.target !== reprintBtn) {
+                reprintMenu.style.display = 'none';
+              }
+              document.removeEventListener('click', closeHandler);
+            };
+            document.addEventListener('click', closeHandler);
+          }, 0);
+        }
       });
-      // Close menu on outside click
-      document.addEventListener('click', () => { reprintMenu.style.display = 'none'; }, { once: false });
 
       // Handle menu option clicks
       reprintMenu.querySelectorAll('.reprint-opt').forEach(opt => {
