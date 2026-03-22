@@ -171,7 +171,7 @@ exports.handler = async (event) => {
     // Validate state
     const stateRes = await sbFetch('/rest/v1/google_tokens?id=eq.1&select=oauth_state,state_created,connected_by');
     const stateRows = await stateRes.json();
-    if (!stateRows || stateRows.length === 0 || stateRows[0].oauth_state !== qs.state) {
+    if (!Array.isArray(stateRows) || stateRows.length === 0 || stateRows[0].oauth_state !== qs.state) {
       return htmlReply('<html><body style="background:#141210;color:#e8e2da;font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;"><h2>Invalid state \u2014 please try again.</h2></body></html>');
     }
 
