@@ -7575,14 +7575,13 @@ function spGetInlineFormRow(productId, productName) {
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:flex-end;">
         <div style="min-width:80px;"><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Amount ($)</div><input type="number" id="sp-inline-amount" placeholder="29.95" step="0.01" min="0" oninput="var dp=document.getElementById('sp-inline-display-price');if(!dp.dataset.manual)dp.value=this.value;" style="${inpStyle}width:80px;"></div>
         <div style="min-width:70px;"><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Currency</div><select id="sp-inline-currency" style="${selStyle}"><option value="nzd">NZD</option><option value="aud">AUD</option><option value="usd">USD</option></select></div>
-        <div style="flex:1;min-width:120px;"><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Label</div><input type="text" id="sp-inline-nickname" placeholder="e.g. One-time NZ" style="${inpStyle}"></div>
+        <div style="flex:1;min-width:120px;"><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Variant Code</div><input type="text" id="sp-inline-nickname" placeholder="e.g. VM120, F250" style="${inpStyle}" title="Used as Stripe price description and variant identifier in orders"></div>
         <div style="min-width:80px;"><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Type</div><select id="sp-inline-type" style="${selStyle}"><option value="one_time">One-time</option><option value="month">Monthly</option><option value="week">Weekly</option><option value="year">Yearly</option></select></div>
       </div>
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:flex-end;margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid var(--border);">
         <div style="font-size:0.7rem;color:var(--muted);font-weight:600;width:100%;">Catalog Metadata</div>
         <div><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Category</div><select id="sp-inline-category" style="${selStyle}"><option value="tallow">tallow</option><option value="broth">broth</option></select></div>
         <div style="min-width:90px;"><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Product Type</div><input type="text" id="sp-inline-product-type" placeholder="balm" style="${inpStyle}width:90px;"></div>
-        <div style="min-width:90px;"><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Variant</div><input type="text" id="sp-inline-variant" placeholder="vanilla-rose" style="${inpStyle}width:90px;"></div>
         <div style="min-width:70px;"><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Size</div><input type="text" id="sp-inline-size" placeholder="120ml" style="${inpStyle}width:70px;"></div>
         <div><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Order Type</div><select id="sp-inline-order-type" style="${selStyle}"><option value="single">single</option><option value="pack">pack</option><option value="monthly">monthly</option><option value="quarterly">quarterly</option></select></div>
         <div><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Market</div><select id="sp-inline-market" style="${selStyle}"><option value="NZ">NZ</option><option value="AU">AU</option></select></div>
@@ -7612,14 +7611,13 @@ async function spHandleInlineCreatePrice() {
   if (nickname) payload.nickname = nickname;
   if (priceType !== 'one_time') payload.recurring_interval = priceType;
 
-  // Include catalog metadata if filled in
+  // Include catalog metadata — variant code comes from the nickname field
   const metaPT = document.getElementById('sp-inline-product-type').value.trim();
-  const metaVariant = document.getElementById('sp-inline-variant').value.trim();
   const metaSize = document.getElementById('sp-inline-size').value.trim();
-  if (metaPT && metaVariant && metaSize) {
+  if (metaPT && nickname && metaSize) {
     payload.category = document.getElementById('sp-inline-category').value;
     payload.product_type = metaPT;
-    payload.variant = metaVariant;
+    payload.variant = nickname;
     payload.size = metaSize;
     payload.order_type = document.getElementById('sp-inline-order-type').value;
     payload.market = document.getElementById('sp-inline-market').value;
