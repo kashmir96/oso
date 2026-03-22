@@ -781,6 +781,10 @@
         <button id="attr-first" class="attr-btn active" style="padding:0.3rem 0.5rem;border:none;cursor:pointer;font-size:0.65rem;font-family:'DM Sans',sans-serif;transition:all 0.15s;background:var(--sage);color:#141210;">First click</button>
         <button id="attr-last" class="attr-btn" style="padding:0.3rem 0.5rem;border:none;border-left:1px solid var(--border);cursor:pointer;font-size:0.65rem;font-family:'DM Sans',sans-serif;transition:all 0.15s;background:var(--card);color:var(--muted);">Last click</button>
       </span>
+      <span id="stats-mode-toggle" style="display:inline-flex;align-items:center;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;font-size:0.65rem;">
+        <button id="stats-mode-total" style="padding:0.3rem 0.5rem;border:none;cursor:pointer;font-size:0.65rem;font-family:'DM Sans',sans-serif;transition:all 0.15s;background:var(--sage);color:#141210;">Total</button>
+        <button id="stats-mode-avg" style="padding:0.3rem 0.5rem;border:none;border-left:1px solid var(--border);cursor:pointer;font-size:0.65rem;font-family:'DM Sans',sans-serif;transition:all 0.15s;background:var(--card);color:var(--muted);">Avg Per Order</button>
+      </span>
       <button id="refresh-btn" title="Refresh data" style="font-size:1rem;line-height:1;">↻</button>
       <span id="last-refresh" style="font-size:0.7rem;color:var(--dim);"></span>
       <span id="deploy-pills" style="display:inline-flex;gap:0.3rem;align-items:center;"></span>
@@ -790,10 +794,7 @@
     </div>
   </div>
 
-  <div id="adspend-banner" style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:0.75rem 1.25rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:0.75rem;">
-    <span style="font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">Ad Spend Today</span>
-    <span id="adspend-value" style="font-size:1.5rem;font-weight:700;color:var(--honey);">—</span>
-  </div>
+  <!-- adspend banner removed — adspend now shown in stats grid -->
 
   <!-- Nav drawer -->
   <div class="nav-overlay" id="nav-overlay"></div>
@@ -2294,7 +2295,7 @@ const db = {
   from(table) {
     let _op, _params = {};
     const chain = {
-      select(cols) { _op = 'select'; _params.select = cols || '*'; return chain; },
+      select(cols) { if (!_op) _op = 'select'; _params.select = cols || '*'; return chain; },
       insert(data) { _op = 'insert'; _params.data = data; return chain; },
       update(data) { _op = 'update'; _params.data = data; return chain; },
       delete() { _op = 'delete'; return chain; },
@@ -2331,6 +2332,8 @@ const PAGE_SIZE = 10;
 let currentStaff = null;
 let activeTab = 'sales';
 let attributionModel = localStorage.getItem('oso_attr_model') || 'first';
+let statsMode = localStorage.getItem('oso_stats_mode') || 'total';
+let currentAdSpend = 0;
 let statsRefreshTimer = null;
 const STATS_REFRESH_MS = 60000;
 let lastKnownRevenue = null;
@@ -2792,14 +2795,9 @@ async function loadAdSpend() {
   try {
     const res = await fetch(`/.netlify/functions/facebook-adspend?token=${encodeURIComponent(currentStaff.token)}`);
     const json = await res.json();
-    const el = document.getElementById('adspend-value');
-    if (json.spend !== null && json.spend !== undefined) {
-      el.textContent = '$' + Number(json.spend).toFixed(2);
-    } else {
-      el.textContent = '—';
-    }
+    currentAdSpend = Number(json.spend || 0);
   } catch (e) {
-    document.getElementById('adspend-value').textContent = '—';
+    currentAdSpend = 0;
   }
 }
 
@@ -3131,34 +3129,45 @@ function renderStats(orders, lineItems) {
   const grossMargin = revenue > 0 ? ((revenue - periodCOGS) / revenue * 100).toFixed(1) : '0.0';
   const sparkCOGS = buildHourlySpark(h => orders.filter(o => orderHourNZ(o) === h).reduce((s, o) => s + getOrderCOGS(o.id), 0));
 
-  // Wait-time stats (computed from ALL orders, not just filtered period)
-  const waitingOrders = allOrders.filter(o => orderDaysWaiting(o) >= 0);
-  const waitDays = waitingOrders.map(o => orderDaysWaiting(o));
-  const longestWait = waitDays.length > 0 ? Math.max(...waitDays) : 0;
-  const waitOver2 = waitDays.filter(d => d > 2).length;
-  const avgWait = waitDays.length > 0 ? (waitDays.reduce((a, b) => a + b, 0) / waitDays.length).toFixed(1) : '0';
+  // Profit = Revenue - COGS - Adspend
+  const profit = revenue - periodCOGS - currentAdSpend;
+  const priorProfit = priorRevenue - priorCOGS; // no prior adspend available
+  const avgProfit = orderCount > 0 ? profit / orderCount : 0;
+  const avgCOGS = orderCount > 0 ? periodCOGS / orderCount : 0;
+  const blendedCPA = orderCount > 0 ? currentAdSpend / orderCount : 0;
+  const priorAvgCOGS = priorOrderCount > 0 ? priorCOGS / priorOrderCount : 0;
 
   // Total refund $ value
   const refundTotal = refundedOrders.reduce((s, o) => s + Number(o.total_value || 0), 0);
 
-  // Sales tab stats
+  // Overview stats — toggled by statsMode
+  const isAvg = statsMode === 'avg';
   const stats = [
-    { label: 'Revenue', value: fmt_money(revenue), sub: `${growthSign}${growthPct}% vs prior period`, prior: fmtDelta(revenue, priorRevenue, true), spark: renderSparkBars(sparkRevenue, 'var(--sage)'), color: 'var(--green)' },
-    { label: 'COGS', value: fmt_money(periodCOGS), sub: `${grossMargin}% gross margin`, prior: fmtDelta(periodCOGS, priorCOGS, true), spark: renderSparkBars(sparkCOGS, 'var(--honey)'), color: 'var(--honey)' },
+    isAvg
+      ? { label: 'Avg Profit', value: fmt_money(avgProfit), sub: 'per order after cogs + ads', color: profit >= 0 ? 'var(--green)' : 'var(--red)' }
+      : { label: 'Profit', value: fmt_money(profit), sub: `revenue − cogs − adspend`, prior: fmtDelta(profit, priorProfit, true), color: profit >= 0 ? 'var(--green)' : 'var(--red)' },
+    isAvg
+      ? { label: 'AOV', value: fmt_money(aov), sub: 'avg order value', prior: fmtDelta(aov, priorAov, true), spark: renderSparkBars(sparkAov, 'var(--sage)'), color: 'var(--sage)' }
+      : { label: 'Revenue', value: fmt_money(revenue), sub: `${growthSign}${growthPct}% vs prior period`, prior: fmtDelta(revenue, priorRevenue, true), spark: renderSparkBars(sparkRevenue, 'var(--sage)'), color: 'var(--green)' },
+    isAvg
+      ? { label: 'Avg Order COGs', value: fmt_money(avgCOGS), sub: 'cost per order', prior: fmtDelta(avgCOGS, priorAvgCOGS, true), color: 'var(--honey)' }
+      : { label: 'COGs', value: fmt_money(periodCOGS), sub: `${grossMargin}% gross margin`, prior: fmtDelta(periodCOGS, priorCOGS, true), spark: renderSparkBars(sparkCOGS, 'var(--honey)'), color: 'var(--honey)' },
+    isAvg
+      ? { label: 'Blended CPA', value: fmt_money(blendedCPA), sub: 'adspend per order', color: 'var(--amber)' }
+      : { label: 'Adspend', value: fmt_money(currentAdSpend), sub: 'today\'s ad spend', color: 'var(--amber)' },
+    isAvg
+      ? { label: 'Avg Items/Order', value: avgJars.toFixed(1), sub: 'line items per order', prior: fmtDelta(avgJars, priorAvgJars), color: 'var(--pink)' }
+      : { label: 'Total Items', value: totalQty, sub: 'items purchased', prior: fmtDelta(totalQty, priorTotalQty), color: 'var(--pink)' },
     { label: 'Orders', value: orderCount, sub: `${periodEmails.size} customers`, prior: fmtDelta(orderCount, priorOrderCount), spark: renderSparkBars(sparkOrders, 'var(--blue)'), color: 'var(--blue)' },
-    { label: 'AOV', value: fmt_money(aov), sub: 'avg order value', prior: fmtDelta(aov, priorAov, true), spark: renderSparkBars(sparkAov, 'var(--purple)'), color: 'var(--purple)' },
-    { label: 'Website Visitors', value: '<span id="wa-visitors-count">-</span>', sub: 'across all sites', color: 'var(--cyan)' },
-    { label: 'Avg Items/Order', value: avgJars.toFixed(1), sub: 'line items', prior: fmtDelta(avgJars, priorAvgJars), color: 'var(--pink)' },
-    { label: 'Refunds', value: fmt_money(refundTotal), sub: `${refundedOrders.length} order${refundedOrders.length !== 1 ? 's' : ''} refunded`, color: 'var(--red)' },
-    { label: 'Avg Wait Time', value: avgWait + 'd', sub: `${waitingOrders.length} unshipped`, color: Number(avgWait) >= 2 ? 'var(--amber)' : 'var(--green)' },
-    { label: 'Waiting 2+ Days', value: waitOver2, sub: waitOver2 > 0 ? 'need attention' : 'all on track', color: waitOver2 > 0 ? 'var(--red)' : 'var(--green)' },
-    { label: 'Avg Response', value: '<span id="stat-avg-response">-</span>', sub: 'to customer emails', color: 'var(--cyan)' },
-    { label: 'Unanswered', value: '<span id="stat-unanswered">-</span>', sub: 'customer emails', color: 'var(--amber)' },
+    { label: 'Live Visitors', value: '<span id="wa-live-count">-</span>', sub: 'on site now', color: 'var(--cyan)' },
+    { label: 'Website Visitors', value: '<span id="wa-visitors-count">-</span>', sub: 'unique visitors', color: 'var(--cyan)' },
+    { label: 'Refunds', value: `${fmt_money(refundTotal)} (${refundedOrders.length})`, sub: `${refundedOrders.length} order${refundedOrders.length !== 1 ? 's' : ''} refunded`, color: 'var(--red)' },
   ];
 
   function renderStatCard(s) {
-    const sensitive = s.label === 'Revenue' || s.label === 'Orders';
-    return `<div class="stat-card${sensitive ? ' sensitive-stat' : ''}" ${s.label === 'Revenue' ? 'id="revenue-stat-card"' : ''}>
+    const sensitive = ['Revenue', 'Orders', 'Profit', 'AOV', 'Avg Profit'].includes(s.label);
+    const isRevCard = s.label === 'Revenue' || s.label === 'AOV';
+    return `<div class="stat-card${sensitive ? ' sensitive-stat' : ''}" ${isRevCard ? 'id="revenue-stat-card"' : ''}>
       <div class="label">${s.label}</div>
       <div class="value" style="color:${s.color}">${s.value}</div>
       <div class="sub">${s.sub}</div>
@@ -3190,7 +3199,7 @@ function renderStats(orders, lineItems) {
   }
   lastKnownRevenue = revenue;
 
-  // Async: fetch website visitors from analytics
+  // Async: fetch website visitors + live visitors from analytics
   if (currentStaff && currentStaff.token) {
     const [waFrom, waTo] = getDateRange();
     fetch(`/.netlify/functions/analytics-dashboard?metric=summary&site=PrimalPantry.co.nz&from=${waFrom}&to=${waTo}&token=${currentStaff.token}`)
@@ -3199,6 +3208,12 @@ function renderStats(orders, lineItems) {
         const el = document.getElementById('wa-visitors-count');
         const v = s.unique_visitors || 0;
         if (el) el.textContent = v >= 1000 ? (v / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : v;
+      }).catch(() => {});
+    fetch(`/.netlify/functions/analytics-realtime?site=PrimalPantry.co.nz&token=${currentStaff.token}`)
+      .then(r => r.json())
+      .then(d => {
+        const el = document.getElementById('wa-live-count');
+        if (el) el.textContent = d.active_visitors || 0;
       }).catch(() => {});
   }
 }
@@ -3322,27 +3337,37 @@ function renderDailyPace() {
 
   const todayHourly = Array(24).fill(0);
   const lastWeekHourly = Array(24).fill(0);
+  const todayCogsHourly = Array(24).fill(0);
 
   allOrders.forEach(o => {
     const val = Number(o.total_value || 0);
     if (o.order_date === todayStr) {
       const h = o.created_at ? new Date(o.created_at).getHours() : 0;
       todayHourly[h] += val;
+      todayCogsHourly[h] += getOrderCOGS(o.id);
     } else if (o.order_date === lastWeekStr) {
       const h = o.created_at ? new Date(o.created_at).getHours() : 0;
       lastWeekHourly[h] += val;
     }
   });
 
-  const labels = [], cumToday = [], cumLastWeek = [];
-  let runToday = 0, runLW = 0;
+  const labels = [], cumToday = [], cumLastWeek = [], cumCogs = [], cumAdspend = [];
+  let runToday = 0, runLW = 0, runCogs = 0;
+  // Spread adspend evenly across completed hours
+  const adspendPerHour = currentHour > 0 ? currentAdSpend / (currentHour + 1) : currentAdSpend;
+  let runAds = 0;
   for (let h = 0; h < 24; h++) {
     const ampm = h === 0 ? '12am' : h < 12 ? h + 'am' : h === 12 ? '12pm' : (h - 12) + 'pm';
     labels.push(ampm);
     runLW += lastWeekHourly[h];
     cumLastWeek.push(runLW);
-    if (h <= currentHour) { runToday += todayHourly[h]; cumToday.push(runToday); }
-    else cumToday.push(null);
+    if (h <= currentHour) {
+      runToday += todayHourly[h]; cumToday.push(runToday);
+      runCogs += todayCogsHourly[h]; cumCogs.push(runCogs);
+      runAds += adspendPerHour; cumAdspend.push(runAds);
+    } else {
+      cumToday.push(null); cumCogs.push(null); cumAdspend.push(null);
+    }
   }
 
   const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -3357,6 +3382,8 @@ function renderDailyPace() {
       datasets: [
         { label: lwLabel, data: cumLastWeek, borderColor: 'rgba(156,146,135,0.35)', backgroundColor: 'rgba(156,146,135,0.05)', fill: true, borderWidth: 1.5, borderDash: [4, 3], tension: 0.3, pointRadius: 0 },
         { label: todayLabel, data: cumToday, borderColor: '#8CB47A', backgroundColor: 'rgba(140,180,122,0.1)', fill: true, borderWidth: 2.5, tension: 0.3, pointRadius: 0, pointHitRadius: 8 },
+        { label: 'COGs', data: cumCogs, borderColor: '#e74c3c', backgroundColor: 'transparent', fill: false, borderWidth: 1.5, tension: 0.3, pointRadius: 0, borderDash: [3, 2] },
+        { label: 'Adspend', data: cumAdspend, borderColor: 'var(--honey)', backgroundColor: 'transparent', fill: false, borderWidth: 1.5, tension: 0.3, pointRadius: 0, borderDash: [6, 3] },
       ],
     },
     options: {
@@ -8228,13 +8255,17 @@ async function saveUnitCost(sku) {
   const ingredients = parseFloat(row.querySelector('[data-field="ingredients"]').value) || 0;
   const labor = parseFloat(row.querySelector('[data-field="labor"]').value) || 0;
   const packaging = parseFloat(row.querySelector('[data-field="packaging"]').value) || 0;
-  const { data, error } = await db.from('product_unit_costs')
-    .upsert({ sku, ingredients, labor, packaging, updated_at: new Date().toISOString() }, { onConflict: 'sku' })
-    .select().single();
-  if (error) { alert('Save failed: ' + error.message); return; }
-  unitCosts[sku] = data;
-  unitCostEditingSku = null;
-  renderUnitCostsTable();
+  try {
+    const { data, error } = await db.from('product_unit_costs')
+      .upsert({ sku, ingredients, labor, packaging, updated_at: new Date().toISOString() }, { onConflict: 'sku' })
+      .select().single();
+    if (error) { alert('Save failed: ' + error.message); return; }
+    unitCosts[sku] = data;
+    unitCostEditingSku = null;
+    renderUnitCostsTable();
+  } catch (err) {
+    alert('Save failed: ' + (err.message || 'Network error'));
+  }
 }
 
 function getOrderCOGS(orderId) {
