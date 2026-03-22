@@ -84,14 +84,10 @@ exports.handler = async (event) => {
     return reply(400, { error: 'Missing params: site, from, to, metric' });
   }
 
-  // Convert NZ dates to UTC — dynamically detect NZST (+12) vs NZDT (+13)
-  const nzOffset = (() => {
-    const now = new Date();
-    const utc = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
-    const nz = new Date(now.toLocaleString('en-US', { timeZone: 'Pacific/Auckland' }));
-    const h = Math.round((nz - utc) / 3600000);
-    return `${h >= 0 ? '+' : '-'}${String(Math.abs(h)).padStart(2, '0')}:00`;
-  })();
+  // Convert NZ dates to UTC
+  // NZDT (UTC+13) until first Sunday in April, then NZST (UTC+12)
+  const nzMonth = new Date().getMonth(); // 0-indexed
+  const nzOffset = (nzMonth >= 3 && nzMonth <= 8) ? '+12:00' : '+13:00'; // Apr-Sep = NZST
   const p_from = new Date(from + 'T00:00:00' + nzOffset).toISOString();
   // Add 1 day to 'to' so it includes the full end date in NZ time
   const toDate = new Date(to + 'T00:00:00' + nzOffset);
