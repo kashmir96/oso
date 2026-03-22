@@ -4339,9 +4339,10 @@ function renderShipmentsTable() {
     const awaitingBadge = matched && matched.awaiting_sku ? ` <span class="ship-status-badge awaiting-stock">Awaiting: ${matched.awaiting_sku}</span>` : '';
     const clickHandler = matched ? `onclick="openOrderModal(${matched.id})" style="cursor:pointer;"` : '';
 
-    // Checkbox for bulk bag mode
+    // Checkbox for bulk bag mode — only for unshipped/printed orders
     const shipOrderId = o.order_id || o.id || 0;
-    const checkboxTd = bulkBagMode ? `<td onclick="event.stopPropagation();" style="text-align:center;width:2rem;"><input type="checkbox" class="bulk-bag-check" data-order-id="${shipOrderId}" ${bulkBagOrderIds.includes(shipOrderId) ? 'checked' : ''} onchange="toggleBulkBagOrder(${shipOrderId}, this.checked)" style="cursor:pointer;width:16px;height:16px;accent-color:var(--cyan);"></td>` : '';
+    const canChangeBag = ['Waiting to Print', 'Printed'].includes(status);
+    const checkboxTd = bulkBagMode ? `<td onclick="event.stopPropagation();" style="text-align:center;width:2rem;">${canChangeBag ? `<input type="checkbox" class="bulk-bag-check" data-order-id="${shipOrderId}" ${bulkBagOrderIds.includes(shipOrderId) ? 'checked' : ''} onchange="toggleBulkBagOrder(${shipOrderId}, this.checked)" style="cursor:pointer;width:16px;height:16px;accent-color:var(--cyan);">` : '<span style="color:var(--dim);font-size:0.7rem;">—</span>'}</td>` : '';
 
     return `<tr ${clickHandler}>
       ${checkboxTd}
