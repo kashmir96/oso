@@ -303,33 +303,54 @@ exports.handler = async (event) => {
   if (action === 'threads') {
     const limit = body.limit || 50;
     const search = body.search || '';
+    const filter = body.filter || 'all'; // all|customers|suppliers|wholesalers|flagged
 
-    let path = '/rest/v1/email_messages?select=thread_id,customer_email,from_address,to_address,subject,snippet,date,direction,is_read,staff_name,account_id&order=date.desc&limit=500';
+    let path = '/rest/v1/email_messages?select=thread_id,customer_email,from_address,to_address,subject,snippet,date,direction,is_read,staff_name,account_id,order_flagged&order=date.desc&limit=500';
     const res = await sbFetch(path);
     const msgs = await res.json();
+
+    // Load contacts for type detection
+    const contactRes = await sbFetch('/rest/v1/contacts?select=email,name,company,type');
+    const contactRows = await contactRes.json();
+    const contactMap = {};
+    if (Array.isArray(contactRows)) {
+      contactRows.forEach(c => { contactMap[c.email.toLowerCase()] = c; });
+    }
 
     // Group by thread_id (prefer) or customer_email
     const threadMap = {};
     for (const m of msgs) {
       const key = m.thread_id || m.customer_email || m.from_address;
       if (!threadMap[key]) {
+        const email = m.customer_email || (m.direction === 'inbound' ? parseEmailAddress(m.from_address) : parseEmailAddress(m.to_address));
+        const contact = contactMap[email] || null;
         threadMap[key] = {
           thread_id: m.thread_id,
-          customer_email: m.customer_email || (m.direction === 'inbound' ? parseEmailAddress(m.from_address) : parseEmailAddress(m.to_address)),
+          customer_email: email,
           last_subject: m.subject,
           last_snippet: m.snippet,
           last_date: m.date,
           unread_count: 0,
           message_count: 0,
           account_id: m.account_id,
+          order_flagged: false,
+          contact_type: contact ? contact.type : 'customer',
+          contact_name: contact ? (contact.company || contact.name) : null,
         };
       }
       threadMap[key].message_count++;
       if (!m.is_read && m.direction === 'inbound') threadMap[key].unread_count++;
+      if (m.order_flagged) threadMap[key].order_flagged = true;
     }
 
     let threads = Object.values(threadMap)
       .sort((a, b) => new Date(b.last_date) - new Date(a.last_date));
+
+    // Filter by contact type
+    if (filter === 'suppliers') threads = threads.filter(t => t.contact_type === 'supplier');
+    else if (filter === 'wholesalers') threads = threads.filter(t => t.contact_type === 'wholesaler');
+    else if (filter === 'customers') threads = threads.filter(t => t.contact_type === 'customer');
+    else if (filter === 'flagged') threads = threads.filter(t => t.order_flagged);
 
     // Search filter
     if (search) {
@@ -337,7 +358,8 @@ exports.handler = async (event) => {
       threads = threads.filter(t =>
         (t.customer_email || '').toLowerCase().includes(q) ||
         (t.last_subject || '').toLowerCase().includes(q) ||
-        (t.last_snippet || '').toLowerCase().includes(q)
+        (t.last_snippet || '').toLowerCase().includes(q) ||
+        (t.contact_name || '').toLowerCase().includes(q)
       );
     }
 
@@ -351,7 +373,7 @@ exports.handler = async (event) => {
 
     threads = threads.slice(0, limit).map(t => ({
       ...t,
-      customer_name: nameMap[t.customer_email] || t.customer_email || 'Unknown',
+      customer_name: t.contact_name || nameMap[t.customer_email] || t.customer_email || 'Unknown',
     }));
 
     return reply(200, { threads });
@@ -498,6 +520,107 @@ exports.handler = async (event) => {
     const res = await sbFetch(`/rest/v1/email_messages?thread_id=eq.${encodeURIComponent(thread_id)}&order=date.asc`);
     const messages = await res.json();
     return reply(200, { messages: messages || [] });
+  }
+
+  // ── prompt: admin flags an email for a staff member ──
+  if (action === 'prompt') {
+    const { message_id, thread_id, to_staff_id, note } = body;
+    if (!to_staff_id) return reply(400, { error: 'to_staff_id required' });
+
+    const promptBody = {
+      thread_id: thread_id || null,
+      from_staff_id: staff.id,
+      to_staff_id: parseInt(to_staff_id),
+      note: note || '',
+    };
+    if (message_id) promptBody.email_message_id = parseInt(message_id);
+
+    await sbFetch('/rest/v1/email_prompts', { method: 'POST', body: promptBody });
+
+    // Log activity
+    const staffRes = await sbFetch(`/rest/v1/staff?id=eq.${to_staff_id}&select=display_name`);
+    const staffRows = await staffRes.json();
+    const targetName = staffRows[0]?.display_name || 'staff';
+    await sbFetch('/rest/v1/staff_activity_log', {
+      method: 'POST',
+      body: { staff_id: staff.id, action: 'email_prompted', details: `Prompted ${targetName} to check email thread` },
+    });
+
+    return reply(200, { success: true });
+  }
+
+  // ── get_prompts: get unseen prompts for current staff ──
+  if (action === 'get_prompts') {
+    // Get unseen prompts for this staff member
+    const promptRes = await sbFetch(`/rest/v1/email_prompts?to_staff_id=eq.${staff.id}&seen=eq.false&order=created_at.desc&limit=20`);
+    const prompts = await promptRes.json();
+
+    // Enrich with message details and prompter name
+    const enriched = [];
+    for (const p of (prompts || [])) {
+      let msgData = {};
+      if (p.email_message_id) {
+        const mRes = await sbFetch(`/rest/v1/email_messages?id=eq.${p.email_message_id}&select=from_address,to_address,subject,snippet,date,account_id,thread_id`);
+        const mRows = await mRes.json();
+        if (mRows && mRows[0]) msgData = mRows[0];
+      } else if (p.thread_id) {
+        const mRes = await sbFetch(`/rest/v1/email_messages?thread_id=eq.${encodeURIComponent(p.thread_id)}&order=date.desc&limit=1&select=from_address,to_address,subject,snippet,date,account_id`);
+        const mRows = await mRes.json();
+        if (mRows && mRows[0]) msgData = mRows[0];
+      }
+
+      // Get prompter name
+      const fromRes = await sbFetch(`/rest/v1/staff?id=eq.${p.from_staff_id}&select=display_name`);
+      const fromRows = await fromRes.json();
+
+      enriched.push({
+        id: p.id,
+        thread_id: p.thread_id || msgData.thread_id,
+        from_staff: fromRows[0]?.display_name || 'Admin',
+        note: p.note,
+        created_at: p.created_at,
+        email_from: msgData.from_address || '',
+        email_subject: msgData.subject || '',
+        email_snippet: msgData.snippet || '',
+        email_date: msgData.date || '',
+        account_id: msgData.account_id,
+      });
+    }
+
+    return reply(200, { prompts: enriched });
+  }
+
+  // ── dismiss_prompt: mark prompt as seen ──
+  if (action === 'dismiss_prompt') {
+    const { prompt_id } = body;
+    if (!prompt_id) return reply(400, { error: 'prompt_id required' });
+
+    await sbFetch(`/rest/v1/email_prompts?id=eq.${prompt_id}`, {
+      method: 'PATCH',
+      body: { seen: true, seen_at: new Date().toISOString() },
+    });
+
+    return reply(200, { success: true });
+  }
+
+  // ── flag_order: toggle order flag on a thread ──
+  if (action === 'flag_order') {
+    const { thread_id, flagged } = body;
+    if (!thread_id) return reply(400, { error: 'thread_id required' });
+
+    await sbFetch(`/rest/v1/email_messages?thread_id=eq.${encodeURIComponent(thread_id)}`, {
+      method: 'PATCH',
+      body: { order_flagged: flagged !== false },
+    });
+
+    return reply(200, { success: true });
+  }
+
+  // ── get_staff_list: for prompt dropdown ──
+  if (action === 'get_staff_list') {
+    const res = await sbFetch('/rest/v1/staff?select=id,display_name,role&order=display_name.asc');
+    const staffList = await res.json();
+    return reply(200, { staff: (staffList || []).filter(s => s.id !== staff.id) });
   }
 
   return reply(400, { error: 'Unknown action: ' + action });

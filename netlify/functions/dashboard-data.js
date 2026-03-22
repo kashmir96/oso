@@ -29,6 +29,10 @@ const ALLOWED_TABLES = new Set([
   'email_messages',
   'gmail_accounts',
   'product_price_map',
+  'contacts',
+  'email_prompts',
+  'suppliers',
+  'wholesalers',
 ]);
 
 const ALLOWED_OPS = new Set(['select', 'insert', 'update', 'delete', 'upsert']);
