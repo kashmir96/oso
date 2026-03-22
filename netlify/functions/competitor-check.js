@@ -212,9 +212,27 @@ function diffSnapshots(prev, curr, competitorName) {
   return changes;
 }
 
+// ── Auth helper for manual triggers ──
+
+async function verifyToken(token) {
+  if (!token) return false;
+  const res = await sbFetch(`/rest/v1/staff_sessions?token=eq.${encodeURIComponent(token)}&select=id`);
+  const rows = await res.json();
+  return Array.isArray(rows) && rows.length > 0;
+}
+
 // ── Main handler ──
 
 exports.handler = async (event) => {
+  // Support manual trigger via HTTP with token auth
+  const params = event.queryStringParameters || {};
+  if (params.token) {
+    const valid = await verifyToken(params.token);
+    if (!valid) {
+      return { statusCode: 401, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ error: 'Unauthorized' }) };
+    }
+  }
+
   console.log('Competitor check starting...');
 
   // Get all active competitors

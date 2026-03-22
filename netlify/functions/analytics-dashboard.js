@@ -84,11 +84,17 @@ exports.handler = async (event) => {
     return reply(400, { error: 'Missing params: site, from, to, metric' });
   }
 
-  // Convert NZ dates to UTC — NZ is UTC+12 (NZST) or UTC+13 (NZDT)
-  // Use -11:00 offset so "2026-03-21" → "2026-03-20T11:00:00Z" (start of NZ day in UTC)
-  const p_from = new Date(from + 'T00:00:00+13:00').toISOString();
+  // Convert NZ dates to UTC — dynamically detect NZST (+12) vs NZDT (+13)
+  const nzOffset = (() => {
+    const now = new Date();
+    const utc = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
+    const nz = new Date(now.toLocaleString('en-US', { timeZone: 'Pacific/Auckland' }));
+    const h = Math.round((nz - utc) / 3600000);
+    return `${h >= 0 ? '+' : '-'}${String(Math.abs(h)).padStart(2, '0')}:00`;
+  })();
+  const p_from = new Date(from + 'T00:00:00' + nzOffset).toISOString();
   // Add 1 day to 'to' so it includes the full end date in NZ time
-  const toDate = new Date(to + 'T00:00:00+13:00');
+  const toDate = new Date(to + 'T00:00:00' + nzOffset);
   toDate.setDate(toDate.getDate() + 1);
   const p_to = toDate.toISOString();
 

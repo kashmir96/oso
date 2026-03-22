@@ -24,6 +24,15 @@ CREATE TABLE analytics_pageviews (
   duration      int         DEFAULT 0,
   is_unique     boolean     NOT NULL DEFAULT false,
   entry_page    boolean     NOT NULL DEFAULT false,
+  persistent_id text        DEFAULT '',
+  ft_source     text        DEFAULT '',
+  ft_campaign   text        DEFAULT '',
+  ft_medium     text        DEFAULT '',
+  lt_source     text        DEFAULT '',
+  lt_campaign   text        DEFAULT '',
+  lt_medium     text        DEFAULT '',
+  gclid         text        DEFAULT '',
+  fbclid        text        DEFAULT '',
   created_at    timestamptz NOT NULL DEFAULT now()
 );
 

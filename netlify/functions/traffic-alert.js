@@ -17,11 +17,18 @@
 
 const SITE_ID = 'PrimalPantry.co.nz';
 
-let lastAlertedPair = null;
-
 function getNZTime() {
   const nzStr = new Date().toLocaleString('en-US', { timeZone: 'Pacific/Auckland' });
   return new Date(nzStr);
+}
+
+function getNZOffset() {
+  const now = new Date();
+  const utcStr = now.toLocaleString('en-US', { timeZone: 'UTC' });
+  const nzStr = now.toLocaleString('en-US', { timeZone: 'Pacific/Auckland' });
+  const diffMs = new Date(nzStr) - new Date(utcStr);
+  const h = Math.round(diffMs / 3600000);
+  return `${h >= 0 ? '+' : '-'}${String(Math.abs(h)).padStart(2, '0')}:00`;
 }
 
 function getNZDateRange(nzNow) {
@@ -29,8 +36,8 @@ function getNZDateRange(nzNow) {
   const m = String(nzNow.getMonth() + 1).padStart(2, '0');
   const d = String(nzNow.getDate()).padStart(2, '0');
   const dateStr = `${y}-${m}-${d}`;
-  // Start/end of day in NZ as UTC timestamps for querying
-  const startNZ = new Date(`${dateStr}T00:00:00+13:00`); // NZDT
+  const offset = getNZOffset();
+  const startNZ = new Date(`${dateStr}T00:00:00${offset}`);
   return { dateStr, startNZ };
 }
 
@@ -60,31 +67,20 @@ async function sendSMS(message) {
   return results;
 }
 
-async function getPageviewsByHour(nzNow) {
-  const SUPABASE_URL = process.env.SUPABASE_URL;
-  const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
-
-  const { dateStr, startNZ } = getNZDateRange(nzNow);
-
-  // Get hourly pageview counts for today (NZ time) using the timeseries RPC
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/analytics_timeseries`, {
-    method: 'POST',
+async function getRecentPageviewCount() {
+  // Query analytics_pageviews directly via REST (no RPC dependency)
+  // Check if there are ANY pageviews in the last 2 hours
+  const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+  const url = `${process.env.SUPABASE_URL}/rest/v1/analytics_pageviews?site_id=eq.${encodeURIComponent(SITE_ID)}&created_at=gte.${twoHoursAgo}&select=id&limit=1`;
+  const res = await fetch(url, {
     headers: {
-      'apikey': SUPABASE_KEY,
-      'Authorization': `Bearer ${SUPABASE_KEY}`,
-      'Content-Type': 'application/json',
+      'apikey': process.env.SUPABASE_SERVICE_KEY,
+      'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}`,
     },
-    body: JSON.stringify({
-      p_site: SITE_ID,
-      p_from: startNZ.toISOString(),
-      p_to: new Date().toISOString(),
-      p_interval: 'hour',
-    }),
   });
-
-  if (!res.ok) throw new Error(`Supabase RPC error ${res.status}`);
-  const data = await res.json();
-  return { dateStr, timeseries: data };
+  if (!res.ok) throw new Error(`Supabase query error ${res.status}: ${await res.text()}`);
+  const rows = await res.json();
+  return rows.length;
 }
 
 exports.handler = async (event) => {
@@ -97,53 +93,35 @@ exports.handler = async (event) => {
     const nzNow = getNZTime();
     const currentHour = nzNow.getHours();
 
-    // Silent between 11pm (23) and 6am (6)
+    // Silent between 11pm (23) and 6am (6) NZ time
     if (currentHour >= 23 || currentHour < 6) {
-      return { statusCode: 200, headers, body: JSON.stringify({ skipped: true, reason: 'Outside alert hours (11pm-6am)' }) };
+      return { statusCode: 200, headers, body: JSON.stringify({ skipped: true, reason: 'Outside alert hours (11pm-6am NZT)' }) };
     }
 
-    // Need at least 2 completed hours to check (earliest check at 8am for 6am+7am)
+    // Need at least 2 hours since 6am
     if (currentHour < 8) {
       return { statusCode: 200, headers, body: JSON.stringify({ skipped: true, reason: 'Too early – need 2 completed hours since 6am' }) };
     }
 
-    const { dateStr, timeseries } = await getPageviewsByHour(nzNow);
+    // Simple check: any pageviews in last 2 hours?
+    const recentCount = await getRecentPageviewCount();
 
-    // Build hourly counts from timeseries data
-    // timeseries returns [{period: "2026-03-22T...", visitors: N, pageviews: N}, ...]
-    const hourlyCounts = {};
-    for (let h = 6; h <= 22; h++) hourlyCounts[h] = 0;
+    if (recentCount > 0) {
+      return { statusCode: 200, headers, body: JSON.stringify({ alert: false, message: 'Traffic detected in last 2 hours', recentCount }) };
+    }
 
-    timeseries.forEach(row => {
-      const rowDate = new Date(row.period);
-      // Convert to NZ hour
-      const nzHourStr = rowDate.toLocaleString('en-US', { timeZone: 'Pacific/Auckland', hour: 'numeric', hour12: false });
-      const h = parseInt(nzHourStr, 10);
-      if (h >= 6 && h <= 22) {
-        hourlyCounts[h] = (hourlyCounts[h] || 0) + row.pageviews;
-      }
+    // Zero pageviews in last 2 hours — check dedup before alerting
+    const { dateStr } = getNZDateRange(nzNow);
+    const alertKey = `traffic-alert-${dateStr}`;
+    const dedupRes = await fetch(`${process.env.SUPABASE_URL}/rest/v1/analytics_salt?id=eq.2&select=date_str`, {
+      headers: {
+        'apikey': process.env.SUPABASE_SERVICE_KEY,
+        'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}`,
+      },
     });
-
-    // Check completed hours only (up to currentHour - 1)
-    const maxHour = Math.min(currentHour - 1, 22);
-    const consecutiveZeros = [];
-
-    for (let h = 7; h <= maxHour; h++) {
-      if (hourlyCounts[h] === 0 && hourlyCounts[h - 1] === 0) {
-        consecutiveZeros.push([h - 1, h]);
-      }
-    }
-
-    if (consecutiveZeros.length === 0) {
-      return { statusCode: 200, headers, body: JSON.stringify({ alert: false, message: 'No consecutive zero-traffic hours', today: dateStr, hourlyCounts }) };
-    }
-
-    // Alert on the most recent consecutive pair
-    const [hourA, hourB] = consecutiveZeros[consecutiveZeros.length - 1];
-    const pairKey = `${dateStr}-${hourA}-${hourB}`;
-
-    if (lastAlertedPair === pairKey) {
-      return { statusCode: 200, headers, body: JSON.stringify({ alert: false, message: 'Already alerted for this pair', pair: [hourA, hourB] }) };
+    const dedupRows = await dedupRes.json();
+    if (dedupRows && dedupRows.length > 0 && dedupRows[0].date_str === alertKey) {
+      return { statusCode: 200, headers, body: JSON.stringify({ alert: false, message: 'Already alerted today' }) };
     }
 
     const formatHour = (h) => {
@@ -153,15 +131,27 @@ exports.handler = async (event) => {
       return (h - 12) + 'pm';
     };
 
-    const msg = `Primal Pantry Traffic Alert: Zero website traffic between ${formatHour(hourA)}-${formatHour(hourB + 1)} today (${dateStr}). Site may be down — check primalpantry.co.nz`;
+    const msg = `Primal Pantry Traffic Alert: Zero pageviews recorded in the last 2 hours (as of ${formatHour(currentHour)} NZT, ${dateStr}). Tracking may be broken — check primalpantry.co.nz`;
 
-    await sendSMS(msg);
-    lastAlertedPair = pairKey;
+    const smsResults = await sendSMS(msg);
+    console.log('[traffic-alert] SMS sent:', JSON.stringify(smsResults));
+
+    // Store dedup key
+    await fetch(`${process.env.SUPABASE_URL}/rest/v1/analytics_salt`, {
+      method: 'POST',
+      headers: {
+        'apikey': process.env.SUPABASE_SERVICE_KEY,
+        'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates',
+      },
+      body: JSON.stringify({ id: 2, salt: 'alert-dedup', date_str: alertKey }),
+    });
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ alert: true, message: msg, pair: [hourA, hourB], today: dateStr }),
+      body: JSON.stringify({ alert: true, message: msg, smsResults, today: dateStr }),
     };
   } catch (err) {
     console.error('[traffic-alert] Error:', err);
