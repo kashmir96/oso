@@ -2063,7 +2063,7 @@ function openOrderModal(orderId) {
       bagSizeHtml = `<div class="modal-row" style="align-items:center;">
         <span class="label">Bag Size</span>
         <span style="display:flex;align-items:center;gap:0.5rem;">
-          <select id="modal-bag-size" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.3rem 0.5rem;border-radius:6px;font-size:0.8rem;font-family:'DM Sans',sans-serif;">
+          <select id="modal-bag-size" onclick="event.stopPropagation();" onmousedown="event.stopPropagation();" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.3rem 0.5rem;border-radius:6px;font-size:0.8rem;font-family:'DM Sans',sans-serif;">
             ${options}
           </select>
           <button id="modal-bag-save" style="background:var(--sage);color:#141210;border:none;padding:0.3rem 0.6rem;border-radius:4px;font-size:0.75rem;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;">Update</button>
@@ -4338,7 +4338,8 @@ function renderShipmentsTable() {
     const clickHandler = matched ? `onclick="openOrderModal(${matched.id})" style="cursor:pointer;"` : '';
 
     // Checkbox for bulk bag mode
-    const checkboxTd = bulkBagMode && o.order_id ? `<td onclick="event.stopPropagation();" style="text-align:center;width:2rem;"><input type="checkbox" class="bulk-bag-check" data-order-id="${o.order_id}" data-shipping-method="${o.shipping_method || ''}" ${bulkBagOrderIds.includes(o.order_id) ? 'checked' : ''} onchange="toggleBulkBagOrder(${o.order_id}, this.checked)" style="cursor:pointer;width:16px;height:16px;accent-color:var(--cyan);"></td>` : '';
+    const shipOrderId = o.order_id || o.id || 0;
+    const checkboxTd = bulkBagMode ? `<td onclick="event.stopPropagation();" style="text-align:center;width:2rem;"><input type="checkbox" class="bulk-bag-check" data-order-id="${shipOrderId}" ${bulkBagOrderIds.includes(shipOrderId) ? 'checked' : ''} onchange="toggleBulkBagOrder(${shipOrderId}, this.checked)" style="cursor:pointer;width:16px;height:16px;accent-color:var(--cyan);"></td>` : '';
 
     return `<tr ${clickHandler}>
       ${checkboxTd}
