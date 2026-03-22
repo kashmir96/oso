@@ -4440,7 +4440,10 @@ document.getElementById('barcode-input').addEventListener('keydown', function(e)
     this.value = '';
     if (!val) return;
 
-    if (bulkAwaitingMode && bulkAwaitingSku) {
+    if (bulkBagMode && bulkBagSize) {
+      // Bulk bag size mode: update scanned order's bag size
+      handleBulkBagScan(val);
+    } else if (bulkAwaitingMode && bulkAwaitingSku) {
       // Bulk mode: tag the scanned order
       handleBulkScan(val);
     } else {
@@ -4474,9 +4477,9 @@ document.getElementById('barcode-input').addEventListener('keydown', function(e)
 
 // Keep scanner focused when clicking elsewhere in shipping tab
 document.getElementById('barcode-input').addEventListener('blur', function() {
-  if (scannerActive || bulkAwaitingMode) {
+  if (scannerActive || bulkAwaitingMode || bulkBagMode) {
     setTimeout(() => {
-      if (scannerActive || bulkAwaitingMode) this.focus();
+      if (scannerActive || bulkAwaitingMode || bulkBagMode) this.focus();
     }, 100);
   }
 });
@@ -4555,6 +4558,151 @@ function exitBulkAwaitingMode() {
   if (count > 0) {
     alert(`Tagged ${count} order${count !== 1 ? 's' : ''} as awaiting ${sku}.`);
   }
+}
+
+// ── Bulk Bag Size Mode ──
+let bulkBagMode = false;
+let bulkBagSize = null;
+let bulkBagSizeLabel = null;
+let bulkBagCount = 0;
+let bulkBagOrderIds = [];
+
+const BAG_SIZE_MAP = {
+  CPOLTPDL: 'DL',
+  CPOLTPA5: 'A5',
+  CPOLTPA4: 'A4',
+  CPOLTPA3: 'Foolscap',
+};
+
+function closeBagSizeModal() {
+  document.getElementById('bag-size-modal').classList.remove('open');
+  if (bulkBagMode && !bulkBagSize) {
+    bulkBagMode = false;
+  }
+}
+
+function pickBagSize(code) {
+  document.getElementById('bag-size-modal').classList.remove('open');
+  if (!bulkBagMode) return;
+  bulkBagSize = code;
+  bulkBagSizeLabel = BAG_SIZE_MAP[code] || code;
+  startBulkBagScanning();
+}
+
+document.getElementById('bulk-bag-btn').addEventListener('click', () => {
+  if (bulkBagMode) { exitBulkBagMode(); return; }
+  bulkBagMode = true;
+  document.getElementById('bag-size-modal').classList.add('open');
+});
+
+function startBulkBagScanning() {
+  bulkBagCount = 0;
+  bulkBagOrderIds = [];
+  document.getElementById('bulk-bag-label').textContent = bulkBagSizeLabel;
+  document.getElementById('bulk-bag-count').textContent = '0';
+  document.getElementById('bulk-bag-status').textContent = '';
+  document.getElementById('bulk-bag-print').style.display = 'none';
+  document.getElementById('bulk-bag-banner').classList.add('active');
+  scannerActive = true;
+  document.getElementById('barcode-scan-btn').classList.add('active');
+  document.getElementById('barcode-input').value = '';
+  document.getElementById('barcode-input').focus();
+}
+
+async function handleBulkBagScan(scannedValue) {
+  const val = scannedValue.trim();
+  const nzPostMatch = val.match(/[A-Z]{2}\d{9}[A-Z]{2}/i);
+  const trackingVal = nzPostMatch ? nzPostMatch[0].toUpperCase() : null;
+  const shipment = allShipments.find(s =>
+    s.order_number === val ||
+    (s.tracking_number && (s.tracking_number === val || s.tracking_number.toUpperCase() === trackingVal)) ||
+    (s.tracking_numbers && s.tracking_numbers.some(t => t === val || (trackingVal && t.toUpperCase() === trackingVal)))
+  );
+
+  const table = document.getElementById('shipments-table');
+  if (!shipment || !shipment.order_id) {
+    table.classList.add('scan-flash-err');
+    setTimeout(() => table.classList.remove('scan-flash-err'), 400);
+    return;
+  }
+
+  // Skip if already updated in this session
+  if (bulkBagOrderIds.includes(shipment.order_id)) return;
+
+  // Skip if already this bag size
+  if (shipment.shipping_method === bulkBagSize) {
+    document.getElementById('bulk-bag-status').innerHTML = '<span style="color:var(--dim);">Already ' + bulkBagSizeLabel + '</span>';
+    return;
+  }
+
+  document.getElementById('bulk-bag-status').innerHTML = '<span style="color:var(--dim);">Updating...</span>';
+
+  try {
+    const res = await fetch('/.netlify/functions/eship-update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order_id: shipment.order_id, shipping_method: bulkBagSize, token: currentStaff.token }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      shipment.shipping_method = bulkBagSize;
+      bulkBagOrderIds.push(shipment.order_id);
+      bulkBagCount++;
+      document.getElementById('bulk-bag-count').textContent = bulkBagCount;
+      document.getElementById('bulk-bag-status').innerHTML = '<span style="color:var(--sage);">Updated!</span>';
+      table.classList.add('scan-flash');
+      setTimeout(() => table.classList.remove('scan-flash'), 400);
+    } else {
+      document.getElementById('bulk-bag-status').innerHTML = '<span style="color:var(--red);">' + (data.error || 'Failed') + '</span>';
+      table.classList.add('scan-flash-err');
+      setTimeout(() => table.classList.remove('scan-flash-err'), 400);
+    }
+  } catch (e) {
+    document.getElementById('bulk-bag-status').innerHTML = '<span style="color:var(--red);">' + e.message + '</span>';
+  }
+
+  // Show print button when at least one updated
+  if (bulkBagCount > 0) {
+    document.getElementById('bulk-bag-status').innerHTML = '<span style="color:var(--sage);">Ready to print new labels</span>';
+    document.getElementById('bulk-bag-print').style.display = '';
+  }
+}
+
+// Print handler for bulk bag mode
+document.getElementById('bulk-bag-print').addEventListener('click', async () => {
+  const btn = document.getElementById('bulk-bag-print');
+  btn.disabled = true; btn.textContent = 'Printing...';
+  try {
+    const res = await fetch('/.netlify/functions/eship-print', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order_ids: bulkBagOrderIds }),
+    });
+    const data = await res.json();
+    if (data.success || data.printed) {
+      alert(`Printed ${data.printed || bulkBagCount} label${(data.printed || bulkBagCount) !== 1 ? 's' : ''} with new ${bulkBagSizeLabel} bag size.`);
+      exitBulkBagMode();
+      loadShippingData();
+    } else {
+      alert('Print failed: ' + (data.error || JSON.stringify(data)));
+    }
+  } catch (e) {
+    alert('Print error: ' + e.message);
+  }
+  btn.disabled = false; btn.textContent = 'Print New Labels';
+});
+
+function exitBulkBagMode() {
+  bulkBagMode = false;
+  bulkBagSize = null;
+  bulkBagSizeLabel = null;
+  bulkBagCount = 0;
+  bulkBagOrderIds = [];
+  scannerActive = false;
+  document.getElementById('bulk-bag-banner').classList.remove('active');
+  document.getElementById('barcode-scan-btn').classList.remove('active');
+  document.getElementById('barcode-input').blur();
+  renderShipmentsTable();
 }
 
 // ── Queued Batches (Manufacturing) ──

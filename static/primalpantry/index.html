@@ -504,6 +504,7 @@
         <input type="text" class="search-bar" id="shipment-search" placeholder="Search by name, tracking number, or order..." style="margin-bottom:0;flex:1;">
         <button id="barcode-scan-btn" class="scan-btn" title="Scan barcode to find order"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5v-2h4"/><path d="M17 3h4v4"/><path d="M21 19v2h-4"/><path d="M7 21H3v-4"/><line x1="7" y1="3" x2="7" y2="21"/><line x1="12" y1="3" x2="12" y2="21"/><line x1="17" y1="3" x2="17" y2="21"/></svg> Scan</button>
         <button id="bulk-awaiting-btn" style="background:var(--card);border:1px solid var(--amber);color:var(--amber);padding:0.5rem 0.85rem;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600;white-space:nowrap;display:flex;align-items:center;gap:0.35rem;" title="Bulk tag orders as awaiting stock"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg> Bulk Awaiting</button>
+        <button id="bulk-bag-btn" style="background:var(--card);border:1px solid var(--cyan);color:var(--cyan);padding:0.5rem 0.85rem;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600;white-space:nowrap;display:flex;align-items:center;gap:0.35rem;" title="Bulk change bag size then print"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg> Bulk Bag Size</button>
         <button id="eship-print-btn" style="background:var(--card);border:1px solid var(--sage);color:var(--sage);padding:0.5rem 0.85rem;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600;white-space:nowrap;display:flex;align-items:center;gap:0.35rem;" title="Print all waiting orders via eShip Desktop Agent"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> Print All</button>
         <select id="shipment-status-filter" style="background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.5rem;font-size:0.85rem;">
           <option value="">All Statuses</option>
@@ -517,6 +518,12 @@
       <div class="bulk-banner" id="bulk-banner">
         <div class="bulk-info"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg> Scanning for: <span id="bulk-sku-label">—</span> &mdash; <span class="bulk-count" id="bulk-count">0</span> tagged</div>
         <button class="bulk-exit-btn" onclick="exitBulkAwaitingMode()">Exit Bulk Mode</button>
+      </div>
+      <div class="bulk-banner" id="bulk-bag-banner" style="border-color:var(--cyan);">
+        <div class="bulk-info"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg> Changing to: <span id="bulk-bag-label" style="color:var(--cyan);font-weight:700;">—</span> &mdash; <span class="bulk-count" id="bulk-bag-count">0</span> updated</div>
+        <span id="bulk-bag-status" style="font-size:0.8rem;color:var(--dim);"></span>
+        <button id="bulk-bag-print" style="display:none;background:var(--sage);color:#141210;border:none;padding:0.4rem 0.8rem;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600;font-family:'DM Sans',sans-serif;">Print New Labels</button>
+        <button class="bulk-exit-btn" onclick="exitBulkBagMode()" style="border-color:var(--cyan);color:var(--cyan);">Exit</button>
       </div>
       <table>
         <thead>
@@ -1609,6 +1616,19 @@
   <div class="awaiting-modal">
     <h3>Select SKU awaiting stock</h3>
     <div id="awaiting-sku-list"></div>
+  </div>
+</div>
+
+<!-- Bag Size Picker Modal -->
+<div class="awaiting-modal-overlay" id="bag-size-modal" onclick="if(event.target===this)closeBagSizeModal()">
+  <div class="awaiting-modal">
+    <h3>Select Bag Size</h3>
+    <div id="bag-size-list">
+      <div class="sku-option" onclick="pickBagSize('CPOLTPDL')"><span>DL — Small</span><span class="sku-code">≤3 jars</span></div>
+      <div class="sku-option" onclick="pickBagSize('CPOLTPA5')"><span>A5 — Medium</span><span class="sku-code">4-6 jars</span></div>
+      <div class="sku-option" onclick="pickBagSize('CPOLTPA4')"><span>A4 — Large</span><span class="sku-code">7-9 jars</span></div>
+      <div class="sku-option" onclick="pickBagSize('CPOLTPA3')"><span>Foolscap — Extra Large</span><span class="sku-code">10+ jars</span></div>
+    </div>
   </div>
 </div>
 
