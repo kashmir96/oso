@@ -1,12 +1,15 @@
 /**
  * eship-update.js
  *
- * Change a StarshipIt order's bag size by deleting and recreating it.
- * StarshipIt has no API field for carrier product code — it's set at
- * creation time via shipping_method which maps to carrier rules.
+ * Update StarshipIt order(s) carrier product code (bag size).
  *
- * POST /.netlify/functions/eship-update
- * Body: { order_id: 123, shipping_method: "CPOLTPA5", token: "staff_token" }
+ * Supports single and batch updates:
+ *   Single: { order_id: 123, shipping_method: "CPOLTPA5", token: "..." }
+ *   Batch:  { order_ids: [123, 456], shipping_method: "CPOLTPA5", token: "..." }
+ *
+ * Uses two approaches for reliability:
+ * 1. PUT /api/orders with carrier_service_code (single order update)
+ * 2. PUT /api/orders/update with product_code (batch update)
  */
 
 const { createClient } = require('@supabase/supabase-js');
@@ -21,13 +24,6 @@ async function validateToken(token) {
   if (!token) return null;
   const { data } = await getSb().from('staff').select('id,role').eq('session_token', token).single();
   return data;
-}
-
-const wait = (ms) => new Promise(r => setTimeout(r, ms));
-
-async function apiFetch(url, apiHeaders, options = {}) {
-  const res = await fetch(url, { headers: apiHeaders, ...options });
-  return res.json();
 }
 
 exports.handler = async (event) => {
@@ -46,12 +42,14 @@ exports.handler = async (event) => {
 
   try {
     const body = JSON.parse(event.body || '{}');
-    const { order_id, shipping_method, token } = body;
+    const { order_id, order_ids, shipping_method, token } = body;
 
     const staff = await validateToken(token);
     if (!staff) return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) };
-    if (!order_id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'order_id required' }) };
     if (!shipping_method) return { statusCode: 400, headers, body: JSON.stringify({ error: 'shipping_method required' }) };
+
+    const ids = order_ids || (order_id ? [order_id] : []);
+    if (ids.length === 0) return { statusCode: 400, headers, body: JSON.stringify({ error: 'order_id or order_ids required' }) };
 
     const apiHeaders = {
       'StarShipIT-Api-Key': API_KEY,
@@ -59,94 +57,63 @@ exports.handler = async (event) => {
       'Content-Type': 'application/json',
     };
 
-    // Step 1: Find the order in unshipped list (most reliable source of full order data)
-    console.log('[eship-update] Looking for order_id:', order_id);
-    const unshippedData = await apiFetch('https://api.starshipit.com/api/orders/unshipped?limit=500', apiHeaders);
-    const unshippedOrders = Array.isArray(unshippedData.orders) ? unshippedData.orders : [];
-    let existingOrder = unshippedOrders.find(o => o.order_id === order_id);
-
-    // Also check printed orders if not found in unshipped
-    if (!existingOrder) {
-      const summaryData = await apiFetch('https://api.starshipit.com/api/orders/summary?order_status=printed', apiHeaders);
-      const printedOrders = Array.isArray(summaryData.orders) ? summaryData.orders : [];
-      existingOrder = printedOrders.find(o => o.order_id === order_id);
-    }
-
-    if (!existingOrder) {
-      console.log('[eship-update] Order not found in unshipped or printed lists');
-      return { statusCode: 404, headers, body: JSON.stringify({ error: 'Order not found — can only change bag size on unshipped/printed orders' }) };
-    }
-
-    console.log('[eship-update] Found order:', existingOrder.order_number, 'current shipping_method:', existingOrder.shipping_method);
-
-    // Step 2: Delete the existing order
-    const deleteRes = await fetch(`https://api.starshipit.com/api/orders/${order_id}`, {
-      method: 'DELETE',
-      headers: apiHeaders,
-    });
-
-    if (!deleteRes.ok) {
-      const deleteErr = await deleteRes.text();
-      console.error('[eship-update] Delete failed:', deleteErr);
-      return { statusCode: deleteRes.status, headers, body: JSON.stringify({ error: 'Failed to delete order: ' + deleteErr }) };
-    }
-
-    console.log('[eship-update] Deleted order_id:', order_id);
-    await wait(800);
-
-    // Step 3: Recreate with the new shipping method
-    const newOrder = {
-      order: {
-        order_number: existingOrder.order_number,
-        order_date: existingOrder.order_date || new Date().toISOString(),
-        reference: existingOrder.reference || '',
-        shipping_method: shipping_method,
-        signature_required: existingOrder.signature_required || false,
-        authority_to_leave: existingOrder.authority_to_leave !== false,
-        currency: existingOrder.currency || 'NZD',
-        destination: existingOrder.destination || {},
-        items: (existingOrder.items || []).map(item => ({
-          description: item.description || '',
-          sku: item.sku || '',
-          quantity: item.quantity || 1,
-          weight: item.weight || 0.2,
-          value: item.value || 0,
-          country_of_origin: item.country_of_origin || 'New Zealand',
-        })),
-        packages: existingOrder.packages || [{ weight: 0.5, height: 0.13, width: 0.13, length: 0.24 }],
-      },
+    // Try batch update endpoint first (most direct way to set product code)
+    const batchBody = {
+      order_ids: ids,
+      product_code: shipping_method,
     };
 
-    console.log('[eship-update] Recreating with shipping_method:', shipping_method);
-    const createRes = await fetch('https://api.starshipit.com/api/orders', {
-      method: 'POST',
+    console.log('[eship-update] Batch updating', ids.length, 'orders to product_code:', shipping_method);
+
+    const batchRes = await fetch('https://api.starshipit.com/api/orders/update', {
+      method: 'PUT',
       headers: apiHeaders,
-      body: JSON.stringify(newOrder),
+      body: JSON.stringify(batchBody),
     });
 
-    const createData = await createRes.json();
-    console.log('[eship-update] Create response:', JSON.stringify(createData).slice(0, 500));
+    const batchData = await batchRes.json();
+    console.log('[eship-update] Batch response:', batchRes.status, JSON.stringify(batchData).slice(0, 300));
 
-    if (!createRes.ok) {
-      console.error('[eship-update] Recreate FAILED — original order was deleted!');
+    if (batchRes.ok) {
       return {
-        statusCode: createRes.status,
+        statusCode: 200,
         headers,
-        body: JSON.stringify({
-          error: 'Deleted old order but failed to recreate. Contact support with this data.',
-          details: createData,
-          original_order: existingOrder,
-        }),
+        body: JSON.stringify({ success: true, order_id: ids[0], order_ids: ids, shipping_method }),
       };
     }
 
-    const newOrderId = createData.order?.order_id || order_id;
-    console.log('[eship-update] Success! New order_id:', newOrderId);
+    // Fallback: try single PUT with carrier_service_code for each order
+    console.log('[eship-update] Batch failed, falling back to single updates');
+    let updated = 0;
+    for (const oid of ids) {
+      const res = await fetch('https://api.starshipit.com/api/orders', {
+        method: 'PUT',
+        headers: apiHeaders,
+        body: JSON.stringify({
+          order: {
+            order_id: oid,
+            carrier_service_code: shipping_method,
+            shipping_method: shipping_method,
+          },
+        }),
+      });
+      const data = await res.json();
+      console.log('[eship-update] Single update', oid, ':', res.status, JSON.stringify(data).slice(0, 200));
+      if (res.ok) updated++;
+    }
+
+    if (updated > 0) {
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ success: true, order_id: ids[0], order_ids: ids, shipping_method, updated }),
+      };
+    }
 
     return {
-      statusCode: 200,
+      statusCode: 500,
       headers,
-      body: JSON.stringify({ success: true, order_id: newOrderId, old_order_id: order_id, shipping_method }),
+      body: JSON.stringify({ error: 'Both batch and single update failed', batch_response: batchData }),
     };
   } catch (err) {
     console.error('[eship-update] Error:', err.message);
