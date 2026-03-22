@@ -307,8 +307,12 @@ exports.handler = async (event) => {
     const search = body.search || '';
     const filter = body.filter || 'all';
 
+    const channelFilter = body.channel || 'all';
+
     // Single lightweight query
-    const res = await sbFetch('/rest/v1/email_messages?select=thread_id,customer_email,from_address,to_address,subject,snippet,date,direction,is_read,account_id,order_flagged&archived=eq.false&order=date.desc&limit=200');
+    let msgPath = '/rest/v1/email_messages?select=thread_id,customer_email,from_address,to_address,subject,snippet,date,direction,is_read,account_id,order_flagged,channel&archived=eq.false&order=date.desc&limit=200';
+    if (channelFilter !== 'all') msgPath += '&channel=eq.' + channelFilter;
+    const res = await sbFetch(msgPath);
     const msgs = await res.json();
     if (!Array.isArray(msgs)) return reply(200, { threads: [] });
 
@@ -321,7 +325,7 @@ exports.handler = async (event) => {
         threadMap[key] = {
           thread_id: m.thread_id,
           customer_email: email,
-          customer_name: email || 'Unknown',
+          customer_name: email || m.from_address || 'Unknown',
           last_subject: m.subject,
           last_snippet: m.snippet,
           last_date: m.date,
@@ -331,6 +335,7 @@ exports.handler = async (event) => {
           order_flagged: false,
           contact_type: 'customer',
           contact_name: null,
+          channel: m.channel || 'email',
         };
       }
       threadMap[key].message_count++;

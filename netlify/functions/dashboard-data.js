@@ -33,6 +33,9 @@ const ALLOWED_TABLES = new Set([
   'email_prompts',
   'suppliers',
   'wholesalers',
+  'meta_contacts',
+  'macros',
+  'live_chat_sessions',
 ]);
 
 const ALLOWED_OPS = new Set(['select', 'insert', 'update', 'delete', 'upsert']);
