@@ -2839,7 +2839,7 @@ function populateFilterDropdowns() {
 
   // UTM campaigns
   const campaignSelect = document.getElementById('filter-utm-campaign');
-  const campaigns = [...new Set(allOrders.map(o => o.utm_campaign || getUtmFromUrl(o.thank_you_url, 'utm_campaign') || '').filter(Boolean))].sort();
+  const campaigns = [...new Set(allOrders.map(o => resolveOrderCampaign(o)).filter(Boolean))].sort();
   campaignSelect.innerHTML = '<option value="">All</option>' + campaigns.map(c => `<option value="${c}">${utmTranslate('utm_campaign', c)}</option>`).join('');
 
   // Cities
@@ -2858,7 +2858,7 @@ function applyFilter() {
     if (o.order_date < from || o.order_date > to) return false;
     if (utmFilter && resolveOrderSource(o) !== utmFilter) return false;
     if (mediumFilter && (o.utm_medium || getUtmFromUrl(o.thank_you_url, 'utm_medium') || '') !== mediumFilter) return false;
-    if (campaignFilter && (o.utm_campaign || getUtmFromUrl(o.thank_you_url, 'utm_campaign') || '') !== campaignFilter) return false;
+    if (campaignFilter && (resolveOrderCampaign(o)) !== campaignFilter) return false;
     if (cityFilter && o.city !== cityFilter) return false;
     return true;
   });
@@ -2956,7 +2956,7 @@ async function refreshStats() {
       if (o.order_date < from || o.order_date > to) return false;
       if (utmFilter && resolveOrderSource(o) !== utmFilter) return false;
       if (mediumFilter && (o.utm_medium || getUtmFromUrl(o.thank_you_url, 'utm_medium') || '') !== mediumFilter) return false;
-      if (campaignFilter && (o.utm_campaign || getUtmFromUrl(o.thank_you_url, 'utm_campaign') || '') !== campaignFilter) return false;
+      if (campaignFilter && (resolveOrderCampaign(o)) !== campaignFilter) return false;
       if (cityFilter && o.city !== cityFilter) return false;
       return true;
     });
@@ -3747,16 +3747,24 @@ function getUtmFromUrl(url, param) {
   } catch { return ''; }
 }
 
-// Resolve order source with gclid/fbclid fallback (checks landing_page + thank_you_url)
+// Extract a param from order's landing_page, thank_you_url, or the landing_url inside thank_you_url
+function getOrderParam(o, param) {
+  return getUtmFromUrl(o.thank_you_url, param) || getUtmFromUrl(o.landing_page, param) || '';
+}
+
+// Resolve order source with gad_source/gclid/fbclid fallback
 function resolveOrderSource(o) {
-  const src = o.utm_source || o.analytics_source || getUtmFromUrl(o.thank_you_url, 'utm_source') || getUtmFromUrl(o.landing_page, 'utm_source') || '';
+  const src = o.utm_source || o.analytics_source || getOrderParam(o, 'utm_source') || '';
   if (src) return src;
-  // Check landing_page and thank_you_url for click IDs
-  const lp = o.landing_page || '';
-  const tu = o.thank_you_url || '';
-  if (o.gclid || getUtmFromUrl(lp, 'gclid') || getUtmFromUrl(tu, 'gclid')) return 'google';
-  if (o.fbclid || getUtmFromUrl(lp, 'fbclid') || getUtmFromUrl(tu, 'fbclid')) return 'facebook';
+  // Google Ads auto-params: gad_source=1, gclid, gbraid
+  if (o.gclid || getOrderParam(o, 'gclid') || getOrderParam(o, 'gad_source') || getOrderParam(o, 'gbraid')) return 'google';
+  if (o.fbclid || getOrderParam(o, 'fbclid')) return 'facebook';
   return '';
+}
+
+// Resolve order campaign with gad_campaignid fallback
+function resolveOrderCampaign(o) {
+  return o.utm_campaign || getOrderParam(o, 'utm_campaign') || getOrderParam(o, 'gad_campaignid') || '';
 }
 
 function sourceColor(src) {
@@ -3781,6 +3789,26 @@ function sourcePill(src) {
   const c = sourceColor(src);
   const display = typeof utmTranslateAny === 'function' ? utmTranslateAny(src) : src;
   return `<span class="source-pill" style="background:${c.bg};color:${c.fg}">${display}</span>`;
+}
+
+// Rich source pill from order: "source – campaign / content"
+function orderSourcePill(o) {
+  const src = resolveOrderSource(o);
+  if (!src) return '';
+  const c = sourceColor(src);
+  const srcDisplay = utmTranslate('utm_source', src);
+  // Build detail: campaign, then adgroup/content/keyword
+  const camp = resolveOrderCampaign(o);
+  const content = o.utm_content || getOrderParam(o, 'utm_content') || '';
+  const term = o.utm_term || getOrderParam(o, 'utm_term') || '';
+  const adgroup = o.utm_adgroup || getOrderParam(o, 'utm_adgroup') || '';
+  const details = [];
+  if (camp) details.push(utmTranslate('utm_campaign', camp));
+  if (adgroup) details.push(utmTranslateAny(adgroup));
+  if (content) details.push(utmTranslateAny(content));
+  if (term && !content) details.push(utmTranslateAny(term));
+  const label = details.length ? srcDisplay + ' – ' + details.join(' / ') : srcDisplay;
+  return `<span class="source-pill" style="background:${c.bg};color:${c.fg}">${label}</span>`;
 }
 
 // ── Heatmap (Day of week x Hour) ──
@@ -4000,7 +4028,7 @@ function renderOrdersTable() {
       <td>$${Number(o.total_value || 0).toFixed(2)}</td>
       <td>${(() => { const cg = getOrderCOGS(o.id); return cg > 0 ? '$' + cg.toFixed(2) : '-'; })()}</td>
       <td>${(() => { const cg = getOrderCOGS(o.id); const tv = Number(o.total_value || 0); return cg > 0 && tv > 0 ? ((tv - cg) / tv * 100).toFixed(0) + '%' : '-'; })()}</td>
-      <td>${sourcePill(src) || '-'}</td>
+      <td>${orderSourcePill(o) || '-'}</td>
       <td style="font-size:0.82rem;">${itemsHtml}</td>
       <td>${shipStatusPill(o)}</td>
     </tr>`;
@@ -4038,7 +4066,7 @@ function openOrderModal(orderId) {
   const oSrc = resolveOrderSource(order);
   const magnetItem = (items[0] || {}).description || '';
   let pillsHtml = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">';
-  if (oSrc) pillsHtml += sourcePill(oSrc);
+  if (oSrc) pillsHtml += orderSourcePill(order);
   if (magnetItem) pillsHtml += sourcePill(magnetItem);
   pillsHtml += '</div>';
 
@@ -4073,7 +4101,7 @@ function openOrderModal(orderId) {
     ['Analytics Source', order.analytics_source || '-'],
     ['UTM Source', utmTranslate('utm_source', resolveOrderSource(order)) || '-'],
     ['UTM Medium', utmTranslate('utm_medium', order.utm_medium || getUtmFromUrl(order.thank_you_url, 'utm_medium')) || '-'],
-    ['UTM Campaign', utmTranslate('utm_campaign', order.utm_campaign || getUtmFromUrl(order.thank_you_url, 'utm_campaign')) || '-'],
+    ['UTM Campaign', utmTranslate('utm_campaign', resolveOrderCampaign(order)) || '-'],
     ['Thank You URL', order.thank_you_url ? `<a href="${order.thank_you_url}" target="_blank" rel="noopener" style="color:var(--accent);word-break:break-all;font-size:0.8rem;">${order.thank_you_url}</a>` : '-'],
     ['Stripe ID', order.stripe_session_id],
   ];
@@ -5662,7 +5690,7 @@ function renderCustomersTab() {
       return `<div class="customer-order-row" onclick="event.stopPropagation(); openOrderModal(${o.id});">
         <span>${o.order_date}</span>
         <span>$${Number(o.total_value || 0).toFixed(2)}</span>
-        ${sourcePill(src)} ${magnet ? sourcePill(magnet) : ''} ${shipPill} ${daysWaitingBadge(o)}
+        ${orderSourcePill(o)} ${magnet ? sourcePill(magnet) : ''} ${shipPill} ${daysWaitingBadge(o)}
         <span style="font-size:0.7rem;color:var(--muted);" title="Time to ship">Ship: ${shipTimeStr}</span>
         <span style="font-size:0.7rem;color:var(--muted);" title="Total wait time">Wait: ${waitStr}</span>
         <div class="customer-order-items" style="width:100%;">${itemStr || 'No items'}</div>
@@ -6007,7 +6035,7 @@ async function openCustomerTimeline(email) {
       const items = allLineItems.filter(li => li.order_id === o.id);
       const journey = journeyResults[idx] || [];
       const src = resolveOrderSource(o);
-      const campaign = o.utm_campaign || getUtmFromUrl(o.thank_you_url, 'utm_campaign') || '';
+      const campaign = resolveOrderCampaign(o);
       const content = o.utm_content || '';
 
       // Add session pages before the order
@@ -7485,7 +7513,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
         const med = o.utm_medium || (o.thank_you_url ? getUtmFromUrl(o.thank_you_url, 'utm_medium') : '') || '';
         if (med) revByMedium[med] = (revByMedium[med] || 0) + rev;
         // UTM campaign
-        const camp = o.utm_campaign || (o.thank_you_url ? getUtmFromUrl(o.thank_you_url, 'utm_campaign') : '') || '';
+        const camp = resolveOrderCampaign(o);
         if (camp) revByCampaign[camp] = (revByCampaign[camp] || 0) + rev;
       });
       waRevMaps = { pathname: revByPage, utm_source: revBySource, utm_medium: revByMedium, utm_campaign: revByCampaign };
@@ -9654,9 +9682,12 @@ function renderMktGads() {
   document.getElementById('mkt-gads-table').innerHTML = page.map(c => {
     const roas = c.spend > 0 ? (c.conversions_value / c.spend).toFixed(1) + 'x' : '-';
     const nameLower = c.name.toLowerCase();
+    const cId = String(c.id || '');
     const utmSales = googleOrders.filter(o => {
-      const camp = (o.utm_campaign || getUtmFromUrl(o.thank_you_url, 'utm_campaign') || '').toLowerCase();
-      return camp === nameLower || utmTranslate('utm_campaign', camp).toLowerCase() === nameLower;
+      const camp = resolveOrderCampaign(o).toLowerCase();
+      const gadId = getOrderParam(o, 'gad_campaignid');
+      // Match by campaign name, translated name, or gad_campaignid
+      return camp === nameLower || utmTranslate('utm_campaign', camp).toLowerCase() === nameLower || (gadId && gadId === cId);
     }).length;
     return '<tr><td>' + esc(c.name) + '</td>'
       + '<td>$' + (c.conversions_value || 0).toFixed(2) + '</td>'
