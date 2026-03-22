@@ -9471,8 +9471,18 @@ function renderEntityTable(tableId, data, type) {
   }).join('');
 }
 
+async function ensureXeroStatus() {
+  if (xeroConnected) return;
+  try {
+    const res = await fetch('/.netlify/functions/xero-status?token=' + currentStaff.token);
+    const status = await res.json();
+    xeroConnected = status.connected || false;
+  } catch { xeroConnected = false; }
+}
+
 async function loadSuppliers() {
   try {
+    await ensureXeroStatus();
     const res = await fetch('/.netlify/functions/suppliers?token=' + currentStaff.token + '&type=suppliers');
     const data = await res.json();
     renderEntityTable('sup-table', data.suppliers || [], 'suppliers');
@@ -9481,6 +9491,7 @@ async function loadSuppliers() {
 
 async function loadWholesalers() {
   try {
+    await ensureXeroStatus();
     const res = await fetch('/.netlify/functions/suppliers?token=' + currentStaff.token + '&type=wholesalers');
     const data = await res.json();
     renderEntityTable('ws-table', data.wholesalers || [], 'wholesalers');
