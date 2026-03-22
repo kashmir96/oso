@@ -208,10 +208,11 @@
     .tracking-link { color: var(--sage); text-decoration: none; font-size: 0.8rem; font-weight: 600; }
     .tracking-link:hover { text-decoration: underline; }
     .ship-status-badge.awaiting-stock { background: rgba(212,168,75,0.18); color: var(--amber); }
-    .awaiting-btn { background: none; border: 1px solid var(--amber); color: var(--amber); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
-    .awaiting-btn:hover { background: rgba(212,168,75,0.12); }
-    .awaiting-clear { background: none; border: none; color: var(--dim); cursor: pointer; font-size: 0.8rem; margin-left: 0.25rem; }
-    .awaiting-clear:hover { color: var(--red); }
+    .awaiting-modal-btn { background: none; border: 1px solid var(--amber); color: var(--amber); padding: 0.45rem 1rem; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.35rem; }
+    .awaiting-modal-btn:hover { background: rgba(212,168,75,0.12); }
+    .awaiting-modal-btn.active { background: rgba(212,168,75,0.15); }
+    .awaiting-clear-btn { background: none; border: 1px solid var(--border); color: var(--muted); padding: 0.45rem 1rem; border-radius: 6px; font-size: 0.85rem; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+    .awaiting-clear-btn:hover { border-color: var(--red); color: var(--red); }
 
     /* Awaiting SKU picker modal */
     .awaiting-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: none; align-items: center; justify-content: center; }
@@ -1082,11 +1083,10 @@
             <th>Tracking</th>
             <th>Status</th>
             <th>Date</th>
-            <th></th>
           </tr>
         </thead>
         <tbody id="shipments-table">
-          <tr><td colspan="10" class="loading">Click to load shipping data...</td></tr>
+          <tr><td colspan="9" class="loading">Click to load shipping data...</td></tr>
         </tbody>
       </table>
       <div id="shipments-pagination"></div>
@@ -3568,6 +3568,20 @@ function openOrderModal(orderId) {
     }
   }
 
+  // Awaiting Item button
+  const awaitingSku = order.awaiting_sku;
+  if (awaitingSku) {
+    const awaitDesc = getSkuDesc(awaitingSku);
+    html += `<div style="margin-top:0.75rem;text-align:center;display:flex;gap:0.5rem;justify-content:center;align-items:center;">
+      <button class="awaiting-modal-btn active" onclick="openAwaitingPicker('${order.order_number || order.stripe_session_id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg> Awaiting: ${awaitDesc}</button>
+      <button class="awaiting-clear-btn" onclick="clearAwaitingSku('${order.order_number || order.stripe_session_id}');closeModal();">Clear</button>
+    </div>`;
+  } else {
+    html += `<div style="margin-top:0.75rem;text-align:center;">
+      <button class="awaiting-modal-btn" onclick="openAwaitingPicker('${order.order_number || order.stripe_session_id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg> Awaiting Item</button>
+    </div>`;
+  }
+
   // Email Customer button
   html += `<div style="margin-top:0.75rem;text-align:center;">
     <button onclick="openComposeModal({to: '${(order.email || '').replace(/'/g, "\\'")}', subject: 'Re: Your Primal Pantry Order #${orderId}'})" style="background:none;border:1px solid var(--sage);color:var(--sage);border-radius:6px;padding:0.5rem 1.2rem;font-size:0.85rem;cursor:pointer;font-weight:600;font-family:'DM Sans',sans-serif;">Email Customer</button>
@@ -5381,7 +5395,7 @@ let activeShipFilter = '';
 
 async function loadShippingData() {
   const tbody = document.getElementById('shipments-table');
-  tbody.innerHTML = '<tr><td colspan="10" class="loading">Loading shipping data...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="9" class="loading">Loading shipping data...</td></tr>';
 
   try {
     const res = await fetch(ESHIP_PROXY + '?limit=500');
@@ -5405,7 +5419,7 @@ async function loadShippingData() {
       renderShipmentsTable();
     });
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="10" class="loading">Error loading shipping data: ${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="loading">Error loading shipping data: ${err.message}</td></tr>`;
   }
 }
 
@@ -5607,6 +5621,7 @@ function renderShipmentsTable() {
       const fields = [
         o.order_number, o.name, o.destination?.name,
         o.destination?.city, o.tracking_number,
+        ...(o.tracking_numbers || []),
         o.carrier_name, o.carrier,
       ].filter(Boolean).join(' ').toLowerCase();
       return fields.includes(query);
@@ -5614,7 +5629,7 @@ function renderShipmentsTable() {
   }
 
   if (orders.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="10" class="loading">No shipments found</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="loading">No shipments found</td></tr>';
     renderPagination('shipments-pagination', 1, 0, () => {});
     return;
   }
@@ -5637,15 +5652,11 @@ function renderShipmentsTable() {
     const badge = matched ? daysWaitingBadge(matched) : '';
     const clippedOrder = (o.order_number || '-').length > 12 ? (o.order_number.slice(0, 12) + '…') : (o.order_number || '-');
 
-    // Awaiting stock action cell
-    let awaitingCell = '';
-    if (matched && matched.awaiting_sku) {
-      awaitingCell = `<span class="ship-status-badge awaiting-stock">Awaiting: ${matched.awaiting_sku}</span><button class="awaiting-clear" onclick="event.stopPropagation();clearAwaitingSku('${o.order_number}')" title="Clear">&times;</button>`;
-    } else {
-      awaitingCell = `<button class="awaiting-btn" onclick="event.stopPropagation();openAwaitingPicker('${o.order_number}')">Awaiting</button>`;
-    }
+    // Show awaiting badge inline with status
+    const awaitingBadge = matched && matched.awaiting_sku ? ` <span class="ship-status-badge awaiting-stock">Awaiting: ${matched.awaiting_sku}</span>` : '';
+    const clickHandler = matched ? `onclick="openOrderModal(${matched.id})" style="cursor:pointer;"` : '';
 
-    return `<tr>
+    return `<tr ${clickHandler}>
       <td title="${o.order_number || ''}" style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${clippedOrder}</td>
       <td>${dest.name || o.name || '-'}</td>
       <td>${[dest.city, dest.country_code || dest.country].filter(Boolean).join(', ') || '-'}</td>
@@ -5653,9 +5664,8 @@ function renderShipmentsTable() {
       <td style="text-align:center;">${itemCount}</td>
       <td>${carrier}</td>
       <td>${tracking ? `<a class="tracking-link" href="${trackUrl}" target="_blank" rel="noopener">${tracking}</a>` : '-'}</td>
-      <td><span class="ship-status-badge ${statusClass}">${status}</span> ${badge}</td>
+      <td><span class="ship-status-badge ${statusClass}">${status}</span> ${badge}${awaitingBadge}</td>
       <td>${displayDate}</td>
-      <td>${awaitingCell}</td>
     </tr>`;
   }).join('');
 
@@ -5736,8 +5746,14 @@ async function pickAwaitingSku(sku) {
     return;
   }
   if (!awaitingPickerOrderNumber) return;
-  await setAwaitingSku(awaitingPickerOrderNumber, sku);
+  const orderNum = awaitingPickerOrderNumber;
   closeAwaitingModal();
+  await setAwaitingSku(orderNum, sku);
+  // Re-open the order modal to show updated state
+  const order = allOrders.find(o => o.order_number === orderNum || o.stripe_session_id === orderNum);
+  if (order && document.getElementById('order-modal').classList.contains('open')) {
+    openOrderModal(order.id);
+  }
 }
 
 async function setAwaitingSku(orderNumber, sku) {
@@ -5803,11 +5819,25 @@ document.getElementById('barcode-input').addEventListener('keydown', function(e)
       // Bulk mode: tag the scanned order
       handleBulkScan(val);
     } else {
-      // Normal mode: search/filter
-      document.getElementById('shipment-search').value = val;
+      // Normal mode: search/filter by scanned barcode
+      // Try the raw value first; if no results, try extracting NZ Post tracking number
+      let searchVal = val;
+      document.getElementById('shipment-search').value = searchVal;
       shipmentsPage = 1;
       renderShipmentsTable();
-      // Flash the table
+
+      // If no results found with full barcode, try extracting tracking number patterns
+      const visibleRows = document.getElementById('shipments-table').querySelectorAll('tr:not(.loading)');
+      if (visibleRows.length === 0 || (visibleRows.length === 1 && visibleRows[0].querySelector('.loading'))) {
+        // NZ Post tracking: typically 2 letters + 9 digits + 2 letters (e.g. LN123456789NZ)
+        const nzPostMatch = val.match(/[A-Z]{2}\d{9}[A-Z]{2}/i);
+        if (nzPostMatch && nzPostMatch[0] !== val) {
+          searchVal = nzPostMatch[0];
+          document.getElementById('shipment-search').value = searchVal;
+          renderShipmentsTable();
+        }
+      }
+
       const table = document.getElementById('shipments-table');
       table.classList.add('scan-flash');
       setTimeout(() => table.classList.remove('scan-flash'), 400);
@@ -5846,8 +5876,15 @@ function startBulkScanning() {
 }
 
 async function handleBulkScan(scannedValue) {
-  // Try to match to a shipment
-  const shipment = allShipments.find(s => s.order_number === scannedValue || (s.tracking_number && s.tracking_number === scannedValue));
+  // Try to match to a shipment by order number, tracking number, or NZ Post barcode
+  const val = scannedValue.trim();
+  const nzPostMatch = val.match(/[A-Z]{2}\d{9}[A-Z]{2}/i);
+  const trackingVal = nzPostMatch ? nzPostMatch[0].toUpperCase() : null;
+  const shipment = allShipments.find(s =>
+    s.order_number === val ||
+    (s.tracking_number && (s.tracking_number === val || s.tracking_number.toUpperCase() === trackingVal)) ||
+    (s.tracking_numbers && s.tracking_numbers.some(t => t === val || (trackingVal && t.toUpperCase() === trackingVal)))
+  );
   if (!shipment) {
     const table = document.getElementById('shipments-table');
     table.classList.add('scan-flash-err');
