@@ -1005,6 +1005,11 @@
           <span style="color:var(--dim);">No Gmail accounts connected</span>
           <button class="comms-connect-btn" id="comms-connect-btn" style="margin-left:0.5rem;">Connect Gmail</button>
         </div>
+        <div class="comms-filter-bar" style="border-bottom:none;padding-bottom:0;">
+          <select id="comms-inbox-filter" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.25rem 0.5rem;border-radius:6px;font-size:0.75rem;font-family:'DM Sans',sans-serif;flex:1;">
+            <option value="all">All Inboxes</option>
+          </select>
+        </div>
         <div class="comms-filter-bar" id="comms-filter-bar">
           <button class="comms-filter-btn active" data-filter="all">All</button>
           <button class="comms-filter-btn" data-filter="customers">Customers</button>
@@ -8871,9 +8876,17 @@ function renderCommsAccounts() {
   const fromOpts = commsAccounts.map(a => '<option value="' + a.id + '">' + esc(a.email_address) + '</option>').join('');
   document.getElementById('comms-reply-from').innerHTML = fromOpts;
   document.getElementById('compose-from').innerHTML = fromOpts;
+  // Populate inbox filter dropdown
+  const inboxSel = document.getElementById('comms-inbox-filter');
+  if (inboxSel) {
+    const current = inboxSel.value;
+    inboxSel.innerHTML = '<option value="all">All Inboxes</option>' + commsAccounts.map(a => '<option value="' + a.id + '">' + esc(a.email_address) + '</option>').join('');
+    inboxSel.value = current;
+  }
 }
 
 let commsFilter = 'all';
+let commsInboxFilter = 'all';
 let commsStaffList = [];
 let commsPrompts = [];
 
@@ -8892,6 +8905,11 @@ function commsDateLabel(dateStr) {
 function renderCommsThreadList(searchFilter) {
   const list = document.getElementById('comms-thread-list');
   let threads = commsThreads;
+  // Filter by inbox
+  if (commsInboxFilter && commsInboxFilter !== 'all') {
+    const aid = parseInt(commsInboxFilter);
+    threads = threads.filter(t => t.account_id === aid);
+  }
   if (searchFilter) {
     const q = searchFilter.toLowerCase();
     threads = threads.filter(t =>
@@ -9261,6 +9279,10 @@ async function loadCommsTab() {
         commsFilter = this.dataset.filter;
         loadCommsThreads();
       });
+    });
+    document.getElementById('comms-inbox-filter').addEventListener('change', function() {
+      commsInboxFilter = this.value;
+      loadCommsThreads();
     });
     window.addEventListener('message', e => { if (e.data && e.data.gmailConnected) loadCommsTab(); });
   }
