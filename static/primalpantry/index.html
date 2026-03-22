@@ -7680,6 +7680,10 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
   }
   window.utmTranslate = utmTranslate;
   window.utmTranslateAny = utmTranslateAny;
+  window.utmEnsureLoaded = async function() {
+    if (utmMappings.length > 0) return;
+    await utmLoadMappings();
+  };
 
   function utmBuildLookup() {
     Object.keys(utmMapLookup).forEach(k => delete utmMapLookup[k]);
@@ -7922,60 +7926,65 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     const currencySymbol = '$';
     const total = ac.amount_total ? currencySymbol + (ac.amount_total / 100).toFixed(2) : '';
     const itemsHtml = (ac.line_items || []).map(li =>
-      `<tr><td style="padding:6px 8px;border-bottom:1px solid #f0ebe5;font-size:13px;">${li.description || 'Product'}</td><td style="padding:6px 8px;border-bottom:1px solid #f0ebe5;font-size:13px;text-align:center;">${li.quantity || 1}</td><td style="padding:6px 8px;border-bottom:1px solid #f0ebe5;font-size:13px;text-align:right;">${currencySymbol}${((li.amount || 0) / 100).toFixed(2)}</td></tr>`
+      `<tr><td style="padding:8px 12px;border-bottom:1px solid #f0ebe5;font-size:14px;color:#2d2a26;">${li.description || 'Product'}</td><td style="padding:8px 12px;border-bottom:1px solid #f0ebe5;font-size:14px;color:#6e6259;text-align:center;">${li.quantity || 1}</td><td style="padding:8px 12px;border-bottom:1px solid #f0ebe5;font-size:14px;color:#2d2a26;text-align:right;">${currencySymbol}${((li.amount || 0) / 100).toFixed(2)}</td></tr>`
     ).join('');
 
-    document.getElementById('recovery-preview').innerHTML = `
-      <div style="font-family:sans-serif;max-width:500px;margin:0 auto;">
-        <p style="font-size:13px;color:#6e6259;margin-bottom:8px;"><strong>To:</strong> ${ac.email}</p>
-        <p style="font-size:13px;color:#6e6259;margin-bottom:12px;"><strong>Subject:</strong> ${firstName}, you left something behind!</p>
-        <hr style="border:none;border-top:1px solid #e8e2da;margin:12px 0;">
-        <p style="font-size:14px;color:#2d2a26;">Hey ${firstName},</p>
-        <p style="font-size:13px;color:#6e6259;">We noticed you left some items in your cart. No worries — they're still waiting for you!</p>
-        <table style="width:100%;border-collapse:collapse;margin:12px 0;"><thead><tr style="background:#f8f5f0;"><th style="padding:6px 8px;text-align:left;font-size:11px;color:#9c9287;text-transform:uppercase;">Item</th><th style="padding:6px 8px;text-align:center;font-size:11px;color:#9c9287;">Qty</th><th style="padding:6px 8px;text-align:right;font-size:11px;color:#9c9287;">Price</th></tr></thead><tbody>${itemsHtml}</tbody></table>
-        ${total ? `<p style="text-align:right;font-weight:600;font-size:14px;color:#2d2a26;">Total: ${total}</p>` : ''}
-        <div style="text-align:center;margin:16px 0;"><span style="background:#8CB47A;color:#141210;padding:8px 24px;border-radius:6px;font-weight:600;font-size:13px;">Complete Your Order →</span></div>
-      </div>
-    `;
+    const emailBody = `<div style="max-width:560px;margin:0 auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <div style="text-align:center;margin-bottom:24px;"><h1 style="font-size:22px;color:#2d2a26;margin:0;">Primal Pantry</h1></div>
+  <div style="background:#fff;border-radius:12px;padding:32px;border:1px solid #e8e2da;">
+    <h2 style="font-size:18px;color:#2d2a26;margin:0 0 16px;">Hey ${firstName},</h2>
+    <p style="font-size:14px;color:#6e6259;line-height:1.6;margin:0 0 20px;">We noticed you left some items in your cart. No worries — they're still waiting for you!</p>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+      <thead><tr style="background:#f8f5f0;"><th style="padding:8px 12px;text-align:left;font-size:12px;color:#9c9287;text-transform:uppercase;">Item</th><th style="padding:8px 12px;text-align:center;font-size:12px;color:#9c9287;text-transform:uppercase;">Qty</th><th style="padding:8px 12px;text-align:right;font-size:12px;color:#9c9287;text-transform:uppercase;">Price</th></tr></thead>
+      <tbody>${itemsHtml}</tbody>
+      ${total ? `<tfoot><tr><td colspan="2" style="padding:10px 12px;font-size:14px;font-weight:600;color:#2d2a26;">Total</td><td style="padding:10px 12px;font-size:14px;font-weight:600;color:#2d2a26;text-align:right;">${total}</td></tr></tfoot>` : ''}
+    </table>
+    <div style="text-align:center;margin:24px 0;">
+      <a href="https://www.primalpantry.co.nz/cart/" style="display:inline-block;background:#8CB47A;color:#141210;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Complete Your Order</a>
+    </div>
+    <p style="font-size:13px;color:#9c9287;line-height:1.5;margin:16px 0 0;text-align:center;">Need help? Just reply to this email — we're happy to assist.</p>
+  </div>
+</div>`;
 
-    document.getElementById('recovery-modal').classList.add('open');
-  }
+    // Open the Gmail compose modal with the recovery template pre-filled
+    openComposeModal({
+      to: ac.email,
+      subject: firstName + ', you left something behind!',
+      body: emailBody,
+      sendType: 'direct',
+    });
 
-  document.getElementById('recovery-send-btn').addEventListener('click', async function() {
-    if (!acRecoveryTarget) return;
-    const btn = this;
-    btn.disabled = true;
-    btn.textContent = 'Sending...';
-
-    try {
-      const res = await fetch(RC_BASE, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          session_id: acRecoveryTarget.session_id,
-          email: acRecoveryTarget.email,
-          name: acRecoveryTarget.name,
-          line_items: acRecoveryTarget.line_items,
-          amount_total: acRecoveryTarget.amount_total,
-          currency: acRecoveryTarget.currency,
-          staff_name: currentStaff ? currentStaff.name : 'Unknown',
-        }),
-      });
-
-      if (!res.ok) throw new Error('Send failed: HTTP ' + res.status);
-
-      // Update local state
-      acRecoveryTarget.status = 'contacted';
-      acRecoveryTarget.contacted_at = new Date().toISOString();
+    // Listen for send completion to update abandoned checkout status
+    const origHandler = document.getElementById('compose-send')._recoveryCleanup;
+    if (origHandler) document.getElementById('compose-send').removeEventListener('click', origHandler);
+    const onSend = async () => {
+      // Mark as contacted after Gmail send succeeds
+      try {
+        await fetch(AC_BASE + '?token=' + currentStaff.token + '&action=update_status&session_id=' + encodeURIComponent(ac.session_id) + '&status=contacted');
+      } catch {}
+      ac.status = 'contacted';
+      ac.contacted_at = new Date().toISOString();
       renderAbandonedTable();
-      document.getElementById('recovery-modal').classList.remove('open');
-    } catch (err) {
-      alert('Error sending email: ' + err.message);
-    } finally {
-      btn.disabled = false;
-      btn.textContent = 'Send Email';
-    }
-  });
+      document.getElementById('compose-send').removeEventListener('click', onSend);
+      document.getElementById('compose-send')._recoveryCleanup = null;
+    };
+    // We need to fire after the actual send succeeds, so hook into the result
+    const observer = new MutationObserver((mutations) => {
+      const result = document.getElementById('compose-result');
+      if (result && result.textContent.includes('sent')) {
+        onSend();
+        observer.disconnect();
+      }
+    });
+    observer.observe(document.getElementById('compose-result'), { childList: true, characterData: true, subtree: true });
+    document.getElementById('compose-send')._recoveryCleanup = () => observer.disconnect();
+    // Disconnect observer if modal is closed without sending
+    const modal = document.getElementById('email-compose-modal');
+    const closeObserver = new MutationObserver(() => {
+      if (!modal.classList.contains('open')) { observer.disconnect(); closeObserver.disconnect(); }
+    });
+    closeObserver.observe(modal, { attributes: true, attributeFilter: ['class'] });
+  }
 
   // ── Country Heatmap ──
   // Simplified world map using country code → [lat, lng] centroids
@@ -9790,6 +9799,7 @@ function renderMktCreativeTimeChart(orders) {
 }
 function renderMktGmc(products) { const start = (mktGmcPage - 1) * PAGE_SIZE; const page = products.slice(start, start + PAGE_SIZE); document.getElementById('mkt-gmc-table').innerHTML = page.map(p => { const iss = p.issues.length>0?p.issues.map(i=>i.description).join('; '):'-'; const rc = p.status==='disapproved'?' style="background:rgba(224,96,80,0.08);"':''; return '<tr'+rc+'><td>'+p.title+'</td><td><span class="dummy-badge '+p.status+'">'+p.status.charAt(0).toUpperCase()+p.status.slice(1)+'</span></td><td>'+iss+'</td></tr>'; }).join(''); renderPagination('mkt-gmc-pagination', mktGmcPage, products.length, p => { mktGmcPage = p; renderMktGmc(products); }); }
 async function loadMarketingTab() {
+  if (typeof utmEnsureLoaded === 'function') await utmEnsureLoaded();
   const [from, to] = getDateRange();
   if (!mktInited) {
     mktInited = true;
