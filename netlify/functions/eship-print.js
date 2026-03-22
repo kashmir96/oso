@@ -88,6 +88,7 @@ exports.handler = async (event) => {
           shipmentBody.carrier_service_code = carrierServiceCode;
           shipmentBody.carrier = 'CourierPost';
         }
+        console.log('[eship-print] Printing order', orderId, 'body:', JSON.stringify(shipmentBody));
         const result = await apiFetch(
           'https://api.starshipit.com/api/orders/shipment',
           apiHeaders,
@@ -96,7 +97,9 @@ exports.handler = async (event) => {
             body: JSON.stringify(shipmentBody),
           }
         );
-        results.push({ order_id: orderId, success: !result.errors, result });
+        console.log('[eship-print] Result for', orderId, ':', JSON.stringify(result).slice(0, 500));
+        const ok = !result.errors && !result.error;
+        results.push({ order_id: orderId, success: ok, result });
       } catch (err) {
         results.push({ order_id: orderId, success: false, error: err.message });
       }
@@ -113,6 +116,7 @@ exports.handler = async (event) => {
         printed,
         total: orderIds.length,
         failed: failed.length > 0 ? failed : undefined,
+        results: results,
       }),
     };
   } catch (err) {
