@@ -207,6 +207,46 @@
     .ship-status-badge.exception { background: rgba(224,96,80,0.15); color: var(--red); }
     .tracking-link { color: var(--sage); text-decoration: none; font-size: 0.8rem; font-weight: 600; }
     .tracking-link:hover { text-decoration: underline; }
+    .ship-status-badge.awaiting-stock { background: rgba(212,168,75,0.18); color: var(--amber); }
+    .awaiting-btn { background: none; border: 1px solid var(--amber); color: var(--amber); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    .awaiting-btn:hover { background: rgba(212,168,75,0.12); }
+    .awaiting-clear { background: none; border: none; color: var(--dim); cursor: pointer; font-size: 0.8rem; margin-left: 0.25rem; }
+    .awaiting-clear:hover { color: var(--red); }
+
+    /* Awaiting SKU picker modal */
+    .awaiting-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: none; align-items: center; justify-content: center; }
+    .awaiting-modal-overlay.open { display: flex; }
+    .awaiting-modal { background: var(--card); border-radius: 10px; padding: 1.25rem; max-width: 400px; width: 90%; max-height: 70vh; overflow-y: auto; border: 1px solid var(--border); }
+    .awaiting-modal h3 { margin: 0 0 0.75rem; font-size: 0.95rem; }
+    .awaiting-modal .sku-option { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; border-bottom: 1px solid var(--cream-deep); }
+    .awaiting-modal .sku-option:hover { background: rgba(212,168,75,0.1); }
+    .awaiting-modal .sku-option .sku-code { color: var(--amber); font-weight: 600; font-size: 0.75rem; }
+
+    /* Barcode scanner */
+    .scan-btn { background: var(--card); border: 1px solid var(--sage); color: var(--sage); padding: 0.5rem 0.85rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 600; white-space: nowrap; display: flex; align-items: center; gap: 0.35rem; }
+    .scan-btn:hover { background: rgba(140,180,122,0.08); }
+    .scan-btn.active { border-color: var(--amber); color: var(--amber); background: rgba(212,168,75,0.08); }
+
+    /* Bulk awaiting banner */
+    .bulk-banner { display: none; background: rgba(212,168,75,0.1); border: 1px solid var(--amber); border-radius: 8px; padding: 0.65rem 1rem; margin-bottom: 0.75rem; align-items: center; justify-content: space-between; gap: 0.75rem; font-size: 0.85rem; }
+    .bulk-banner.active { display: flex; }
+    .bulk-banner .bulk-info { display: flex; align-items: center; gap: 0.5rem; color: var(--amber); font-weight: 600; }
+    .bulk-banner .bulk-count { background: var(--amber); color: #111; padding: 0.1rem 0.5rem; border-radius: 10px; font-size: 0.75rem; font-weight: 700; }
+    .bulk-exit-btn { background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 0.35rem 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+    .scan-flash { animation: scan-ok 0.4s ease; }
+    @keyframes scan-ok { 0% { background: rgba(140,180,122,0.3); } 100% { background: transparent; } }
+    .scan-flash-err { animation: scan-err 0.4s ease; }
+    @keyframes scan-err { 0% { background: rgba(224,96,80,0.3); } 100% { background: transparent; } }
+
+    /* Queued batches */
+    .queued-sku-card { display: flex; justify-content: space-between; align-items: center; padding: 0.65rem 0.75rem; border-radius: 8px; border: 1px solid var(--amber); background: rgba(212,168,75,0.06); margin-bottom: 0.5rem; }
+    .queued-sku-info { display: flex; flex-direction: column; gap: 0.15rem; }
+    .queued-sku-name { font-weight: 600; font-size: 0.85rem; }
+    .queued-sku-count { font-size: 0.8rem; color: var(--amber); font-weight: 600; }
+    .queued-sku-actions { display: flex; gap: 0.5rem; }
+    .queued-batch-btn { background: var(--sage); color: #fff; border: none; padding: 0.35rem 0.65rem; border-radius: 5px; font-size: 0.75rem; font-weight: 600; cursor: pointer; }
+    .queued-clear-btn { background: none; border: 1px solid var(--border); color: var(--muted); padding: 0.35rem 0.65rem; border-radius: 5px; font-size: 0.75rem; cursor: pointer; }
+    .queued-clear-btn:hover { border-color: var(--red); color: var(--red); }
 
     /* Customers tab */
     .customer-profile { background: var(--card); border-radius: 10px; padding: 1.25rem; margin-bottom: 0.75rem; border: 1px solid var(--border); cursor: pointer; transition: border 0.2s; }
@@ -1014,6 +1054,8 @@
       <h3>Shipments</h3>
       <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.5rem;">
         <input type="text" class="search-bar" id="shipment-search" placeholder="Search by name, tracking number, or order..." style="margin-bottom:0;flex:1;">
+        <button id="barcode-scan-btn" class="scan-btn" title="Scan barcode to find order"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5v-2h4"/><path d="M17 3h4v4"/><path d="M21 19v2h-4"/><path d="M7 21H3v-4"/><line x1="7" y1="3" x2="7" y2="21"/><line x1="12" y1="3" x2="12" y2="21"/><line x1="17" y1="3" x2="17" y2="21"/></svg> Scan</button>
+        <button id="bulk-awaiting-btn" style="background:var(--card);border:1px solid var(--amber);color:var(--amber);padding:0.5rem 0.85rem;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600;white-space:nowrap;display:flex;align-items:center;gap:0.35rem;" title="Bulk tag orders as awaiting stock"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg> Bulk Awaiting</button>
         <button id="eship-print-btn" style="background:var(--card);border:1px solid var(--sage);color:var(--sage);padding:0.5rem 0.85rem;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600;white-space:nowrap;display:flex;align-items:center;gap:0.35rem;" title="Print all waiting orders via eShip Desktop Agent"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> Print All</button>
         <select id="shipment-status-filter" style="background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.5rem;font-size:0.85rem;">
           <option value="">All Statuses</option>
@@ -1023,6 +1065,10 @@
           <option value="Delivered">Delivered</option>
           <option value="Exception">Exception</option>
         </select>
+      </div>
+      <div class="bulk-banner" id="bulk-banner">
+        <div class="bulk-info"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg> Scanning for: <span id="bulk-sku-label">—</span> &mdash; <span class="bulk-count" id="bulk-count">0</span> tagged</div>
+        <button class="bulk-exit-btn" onclick="exitBulkAwaitingMode()">Exit Bulk Mode</button>
       </div>
       <table>
         <thead>
@@ -1036,10 +1082,11 @@
             <th>Tracking</th>
             <th>Status</th>
             <th>Date</th>
+            <th></th>
           </tr>
         </thead>
         <tbody id="shipments-table">
-          <tr><td colspan="9" class="loading">Click to load shipping data...</td></tr>
+          <tr><td colspan="10" class="loading">Click to load shipping data...</td></tr>
         </tbody>
       </table>
       <div id="shipments-pagination"></div>
@@ -1059,6 +1106,10 @@
     </div>
 
     <div id="mfg-panel-batches">
+      <div id="mfg-queued-batches" class="orders-card" style="display:none;margin-bottom:1rem;">
+        <h3>Queued Batches <span style="font-size:0.65rem;color:var(--dim);font-weight:400;">(orders awaiting stock)</span></h3>
+        <div id="mfg-queued-list"></div>
+      </div>
       <div class="orders-card">
         <h3>Manufacturing Batches</h3>
         <div class="mfg-form" id="mfg-form">
@@ -1911,6 +1962,17 @@
     <button class="submit-order-btn" id="mo-submit">Create Order</button>
   </div>
 </div>
+
+<!-- Awaiting SKU picker modal -->
+<div class="awaiting-modal-overlay" id="awaiting-sku-modal" onclick="if(event.target===this)closeAwaitingModal()">
+  <div class="awaiting-modal">
+    <h3>Select SKU awaiting stock</h3>
+    <div id="awaiting-sku-list"></div>
+  </div>
+</div>
+
+<!-- Hidden barcode scanner input -->
+<input type="text" id="barcode-input" style="position:absolute;left:-9999px;" autocomplete="off">
 
 <!-- Team management modal -->
 <div class="modal-overlay" id="team-modal">
@@ -5319,7 +5381,7 @@ let activeShipFilter = '';
 
 async function loadShippingData() {
   const tbody = document.getElementById('shipments-table');
-  tbody.innerHTML = '<tr><td colspan="9" class="loading">Loading shipping data...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="10" class="loading">Loading shipping data...</td></tr>';
 
   try {
     const res = await fetch(ESHIP_PROXY + '?limit=500');
@@ -5343,7 +5405,7 @@ async function loadShippingData() {
       renderShipmentsTable();
     });
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="9" class="loading">Error loading shipping data: ${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" class="loading">Error loading shipping data: ${err.message}</td></tr>`;
   }
 }
 
@@ -5382,12 +5444,24 @@ function renderShippingStats(data) {
   const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
   const iosThisMonth = allOrders.filter(o => o.order_date >= monthStart && (o.status || '').toLowerCase() === 'incorrect order').length;
 
+  // Awaiting stock count + breakdown
+  const awaitingOrders = allOrders.filter(o => o.awaiting_sku);
+  const awaitingCount = awaitingOrders.length;
+  let awaitingSub = 'orders on hold';
+  if (awaitingCount > 0) {
+    const bysku = {};
+    awaitingOrders.forEach(o => { bysku[o.awaiting_sku] = (bysku[o.awaiting_sku] || 0) + 1; });
+    const top = Object.entries(bysku).sort((a, b) => b[1] - a[1]).slice(0, 3);
+    awaitingSub = top.map(([sku, n]) => `${n}x ${sku}`).join(', ');
+  }
+
   const stats = [
     { label: 'Waiting to Print', value: waitingToPrint, sub: 'needs printing', color: 'var(--amber)', filter: 'Waiting to Print' },
     { label: 'Printed', value: printed, sub: 'ready to ship', color: '#facc15', filter: 'Printed' },
     { label: 'In Transit', value: inTransit, sub: 'dispatched', color: 'var(--blue)', filter: 'In Transit' },
     { label: 'Delivered', value: delivered, sub: 'completed', color: 'var(--green)', filter: 'Delivered' },
     { label: 'Exception', value: exception, sub: 'needs attention', color: '#fca5a5', filter: 'Exception' },
+    { label: 'Awaiting Stock', value: awaitingCount, sub: awaitingSub, color: 'var(--amber)', filter: 'Awaiting Stock' },
     { label: 'Avg Ship Time', value: avgShipDays === '-' ? '-' : avgShipDays + 'd', sub: 'order → dispatch', color: 'var(--cyan)', filter: '' },
     { label: 'Avg Delivery', value: avgDeliveryDays === '-' ? '-' : avgDeliveryDays + 'd', sub: 'dispatch → delivered', color: 'var(--green)', filter: '' },
     { label: "IO's This Month", value: iosThisMonth, sub: 'incorrect orders', color: 'var(--amber)', filter: '' },
@@ -5520,7 +5594,12 @@ function renderShipmentsTable() {
   const query = (document.getElementById('shipment-search').value || '').toLowerCase();
 
   let orders = allShipments;
-  if (activeShipFilter) {
+  if (activeShipFilter === 'Awaiting Stock') {
+    orders = orders.filter(o => {
+      const m = allOrders.find(ord => ord.order_number === o.order_number || ord.stripe_session_id === o.order_number);
+      return m && m.awaiting_sku;
+    });
+  } else if (activeShipFilter) {
     orders = orders.filter(o => o._shipping_status === activeShipFilter);
   }
   if (query) {
@@ -5535,7 +5614,7 @@ function renderShipmentsTable() {
   }
 
   if (orders.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="9" class="loading">No shipments found</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="loading">No shipments found</td></tr>';
     renderPagination('shipments-pagination', 1, 0, () => {});
     return;
   }
@@ -5558,6 +5637,14 @@ function renderShipmentsTable() {
     const badge = matched ? daysWaitingBadge(matched) : '';
     const clippedOrder = (o.order_number || '-').length > 12 ? (o.order_number.slice(0, 12) + '…') : (o.order_number || '-');
 
+    // Awaiting stock action cell
+    let awaitingCell = '';
+    if (matched && matched.awaiting_sku) {
+      awaitingCell = `<span class="ship-status-badge awaiting-stock">Awaiting: ${matched.awaiting_sku}</span><button class="awaiting-clear" onclick="event.stopPropagation();clearAwaitingSku('${o.order_number}')" title="Clear">&times;</button>`;
+    } else {
+      awaitingCell = `<button class="awaiting-btn" onclick="event.stopPropagation();openAwaitingPicker('${o.order_number}')">Awaiting</button>`;
+    }
+
     return `<tr>
       <td title="${o.order_number || ''}" style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${clippedOrder}</td>
       <td>${dest.name || o.name || '-'}</td>
@@ -5568,6 +5655,7 @@ function renderShipmentsTable() {
       <td>${tracking ? `<a class="tracking-link" href="${trackUrl}" target="_blank" rel="noopener">${tracking}</a>` : '-'}</td>
       <td><span class="ship-status-badge ${statusClass}">${status}</span> ${badge}</td>
       <td>${displayDate}</td>
+      <td>${awaitingCell}</td>
     </tr>`;
   }).join('');
 
@@ -5609,6 +5697,246 @@ document.getElementById('eship-print-btn').addEventListener('click', async () =>
     btn.style.opacity = '1';
   }
 });
+
+// ── Awaiting Stock ──
+let awaitingPickerOrderNumber = null;
+let bulkAwaitingMode = false;
+let bulkAwaitingSku = null;
+let bulkAwaitingCount = 0;
+let scannerActive = false;
+
+function getSkuDesc(sku) {
+  const p = SHOP_PRODUCTS.find(p => p.sku === sku);
+  return p ? p.desc : sku;
+}
+
+function openAwaitingPicker(orderNumber) {
+  awaitingPickerOrderNumber = orderNumber;
+  const list = document.getElementById('awaiting-sku-list');
+  list.innerHTML = SHOP_PRODUCTS.map(p => `
+    <div class="sku-option" onclick="pickAwaitingSku('${p.sku}')">
+      <span>${p.desc}</span>
+      <span class="sku-code">${p.sku}</span>
+    </div>
+  `).join('');
+  document.getElementById('awaiting-sku-modal').classList.add('open');
+}
+
+function closeAwaitingModal() {
+  document.getElementById('awaiting-sku-modal').classList.remove('open');
+  awaitingPickerOrderNumber = null;
+}
+
+async function pickAwaitingSku(sku) {
+  if (bulkAwaitingMode) {
+    // Entering bulk mode - SKU selected
+    bulkAwaitingSku = sku;
+    closeAwaitingModal();
+    startBulkScanning();
+    return;
+  }
+  if (!awaitingPickerOrderNumber) return;
+  await setAwaitingSku(awaitingPickerOrderNumber, sku);
+  closeAwaitingModal();
+}
+
+async function setAwaitingSku(orderNumber, sku) {
+  const order = allOrders.find(o => o.order_number === orderNumber || o.stripe_session_id === orderNumber);
+  if (!order) { console.warn('Order not found:', orderNumber); return false; }
+  const { error } = await db.from('orders').update({ awaiting_sku: sku }).eq('id', order.id);
+  if (error) { alert('Failed to set awaiting: ' + error.message); return false; }
+  order.awaiting_sku = sku;
+  renderShippingStats({});
+  renderShipmentsTable();
+  return true;
+}
+
+async function clearAwaitingSku(orderNumber) {
+  const order = allOrders.find(o => o.order_number === orderNumber || o.stripe_session_id === orderNumber);
+  if (!order) return;
+  const { error } = await db.from('orders').update({ awaiting_sku: null }).eq('id', order.id);
+  if (error) { alert('Failed to clear awaiting: ' + error.message); return; }
+  order.awaiting_sku = null;
+  renderShippingStats({});
+  renderShipmentsTable();
+}
+
+async function clearAllAwaitingForSku(sku) {
+  const awaiting = allOrders.filter(o => o.awaiting_sku === sku);
+  if (!awaiting.length) return;
+  if (!confirm(`Clear "Awaiting Stock" for ${awaiting.length} order${awaiting.length !== 1 ? 's' : ''} awaiting ${sku}?`)) return;
+  for (const order of awaiting) {
+    await db.from('orders').update({ awaiting_sku: null }).eq('id', order.id);
+    order.awaiting_sku = null;
+  }
+  renderShippingStats({});
+  renderShipmentsTable();
+  if (typeof renderQueuedBatches === 'function') renderQueuedBatches();
+  if (typeof renderMfgStats === 'function') renderMfgStats();
+}
+
+// ── Barcode Scanner ──
+document.getElementById('barcode-scan-btn').addEventListener('click', () => {
+  toggleScanner();
+});
+
+function toggleScanner() {
+  scannerActive = !scannerActive;
+  const btn = document.getElementById('barcode-scan-btn');
+  btn.classList.toggle('active', scannerActive);
+  if (scannerActive) {
+    document.getElementById('barcode-input').value = '';
+    document.getElementById('barcode-input').focus();
+  } else {
+    document.getElementById('barcode-input').blur();
+  }
+}
+
+document.getElementById('barcode-input').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const val = this.value.trim();
+    this.value = '';
+    if (!val) return;
+
+    if (bulkAwaitingMode && bulkAwaitingSku) {
+      // Bulk mode: tag the scanned order
+      handleBulkScan(val);
+    } else {
+      // Normal mode: search/filter
+      document.getElementById('shipment-search').value = val;
+      shipmentsPage = 1;
+      renderShipmentsTable();
+      // Flash the table
+      const table = document.getElementById('shipments-table');
+      table.classList.add('scan-flash');
+      setTimeout(() => table.classList.remove('scan-flash'), 400);
+    }
+    // Re-focus for next scan
+    setTimeout(() => this.focus(), 50);
+  }
+});
+
+// Keep scanner focused when clicking elsewhere in shipping tab
+document.getElementById('barcode-input').addEventListener('blur', function() {
+  if (scannerActive || bulkAwaitingMode) {
+    setTimeout(() => {
+      if (scannerActive || bulkAwaitingMode) this.focus();
+    }, 100);
+  }
+});
+
+// ── Bulk Awaiting Mode ──
+document.getElementById('bulk-awaiting-btn').addEventListener('click', () => {
+  if (bulkAwaitingMode) { exitBulkAwaitingMode(); return; }
+  // Open SKU picker in bulk mode
+  bulkAwaitingMode = true;
+  openAwaitingPicker(null);
+});
+
+function startBulkScanning() {
+  bulkAwaitingCount = 0;
+  document.getElementById('bulk-sku-label').textContent = bulkAwaitingSku;
+  document.getElementById('bulk-count').textContent = '0';
+  document.getElementById('bulk-banner').classList.add('active');
+  scannerActive = true;
+  document.getElementById('barcode-scan-btn').classList.add('active');
+  document.getElementById('barcode-input').value = '';
+  document.getElementById('barcode-input').focus();
+}
+
+async function handleBulkScan(scannedValue) {
+  // Try to match to a shipment
+  const shipment = allShipments.find(s => s.order_number === scannedValue || (s.tracking_number && s.tracking_number === scannedValue));
+  if (!shipment) {
+    const table = document.getElementById('shipments-table');
+    table.classList.add('scan-flash-err');
+    setTimeout(() => table.classList.remove('scan-flash-err'), 400);
+    return;
+  }
+
+  const order = allOrders.find(o => o.order_number === shipment.order_number || o.stripe_session_id === shipment.order_number);
+  if (!order) {
+    const table = document.getElementById('shipments-table');
+    table.classList.add('scan-flash-err');
+    setTimeout(() => table.classList.remove('scan-flash-err'), 400);
+    return;
+  }
+
+  if (order.awaiting_sku === bulkAwaitingSku) {
+    // Already tagged with same SKU, skip
+    return;
+  }
+
+  const ok = await setAwaitingSku(shipment.order_number, bulkAwaitingSku);
+  if (ok) {
+    bulkAwaitingCount++;
+    document.getElementById('bulk-count').textContent = bulkAwaitingCount;
+    const table = document.getElementById('shipments-table');
+    table.classList.add('scan-flash');
+    setTimeout(() => table.classList.remove('scan-flash'), 400);
+  }
+}
+
+function exitBulkAwaitingMode() {
+  const count = bulkAwaitingCount;
+  const sku = bulkAwaitingSku;
+  bulkAwaitingMode = false;
+  bulkAwaitingSku = null;
+  bulkAwaitingCount = 0;
+  scannerActive = false;
+  document.getElementById('bulk-banner').classList.remove('active');
+  document.getElementById('barcode-scan-btn').classList.remove('active');
+  document.getElementById('barcode-input').blur();
+  renderShippingStats({});
+  renderShipmentsTable();
+  if (count > 0) {
+    alert(`Tagged ${count} order${count !== 1 ? 's' : ''} as awaiting ${sku}.`);
+  }
+}
+
+// ── Queued Batches (Manufacturing) ──
+function renderQueuedBatches() {
+  const container = document.getElementById('mfg-queued-batches');
+  const list = document.getElementById('mfg-queued-list');
+  if (!container || !list) return;
+
+  const awaiting = allOrders.filter(o => o.awaiting_sku);
+  if (!awaiting.length) { container.style.display = 'none'; return; }
+
+  // Group by SKU
+  const bysku = {};
+  awaiting.forEach(o => {
+    if (!bysku[o.awaiting_sku]) bysku[o.awaiting_sku] = [];
+    bysku[o.awaiting_sku].push(o);
+  });
+
+  const skus = Object.keys(bysku).sort((a, b) => bysku[b].length - bysku[a].length);
+  list.innerHTML = skus.map(sku => {
+    const orders = bysku[sku];
+    const desc = getSkuDesc(sku);
+    return `<div class="queued-sku-card">
+      <div class="queued-sku-info">
+        <div class="queued-sku-name">${desc}</div>
+        <div class="queued-sku-count">${orders.length} order${orders.length !== 1 ? 's' : ''} awaiting ${sku}</div>
+      </div>
+      <div class="queued-sku-actions">
+        <button class="queued-batch-btn" onclick="prefillBatchForSku('${sku}')">+ Batch</button>
+        <button class="queued-clear-btn" onclick="clearAllAwaitingForSku('${sku}')">Clear All</button>
+      </div>
+    </div>`;
+  }).join('');
+  container.style.display = '';
+}
+
+function prefillBatchForSku(sku) {
+  // Switch to batches sub-tab if not already there
+  document.querySelectorAll('[data-mfg-panel]').forEach(btn => btn.classList.toggle('active', btn.dataset.mfgPanel === 'batches'));
+  document.querySelectorAll('[id^="mfg-panel-"]').forEach(p => p.style.display = p.id === 'mfg-panel-batches' ? '' : 'none');
+  // Pre-fill the SKU
+  document.getElementById('mfg-sku').value = sku;
+  document.getElementById('mfg-qty').focus();
+}
 
 // ── Manual Order ──
 const SHOP_PRODUCTS = [
@@ -7069,6 +7397,7 @@ async function loadManufacturingTab() {
   mfgLoaded = true;
   renderMfgStats();
   renderMfgTable();
+  renderQueuedBatches();
   prefillMfgForm();
 }
 
@@ -7089,11 +7418,13 @@ function renderMfgStats() {
   const totalQty = mfgBatches.reduce((s, b) => s + (b.quantity || 0), 0);
   const uniqueSkus = new Set(mfgBatches.map(b => b.product_sku)).size;
   const latest = mfgBatches.length ? mfgBatches[0].batch_no : '—';
+  const awaitingStockCount = allOrders.filter(o => o.awaiting_sku).length;
   stats.innerHTML = `
     <div class="stat-card"><div class="label">Batches Produced</div><div class="value">${total}</div></div>
     <div class="stat-card"><div class="label">Units Produced</div><div class="value">${totalQty.toLocaleString()}</div></div>
     <div class="stat-card"><div class="label">Unique SKUs</div><div class="value">${uniqueSkus}</div></div>
     <div class="stat-card"><div class="label">Latest Batch</div><div class="value">${latest}</div></div>
+    <div class="stat-card" style="cursor:pointer;${awaitingStockCount ? 'border-color:var(--amber);' : ''}" onclick="document.querySelectorAll('[data-mfg-panel]').forEach(b=>b.classList.toggle('active',b.dataset.mfgPanel==='batches'));document.querySelectorAll('[id^=\\'mfg-panel-\\']').forEach(p=>p.style.display=p.id==='mfg-panel-batches'?'':'none');"><div class="label">Awaiting Stock</div><div class="value" style="color:var(--amber);">${awaitingStockCount}</div><div class="sub">orders on hold</div></div>
   `;
 }
 
@@ -8797,11 +9128,10 @@ async function loadCommsTab() {
   renderCommsPrompts();
 
   if (commsAccounts.length > 0) {
-    document.getElementById('comms-thread-list').innerHTML = '<div class="comms-empty">Syncing messages...</div>';
-    try {
-      await commsApi('sync', { maxResults: 15 });
-    } catch (e) { console.error('Comms sync error:', e); }
+    // Load threads first from existing data (fast)
     await loadCommsThreads();
+    // Then sync in background (slow) and refresh
+    commsApi('sync', { maxResults: 15 }).then(() => loadCommsThreads()).catch(e => console.error('Comms sync error:', e));
   }
 }
 
