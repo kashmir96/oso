@@ -2184,13 +2184,15 @@ function openOrderModal(orderId) {
             }
           }
 
-          // Print
+          // Print — pass carrier_service_code if changing size
           reprintBtn.textContent = 'Printing...';
+          const printBody = { order_ids: [shipment.order_id] };
+          if (action !== 'asis') printBody.carrier_service_code = SIZE_CODES[action];
           try {
             const res = await fetch('/.netlify/functions/eship-print', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ order_ids: [shipment.order_id] }),
+              body: JSON.stringify(printBody),
             });
             const data = await res.json();
             if (data.success || data.printed) {
@@ -4862,7 +4864,7 @@ document.getElementById('bulk-bag-print').addEventListener('click', async () => 
     const res = await fetch('/.netlify/functions/eship-print', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ order_ids: printIds }),
+      body: JSON.stringify({ order_ids: printIds, carrier_service_code: bulkBagSize }),
     });
     const data = await res.json();
     if (data.success || data.printed) {

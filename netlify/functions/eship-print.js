@@ -57,6 +57,7 @@ exports.handler = async (event) => {
   try {
     const body = JSON.parse(event.body || '{}');
     let orderIds = body.order_ids || [];
+    const carrierServiceCode = body.carrier_service_code || null; // Optional: override bag size at print time
 
     // If no specific order IDs provided, fetch all unshipped orders
     if (orderIds.length === 0) {
@@ -78,15 +79,21 @@ exports.handler = async (event) => {
 
     // Call StarshipIt's print endpoint for each order
     // This creates shipments which the Desktop Agent will pick up and print
+    // If carrier_service_code is provided, override the bag size at print time
     const results = [];
     for (const orderId of orderIds) {
       try {
+        const shipmentBody = { order_id: orderId };
+        if (carrierServiceCode) {
+          shipmentBody.carrier_service_code = carrierServiceCode;
+          shipmentBody.carrier = 'CourierPost';
+        }
         const result = await apiFetch(
           'https://api.starshipit.com/api/orders/shipment',
           apiHeaders,
           {
             method: 'POST',
-            body: JSON.stringify({ order_id: orderId }),
+            body: JSON.stringify(shipmentBody),
           }
         );
         results.push({ order_id: orderId, success: !result.errors, result });
