@@ -4073,6 +4073,14 @@ async function loadShippingData() {
 
     // Attach search + filter handlers
     document.getElementById('shipment-search').addEventListener('input', () => { shipmentsPage = 1; renderShipmentsTable(); });
+    // In bulk bag mode, Enter in search bar treats input as barcode scan
+    document.getElementById('shipment-search').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && bulkBagMode && bulkBagSize) {
+        e.preventDefault();
+        const val = e.target.value.trim();
+        if (val) { handleBulkBagScan(val); e.target.value = ''; shipmentsPage = 1; renderShipmentsTable(); }
+      }
+    });
     document.getElementById('shipment-status-filter').addEventListener('change', (e) => {
       activeShipFilter = e.target.value;
       shipmentsPage = 1;
@@ -4528,10 +4536,11 @@ document.getElementById('barcode-input').addEventListener('keydown', function(e)
 });
 
 // Keep scanner focused when clicking elsewhere in shipping tab
+// But NOT during bulk bag mode — search bar needs to stay usable
 document.getElementById('barcode-input').addEventListener('blur', function() {
-  if (scannerActive || bulkAwaitingMode || bulkBagMode) {
+  if ((scannerActive || bulkAwaitingMode) && !bulkBagMode) {
     setTimeout(() => {
-      if (scannerActive || bulkAwaitingMode || bulkBagMode) this.focus();
+      if ((scannerActive || bulkAwaitingMode) && !bulkBagMode) this.focus();
     }, 100);
   }
 });
@@ -4655,10 +4664,7 @@ function startBulkBagScanning() {
   document.getElementById('bulk-bag-status').textContent = 'Tick orders or scan barcodes to select';
   document.getElementById('bulk-bag-print').style.display = 'none';
   document.getElementById('bulk-bag-banner').classList.add('active');
-  // Enable scanner for barcode scanning but don't hijack — search still works
-  scannerActive = true;
-  document.getElementById('barcode-scan-btn').classList.add('active');
-  document.getElementById('barcode-input').value = '';
+  // Don't hijack scanner — search bar stays usable, barcodes still work via keydown listener
   renderShipmentsTable();
 }
 
@@ -4773,9 +4779,7 @@ function exitBulkBagMode() {
   bulkBagSizeLabel = null;
   bulkBagCount = 0;
   bulkBagOrderIds = [];
-  scannerActive = false;
   document.getElementById('bulk-bag-banner').classList.remove('active');
-  document.getElementById('barcode-scan-btn').classList.remove('active');
   document.getElementById('barcode-input').blur();
   renderShipmentsTable();
 }
