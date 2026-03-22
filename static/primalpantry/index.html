@@ -286,6 +286,39 @@
     .comms-send-btn { background: var(--sage); color: #141210; border: none; border-radius: 6px; padding: 0.5rem 1.2rem; font-weight: 600; cursor: pointer; font-size: 0.85rem; font-family: 'DM Sans', sans-serif; }
     .comms-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .comms-empty { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--dim); font-size: 0.9rem; text-align: center; padding: 2rem; }
+    .comms-filter-bar { display: flex; gap: 0.25rem; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+    .comms-filter-btn { background: none; border: 1px solid var(--border); color: var(--dim); padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.7rem; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+    .comms-filter-btn.active { background: var(--sage); color: #141210; border-color: var(--sage); font-weight: 600; }
+    .comms-filter-btn.filter-supplier.active { background: #d4a84b; border-color: #d4a84b; }
+    .comms-filter-btn.filter-wholesaler.active { background: #9b6fcb; border-color: #9b6fcb; color: #fff; }
+    .comms-filter-btn.filter-flagged.active { background: #e06050; border-color: #e06050; color: #fff; }
+    .comms-dot-supplier { background: #d4a84b !important; }
+    .comms-dot-wholesaler { background: #9b6fcb !important; }
+    .comms-date-group { padding: 0.4rem 0.75rem; font-size: 0.65rem; color: var(--dim); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; background: rgba(0,0,0,0.15); }
+    .comms-order-flag { display: inline-block; width: 14px; height: 14px; vertical-align: middle; margin-left: 0.25rem; opacity: 0.7; }
+    .comms-prompt-bubble { background: rgba(220,120,160,0.12); border: 1px solid rgba(220,120,160,0.3); border-radius: 8px; padding: 0.6rem 0.75rem; margin: 0.25rem 0.75rem; cursor: pointer; transition: background 0.15s; }
+    .comms-prompt-bubble:hover { background: rgba(220,120,160,0.2); }
+    .comms-prompt-from { color: #dc78a0; font-weight: 600; font-size: 0.75rem; }
+    .comms-prompt-subject { font-size: 0.8rem; color: var(--text); margin-top: 0.15rem; }
+    .comms-prompt-snippet { font-size: 0.72rem; color: var(--dim); margin-top: 0.1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .comms-prompt-meta { font-size: 0.65rem; color: var(--dim); margin-top: 0.2rem; }
+    .comms-email-header { padding: 0.6rem 0; border-bottom: 1px solid rgba(56,50,44,0.3); cursor: pointer; }
+    .comms-email-header:hover { background: rgba(255,255,255,0.02); border-radius: 4px; }
+    .comms-email-detail { font-size: 0.75rem; color: var(--dim); margin-top: 0.15rem; }
+    .comms-email-detail span { margin-right: 0.75rem; }
+    .comms-html-frame { border: none; width: 100%; min-height: 100px; background: #fff; border-radius: 6px; }
+    .comms-header-actions { display: flex; gap: 0.5rem; align-items: center; }
+    .comms-header-actions label { font-size: 0.75rem; color: var(--muted); display: flex; align-items: center; gap: 0.25rem; cursor: pointer; }
+    .comms-header-actions button { background: none; border: 1px solid var(--border); color: var(--muted); padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.72rem; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+    .comms-header-actions button:hover { background: rgba(220,120,160,0.15); color: #dc78a0; border-color: #dc78a0; }
+    .comms-type-badge { padding: 0.1rem 0.5rem; border-radius: 10px; font-size: 0.65rem; font-weight: 600; }
+    .comms-type-badge.supplier { background: rgba(212,168,75,0.15); color: #d4a84b; }
+    .comms-type-badge.wholesaler { background: rgba(155,111,203,0.15); color: #9b6fcb; }
+    .comms-type-badge.customer { background: rgba(140,180,122,0.15); color: var(--sage); }
+    .settings-tabs { display: flex; gap: 0.5rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
+    .settings-tab-btn { background: var(--card); border: 1px solid var(--border); color: var(--muted); padding: 0.4rem 1rem; border-radius: 20px; cursor: pointer; font-size: 0.85rem; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+    .settings-tab-btn.active { background: var(--sage); color: #141210; border-color: var(--sage); font-weight: 600; }
+    .settings-tab-btn:hover:not(.active) { border-color: var(--sage); color: var(--sage); }
     @media (max-width: 768px) { .comms-layout { grid-template-columns: 1fr; height: auto; } .comms-sidebar { max-height: 40vh; } }
 
     /* Manual order form */
@@ -710,6 +743,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
       Finance
     </button>
+    <button class="nav-item" data-tab="settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Settings
+    </button>
     <div style="flex:1;"></div>
     <div style="padding:0.75rem 1.25rem;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:0.5rem;">
       <button class="manual-order-btn" id="manual-order-btn" style="width:100%;text-align:center;">+ Order</button>
@@ -921,6 +958,14 @@
           <span style="color:var(--dim);">No Gmail accounts connected</span>
           <button class="comms-connect-btn" id="comms-connect-btn" style="margin-left:0.5rem;">Connect Gmail</button>
         </div>
+        <div class="comms-filter-bar" id="comms-filter-bar">
+          <button class="comms-filter-btn active" data-filter="all">All</button>
+          <button class="comms-filter-btn" data-filter="customers">Customers</button>
+          <button class="comms-filter-btn filter-supplier" data-filter="suppliers">Suppliers</button>
+          <button class="comms-filter-btn filter-wholesaler" data-filter="wholesalers">Wholesalers</button>
+          <button class="comms-filter-btn filter-flagged" data-filter="flagged">Flagged</button>
+        </div>
+        <div id="comms-prompts-area"></div>
         <div class="comms-thread-list" id="comms-thread-list">
           <div class="comms-empty">Connect a Gmail account to start</div>
         </div>
@@ -933,8 +978,14 @@
         <div class="comms-reply-box" id="comms-reply-box" style="display:none;">
           <textarea id="comms-reply-text" placeholder="Type your reply..."></textarea>
           <div class="comms-reply-actions">
-            <select id="comms-reply-from"></select>
-            <button class="comms-send-btn" id="comms-reply-send">Send</button>
+            <div style="display:flex;gap:0.5rem;align-items:center;">
+              <select id="comms-reply-from"></select>
+              <button class="comms-send-btn" id="comms-reply-send">Send</button>
+            </div>
+            <div style="display:flex;gap:0.25rem;">
+              <button class="comms-send-btn" id="comms-reply-all-btn" style="background:var(--card);color:var(--muted);border:1px solid var(--border);font-size:0.75rem;padding:0.35rem 0.6rem;">Reply All</button>
+              <button class="comms-send-btn" id="comms-forward-btn" style="background:var(--card);color:var(--muted);border:1px solid var(--border);font-size:0.75rem;padding:0.35rem 0.6rem;">Forward</button>
+            </div>
           </div>
         </div>
       </div>
@@ -1738,6 +1789,71 @@
       </div>
     </div>
   </div><!-- /tab-finance -->
+
+  <div id="tab-settings" class="tab-content">
+    <div class="settings-tabs">
+      <button class="settings-tab-btn active" data-settings-tab="suppliers">Suppliers</button>
+      <button class="settings-tab-btn" data-settings-tab="wholesalers">Wholesalers</button>
+    </div>
+
+    <!-- Suppliers sub-tab -->
+    <div id="settings-suppliers" class="settings-panel">
+      <div class="orders-card" style="margin-bottom:1.5rem;">
+        <h3>Add Supplier</h3>
+        <div class="form-grid" style="margin-bottom:0.75rem;">
+          <div class="form-group"><label>Company Name *</label><input type="text" id="sup-name" placeholder="Supplier name" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;"></div>
+          <div class="form-group"><label>Contact Name</label><input type="text" id="sup-contact" placeholder="Primary contact" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;"></div>
+          <div class="form-group"><label>Email</label><input type="email" id="sup-email" placeholder="orders@supplier.com" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;"></div>
+          <div class="form-group"><label>Phone</label><input type="text" id="sup-phone" placeholder="+64..." style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;"></div>
+          <div class="form-group"><label>Website</label><input type="text" id="sup-website" placeholder="https://..." style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;"></div>
+          <div class="form-group"><label>Payment Terms</label><input type="text" id="sup-terms" placeholder="e.g. Net 30, COD" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;"></div>
+        </div>
+        <div class="form-grid full" style="margin-bottom:0.75rem;">
+          <div class="form-group"><label>Address</label><input type="text" id="sup-address" placeholder="Full address" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;"></div>
+          <div class="form-group"><label>Notes</label><textarea id="sup-notes" rows="2" placeholder="Any notes about this supplier..." style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;resize:vertical;"></textarea></div>
+        </div>
+        <button class="manual-order-btn" id="sup-add-btn">Add Supplier</button>
+      </div>
+      <div class="orders-card">
+        <h3>Suppliers</h3>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead><tr><th>Company</th><th>Contact</th><th>Email</th><th>Phone</th><th>Payment Terms</th><th></th></tr></thead>
+            <tbody id="sup-table"><tr><td colspan="6" class="loading">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Wholesalers sub-tab -->
+    <div id="settings-wholesalers" class="settings-panel" style="display:none;">
+      <div class="orders-card" style="margin-bottom:1.5rem;">
+        <h3>Add Wholesaler</h3>
+        <div class="form-grid" style="margin-bottom:0.75rem;">
+          <div class="form-group"><label>Company Name *</label><input type="text" id="ws-name" placeholder="Wholesaler name" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;"></div>
+          <div class="form-group"><label>Contact Name</label><input type="text" id="ws-contact" placeholder="Primary contact" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;"></div>
+          <div class="form-group"><label>Email</label><input type="email" id="ws-email" placeholder="orders@wholesaler.com" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;"></div>
+          <div class="form-group"><label>Phone</label><input type="text" id="ws-phone" placeholder="+64..." style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;"></div>
+          <div class="form-group"><label>Website</label><input type="text" id="ws-website" placeholder="https://..." style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;"></div>
+          <div class="form-group"><label>Payment Terms</label><input type="text" id="ws-terms" placeholder="e.g. Net 30, COD" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;"></div>
+        </div>
+        <div class="form-grid full" style="margin-bottom:0.75rem;">
+          <div class="form-group"><label>Address</label><input type="text" id="ws-address" placeholder="Full address" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;"></div>
+          <div class="form-group"><label>Notes</label><textarea id="ws-notes" rows="2" placeholder="Any notes about this wholesaler..." style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;resize:vertical;"></textarea></div>
+        </div>
+        <button class="manual-order-btn" id="ws-add-btn">Add Wholesaler</button>
+      </div>
+      <div class="orders-card">
+        <h3>Wholesalers</h3>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead><tr><th>Company</th><th>Contact</th><th>Email</th><th>Phone</th><th>Payment Terms</th><th></th></tr></thead>
+            <tbody id="ws-table"><tr><td colspan="6" class="loading">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div><!-- /tab-settings -->
 
 </div><!-- /dashboard -->
 
@@ -4507,7 +4623,7 @@ async function loadOrderJourney(order) {
 const navDrawer = document.getElementById('nav-drawer');
 const navOverlay = document.getElementById('nav-overlay');
 const navLabel = document.getElementById('nav-active-label');
-const navNames = { sales: 'Overview', orders: 'Orders', shipping: 'Shipping', customers: 'Customers', comms: 'Communications', manufacturing: 'Product & Inventory', website: 'Website Analytics', marketing: 'Marketing', finance: 'Finance' };
+const navNames = { sales: 'Overview', orders: 'Orders', shipping: 'Shipping', customers: 'Customers', comms: 'Communications', manufacturing: 'Product & Inventory', website: 'Website Analytics', marketing: 'Marketing', finance: 'Finance', settings: 'Settings' };
 
 function openNav() { navDrawer.classList.add('open'); navOverlay.classList.add('open'); }
 function closeNav() { navDrawer.classList.remove('open'); navOverlay.classList.remove('open'); }
@@ -4533,7 +4649,7 @@ document.querySelectorAll('.nav-item').forEach(btn => {
       g.style.display = hideFilters ? 'none' : '';
     });
     // Hide entire filter bar on finance (has its own date context)
-    document.querySelector('.filter-bar').style.display = (activeTab === 'finance' || activeTab === 'comms') ? 'none' : '';
+    document.querySelector('.filter-bar').style.display = (activeTab === 'finance' || activeTab === 'comms' || activeTab === 'settings') ? 'none' : '';
     loadActiveTab();
   });
 });
@@ -4582,6 +4698,8 @@ function loadActiveTab() {
     loadCommsTab();
   } else if (activeTab === 'finance') {
     loadFinanceTab();
+  } else if (activeTab === 'settings') {
+    loadSettingsTab();
   }
 }
 
@@ -7455,7 +7573,7 @@ function spGetInlineFormRow(productId, productName) {
       <input type="hidden" id="sp-inline-product-id" value="${productId}">
       <input type="hidden" id="sp-inline-product-name" value="${esc(productName)}">
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:flex-end;">
-        <div style="min-width:80px;"><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Amount ($)</div><input type="number" id="sp-inline-amount" placeholder="29.95" step="0.01" min="0" style="${inpStyle}width:80px;"></div>
+        <div style="min-width:80px;"><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Amount ($)</div><input type="number" id="sp-inline-amount" placeholder="29.95" step="0.01" min="0" oninput="var dp=document.getElementById('sp-inline-display-price');if(!dp.dataset.manual)dp.value=this.value;" style="${inpStyle}width:80px;"></div>
         <div style="min-width:70px;"><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Currency</div><select id="sp-inline-currency" style="${selStyle}"><option value="nzd">NZD</option><option value="aud">AUD</option><option value="usd">USD</option></select></div>
         <div style="flex:1;min-width:120px;"><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Label</div><input type="text" id="sp-inline-nickname" placeholder="e.g. One-time NZ" style="${inpStyle}"></div>
         <div style="min-width:80px;"><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Type</div><select id="sp-inline-type" style="${selStyle}"><option value="one_time">One-time</option><option value="month">Monthly</option><option value="week">Weekly</option><option value="year">Yearly</option></select></div>
@@ -7468,7 +7586,7 @@ function spGetInlineFormRow(productId, productName) {
         <div style="min-width:70px;"><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Size</div><input type="text" id="sp-inline-size" placeholder="120ml" style="${inpStyle}width:70px;"></div>
         <div><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Order Type</div><select id="sp-inline-order-type" style="${selStyle}"><option value="single">single</option><option value="pack">pack</option><option value="monthly">monthly</option><option value="quarterly">quarterly</option></select></div>
         <div><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Market</div><select id="sp-inline-market" style="${selStyle}"><option value="NZ">NZ</option><option value="AU">AU</option></select></div>
-        <div style="min-width:80px;"><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Display $</div><input type="number" id="sp-inline-display-price" placeholder="29.95" step="0.01" min="0" style="${inpStyle}width:80px;"></div>
+        <div style="min-width:80px;"><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Display $</div><input type="number" id="sp-inline-display-price" placeholder="29.95" step="0.01" min="0" oninput="this.dataset.manual='1'" style="${inpStyle}width:80px;"></div>
       </div>
       <div style="display:flex;gap:0.5rem;margin-top:0.65rem;">
         <button id="sp-inline-create-btn" class="mfg-add-btn" style="font-size:0.8rem;padding:0.4rem 0.75rem;">Create Price</button>
@@ -7505,7 +7623,7 @@ async function spHandleInlineCreatePrice() {
     payload.size = metaSize;
     payload.order_type = document.getElementById('sp-inline-order-type').value;
     payload.market = document.getElementById('sp-inline-market').value;
-    payload.display_price = document.getElementById('sp-inline-display-price').value || null;
+    payload.display_price = document.getElementById('sp-inline-display-price').value || amount || null;
     payload.product_name = document.getElementById('sp-inline-product-name').value;
   }
 
@@ -8374,11 +8492,27 @@ function renderCommsAccounts() {
   document.getElementById('compose-from').innerHTML = fromOpts;
 }
 
-function renderCommsThreadList(filter) {
+let commsFilter = 'all';
+let commsStaffList = [];
+let commsPrompts = [];
+
+function commsDateLabel(dateStr) {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today - 86400000);
+  const weekAgo = new Date(today - 604800000);
+  if (d >= today) return 'Today';
+  if (d >= yesterday) return 'Yesterday';
+  if (d >= weekAgo) return 'This Week';
+  return 'Older';
+}
+
+function renderCommsThreadList(searchFilter) {
   const list = document.getElementById('comms-thread-list');
   let threads = commsThreads;
-  if (filter) {
-    const q = filter.toLowerCase();
+  if (searchFilter) {
+    const q = searchFilter.toLowerCase();
     threads = threads.filter(t =>
       (t.customer_name || '').toLowerCase().includes(q) ||
       (t.customer_email || '').toLowerCase().includes(q) ||
@@ -8389,18 +8523,61 @@ function renderCommsThreadList(filter) {
     list.innerHTML = '<div class="comms-empty">' + (commsAccounts.length === 0 ? 'Connect a Gmail account to start' : 'No conversations found') + '</div>';
     return;
   }
-  list.innerHTML = threads.map(t => {
+  // Group by date
+  let lastGroup = '';
+  let html = '';
+  for (const t of threads) {
+    const group = commsDateLabel(t.last_date);
+    if (group !== lastGroup) {
+      lastGroup = group;
+      html += '<div class="comms-date-group">' + group + '</div>';
+    }
     const isActive = commsActiveThread && commsActiveThread.thread_id === t.thread_id;
-    return '<div class="comms-thread-item' + (isActive ? ' active' : '') + (t.unread_count > 0 ? ' unread' : '') + '" onclick="openCommsThread(\'' + (t.thread_id || '').replace(/'/g, "\\'") + '\')">'
+    const dotClass = t.contact_type === 'supplier' ? 'comms-dot-supplier' : t.contact_type === 'wholesaler' ? 'comms-dot-wholesaler' : '';
+    const showDot = t.unread_count > 0;
+    html += '<div class="comms-thread-item' + (isActive ? ' active' : '') + (t.unread_count > 0 ? ' unread' : '') + '" onclick="openCommsThread(\'' + (t.thread_id || '').replace(/'/g, "\\'") + '\')">'
       + '<div class="comms-thread-name">'
-      + (t.unread_count > 0 ? '<span class="comms-unread-dot"></span>' : '')
+      + (showDot ? '<span class="comms-unread-dot ' + dotClass + '"></span>' : (t.contact_type === 'supplier' ? '<span class="comms-unread-dot comms-dot-supplier" style="opacity:0.4;"></span>' : t.contact_type === 'wholesaler' ? '<span class="comms-unread-dot comms-dot-wholesaler" style="opacity:0.4;"></span>' : ''))
       + '<span>' + esc(t.customer_name || t.customer_email || 'Unknown') + '</span>'
-      + '<span class="comms-thread-time">' + commsTimeAgo(t.last_date) + '</span>'
+      + '<span class="comms-thread-time">' + commsTimeAgo(t.last_date)
+      + (t.order_flagged ? ' <svg class="comms-order-flag" viewBox="0 0 24 24" fill="none" stroke="#e06050" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' : '')
+      + '</span>'
       + '</div>'
-      + '<div class="comms-thread-subject">' + esc(t.last_subject || '(no subject)') + '</div>'
+      + '<div class="comms-thread-subject">'
+      + (t.contact_type !== 'customer' ? '<span class="comms-type-badge ' + t.contact_type + '">' + t.contact_type + '</span> ' : '')
+      + esc(t.last_subject || '(no subject)') + '</div>'
       + '<div class="comms-thread-snippet">' + esc(t.last_snippet || '') + '</div>'
       + '</div>';
+  }
+  list.innerHTML = html;
+}
+
+async function renderCommsPrompts() {
+  const area = document.getElementById('comms-prompts-area');
+  try {
+    const data = await commsApi('get_prompts', {});
+    commsPrompts = data.prompts || [];
+  } catch { commsPrompts = []; }
+  if (commsPrompts.length === 0) { area.innerHTML = ''; return; }
+  area.innerHTML = commsPrompts.map(p => {
+    const fromName = (p.email_from || '').split('<')[0].trim() || 'Unknown';
+    return '<div class="comms-prompt-bubble" onclick="openPromptThread(\'' + (p.thread_id || '').replace(/'/g, "\\'") + '\',' + p.id + ')">'
+      + '<div class="comms-prompt-from">Prompted by ' + esc(p.from_staff) + '</div>'
+      + '<div class="comms-prompt-subject">' + esc(fromName) + ' — ' + esc(p.email_subject || '(no subject)') + '</div>'
+      + '<div class="comms-prompt-snippet">' + esc(p.email_snippet || '') + '</div>'
+      + (p.note ? '<div class="comms-prompt-meta">Note: ' + esc(p.note) + '</div>' : '')
+      + '</div>';
   }).join('');
+}
+
+async function openPromptThread(threadId, promptId) {
+  // Dismiss the prompt
+  commsApi('dismiss_prompt', { prompt_id: promptId }).catch(() => {});
+  // Remove from UI
+  commsPrompts = commsPrompts.filter(p => p.id !== promptId);
+  renderCommsPrompts();
+  // Open the thread
+  if (threadId) openCommsThread(threadId);
 }
 
 async function openCommsThread(threadId) {
@@ -8412,7 +8589,23 @@ async function openCommsThread(threadId) {
   const replyBox = document.getElementById('comms-reply-box');
 
   header.style.display = 'flex';
-  header.innerHTML = '<div><strong>' + esc(commsActiveThread.customer_name || commsActiveThread.customer_email || 'Unknown') + '</strong> <span style="color:var(--dim);font-size:0.8rem;">' + esc(commsActiveThread.customer_email || '') + '</span></div>';
+  const ct = commsActiveThread.contact_type || 'customer';
+  const isFlagged = commsActiveThread.order_flagged || false;
+
+  // Load staff list for prompt dropdown if not loaded
+  if (commsStaffList.length === 0) {
+    commsApi('get_staff_list', {}).then(d => { commsStaffList = d.staff || []; }).catch(() => {});
+  }
+
+  header.innerHTML = '<div>'
+    + '<strong>' + esc(commsActiveThread.customer_name || commsActiveThread.customer_email || 'Unknown') + '</strong> '
+    + '<span style="color:var(--dim);font-size:0.8rem;">' + esc(commsActiveThread.customer_email || '') + '</span> '
+    + '<span class="comms-type-badge ' + ct + '">' + ct + '</span>'
+    + '</div>'
+    + '<div class="comms-header-actions">'
+    + '<label><input type="checkbox" id="comms-order-flag" ' + (isFlagged ? 'checked' : '') + ' onchange="toggleOrderFlag(this.checked)"> Order</label>'
+    + '<button id="comms-prompt-btn" onclick="showPromptDropdown()">Prompt</button>'
+    + '</div>';
 
   messagesEl.innerHTML = '<div class="comms-empty">Loading...</div>';
 
@@ -8426,28 +8619,50 @@ async function openCommsThread(threadId) {
       return;
     }
 
-    messagesEl.innerHTML = msgs.map(m => {
+    messagesEl.innerHTML = msgs.map((m, idx) => {
       const isOut = m.direction === 'outbound';
-      const timeStr = new Date(m.date).toLocaleString('en-NZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-      // Use body_text for display, fall back to stripping HTML
-      let displayText = m.body_text || '';
-      if (!displayText && m.body_html) {
-        const div = document.createElement('div');
-        div.innerHTML = m.body_html;
-        displayText = div.textContent || div.innerText || '';
-      }
-      // Truncate very long messages
-      if (displayText.length > 2000) displayText = displayText.slice(0, 2000) + '...';
+      const timeStr = new Date(m.date).toLocaleString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      const fromName = (m.from_address || '').split('<')[0].trim();
+      const toName = (m.to_address || '').split('<')[0].trim();
 
-      return '<div class="comms-msg ' + (isOut ? 'outbound' : 'inbound') + '">'
-        + '<div class="comms-msg-bubble">'
-        + '<div style="font-weight:600;font-size:0.8rem;margin-bottom:0.25rem;color:var(--muted);">' + esc(m.subject || '') + '</div>'
-        + '<div>' + esc(displayText).replace(/\n/g, '<br>') + '</div>'
+      // Gmail-like expandable header
+      let headerHtml = '<div class="comms-email-header" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;">'
+        + '<span style="font-weight:600;font-size:0.85rem;">' + esc(fromName || m.from_address || '') + '</span>'
+        + '<span style="font-size:0.7rem;color:var(--dim);">' + timeStr + '</span>'
+        + '</div>'
+        + '<div style="font-size:0.75rem;color:var(--muted);margin-top:0.1rem;">' + esc(m.subject || '') + '</div>'
+        + '</div>';
+
+      // Expandable detail (hidden by default except last message)
+      let detailHtml = '<div class="comms-email-detail" style="display:' + (idx === msgs.length - 1 ? 'block' : 'none') + ';">'
+        + '<div><span>From: ' + esc(m.from_address || '') + '</span></div>'
+        + '<div><span>To: ' + esc(m.to_address || '') + '</span></div>'
+        + (m.cc ? '<div><span>CC: ' + esc(m.cc) + '</span></div>' : '')
+        + '<div><span>Date: ' + timeStr + '</span></div>'
+        + '</div>';
+
+      // Body - render HTML if available
+      let bodyHtml;
+      if (m.body_html && m.body_html.trim()) {
+        bodyHtml = '<div class="comms-msg-body" style="margin-top:0.5rem;">'
+          + '<iframe class="comms-html-frame" srcdoc="' + m.body_html.replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '" sandbox="allow-same-origin" onload="this.style.height=Math.min(this.contentWindow.document.body.scrollHeight+20,600)+\'px\'"></iframe>'
+          + '</div>';
+      } else {
+        let displayText = m.body_text || '';
+        if (displayText.length > 3000) displayText = displayText.slice(0, 3000) + '...';
+        bodyHtml = '<div style="margin-top:0.5rem;white-space:pre-wrap;font-size:0.85rem;line-height:1.6;">' + esc(displayText) + '</div>';
+      }
+
+      return '<div class="comms-msg ' + (isOut ? 'outbound' : 'inbound') + '" style="max-width:100%;">'
+        + '<div class="comms-msg-bubble" style="border-radius:8px;">'
+        + headerHtml
+        + detailHtml
+        + bodyHtml
         + '</div>'
         + '<div class="comms-msg-meta">'
         + (isOut && m.staff_name ? '<span class="comms-staff-badge">' + esc(m.staff_name) + '</span>' : '')
-        + '<span>' + timeStr + '</span>'
-        + (isOut ? '<span style="color:var(--sage);">Sent</span>' : '<span>from ' + esc(m.from_address || '').split('<')[0].trim() + '</span>')
+        + (isOut ? '<span style="color:var(--sage);">Sent</span>' : '')
         + '</div>'
         + '</div>';
     }).join('');
@@ -8455,12 +8670,15 @@ async function openCommsThread(threadId) {
     // Scroll to bottom
     messagesEl.scrollTop = messagesEl.scrollHeight;
 
-    // Show reply box
+    // Show reply box with quoted text
     replyBox.style.display = 'block';
+    const lastMsg = msgs[msgs.length - 1];
+    const quoteFrom = (lastMsg.from_address || '').split('<')[0].trim();
+    const quoteDate = new Date(lastMsg.date).toLocaleString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const quoteText = (lastMsg.body_text || '').split('\n').map(l => '> ' + l).join('\n');
+    commsActiveThread._quoteBlock = '\n\nOn ' + quoteDate + ', ' + quoteFrom + ' wrote:\n' + quoteText;
     document.getElementById('comms-reply-text').value = '';
 
-    // Set from to the account that received messages in this thread
-    const lastMsg = msgs[msgs.length - 1];
     if (lastMsg.account_id) {
       document.getElementById('comms-reply-from').value = lastMsg.account_id;
     }
@@ -8476,53 +8694,140 @@ async function openCommsThread(threadId) {
   }
 }
 
+function toggleOrderFlag(checked) {
+  if (!commsActiveThread) return;
+  commsApi('flag_order', { thread_id: commsActiveThread.thread_id, flagged: checked }).catch(() => {});
+  commsActiveThread.order_flagged = checked;
+  // Update thread list
+  const t = commsThreads.find(t => t.thread_id === commsActiveThread.thread_id);
+  if (t) t.order_flagged = checked;
+  renderCommsThreadList();
+}
+
+function showPromptDropdown() {
+  const btn = document.getElementById('comms-prompt-btn');
+  // If dropdown already exists, remove it
+  const existing = document.getElementById('comms-prompt-dropdown');
+  if (existing) { existing.remove(); return; }
+
+  const dd = document.createElement('div');
+  dd.id = 'comms-prompt-dropdown';
+  dd.style.cssText = 'position:absolute;right:0;top:100%;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:0.25rem;z-index:99;min-width:180px;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+  if (commsStaffList.length === 0) {
+    dd.innerHTML = '<div style="padding:0.5rem;color:var(--dim);font-size:0.8rem;">Loading staff...</div>';
+    btn.parentElement.style.position = 'relative';
+    btn.parentElement.appendChild(dd);
+    commsApi('get_staff_list', {}).then(d => {
+      commsStaffList = d.staff || [];
+      showPromptDropdown(); // Retry
+    });
+    return;
+  }
+  dd.innerHTML = commsStaffList.map(s =>
+    '<div style="padding:0.4rem 0.6rem;cursor:pointer;font-size:0.8rem;border-radius:4px;" onmouseover="this.style.background=\'rgba(220,120,160,0.15)\'" onmouseout="this.style.background=\'none\'" onclick="sendPrompt(' + s.id + ',\'' + esc(s.display_name || '').replace(/'/g, "\\'") + '\')">'
+    + esc(s.display_name || 'Staff #' + s.id) + ' <span style="color:var(--dim);font-size:0.7rem;">' + s.role + '</span></div>'
+  ).join('');
+  btn.parentElement.style.position = 'relative';
+  btn.parentElement.appendChild(dd);
+  // Close on click outside
+  setTimeout(() => {
+    document.addEventListener('click', function closeDD(e) {
+      if (!dd.contains(e.target) && e.target !== btn) { dd.remove(); document.removeEventListener('click', closeDD); }
+    });
+  }, 50);
+}
+
+async function sendPrompt(staffId, staffName) {
+  if (!commsActiveThread) return;
+  const dd = document.getElementById('comms-prompt-dropdown');
+  if (dd) dd.remove();
+  try {
+    await commsApi('prompt', { thread_id: commsActiveThread.thread_id, to_staff_id: staffId });
+    const btn = document.getElementById('comms-prompt-btn');
+    btn.textContent = 'Prompted ' + staffName;
+    btn.style.color = '#dc78a0';
+    btn.style.borderColor = '#dc78a0';
+    setTimeout(() => { btn.textContent = 'Prompt'; btn.style.color = ''; btn.style.borderColor = ''; }, 2000);
+  } catch (e) { alert('Failed to prompt: ' + e.message); }
+}
+
 async function loadCommsTab() {
   if (!commsInited) {
     commsInited = true;
-    // Search
     document.getElementById('comms-search').addEventListener('input', function() {
       renderCommsThreadList(this.value.trim());
     });
-    // Compose button
     document.getElementById('comms-compose-btn').addEventListener('click', () => openComposeModal({}));
-    // Reply send button
     document.getElementById('comms-reply-send').addEventListener('click', sendCommsReply);
-    // Gmail connected message listener
+    // Reply All button
+    document.getElementById('comms-reply-all-btn').addEventListener('click', () => {
+      if (!commsActiveThread) return;
+      openComposeModal({
+        to: commsActiveThread.customer_email || '',
+        subject: (commsActiveThread.last_subject || '').startsWith('Re:') ? commsActiveThread.last_subject : 'Re: ' + (commsActiveThread.last_subject || ''),
+        threadId: commsActiveThread.thread_id,
+        body: commsActiveThread._quoteBlock || '',
+      });
+    });
+    // Forward button
+    document.getElementById('comms-forward-btn').addEventListener('click', () => {
+      if (!commsActiveThread) return;
+      openComposeModal({
+        subject: 'Fwd: ' + (commsActiveThread.last_subject || ''),
+        body: commsActiveThread._quoteBlock || '',
+      });
+    });
+    // Filter buttons
+    document.querySelectorAll('.comms-filter-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('.comms-filter-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        commsFilter = this.dataset.filter;
+        loadCommsThreads();
+      });
+    });
     window.addEventListener('message', e => { if (e.data && e.data.gmailConnected) loadCommsTab(); });
   }
 
-  // Load accounts
   try {
     const acctData = await fetch('/.netlify/functions/gmail-auth?action=status&token=' + currentStaff.token).then(r => r.json());
     commsAccounts = acctData.accounts || [];
   } catch { commsAccounts = []; }
   renderCommsAccounts();
 
-  // Sync then load threads
+  // Load prompts for this staff member
+  renderCommsPrompts();
+
   if (commsAccounts.length > 0) {
     document.getElementById('comms-thread-list').innerHTML = '<div class="comms-empty">Syncing messages...</div>';
     try {
-      const syncRes = await commsApi('sync', { maxResults: 15 });
-      console.log('Comms sync result:', syncRes);
+      await commsApi('sync', { maxResults: 15 });
     } catch (e) { console.error('Comms sync error:', e); }
-    try {
-      const data = await commsApi('threads', { limit: 50 });
-      console.log('Comms threads result:', data);
-      commsThreads = data.threads || [];
-      renderCommsThreadList();
-    } catch (e) {
-      console.error('Comms threads error:', e);
-      document.getElementById('comms-thread-list').innerHTML = '<div class="comms-empty">Failed to load threads</div>';
-    }
+    await loadCommsThreads();
+  }
+}
+
+async function loadCommsThreads() {
+  try {
+    const data = await commsApi('threads', { limit: 50, filter: commsFilter });
+    commsThreads = data.threads || [];
+    renderCommsThreadList();
+  } catch (e) {
+    console.error('Comms threads error:', e);
+    document.getElementById('comms-thread-list').innerHTML = '<div class="comms-empty">Failed to load threads</div>';
   }
 }
 
 async function sendCommsReply() {
   if (!commsActiveThread) return;
-  const text = document.getElementById('comms-reply-text').value.trim();
+  const textEl = document.getElementById('comms-reply-text');
+  let text = textEl.value.trim();
   if (!text) return;
   const accountId = parseInt(document.getElementById('comms-reply-from').value);
   if (!accountId) return;
+
+  // Append quoted text
+  if (commsActiveThread._quoteBlock) text += commsActiveThread._quoteBlock;
 
   const btn = document.getElementById('comms-reply-send');
   btn.disabled = true; btn.textContent = 'Sending...';
@@ -8530,26 +8835,17 @@ async function sendCommsReply() {
   try {
     const lastSubject = commsActiveThread.last_subject || '';
     const subject = lastSubject.startsWith('Re:') ? lastSubject : 'Re: ' + lastSubject;
-    const to = commsActiveThread.customer_email || '';
-
     await commsApi('send', {
       account_id: accountId,
-      to: to,
+      to: commsActiveThread.customer_email || '',
       subject: subject,
       body: text,
       threadId: commsActiveThread.thread_id,
     });
-
-    document.getElementById('comms-reply-text').value = '';
-    // Reload thread
+    textEl.value = '';
     await openCommsThread(commsActiveThread.thread_id);
-    // Refresh thread list
-    const data = await commsApi('threads', { limit: 50 });
-    commsThreads = data.threads || [];
-    renderCommsThreadList();
-  } catch (e) {
-    alert('Failed to send: ' + e.message);
-  }
+    await loadCommsThreads();
+  } catch (e) { alert('Failed to send: ' + e.message); }
 
   btn.disabled = false; btn.textContent = 'Send';
 }
@@ -8656,6 +8952,129 @@ document.getElementById('compose-send').addEventListener('click', async () => {
 
   btn.disabled = false; btn.textContent = 'Send';
 });
+
+// ── Settings Tab ──
+
+let settingsInited = false;
+let settingsActiveTab = 'suppliers';
+
+async function loadSettingsTab() {
+  if (!settingsInited) {
+    settingsInited = true;
+    // Sub-tab switching
+    document.querySelectorAll('.settings-tab-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('.settings-tab-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        settingsActiveTab = this.dataset.settingsTab;
+        document.querySelectorAll('.settings-panel').forEach(p => p.style.display = 'none');
+        document.getElementById('settings-' + settingsActiveTab).style.display = 'block';
+        if (settingsActiveTab === 'suppliers') loadSuppliers();
+        else if (settingsActiveTab === 'wholesalers') loadWholesalers();
+      });
+    });
+    // Add supplier
+    document.getElementById('sup-add-btn').addEventListener('click', async () => {
+      const name = document.getElementById('sup-name').value.trim();
+      if (!name) return;
+      const btn = document.getElementById('sup-add-btn');
+      btn.disabled = true; btn.textContent = 'Adding...';
+      try {
+        await fetch('/.netlify/functions/suppliers?token=' + currentStaff.token, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'suppliers', name,
+            contact_name: document.getElementById('sup-contact').value.trim(),
+            email: document.getElementById('sup-email').value.trim(),
+            phone: document.getElementById('sup-phone').value.trim(),
+            website: document.getElementById('sup-website').value.trim(),
+            payment_terms: document.getElementById('sup-terms').value.trim(),
+            address: document.getElementById('sup-address').value.trim(),
+            notes: document.getElementById('sup-notes').value.trim(),
+          }),
+        });
+        ['sup-name','sup-contact','sup-email','sup-phone','sup-website','sup-terms','sup-address','sup-notes'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el.tagName === 'TEXTAREA') el.value = ''; else el.value = '';
+        });
+        await loadSuppliers();
+      } catch (e) { alert('Error: ' + e.message); }
+      btn.disabled = false; btn.textContent = 'Add Supplier';
+    });
+    // Add wholesaler
+    document.getElementById('ws-add-btn').addEventListener('click', async () => {
+      const name = document.getElementById('ws-name').value.trim();
+      if (!name) return;
+      const btn = document.getElementById('ws-add-btn');
+      btn.disabled = true; btn.textContent = 'Adding...';
+      try {
+        await fetch('/.netlify/functions/suppliers?token=' + currentStaff.token, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'wholesalers', name,
+            contact_name: document.getElementById('ws-contact').value.trim(),
+            email: document.getElementById('ws-email').value.trim(),
+            phone: document.getElementById('ws-phone').value.trim(),
+            website: document.getElementById('ws-website').value.trim(),
+            payment_terms: document.getElementById('ws-terms').value.trim(),
+            address: document.getElementById('ws-address').value.trim(),
+            notes: document.getElementById('ws-notes').value.trim(),
+          }),
+        });
+        ['ws-name','ws-contact','ws-email','ws-phone','ws-website','ws-terms','ws-address','ws-notes'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el.tagName === 'TEXTAREA') el.value = ''; else el.value = '';
+        });
+        await loadWholesalers();
+      } catch (e) { alert('Error: ' + e.message); }
+      btn.disabled = false; btn.textContent = 'Add Wholesaler';
+    });
+  }
+  if (settingsActiveTab === 'suppliers') loadSuppliers();
+  else loadWholesalers();
+}
+
+function renderEntityTable(tableId, data, type) {
+  const tbl = document.getElementById(tableId);
+  if (!data || data.length === 0) {
+    tbl.innerHTML = '<tr><td colspan="6" class="loading">No ' + type + ' added yet</td></tr>';
+    return;
+  }
+  tbl.innerHTML = data.map(s => {
+    return '<tr>'
+      + '<td style="font-weight:500;">' + esc(s.name) + '</td>'
+      + '<td>' + esc(s.contact_name || '-') + '</td>'
+      + '<td>' + (s.email ? '<a href="mailto:' + esc(s.email) + '" style="color:var(--sage);">' + esc(s.email) + '</a>' : '-') + '</td>'
+      + '<td>' + esc(s.phone || '-') + '</td>'
+      + '<td>' + esc(s.payment_terms || '-') + '</td>'
+      + '<td><button class="delete-btn" onclick="deleteEntity(' + s.id + ',\'' + type + '\')" style="font-size:0.7rem;padding:3px 8px;">Remove</button></td>'
+      + '</tr>';
+  }).join('');
+}
+
+async function loadSuppliers() {
+  try {
+    const res = await fetch('/.netlify/functions/suppliers?token=' + currentStaff.token + '&type=suppliers');
+    const data = await res.json();
+    renderEntityTable('sup-table', data.suppliers || [], 'suppliers');
+  } catch { document.getElementById('sup-table').innerHTML = '<tr><td colspan="6" class="loading">Failed to load</td></tr>'; }
+}
+
+async function loadWholesalers() {
+  try {
+    const res = await fetch('/.netlify/functions/suppliers?token=' + currentStaff.token + '&type=wholesalers');
+    const data = await res.json();
+    renderEntityTable('ws-table', data.wholesalers || [], 'wholesalers');
+  } catch { document.getElementById('ws-table').innerHTML = '<tr><td colspan="6" class="loading">Failed to load</td></tr>'; }
+}
+
+async function deleteEntity(id, type) {
+  if (!confirm('Remove this ' + type.slice(0, -1) + '?')) return;
+  try {
+    await fetch('/.netlify/functions/suppliers?token=' + currentStaff.token + '&id=' + id + '&type=' + type, { method: 'DELETE' });
+    if (type === 'suppliers') loadSuppliers(); else loadWholesalers();
+  } catch (e) { alert('Error: ' + e.message); }
+}
 
 // ── Competitor Tracking ──
 
