@@ -205,6 +205,7 @@
     .dw-orange { background: #fb923c; color: #111; }
     .dw-red { background: #ef4444; color: #fff; }
     .dw-pulse { animation: dw-throb 1.5s ease-in-out infinite; }
+    .dw-delivered { background: var(--border); color: var(--dim); font-weight: 600; }
     @keyframes dw-throb { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.85; transform: scale(1.08); } }
     .ship-status-badge.exception { background: rgba(224,96,80,0.15); color: var(--red); }
     .tracking-link { color: var(--sage); text-decoration: none; font-size: 0.8rem; font-weight: 600; }
@@ -255,10 +256,10 @@
     .customer-profile { background: var(--card); border-radius: 10px; padding: 1.25rem; margin-bottom: 0.75rem; border: 1px solid var(--border); cursor: pointer; transition: border 0.2s; }
     .customer-profile:hover { border-color: var(--sage); }
     .customer-profile.expanded { border-color: var(--sage); }
-    .customer-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+    .customer-header { display: flex; align-items: center; flex-wrap: wrap; gap: 0.75rem; }
     .customer-name { font-size: 1rem; font-weight: 700; }
     .customer-email { font-size: 0.8rem; color: var(--muted); }
-    .customer-meta { display: flex; gap: 1.25rem; font-size: 0.8rem; color: var(--dim); }
+    .customer-meta { display: flex; gap: 1.25rem; font-size: 0.8rem; color: var(--dim); margin-left: auto; }
     .customer-meta span { white-space: nowrap; }
     .customer-meta .val { color: var(--text); font-weight: 600; }
     .customer-orders-list { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border); display: none; }
@@ -408,6 +409,24 @@
     .manual-order-btn { background: var(--card); border: 1px solid var(--sage); color: var(--sage); padding: 0.4rem 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 600; }
     .manual-order-btn:hover { background: var(--sage); color: #141210; }
     .customer-order-items { color: var(--dim); font-size: 0.75rem; }
+
+    /* Delivery days pill */
+    .delivery-pill { display: inline-block; font-size: 0.65rem; font-weight: 600; padding: 0.12rem 0.45rem; border-radius: 9999px; white-space: nowrap; }
+    .delivery-pill.fast { background: rgba(107,143,91,0.15); color: var(--sage); }
+    .delivery-pill.normal { background: rgba(59,165,196,0.15); color: var(--cyan); }
+    .delivery-pill.slow { background: rgba(212,168,75,0.15); color: var(--honey); }
+    .delivery-pill.very-slow { background: rgba(200,80,80,0.15); color: var(--red); }
+
+    /* Response time pill */
+    .response-pill { display: inline-block; font-size: 0.6rem; font-weight: 600; padding: 0.1rem 0.4rem; border-radius: 9999px; white-space: nowrap; margin-left: 0.35rem; }
+    .response-pill.fast { background: rgba(107,143,91,0.15); color: var(--sage); }
+    .response-pill.normal { background: rgba(59,165,196,0.15); color: var(--cyan); }
+    .response-pill.slow { background: rgba(212,168,75,0.15); color: var(--honey); }
+    .response-pill.very-slow { background: rgba(200,80,80,0.15); color: var(--red); }
+
+    /* Customer profile card with avatar */
+    .customer-avatar { width: 42px; height: 42px; border-radius: 50%; background: var(--border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .customer-avatar svg { width: 24px; height: 24px; fill: var(--dim); }
     .customer-sort { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 1rem; }
     .customer-sort select, .customer-sort input { background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.8rem; font-family: 'DM Sans', sans-serif; }
     .customer-sort input { width: 250px; }
@@ -1117,6 +1136,16 @@
           <button class="comms-filter-btn filter-supplier" data-filter="suppliers">Suppliers</button>
           <button class="comms-filter-btn filter-wholesaler" data-filter="wholesalers">Retailers</button>
           <button class="comms-filter-btn filter-flagged" data-filter="flagged">Flagged</button>
+        </div>
+        <div id="comms-response-stats" style="display:flex;gap:0.5rem;padding:0.5rem 0.75rem;border-bottom:1px solid var(--border);flex-wrap:wrap;">
+          <div style="flex:1;min-width:80px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.6rem;text-align:center;">
+            <div style="font-size:0.6rem;color:var(--dim);text-transform:uppercase;">Avg Response</div>
+            <div style="font-size:0.95rem;font-weight:700;color:var(--cyan);" id="comms-avg-response">-</div>
+          </div>
+          <div style="flex:1;min-width:80px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.6rem;text-align:center;">
+            <div style="font-size:0.6rem;color:var(--dim);text-transform:uppercase;">Unanswered</div>
+            <div style="font-size:0.95rem;font-weight:700;color:var(--amber);" id="comms-unanswered">-</div>
+          </div>
         </div>
         <div id="comms-prompts-area"></div>
         <div class="comms-thread-list" id="comms-thread-list">
@@ -2835,6 +2864,7 @@ async function refreshStats() {
     const filteredOrderIds = new Set(filteredOrders.map(o => o.id));
     const filteredLI = allLineItems.filter(li => filteredOrderIds.has(li.order_id));
     renderStats(filteredOrders, filteredLI);
+    loadCommsResponseStats();
     loadAdSpend();
     updateRefreshTime();
   } catch (e) {
@@ -3122,6 +3152,8 @@ function renderStats(orders, lineItems) {
     { label: 'Refunds', value: fmt_money(refundTotal), sub: `${refundedOrders.length} order${refundedOrders.length !== 1 ? 's' : ''} refunded`, color: 'var(--red)' },
     { label: 'Avg Wait Time', value: avgWait + 'd', sub: `${waitingOrders.length} unshipped`, color: Number(avgWait) >= 2 ? 'var(--amber)' : 'var(--green)' },
     { label: 'Waiting 2+ Days', value: waitOver2, sub: waitOver2 > 0 ? 'need attention' : 'all on track', color: waitOver2 > 0 ? 'var(--red)' : 'var(--green)' },
+    { label: 'Avg Response', value: '<span id="stat-avg-response">-</span>', sub: 'to customer emails', color: 'var(--cyan)' },
+    { label: 'Unanswered', value: '<span id="stat-unanswered">-</span>', sub: 'customer emails', color: 'var(--amber)' },
   ];
 
   function renderStatCard(s) {
@@ -3168,6 +3200,78 @@ function renderStats(orders, lineItems) {
         const v = s.unique_visitors || 0;
         if (el) el.textContent = v >= 1000 ? (v / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : v;
       }).catch(() => {});
+  }
+}
+
+// ── Comms response stats (populates overview + comms sidebar) ──
+async function loadCommsResponseStats() {
+  try {
+    const data = await db.from('email_messages').select('thread_id,direction,date,customer_email').order('date', { ascending: true });
+    const msgs = data.data || [];
+    if (!msgs.length) return;
+
+    // Group by thread
+    const threads = {};
+    msgs.forEach(m => {
+      const tid = m.thread_id || m.customer_email || m.date;
+      if (!threads[tid]) threads[tid] = [];
+      threads[tid].push(m);
+    });
+
+    let totalResponseMs = 0, responseCount = 0, unanswered = 0;
+
+    Object.values(threads).forEach(thread => {
+      thread.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+      // Find response times: inbound followed by outbound
+      let lastInbound = null;
+      let answered = false;
+      for (const m of thread) {
+        if (m.direction === 'inbound') {
+          lastInbound = m;
+          answered = false;
+        } else if (m.direction === 'outbound' && lastInbound && !answered) {
+          totalResponseMs += new Date(m.date) - new Date(lastInbound.date);
+          responseCount++;
+          answered = true;
+        }
+      }
+
+      // Check if last message is inbound (unanswered)
+      if (thread[thread.length - 1].direction === 'inbound') {
+        unanswered++;
+      }
+    });
+
+    // Format avg response time
+    let avgLabel = '-';
+    if (responseCount > 0) {
+      const avgMs = totalResponseMs / responseCount;
+      const mins = Math.round(avgMs / 60000);
+      if (mins < 60) avgLabel = mins + 'm';
+      else if (mins < 1440) avgLabel = Math.round(mins / 60) + 'h';
+      else avgLabel = Math.round(mins / 1440) + 'd';
+    }
+
+    // Update overview stats
+    const overviewAvg = document.getElementById('stat-avg-response');
+    const overviewUn = document.getElementById('stat-unanswered');
+    if (overviewAvg) overviewAvg.textContent = avgLabel;
+    if (overviewUn) {
+      overviewUn.textContent = unanswered;
+      overviewUn.style.color = unanswered > 0 ? 'var(--amber)' : 'var(--green)';
+    }
+
+    // Update comms sidebar stats
+    const commsAvg = document.getElementById('comms-avg-response');
+    const commsUn = document.getElementById('comms-unanswered');
+    if (commsAvg) commsAvg.textContent = avgLabel;
+    if (commsUn) {
+      commsUn.textContent = unanswered;
+      commsUn.style.color = unanswered > 0 ? 'var(--amber)' : 'var(--green)';
+    }
+  } catch (e) {
+    console.error('Comms stats error:', e);
   }
 }
 
@@ -3513,18 +3617,43 @@ async function syncDeliveredOrders() {
   if (toShip.length || toDeliver.length) renderOrdersTable();
 }
 
-// Days waiting badge for unshipped orders
+// Days waiting badge — shows active wait (days+hours) or gray delivered pill
 function daysWaitingBadge(order) {
-  const skip = ['delivered', 'refunded', 'incorrect order', 'cancelled'];
-  if (order.shipped_at || skip.includes((order.status || '').toLowerCase())) return '';
+  const skip = ['refunded', 'incorrect order', 'cancelled'];
+  if (skip.includes((order.status || '').toLowerCase())) return '';
   const created = order.created_at ? new Date(order.created_at) : (order.order_date ? new Date(order.order_date + 'T00:00:00') : null);
   if (!created) return '';
-  const days = Math.floor((Date.now() - created) / 86400000);
+
+  // Delivered: gray pill with total delivery time
+  const ship = getShipStatus(order);
+  if ((order.status || '').toLowerCase() === 'delivered' || (ship && ship._shipping_status === 'Delivered')) {
+    const endDate = ship?.delivered_date ? new Date(ship.delivered_date) : new Date();
+    const diffMs = endDate - created;
+    const days = Math.floor(diffMs / 86400000);
+    const hours = Math.floor((diffMs % 86400000) / 3600000);
+    const label = days > 0 ? `${days}d ${hours}h` : `${hours}h`;
+    return `<span class="dw-badge dw-delivered" title="Order placed to delivered">${label}</span>`;
+  }
+
+  // In transit: show wait but no urgency colors
+  if (order.shipped_at) {
+    const diffMs = Date.now() - created;
+    const days = Math.floor(diffMs / 86400000);
+    const hours = Math.floor((diffMs % 86400000) / 3600000);
+    const label = days > 0 ? `${days}d ${hours}h` : `${hours}h`;
+    return `<span class="dw-badge dw-green" title="${days}d ${hours}h since order">${label}</span>`;
+  }
+
+  // Not yet shipped: active waiting with urgency
+  const diffMs = Date.now() - created;
+  const days = Math.floor(diffMs / 86400000);
+  const hours = Math.floor((diffMs % 86400000) / 3600000);
+  const label = days > 0 ? `${days}d ${hours}h` : `${hours}h`;
   let cls = 'dw-green';
   if (days >= 4) cls = 'dw-red dw-pulse';
   else if (days >= 3) cls = 'dw-orange';
   else if (days >= 2) cls = 'dw-yellow';
-  return `<span class="dw-badge ${cls}" title="${days} day${days !== 1 ? 's' : ''} waiting">${days}d</span>`;
+  return `<span class="dw-badge ${cls}" title="${days}d ${hours}h waiting">${label}</span>`;
 }
 
 function orderDaysWaiting(order) {
@@ -3533,6 +3662,18 @@ function orderDaysWaiting(order) {
   const created = order.created_at ? new Date(order.created_at) : (order.order_date ? new Date(order.order_date + 'T00:00:00') : null);
   if (!created) return -1;
   return Math.floor((Date.now() - created) / 86400000);
+}
+
+function responseTimePill(inboundDate, outboundDate) {
+  if (!inboundDate || !outboundDate) return '';
+  const diffMs = new Date(outboundDate) - new Date(inboundDate);
+  if (diffMs < 0) return '';
+  const diffMins = Math.round(diffMs / 60000);
+  let label, cls;
+  if (diffMins < 60) { label = diffMins + 'm'; cls = 'fast'; }
+  else if (diffMins < 1440) { label = Math.round(diffMins / 60) + 'h'; cls = diffMins < 240 ? 'fast' : 'normal'; }
+  else { const d = Math.round(diffMins / 1440); label = d + 'd'; cls = d <= 1 ? 'normal' : d <= 3 ? 'slow' : 'very-slow'; }
+  return `<span class="response-pill ${cls}" title="Response time">${label} reply</span>`;
 }
 
 function orderStatusIcon(status) {
@@ -5296,10 +5437,15 @@ function renderCustomersTab() {
 
     return `<div class="customer-profile" onclick="this.classList.toggle('expanded')">
       <div class="customer-header">
-        <div>
-          <span class="customer-name">${c.name}</span>
-          <span class="customer-email">${c.email}</span>
-          ${renderTagPills(c.email)}
+        <div class="customer-avatar">
+          <svg viewBox="0 0 24 24"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div>
+            <span class="customer-name">${c.name}</span>
+            <span class="customer-email">${c.email}</span>
+            ${renderTagPills(c.email)}
+          </div>
         </div>
         <div class="customer-meta">
           <span><span class="val">${c.orders.length}</span> orders</span>
@@ -5316,11 +5462,230 @@ function renderCustomersTab() {
       <div class="customer-orders-list">
         <div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.5rem;text-transform:uppercase;">Order History (${c.orders.length})</div>
         ${orderItems}
+        <div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border);">
+          <div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.5rem;text-transform:uppercase;">Email History</div>
+          <div class="customer-emails-container" data-email="${c.email}" id="cust-emails-${c.email.replace(/[^a-zA-Z0-9]/g, '_')}">
+            <span style="font-size:0.75rem;color:var(--dim);">Click to load...</span>
+          </div>
+        </div>
       </div>
     </div>`;
   }).join('');
 
   renderPagination('customers-pagination', customersPage, customerList.length, p => { customersPage = p; renderCustomersTab(); });
+
+  // Lazy-load emails when customer card is expanded
+  document.querySelectorAll('.customer-profile').forEach(card => {
+    card.addEventListener('click', function() {
+      if (!this.classList.contains('expanded')) return;
+      const container = this.querySelector('.customer-emails-container');
+      if (!container || container.dataset.loaded) return;
+      container.dataset.loaded = '1';
+      loadCustomerEmails(container.dataset.email, container);
+    });
+  });
+}
+
+async function loadCustomerEmails(email, container) {
+  container.innerHTML = '<span style="font-size:0.75rem;color:var(--dim);">Loading...</span>';
+  try {
+    const data = await db.from('email_messages').select('*').eq('customer_email', email.toLowerCase()).order('date', { ascending: true });
+    const msgs = data.data || [];
+    if (!msgs.length) {
+      container.innerHTML = '<span style="font-size:0.75rem;color:var(--dim);">No emails</span>';
+      return;
+    }
+
+    // Group into threads
+    const threads = {};
+    msgs.forEach(m => {
+      const tid = m.thread_id || m.id;
+      if (!threads[tid]) threads[tid] = [];
+      threads[tid].push(m);
+    });
+
+    let html = '';
+    Object.values(threads).forEach(thread => {
+      thread.sort((a, b) => new Date(a.date) - new Date(b.date));
+      const first = thread[0];
+      const last = thread[thread.length - 1];
+      const subject = first.subject || '(no subject)';
+      const dateStr = new Date(first.date).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+      const msgCount = thread.length;
+      const threadId = 'cust-thread-' + (first.thread_id || first.id);
+
+      // Compute response times within thread
+      let responsePills = '';
+      for (let i = 1; i < thread.length; i++) {
+        if (thread[i].direction === 'outbound' && thread[i - 1].direction === 'inbound') {
+          responsePills += responseTimePill(thread[i - 1].date, thread[i].date);
+        }
+      }
+
+      html += `<div style="border:1px solid var(--border);border-radius:8px;margin-bottom:0.5rem;overflow:hidden;">
+        <div style="padding:0.5rem 0.75rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:0.5rem;flex-wrap:wrap;" onclick="event.stopPropagation();var el=document.getElementById('${threadId}');el.style.display=el.style.display==='none'?'block':'none';">
+          <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
+            <span style="font-size:0.8rem;font-weight:600;">${subject.replace(/</g, '&lt;')}</span>
+            <span style="font-size:0.65rem;color:var(--dim);">${msgCount} msg${msgCount > 1 ? 's' : ''}</span>
+            ${responsePills}
+          </div>
+          <span style="font-size:0.7rem;color:var(--dim);">${dateStr}</span>
+        </div>
+        <div id="${threadId}" style="display:none;border-top:1px solid var(--border);">
+          ${thread.map(m => {
+            const isOut = m.direction === 'outbound';
+            const time = new Date(m.date).toLocaleString('en-NZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+            const from = (m.from_address || '').split('<')[0].trim();
+            const bodyText = (m.body_text || m.snippet || '').slice(0, 300).replace(/</g, '&lt;').replace(/\n/g, '<br>');
+            const staffBadge = isOut && m.staff_name ? `<span class="comms-staff-badge">${m.staff_name}</span>` : '';
+            return `<div style="padding:0.5rem 0.75rem;border-bottom:1px solid var(--border);background:${isOut ? 'rgba(140,180,122,0.05)' : 'transparent'};">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:0.4rem;margin-bottom:0.25rem;">
+                <span style="font-size:0.75rem;font-weight:600;">${from}</span>
+                <div style="display:flex;align-items:center;gap:0.3rem;">
+                  ${staffBadge}
+                  <span style="font-size:0.65rem;color:var(--dim);">${time}</span>
+                </div>
+              </div>
+              <div style="font-size:0.75rem;color:var(--muted);line-height:1.4;">${bodyText || '<span style="color:var(--dim);">(no content)</span>'}</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+    });
+
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = '<span style="font-size:0.75rem;color:var(--red);">Failed to load emails</span>';
+  }
+}
+
+// ── Customers Sub-Tab Switching ──
+let customersSubTabInited = false;
+let customersActiveSubTab = 'ecommerce';
+
+function initCustomersSubTabs() {
+  if (customersSubTabInited) return;
+  customersSubTabInited = true;
+
+  document.querySelectorAll('#customers-sub-tabs .settings-tab-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('#customers-sub-tabs .settings-tab-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      customersActiveSubTab = this.dataset.customersTab;
+      document.querySelectorAll('.customers-panel').forEach(p => p.style.display = 'none');
+      document.getElementById('customers-' + customersActiveSubTab).style.display = 'block';
+      if (customersActiveSubTab === 'ecommerce') renderCustomersTab();
+      else if (customersActiveSubTab === 'retail') loadRetailCustomersTab();
+    });
+  });
+
+  // Retail customer add button
+  document.getElementById('rc-add-btn').addEventListener('click', async () => {
+    const name = document.getElementById('rc-name').value.trim();
+    if (!name) return;
+    const btn = document.getElementById('rc-add-btn');
+    btn.disabled = true; btn.textContent = 'Adding...';
+    try {
+      await fetch('/.netlify/functions/suppliers?token=' + currentStaff.token, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'wholesalers', name,
+          contact_name: document.getElementById('rc-contact').value.trim(),
+          email: document.getElementById('rc-email').value.trim(),
+          phone: document.getElementById('rc-phone').value.trim(),
+          website: document.getElementById('rc-website').value.trim(),
+          payment_terms: document.getElementById('rc-terms').value.trim(),
+          address: document.getElementById('rc-address').value.trim(),
+          notes: document.getElementById('rc-notes').value.trim(),
+        }),
+      });
+      ['rc-name','rc-contact','rc-email','rc-phone','rc-website','rc-terms','rc-address','rc-notes'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el.tagName === 'TEXTAREA') el.value = ''; else el.value = '';
+      });
+      await loadRetailCustomersList();
+    } catch (e) { alert('Error: ' + e.message); }
+    btn.disabled = false; btn.textContent = 'Add Retailer';
+  });
+}
+
+async function loadRetailCustomersTab() {
+  loadRetailCustomersList();
+  loadRetailInvoiceStats();
+}
+
+async function loadRetailCustomersList() {
+  try {
+    await ensureXeroStatus();
+    const res = await fetch('/.netlify/functions/suppliers?token=' + currentStaff.token + '&type=wholesalers');
+    const data = await res.json();
+    const list = data.wholesalers || [];
+    document.getElementById('retail-count').textContent = list.length;
+    renderEntityTable('rc-table', list, 'wholesalers');
+    // Show/hide xero sync button
+    const rcSync = document.getElementById('rc-xero-sync');
+    if (rcSync) rcSync.style.display = xeroConnected ? '' : 'none';
+  } catch {
+    document.getElementById('rc-table').innerHTML = '<tr><td colspan="6" class="loading">Failed to load</td></tr>';
+  }
+}
+
+async function loadRetailInvoiceStats() {
+  const countEl = document.getElementById('retail-inv-count');
+  const valueEl = document.getElementById('retail-inv-value');
+  const tableEl = document.getElementById('retail-invoices-table');
+
+  try {
+    await ensureXeroStatus();
+    if (!xeroConnected) {
+      countEl.textContent = '–';
+      valueEl.textContent = '–';
+      tableEl.innerHTML = '<tr><td colspan="6" class="loading">Connect Xero to view invoices</td></tr>';
+      return;
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const data = await xeroFetch('Invoices', {
+      Statuses: 'AUTHORISED,PAID',
+      where: 'Type=="ACCREC"&&Date>=DateTime(' + today.replace(/-/g, ',') + ')',
+      order: 'Date DESC'
+    });
+
+    const invoices = data.Invoices || [];
+    // Filter to today only (in case API returns broader results)
+    const todayInvoices = invoices.filter(inv => {
+      const invDate = inv.DateString || (inv.Date ? inv.Date.replace(/\/Date\((\d+).*/, (_, ms) => new Date(Number(ms)).toISOString().split('T')[0]) : '');
+      return invDate === today;
+    });
+
+    const totalValue = todayInvoices.reduce((sum, inv) => sum + (inv.SubTotal || inv.Total || 0), 0);
+    countEl.textContent = todayInvoices.length;
+    valueEl.textContent = fmt_money(totalValue);
+
+    if (todayInvoices.length === 0) {
+      tableEl.innerHTML = '<tr><td colspan="6" class="loading">No invoices created today</td></tr>';
+      return;
+    }
+
+    tableEl.innerHTML = todayInvoices.map(inv => {
+      const invDate = inv.DateString || '';
+      const dueDate = inv.DueDateString || '';
+      const status = inv.Status || '';
+      const statusClass = status === 'PAID' ? 'color:var(--green)' : 'color:var(--amber)';
+      return `<tr>
+        <td style="font-weight:500;">${esc(inv.InvoiceNumber || '–')}</td>
+        <td>${esc(inv.Contact ? inv.Contact.Name : '–')}</td>
+        <td>${invDate}</td>
+        <td>${dueDate}</td>
+        <td>$${(inv.Total || 0).toFixed(2)}</td>
+        <td><span style="${statusClass};font-size:0.75rem;font-weight:600;">${status}</span></td>
+      </tr>`;
+    }).join('');
+  } catch (e) {
+    countEl.textContent = '–';
+    valueEl.textContent = '–';
+    tableEl.innerHTML = '<tr><td colspan="6" class="loading">Failed to load invoices</td></tr>';
+  }
 }
 
 // ── Customer Timeline Modal ──
@@ -5505,6 +5870,7 @@ async function openCustomerTimeline(email) {
               <span style="font-weight:700;color:var(--sage);">Order #${ev.order.id}</span>
               ${pill}
               ${shipPill}
+              ${daysWaitingBadge(ev.order)}
               <span style="color:var(--dim);font-size:0.65rem;">${timeStr}</span>
             </div>
             <div style="margin-bottom:0.3rem;">${itemStr}</div>
@@ -9183,6 +9549,15 @@ async function openCommsThread(threadId) {
       return;
     }
 
+    // Pre-compute response times: for each outbound, find the most recent prior inbound
+    const responseTimes = msgs.map((m, idx) => {
+      if (m.direction !== 'outbound') return '';
+      for (let j = idx - 1; j >= 0; j--) {
+        if (msgs[j].direction === 'inbound') return responseTimePill(msgs[j].date, m.date);
+      }
+      return '';
+    });
+
     messagesEl.innerHTML = msgs.map((m, idx) => {
       const isOut = m.direction === 'outbound';
       const timeStr = new Date(m.date).toLocaleString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -9226,7 +9601,7 @@ async function openCommsThread(threadId) {
         + '</div>'
         + '<div class="comms-msg-meta">'
         + (isOut && m.staff_name ? '<span class="comms-staff-badge">' + esc(m.staff_name) + '</span>' : '')
-        + (isOut ? '<span style="color:var(--sage);">Sent</span>' : '')
+        + (isOut ? '<span style="color:var(--sage);">Sent</span>' + responseTimes[idx] : '')
         + '</div>'
         + '</div>';
     }).join('');
@@ -9651,7 +10026,6 @@ async function loadSettingsTab() {
         document.querySelectorAll('.settings-panel').forEach(p => p.style.display = 'none');
         document.getElementById('settings-' + settingsActiveTab).style.display = 'block';
         if (settingsActiveTab === 'suppliers') loadSuppliers();
-        else if (settingsActiveTab === 'wholesalers') loadWholesalers();
         else if (settingsActiveTab === 'macros') loadMacros();
       });
     });
@@ -9701,37 +10075,8 @@ async function loadSettingsTab() {
       } catch (e) { alert('Error: ' + e.message); }
       btn.disabled = false; btn.textContent = 'Add Supplier';
     });
-    // Add wholesaler
-    document.getElementById('ws-add-btn').addEventListener('click', async () => {
-      const name = document.getElementById('ws-name').value.trim();
-      if (!name) return;
-      const btn = document.getElementById('ws-add-btn');
-      btn.disabled = true; btn.textContent = 'Adding...';
-      try {
-        await fetch('/.netlify/functions/suppliers?token=' + currentStaff.token, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'wholesalers', name,
-            contact_name: document.getElementById('ws-contact').value.trim(),
-            email: document.getElementById('ws-email').value.trim(),
-            phone: document.getElementById('ws-phone').value.trim(),
-            website: document.getElementById('ws-website').value.trim(),
-            payment_terms: document.getElementById('ws-terms').value.trim(),
-            address: document.getElementById('ws-address').value.trim(),
-            notes: document.getElementById('ws-notes').value.trim(),
-          }),
-        });
-        ['ws-name','ws-contact','ws-email','ws-phone','ws-website','ws-terms','ws-address','ws-notes'].forEach(id => {
-          const el = document.getElementById(id);
-          if (el.tagName === 'TEXTAREA') el.value = ''; else el.value = '';
-        });
-        await loadWholesalers();
-      } catch (e) { alert('Error: ' + e.message); }
-      btn.disabled = false; btn.textContent = 'Add Retailer';
-    });
   }
   if (settingsActiveTab === 'suppliers') loadSuppliers();
-  else if (settingsActiveTab === 'wholesalers') loadWholesalers();
   else if (settingsActiveTab === 'macros') loadMacros();
 }
 
@@ -9739,9 +10084,9 @@ function renderEntityTable(tableId, data, type) {
   const tbl = document.getElementById(tableId);
   // Show/hide Xero sync buttons
   const supSync = document.getElementById('sup-xero-sync');
-  const wsSync = document.getElementById('ws-xero-sync');
+  const rcSync = document.getElementById('rc-xero-sync');
   if (supSync) supSync.style.display = xeroConnected ? '' : 'none';
-  if (wsSync) wsSync.style.display = xeroConnected ? '' : 'none';
+  if (rcSync) rcSync.style.display = xeroConnected ? '' : 'none';
 
   const displayType = type === 'wholesalers' ? 'retailers' : type;
   if (!data || data.length === 0) {
@@ -9779,21 +10124,12 @@ async function loadSuppliers() {
   } catch { document.getElementById('sup-table').innerHTML = '<tr><td colspan="6" class="loading">Failed to load</td></tr>'; }
 }
 
-async function loadWholesalers() {
-  try {
-    await ensureXeroStatus();
-    const res = await fetch('/.netlify/functions/suppliers?token=' + currentStaff.token + '&type=wholesalers');
-    const data = await res.json();
-    renderEntityTable('ws-table', data.wholesalers || [], 'wholesalers');
-  } catch { document.getElementById('ws-table').innerHTML = '<tr><td colspan="6" class="loading">Failed to load</td></tr>'; }
-}
-
 async function deleteEntity(id, type) {
   const delLabel = type === 'wholesalers' ? 'retailer' : type.slice(0, -1);
   if (!confirm('Remove this ' + delLabel + '?')) return;
   try {
     await fetch('/.netlify/functions/suppliers?token=' + currentStaff.token + '&id=' + id + '&type=' + type, { method: 'DELETE' });
-    if (type === 'suppliers') loadSuppliers(); else loadWholesalers();
+    if (type === 'suppliers') loadSuppliers(); else loadRetailCustomersList();
   } catch (e) { alert('Error: ' + e.message); }
 }
 
@@ -9887,7 +10223,7 @@ function insertMacro(targetId, macroId) {
 }
 
 async function syncFromXero(type) {
-  const btnId = type === 'suppliers' ? 'sup-xero-sync' : 'ws-xero-sync';
+  const btnId = type === 'suppliers' ? 'sup-xero-sync' : 'rc-xero-sync';
   const btn = document.getElementById(btnId);
   btn.disabled = true; btn.textContent = 'Syncing...';
   try {
@@ -9897,7 +10233,7 @@ async function syncFromXero(type) {
     const imp = data.imported || {};
     alert('Imported ' + (imp.suppliers || 0) + ' suppliers and ' + (imp.wholesalers || 0) + ' retailers from Xero');
     loadSuppliers();
-    loadWholesalers();
+    loadRetailCustomersList();
   } catch (e) { alert('Sync error: ' + e.message); }
   btn.disabled = false; btn.textContent = 'Sync from Xero';
 }
