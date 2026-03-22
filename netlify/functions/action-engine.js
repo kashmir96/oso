@@ -12,7 +12,7 @@
  *
  * Env vars: SUPABASE_URL, SUPABASE_SERVICE_KEY, TWILIO_SID, TWILIO_API,
  *           TWILIO_FROM_NUMBER, ALERT_PHONE_NUMBERS, ANTHROPIC_API_KEY,
- *           FACEBOOK_ACCESS_TOKEN, FACEBOOK_AD_ACCOUNT_ID,
+ *           FB_ACCESS_TOKEN, FB_AD_ACCOUNT_ID,
  *           GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_ADS_DEVELOPER_TOKEN
  */
 
@@ -110,8 +110,8 @@ async function loadInventory() {
 
 async function loadFBCampaigns(from, to) {
   try {
-    const token = process.env.FACEBOOK_ACCESS_TOKEN;
-    const accountId = process.env.FACEBOOK_AD_ACCOUNT_ID;
+    const token = process.env.FB_ACCESS_TOKEN;
+    const accountId = process.env.FB_AD_ACCOUNT_ID;
     if (!token || !accountId) return [];
     const fields = 'campaign_name,campaign_id,impressions,clicks,spend,actions,action_values,frequency';
     const url = `https://graph.facebook.com/v21.0/${accountId}/insights?fields=${fields}&time_range={"since":"${from}","until":"${to}"}&level=campaign&limit=200&access_token=${token}`;
