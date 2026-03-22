@@ -351,22 +351,72 @@ async function generateSummary(alerts, orders, campaigns, inventoryData, competi
 
   const totalSpend = campaigns.reduce((s, c) => s + c.spend, 0);
   const totalConv = campaigns.reduce((s, c) => s + c.conversions, 0);
+  const totalRev = campaigns.reduce((s, c) => s + c.conversions_value, 0);
+
+  // Creative performance ranking (by ROAS and CTR)
+  const creativeRanking = campaigns
+    .filter(c => c.spend > 5)
+    .map(c => ({
+      name: c.name, platform: c.platform,
+      spend: c.spend.toFixed(2),
+      roas: c.spend > 0 ? (c.conversions_value / c.spend).toFixed(1) : '0',
+      ctr: c.impressions > 0 ? ((c.clicks / c.impressions) * 100).toFixed(2) : '0',
+      cpa: c.conversions > 0 ? (c.spend / c.conversions).toFixed(2) : 'N/A',
+      conversions: c.conversions,
+    }))
+    .sort((a, b) => Number(b.roas) - Number(a.roas));
+
+  // Discount tracking: check if any orders used discount codes recently
+  const discountOrders = orders.filter(o => o.discount_applied && Number(o.discount_applied) > 0);
+  const discountRate = orders.length > 0 ? ((discountOrders.length / orders.length) * 100).toFixed(1) : '0';
+  const discountRevenue = discountOrders.reduce((s, o) => s + Number(o.total_value || 0), 0);
+  const nonDiscountRevenue = orders.filter(o => !o.discount_applied || Number(o.discount_applied) === 0).reduce((s, o) => s + Number(o.total_value || 0), 0);
+
+  // Inventory status for batch sizing
+  const invStatus = (inventoryData.reorderPoints || []).map(rp => {
+    const bl = inventoryData.baselines.find(b => b.sku === rp.sku);
+    const baseQty = bl ? bl.quantity : 0;
+    const baseDate = bl ? bl.counted_at : '1970-01-01';
+    const mfg = inventoryData.batches.filter(b => b.product_sku === rp.sku && b.created_at > baseDate).reduce((s, b) => s + (b.quantity || 0), 0);
+    const soldQty = lineItems.filter(li => li.sku === rp.sku).length;
+    const stock = baseQty + mfg - soldQty;
+    const velocity = soldQty / 30;
+    return { sku: rp.sku, stock, velocity: velocity.toFixed(1), daysSupply: velocity > 0 ? Math.round(stock / velocity) : 999, reorderPoint: rp.reorder_point };
+  });
+
+  // Seasonal context
+  const month = new Date().getMonth();
+  const seasonalNotes = [];
+  if (month === 10) seasonalNotes.push('Black Friday / Cyber Monday approaching — plan stock and ad budgets');
+  if (month === 11) seasonalNotes.push('Christmas gift season peak — ensure stock and shipping capacity');
+  if (month === 0) seasonalNotes.push('New Year / summer skincare season in NZ');
+  if (month === 3 || month === 4) seasonalNotes.push('Autumn transition — winter skincare messaging opportunity');
+  if (month === 5) seasonalNotes.push('Winter skincare season starting — moisturiser and balm demand rises');
 
   const context = {
     date: yesterday,
     yesterday: { orders: yesterdayOrders.length, revenue: yRevenue.toFixed(2), aov: yesterdayOrders.length > 0 ? (yRevenue / yesterdayOrders.length).toFixed(2) : '0' },
-    ads: { totalSpend: totalSpend.toFixed(2), totalConversions: totalConv, cpa: totalConv > 0 ? (totalSpend / totalConv).toFixed(2) : 'N/A', campaigns: campaigns.slice(0, 10).map(c => ({ name: c.name, platform: c.platform, spend: c.spend.toFixed(2), conversions: c.conversions, cpa: c.conversions > 0 ? (c.spend / c.conversions).toFixed(2) : 'N/A' })) },
+    ads: {
+      totalSpend: totalSpend.toFixed(2), totalConversions: totalConv,
+      cpa: totalConv > 0 ? (totalSpend / totalConv).toFixed(2) : 'N/A',
+      roas: totalSpend > 0 ? (totalRev / totalSpend).toFixed(1) : 'N/A',
+      campaigns: campaigns.slice(0, 10).map(c => ({ name: c.name, platform: c.platform, spend: c.spend.toFixed(2), conversions: c.conversions, cpa: c.conversions > 0 ? (c.spend / c.conversions).toFixed(2) : 'N/A', roas: c.spend > 0 ? (c.conversions_value / c.spend).toFixed(1) : '0', ctr: c.impressions > 0 ? ((c.clicks / c.impressions) * 100).toFixed(2) : '0' })),
+    },
+    creativeRanking: creativeRanking.slice(0, 10),
+    discounts: { discountedOrderPct: discountRate + '%', discountRevenue: discountRevenue.toFixed(2), fullPriceRevenue: nonDiscountRevenue.toFixed(2) },
+    inventory: invStatus.filter(i => i.stock > 0 || i.velocity > 0),
     activeAlerts: { total: alerts.length, p1: alerts.filter(a => a.priority === 'P1').length, p2: alerts.filter(a => a.priority === 'P2').length, p3: alerts.filter(a => a.priority === 'P3').length, list: alerts.slice(0, 15).map(a => ({ title: a.title, priority: a.priority, category: a.category })) },
     topProducts: topProducts.map(([name, d]) => ({ name, revenue: d.revenue.toFixed(2), units: d.units })),
     topMagnets: topMagnets.map(([name, count]) => ({ name, firstPurchases: count })),
     competitorChanges: competitorChanges.slice(0, 10).map(c => ({ summary: c.summary, type: c.change_type })),
     customerEmails: customerEmails.slice(0, 10).map(e => ({ subject: e.subject, snippet: (e.snippet || '').slice(0, 100) })),
+    seasonalNotes,
   };
 
   const dayOfWeek = new Date().getDay();
   const isMonday = dayOfWeek === 1;
 
-  const systemPrompt = `You are the AI business analyst for Primal Pantry, a NZ-based tallow skincare DTC brand. Write in a direct, actionable style. Use NZD currency. No fluff.`;
+  const systemPrompt = `You are the AI business analyst for Primal Pantry, a NZ-based tallow skincare DTC brand. You make direct, specific recommendations. Use NZD. No fluff. Bold key numbers and actions.`;
 
   const userPrompt = `Generate a ${isMonday ? 'weekly' : 'daily'} briefing for ${yesterday}.
 
@@ -376,15 +426,21 @@ ${JSON.stringify(context, null, 2)}
 Structure your response as:
 ${isMonday ? `**Weekly Summary**: Key wins, losses, and week-over-week trends.
 **Focus This Week**: Top 3 priorities across ad ops, inventory, and product.
-**Product Intelligence**: Which products to focus ad spend on (winners), which work best as lead/magnet products, which are best upsells.
-**Improvements**: One specific improvement suggestion for each area (ads, inventory, website, email).` :
-`**Yesterday**: Revenue, orders, standout events.
-**Ad Performance**: What's working, what to kill/scale.
-**Product Focus**: Winners to push, magnets for acquisition, upsell opportunities.
-**Alerts**: Key actions needed from today's alerts.
-**Competitor & Customer Intel**: Notable competitor changes or customer themes.`}
+**Ad Ops**: Which campaigns to kill (CPA too high), scale (CPA/ROAS strong), or create new creatives for. Rank creatives by performance — tell me which to focus budget on.
+**Product Intelligence**: Winners to focus ad spend on, best magnet products for acquisition, best upsells for cross-sell.
+**Inventory & Batches**: Stock status per SKU, recommended batch sizes based on velocity, when to run sales for overstock.
+**Discounts**: Is any active discount driving uplift? Should it be cancelled or extended?
+**Competitor & Trends**: Notable competitor moves, seasonal opportunities, customer request themes from emails.
+**Improvements**: One specific improvement for each area (ads, inventory, website, email).` :
+`**Yesterday**: Revenue, orders, AOV, standout events.
+**Ad Ops — Kill/Scale/Create**: Which campaigns to kill NOW (and why), which to increase budget on, which need new creatives. Rank top 3 creatives to focus spend on.
+**Product Focus**: Winners to push harder, best magnet products for new customer acquisition, best upsell pairings.
+**Inventory**: Any SKUs at risk? Recommended next batch sizes based on velocity. Flag if any SKU should go on sale.
+**Discounts**: % of orders discounted, revenue comparison (discounted vs full-price). Recommend if discount should continue or end.
+**Alerts**: Top actions from today's rule alerts.
+**Intel**: Competitor changes, customer email themes, seasonal considerations.`}
 
-Keep it to 3-4 paragraphs. Bold key numbers and actions.`;
+Keep each section to 1-3 sentences. Be specific — name campaigns, SKUs, and numbers.`;
 
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
