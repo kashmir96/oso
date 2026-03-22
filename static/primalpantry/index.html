@@ -7857,6 +7857,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
   const RC_BASE = '/.netlify/functions/send-recovery-email';
 
   document.getElementById('ac-load-btn').addEventListener('click', loadAbandonedCheckouts);
+  document.getElementById('ac-days').addEventListener('change', loadAbandonedCheckouts);
 
   async function loadAbandonedCheckouts() {
     const tbody = document.getElementById('ac-table');
@@ -8220,6 +8221,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
 
     waLoadDashboard();
     utmLoadMappings();
+    loadAbandonedCheckouts();
   };
 })();
 
