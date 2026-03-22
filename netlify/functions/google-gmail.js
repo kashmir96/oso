@@ -305,16 +305,21 @@ exports.handler = async (event) => {
     const search = body.search || '';
     const filter = body.filter || 'all'; // all|customers|suppliers|wholesalers|flagged
 
-    let path = '/rest/v1/email_messages?select=thread_id,customer_email,from_address,to_address,subject,snippet,date,direction,is_read,staff_name,account_id,order_flagged&order=date.desc&limit=500';
-    const res = await sbFetch(path);
-    const msgs = await res.json();
+    // Fetch messages, contacts, and names in parallel
+    const [res, contactRes, nameRes] = await Promise.all([
+      sbFetch('/rest/v1/email_messages?select=thread_id,customer_email,from_address,to_address,subject,snippet,date,direction,is_read,staff_name,account_id,order_flagged&order=date.desc&limit=500'),
+      sbFetch('/rest/v1/contacts?select=email,name,company,type'),
+      sbFetch('/rest/v1/orders?select=email,customer_name&limit=5000'),
+    ]);
+    const [msgs, contactRows, nameRows] = await Promise.all([res.json(), contactRes.json(), nameRes.json()]);
 
-    // Load contacts for type detection
-    const contactRes = await sbFetch('/rest/v1/contacts?select=email,name,company,type');
-    const contactRows = await contactRes.json();
     const contactMap = {};
     if (Array.isArray(contactRows)) {
       contactRows.forEach(c => { contactMap[c.email.toLowerCase()] = c; });
+    }
+    const nameMap = {};
+    if (Array.isArray(nameRows)) {
+      nameRows.forEach(r => { if (r.email && r.customer_name) nameMap[r.email.toLowerCase()] = r.customer_name; });
     }
 
     // Group by thread_id (prefer) or customer_email
@@ -361,14 +366,6 @@ exports.handler = async (event) => {
         (t.last_snippet || '').toLowerCase().includes(q) ||
         (t.contact_name || '').toLowerCase().includes(q)
       );
-    }
-
-    // Try to match customer names from orders
-    const nameRes = await sbFetch('/rest/v1/orders?select=email,customer_name&limit=5000');
-    const nameRows = await nameRes.json();
-    const nameMap = {};
-    if (Array.isArray(nameRows)) {
-      nameRows.forEach(r => { if (r.email && r.customer_name) nameMap[r.email.toLowerCase()] = r.customer_name; });
     }
 
     threads = threads.slice(0, limit).map(t => ({
