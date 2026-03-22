@@ -1,10 +1,13 @@
 /**
  * eship-update.js
  *
- * Change a StarshipIt order's bag size by deleting and recreating
- * the order with the new shipping_method (carrier product code).
- * StarshipIt's rules engine ignores shipping_method on PUT updates,
- * so delete+recreate is the reliable approach.
+ * Update a StarshipIt order's shipping method (bag size).
+ *
+ * NOTE: StarshipIt does not allow setting carrier_service_code
+ * directly via the API. You must set up Rules in your StarshipIt
+ * dashboard (Settings → Rules) that map shipping_method values
+ * (CPOLTPDL, CPOLTPA5, CPOLTPA4, CPOLTPA3) to the corresponding
+ * NZ Post carrier products.
  *
  * POST /.netlify/functions/eship-update
  * Body: { order_id: 123, shipping_method: "CPOLTPA5", token: "staff_token" }
@@ -28,8 +31,6 @@ async function validateToken(token) {
   const { data } = await getSb().from('staff').select('id,role').eq('session_token', token).single();
   return data;
 }
-
-const wait = (ms) => new Promise(r => setTimeout(r, ms));
 
 exports.handler = async (event) => {
   const headers = {
@@ -76,81 +77,30 @@ exports.handler = async (event) => {
       'Content-Type': 'application/json',
     };
 
-    // Step 1: Fetch the existing order details
-    const searchRes = await fetch(
-      `https://api.starshipit.com/api/orders/search?order_id=${order_id}`,
-      { headers: apiHeaders }
-    );
-    const searchData = await searchRes.json();
-    const existingOrder = searchData.order || searchData.orders?.[0];
-
-    if (!existingOrder) {
-      return { statusCode: 404, headers, body: JSON.stringify({ error: 'Order not found in StarshipIt' }) };
-    }
-
-    // Step 2: Delete the existing order
-    const deleteRes = await fetch(
-      `https://api.starshipit.com/api/orders/${order_id}`,
-      { method: 'DELETE', headers: apiHeaders }
-    );
-
-    if (!deleteRes.ok) {
-      const deleteErr = await deleteRes.json();
-      console.error('[eship-update] Delete failed:', JSON.stringify(deleteErr));
-      return { statusCode: deleteRes.status, headers, body: JSON.stringify({ error: 'Failed to delete old order', details: deleteErr }) };
-    }
-
-    await wait(500); // Brief pause between delete and recreate
-
-    // Step 3: Recreate with new shipping method
-    const newOrder = {
-      order: {
-        order_number: existingOrder.order_number,
-        order_date: existingOrder.order_date || new Date().toISOString(),
-        reference: existingOrder.reference || '',
-        shipping_method: shipping_method,
-        signature_required: existingOrder.signature_required || false,
-        authority_to_leave: existingOrder.authority_to_leave !== false,
-        currency: existingOrder.currency || 'NZD',
-        destination: existingOrder.destination || {},
-        sender: existingOrder.sender || undefined,
-        items: existingOrder.items || [],
-        packages: existingOrder.packages || [{}],
-      },
-    };
-
-    const createRes = await fetch('https://api.starshipit.com/api/orders', {
-      method: 'POST',
+    // Update the order via StarshipIt PUT API
+    const res = await fetch('https://api.starshipit.com/api/orders', {
+      method: 'PUT',
       headers: apiHeaders,
-      body: JSON.stringify(newOrder),
+      body: JSON.stringify({
+        order: {
+          order_id: order_id,
+          shipping_method: shipping_method,
+          shipping_description: shipping_method,
+        },
+      }),
     });
 
-    const createData = await createRes.json();
+    const data = await res.json();
 
-    if (!createRes.ok) {
-      console.error('[eship-update] Recreate failed:', JSON.stringify(createData));
-      return {
-        statusCode: createRes.status,
-        headers,
-        body: JSON.stringify({
-          error: 'Deleted old order but failed to recreate with new bag size. Order may need manual recreation.',
-          details: createData,
-          original_order: existingOrder,
-        }),
-      };
+    if (!res.ok) {
+      console.error('[eship-update] StarshipIt error:', JSON.stringify(data));
+      return { statusCode: res.status, headers, body: JSON.stringify({ error: data.message || 'StarshipIt update failed', details: data }) };
     }
-
-    const newOrderId = createData.order?.order_id || order_id;
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({
-        success: true,
-        order_id: newOrderId,
-        old_order_id: order_id,
-        shipping_method,
-      }),
+      body: JSON.stringify({ success: true, order_id, shipping_method }),
     };
   } catch (err) {
     console.error('[eship-update] Error:', err.message);
