@@ -4453,8 +4453,15 @@ document.getElementById('eship-print-btn').addEventListener('click', async () =>
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Print failed');
-    alert(`${data.printed} order${data.printed !== 1 ? 's' : ''} sent to printer.`);
-    // Refresh shipping data to update statuses
+    let msg = `${data.printed} order${data.printed !== 1 ? 's' : ''} sent to printer.`;
+    if (data.failed && data.failed.length > 0) {
+      const errors = data.failed.map(f => {
+        const errMsg = f.result?.errors?.[0]?.details || f.result?.errors?.[0]?.message || f.error || 'Unknown error';
+        return `Order ${f.order_id}: ${errMsg}`;
+      }).join('\n');
+      msg += `\n\n${data.failed.length} failed:\n${errors}`;
+    }
+    alert(msg);
     await loadShippingData();
   } catch (err) {
     alert('Print failed: ' + err.message);
