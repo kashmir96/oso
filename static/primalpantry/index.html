@@ -1175,6 +1175,7 @@
         <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap;">
           <button id="sp-new-product-btn" style="background:var(--sage);color:#fff;border:none;padding:0.5rem 0.85rem;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600;">+ New Product</button>
           <button id="sp-refresh-btn" style="background:var(--card);border:1px solid var(--border);color:var(--text);padding:0.5rem 0.85rem;border-radius:6px;cursor:pointer;font-size:0.8rem;">Refresh</button>
+          <input type="text" id="sp-search" placeholder="Search products..." style="flex:1;min-width:180px;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.5rem 0.75rem;font-size:0.85rem;">
         </div>
 
         <!-- New Product Form (hidden by default) -->
@@ -7417,11 +7418,13 @@ async function loadStripeProducts(force) {
 
 function renderStripeProducts() {
   const tbody = document.getElementById('sp-products-table');
-  if (!spProducts.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="loading">No products found in Stripe. Create one above.</td></tr>';
+  const query = (document.getElementById('sp-search')?.value || '').toLowerCase().trim();
+  const filtered = query ? spProducts.filter(p => (p.name || '').toLowerCase().includes(query) || (p.description || '').toLowerCase().includes(query) || (p.id || '').toLowerCase().includes(query)) : spProducts;
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="6" class="loading">${spProducts.length ? 'No products match your search.' : 'No products found in Stripe. Create one above.'}</td></tr>`;
     return;
   }
-  tbody.innerHTML = spProducts.map(p => {
+  tbody.innerHTML = filtered.map(p => {
     const created = new Date(p.created * 1000).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
     const isExpanded = spExpandedProduct === p.id;
     const arrow = isExpanded ? '&#9660;' : '&#9654;';
@@ -7576,6 +7579,11 @@ document.getElementById('sp-create-price-btn').addEventListener('click', async (
 // Refresh button
 document.getElementById('sp-refresh-btn').addEventListener('click', () => {
   loadStripeProducts(true);
+});
+
+// Search filter
+document.getElementById('sp-search').addEventListener('input', () => {
+  if (spLoaded) renderStripeProducts();
 });
 
 // ── Stripe Products: View Switching, YAML Generator, Form Builder ──
