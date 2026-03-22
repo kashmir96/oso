@@ -61,7 +61,7 @@ exports.handler = async (event) => {
 
     // Step 1: Find the order in unshipped list (most reliable source of full order data)
     console.log('[eship-update] Looking for order_id:', order_id);
-    const unshippedData = await apiFetch('https://api.starshipit.com/api/orders/unshipped?limit=200', apiHeaders);
+    const unshippedData = await apiFetch('https://api.starshipit.com/api/orders/unshipped?limit=500', apiHeaders);
     const unshippedOrders = Array.isArray(unshippedData.orders) ? unshippedData.orders : [];
     let existingOrder = unshippedOrders.find(o => o.order_id === order_id);
 

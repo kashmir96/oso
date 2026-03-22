@@ -4760,9 +4760,19 @@ document.getElementById('bulk-bag-print').addEventListener('click', async () => 
         const shipment = allShipments.find(s => s.order_id === orderId);
         if (shipment) { shipment.shipping_method = bulkBagSize; shipment.order_id = data.order_id || orderId; }
         updated++;
-      } else { failed++; }
-    } catch { failed++; }
-    statusEl.innerHTML = '<span style="color:var(--dim);">Updating bag sizes... ' + (updated + failed) + '/' + total + '</span>';
+      } else {
+        failed++;
+        console.error('Bag update failed for order', orderId, data.error || data);
+        statusEl.innerHTML = '<span style="color:var(--red);">Failed: ' + (data.error || 'Unknown error') + '</span>';
+      }
+    } catch (e) {
+      failed++;
+      console.error('Bag update error for order', orderId, e);
+      statusEl.innerHTML = '<span style="color:var(--red);">Error: ' + e.message + '</span>';
+    }
+    if (!statusEl.innerHTML.includes('Failed') && !statusEl.innerHTML.includes('Error')) {
+      statusEl.innerHTML = '<span style="color:var(--dim);">Updating bag sizes... ' + (updated + failed) + '/' + total + '</span>';
+    }
   }
 
   if (failed > 0) {
