@@ -12,6 +12,8 @@
 
 const crypto = require('crypto');
 
+const VALID_ROLES = ['owner', 'admin', 'office', 'shipping', 'manufacturing'];
+
 // ── Password helpers ──
 function hashPassword(password, salt) {
   return crypto.createHash('sha256').update(salt + password).digest('hex');
@@ -137,9 +139,12 @@ async function seedAccounts() {
 
   const accounts = [
     { username: 'Kashmir', display_name: 'Kashmir (Curtis)', password: '1532Milo2631!', role: 'owner', can_manage_users: true, must_change_password: false },
-    { username: 'Linda', display_name: 'Linda (Mum)', password: 'ChangeMe1!', role: 'admin', can_manage_users: true, must_change_password: true },
-    { username: 'Kerry', display_name: 'Kerry', password: 'ChangeMe1!', role: 'staff', can_manage_users: false, must_change_password: true },
-    { username: 'Trixy', display_name: 'Trixy', password: 'ChangeMe1!', role: 'staff', can_manage_users: false, must_change_password: true },
+    { username: 'Linda', display_name: 'Linda', password: 'ChangeMe1!', role: 'admin', can_manage_users: true, must_change_password: true },
+    { username: 'Trixy', display_name: 'Trixy', password: 'ChangeMe1!', role: 'admin', can_manage_users: true, must_change_password: true },
+    { username: 'Kerry', display_name: 'Kerry', password: 'ChangeMe1!', role: 'office', can_manage_users: false, must_change_password: true },
+    { username: 'Crystal', display_name: 'Crystal', password: 'ChangeMe1!', role: 'office', can_manage_users: false, must_change_password: true },
+    { username: 'Andrea', display_name: 'Andrea', password: 'ChangeMe1!', role: 'shipping', can_manage_users: false, must_change_password: true },
+    { username: 'Joji', display_name: 'Joji', password: 'ChangeMe1!', role: 'manufacturing', can_manage_users: false, must_change_password: true },
   ];
 
   const rows_to_insert = accounts.map(a => {
@@ -315,8 +320,12 @@ exports.handler = async (event) => {
     const admin = await getStaffByToken(token);
     if (!admin || !admin.can_manage_users) return reply(403, { error: 'Not authorised' });
 
-    if (can_manage_users && admin.role !== 'owner' && admin.role !== 'admin') {
-      return reply(403, { error: 'Only owner/admin can grant user management permissions' });
+    if (role && !VALID_ROLES.includes(role)) {
+      return reply(400, { error: 'Invalid role. Must be: ' + VALID_ROLES.join(', ') });
+    }
+
+    if ((role && role !== 'office') || can_manage_users) {
+      if (admin.role !== 'owner') return reply(403, { error: 'Only the owner can assign roles and permissions' });
     }
 
     if (!username || !display_name) return reply(400, { error: 'username and display_name required' });
@@ -359,8 +368,15 @@ exports.handler = async (event) => {
 
     const updates = {};
     if (display_name !== undefined) updates.display_name = display_name;
-    if (role !== undefined) updates.role = role;
-    if (can_manage_users !== undefined) updates.can_manage_users = can_manage_users;
+    if (role !== undefined) {
+      if (admin.role !== 'owner') return reply(403, { error: 'Only the owner can change roles' });
+      if (!VALID_ROLES.includes(role)) return reply(400, { error: 'Invalid role' });
+      updates.role = role;
+    }
+    if (can_manage_users !== undefined) {
+      if (admin.role !== 'owner') return reply(403, { error: 'Only the owner can change permissions' });
+      updates.can_manage_users = can_manage_users;
+    }
 
     if (reset_password) {
       const salt = generateSalt();
