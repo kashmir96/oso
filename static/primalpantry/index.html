@@ -926,6 +926,7 @@
       <button class="wa-panel-tab" data-mfg-panel="sku-performance">SKU Performance</button>
       <button class="wa-panel-tab" data-mfg-panel="inventory">Inventory</button>
       <button class="wa-panel-tab" data-mfg-panel="supplier-orders">Supplier Orders</button>
+      <button class="wa-panel-tab" data-mfg-panel="stripe-products">Stripe Products</button>
     </div>
 
     <div id="mfg-panel-batches">
@@ -1082,6 +1083,87 @@
             </thead>
             <tbody id="supplier-orders-table">
               <tr><td colspan="9" class="loading">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="mfg-panel-stripe-products" style="display:none;">
+      <div class="orders-card">
+        <h3>Stripe Product Catalog</h3>
+        <p style="font-size:0.8rem;color:var(--muted);margin-bottom:0.75rem;">Create new products and prices in Stripe, or add prices to existing products.</p>
+
+        <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap;">
+          <button id="sp-new-product-btn" style="background:var(--sage);color:#fff;border:none;padding:0.5rem 0.85rem;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600;">+ New Product</button>
+          <button id="sp-refresh-btn" style="background:var(--card);border:1px solid var(--border);color:var(--text);padding:0.5rem 0.85rem;border-radius:6px;cursor:pointer;font-size:0.8rem;">Refresh</button>
+        </div>
+
+        <!-- New Product Form (hidden by default) -->
+        <div id="sp-new-product-form" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1rem;">
+          <h4 style="margin:0 0 0.75rem;font-size:0.9rem;">Create New Product</h4>
+          <div class="mfg-form-row" style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:flex-end;">
+            <div class="form-group" style="flex:1;min-width:200px;"><label>Product Name</label><input type="text" id="sp-prod-name" placeholder="e.g. Tallow Balm - Lavender 120ml"></div>
+            <div class="form-group" style="flex:1;min-width:200px;"><label>Description</label><input type="text" id="sp-prod-desc" placeholder="Optional description"></div>
+            <div class="form-group" style="flex:0;">
+              <label>&nbsp;</label>
+              <div style="display:flex;gap:0.5rem;">
+                <button id="sp-create-product-btn" class="mfg-add-btn">Create Product</button>
+                <button id="sp-cancel-product-btn" style="background:var(--card);border:1px solid var(--border);color:var(--muted);padding:0.5rem 0.75rem;border-radius:6px;cursor:pointer;font-size:0.8rem;">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Add Price Form (hidden by default) -->
+        <div id="sp-new-price-form" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1rem;">
+          <h4 style="margin:0 0 0.75rem;font-size:0.9rem;">Add Price to: <span id="sp-price-product-name" style="color:var(--sage);"></span></h4>
+          <input type="hidden" id="sp-price-product-id">
+          <div class="mfg-form-row" style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:flex-end;">
+            <div class="form-group" style="min-width:120px;"><label>Amount ($)</label><input type="number" id="sp-price-amount" placeholder="29.95" step="0.01" min="0"></div>
+            <div class="form-group" style="min-width:100px;">
+              <label>Currency</label>
+              <select id="sp-price-currency" style="background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.5rem;font-size:0.85rem;width:100%;">
+                <option value="nzd" selected>NZD</option>
+                <option value="aud">AUD</option>
+                <option value="usd">USD</option>
+              </select>
+            </div>
+            <div class="form-group" style="flex:1;min-width:180px;"><label>Description / Label</label><input type="text" id="sp-price-nickname" placeholder="e.g. One-time NZ, Subscription AU"></div>
+            <div class="form-group" style="min-width:120px;">
+              <label>Type</label>
+              <select id="sp-price-type" style="background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.5rem;font-size:0.85rem;width:100%;">
+                <option value="one_time">One-time</option>
+                <option value="month">Monthly</option>
+                <option value="week">Weekly</option>
+                <option value="year">Yearly</option>
+              </select>
+            </div>
+            <div class="form-group" style="flex:0;">
+              <label>&nbsp;</label>
+              <div style="display:flex;gap:0.5rem;">
+                <button id="sp-create-price-btn" class="mfg-add-btn">Create Price</button>
+                <button id="sp-cancel-price-btn" style="background:var(--card);border:1px solid var(--border);color:var(--muted);padding:0.5rem 0.75rem;border-radius:6px;cursor:pointer;font-size:0.8rem;">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Products Table -->
+        <div style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:2rem;"></th>
+                <th>Product Name</th>
+                <th>Description</th>
+                <th>Product ID</th>
+                <th>Created</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="sp-products-table">
+              <tr><td colspan="6" class="loading">Click Stripe Products tab to load...</td></tr>
             </tbody>
           </table>
         </div>
@@ -7044,7 +7126,7 @@ document.querySelectorAll('[data-sku-sort]').forEach(th => {
 });
 
 // Manufacturing sub-tab switching
-const mfgPanels = ['batches', 'unit-costs', 'sku-performance', 'inventory', 'supplier-orders'];
+const mfgPanels = ['batches', 'unit-costs', 'sku-performance', 'inventory', 'supplier-orders', 'stripe-products'];
 document.querySelectorAll('#mfg-sub-tabs .wa-panel-tab').forEach(tab => {
   tab.addEventListener('click', function() {
     document.querySelectorAll('#mfg-sub-tabs .wa-panel-tab').forEach(t => t.classList.remove('active'));
@@ -7058,7 +7140,187 @@ document.querySelectorAll('#mfg-sub-tabs .wa-panel-tab').forEach(tab => {
     if (panel === 'sku-performance') { renderSkuPerformance(); }
     if (panel === 'inventory') { loadInventory(); }
     if (panel === 'supplier-orders') { loadSupplierOrders(); }
+    if (panel === 'stripe-products') { loadStripeProducts(); }
   });
+});
+
+// ── Stripe Products Tab ──
+let spProducts = [];
+let spPricesCache = {}; // product_id -> prices array
+let spLoaded = false;
+let spExpandedProduct = null;
+const SP_ENDPOINT = '/.netlify/functions/stripe-products';
+
+async function spFetch(payload) {
+  const token = currentStaff?.token;
+  const res = await fetch(SP_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, ...payload }),
+  });
+  return res.json();
+}
+
+async function loadStripeProducts(force) {
+  if (spLoaded && !force) { renderStripeProducts(); return; }
+  const tbody = document.getElementById('sp-products-table');
+  tbody.innerHTML = '<tr><td colspan="6" class="loading">Loading products from Stripe...</td></tr>';
+  const res = await spFetch({ action: 'list-products' });
+  if (res.error) {
+    tbody.innerHTML = `<tr><td colspan="6" class="loading">Error: ${res.error}</td></tr>`;
+    return;
+  }
+  spProducts = (res.products || []).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  spLoaded = true;
+  spPricesCache = {};
+  renderStripeProducts();
+}
+
+function renderStripeProducts() {
+  const tbody = document.getElementById('sp-products-table');
+  if (!spProducts.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="loading">No products found in Stripe. Create one above.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = spProducts.map(p => {
+    const created = new Date(p.created * 1000).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+    const isExpanded = spExpandedProduct === p.id;
+    const arrow = isExpanded ? '&#9660;' : '&#9654;';
+    let row = `<tr class="sp-product-row" data-product-id="${p.id}" style="cursor:pointer;">
+      <td style="text-align:center;color:var(--muted);font-size:0.75rem;">${arrow}</td>
+      <td style="font-weight:600;">${esc(p.name)}</td>
+      <td style="color:var(--muted);">${esc(p.description || '—')}</td>
+      <td style="font-size:0.75rem;font-family:monospace;color:var(--dim);">${p.id}</td>
+      <td>${created}</td>
+      <td><button class="sp-add-price-btn" data-product-id="${p.id}" data-product-name="${esc(p.name)}" style="background:var(--card);border:1px solid var(--sage);color:var(--sage);padding:0.35rem 0.65rem;border-radius:5px;cursor:pointer;font-size:0.75rem;font-weight:600;white-space:nowrap;">+ Price</button></td>
+    </tr>`;
+    if (isExpanded) {
+      const prices = spPricesCache[p.id];
+      if (!prices) {
+        row += `<tr class="sp-prices-row"><td></td><td colspan="5" style="padding:0.75rem;"><span class="loading">Loading prices...</span></td></tr>`;
+      } else if (prices.length === 0) {
+        row += `<tr class="sp-prices-row"><td></td><td colspan="5" style="padding:0.75rem;color:var(--muted);font-size:0.85rem;">No prices yet. Click "+ Price" to add one.</td></tr>`;
+      } else {
+        const priceRows = prices.map(pr => {
+          const amt = (pr.unit_amount / 100).toFixed(2);
+          const cur = (pr.currency || 'nzd').toUpperCase();
+          const type = pr.recurring ? `${pr.recurring.interval}ly` : 'One-time';
+          const label = pr.nickname || '—';
+          return `<tr class="sp-prices-row" style="background:var(--bg);">
+            <td></td>
+            <td style="padding-left:1.5rem;font-size:0.85rem;color:var(--sage);">&#8627; ${esc(label)}</td>
+            <td style="font-size:0.85rem;font-weight:600;">$${amt} ${cur}</td>
+            <td style="font-size:0.75rem;font-family:monospace;color:var(--dim);">${pr.id}</td>
+            <td style="font-size:0.85rem;color:var(--muted);">${type}</td>
+            <td></td>
+          </tr>`;
+        }).join('');
+        row += priceRows;
+      }
+    }
+    return row;
+  }).join('');
+
+  // Attach click handlers for expand/collapse
+  document.querySelectorAll('.sp-product-row').forEach(row => {
+    row.addEventListener('click', async function(e) {
+      if (e.target.closest('.sp-add-price-btn')) return;
+      const pid = this.dataset.productId;
+      if (spExpandedProduct === pid) {
+        spExpandedProduct = null;
+      } else {
+        spExpandedProduct = pid;
+        if (!spPricesCache[pid]) {
+          renderStripeProducts();
+          const res = await spFetch({ action: 'list-prices', product_id: pid });
+          spPricesCache[pid] = res.prices || [];
+        }
+      }
+      renderStripeProducts();
+    });
+  });
+
+  // Attach click handlers for "+ Price" buttons
+  document.querySelectorAll('.sp-add-price-btn').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const pid = this.dataset.productId;
+      const pname = this.dataset.productName;
+      document.getElementById('sp-price-product-id').value = pid;
+      document.getElementById('sp-price-product-name').textContent = pname;
+      document.getElementById('sp-price-amount').value = '';
+      document.getElementById('sp-price-nickname').value = '';
+      document.getElementById('sp-price-currency').value = 'nzd';
+      document.getElementById('sp-price-type').value = 'one_time';
+      document.getElementById('sp-new-price-form').style.display = '';
+      document.getElementById('sp-new-product-form').style.display = 'none';
+    });
+  });
+}
+
+// New Product form
+document.getElementById('sp-new-product-btn').addEventListener('click', () => {
+  document.getElementById('sp-new-product-form').style.display = '';
+  document.getElementById('sp-new-price-form').style.display = 'none';
+  document.getElementById('sp-prod-name').value = '';
+  document.getElementById('sp-prod-desc').value = '';
+  document.getElementById('sp-prod-name').focus();
+});
+document.getElementById('sp-cancel-product-btn').addEventListener('click', () => {
+  document.getElementById('sp-new-product-form').style.display = 'none';
+});
+
+document.getElementById('sp-create-product-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('sp-create-product-btn');
+  const name = document.getElementById('sp-prod-name').value.trim();
+  const description = document.getElementById('sp-prod-desc').value.trim();
+  if (!name) { alert('Product name is required'); return; }
+  btn.disabled = true; btn.textContent = 'Creating...';
+  const res = await spFetch({ action: 'create-product', name, description });
+  btn.disabled = false; btn.textContent = 'Create Product';
+  if (res.error) { alert('Error: ' + res.error); return; }
+  document.getElementById('sp-new-product-form').style.display = 'none';
+  spLoaded = false;
+  await loadStripeProducts(true);
+});
+
+// New Price form
+document.getElementById('sp-cancel-price-btn').addEventListener('click', () => {
+  document.getElementById('sp-new-price-form').style.display = 'none';
+});
+
+document.getElementById('sp-create-price-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('sp-create-price-btn');
+  const product_id = document.getElementById('sp-price-product-id').value;
+  const amount = parseFloat(document.getElementById('sp-price-amount').value);
+  const currency = document.getElementById('sp-price-currency').value;
+  const nickname = document.getElementById('sp-price-nickname').value.trim();
+  const priceType = document.getElementById('sp-price-type').value;
+
+  if (!product_id) { alert('No product selected'); return; }
+  if (isNaN(amount) || amount < 0) { alert('Enter a valid price amount'); return; }
+
+  const unit_amount = Math.round(amount * 100); // Convert dollars to cents
+  const payload = { action: 'create-price', product_id, unit_amount, currency };
+  if (nickname) payload.nickname = nickname;
+  if (priceType !== 'one_time') payload.recurring_interval = priceType;
+
+  btn.disabled = true; btn.textContent = 'Creating...';
+  const res = await spFetch(payload);
+  btn.disabled = false; btn.textContent = 'Create Price';
+  if (res.error) { alert('Error: ' + res.error); return; }
+  document.getElementById('sp-new-price-form').style.display = 'none';
+  // Refresh prices for this product
+  delete spPricesCache[product_id];
+  spExpandedProduct = product_id;
+  const priceRes = await spFetch({ action: 'list-prices', product_id });
+  spPricesCache[product_id] = priceRes.prices || [];
+  renderStripeProducts();
+});
+
+// Refresh button
+document.getElementById('sp-refresh-btn').addEventListener('click', () => {
+  loadStripeProducts(true);
 });
 
 // ── Inventory Tab ──
