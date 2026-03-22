@@ -105,8 +105,10 @@ exports.handler = async (event) => {
 
     const state = crypto.randomBytes(32).toString('hex');
 
-    // Store state temporarily in a placeholder row (we'll upsert the real data on callback)
-    // Use a temp row with oauth_state for validation
+    // Clean up any old pending rows
+    await sbFetch('/rest/v1/gmail_accounts?email_address=like.pending_*@temp', { method: 'DELETE' });
+
+    // Store state temporarily in a placeholder row
     await sbFetch('/rest/v1/gmail_accounts', {
       method: 'POST',
       prefer: 'return=representation',
@@ -175,43 +177,28 @@ exports.handler = async (event) => {
 
     const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
 
-    // Check if this email is already connected
-    const existingRes = await sbFetch(`/rest/v1/gmail_accounts?email_address=eq.${encodeURIComponent(emailAddress)}&select=id`);
-    const existing = await existingRes.json();
+    // Delete the temp pending row
+    await sbFetch(`/rest/v1/gmail_accounts?id=eq.${pendingRow.id}`, { method: 'DELETE' });
 
-    if (existing && existing.length > 0 && existing[0].id !== pendingRow.id) {
-      // Update existing row, delete temp row
-      await sbFetch(`/rest/v1/gmail_accounts?id=eq.${existing[0].id}`, {
-        method: 'PATCH',
-        body: {
-          access_token: tokenData.access_token,
-          refresh_token: tokenData.refresh_token || '',
-          expires_at: expiresAt,
-          connected_at: new Date().toISOString(),
-          connected_by: pendingRow.connected_by,
-          active: true,
-          oauth_state: null,
-          state_created: null,
-        },
-      });
-      await sbFetch(`/rest/v1/gmail_accounts?id=eq.${pendingRow.id}`, { method: 'DELETE' });
-    } else {
-      // Update the temp row with real data
-      await sbFetch(`/rest/v1/gmail_accounts?id=eq.${pendingRow.id}`, {
-        method: 'PATCH',
-        body: {
-          email_address: emailAddress,
-          display_name: profile.name || emailAddress,
-          access_token: tokenData.access_token,
-          refresh_token: tokenData.refresh_token || '',
-          expires_at: expiresAt,
-          connected_at: new Date().toISOString(),
-          active: true,
-          oauth_state: null,
-          state_created: null,
-        },
-      });
-    }
+    // Upsert by email_address — handles both new and re-connect
+    const upsertRes = await sbFetch('/rest/v1/gmail_accounts', {
+      method: 'POST',
+      prefer: 'resolution=merge-duplicates,return=representation',
+      body: {
+        email_address: emailAddress,
+        display_name: profile.name || emailAddress,
+        access_token: tokenData.access_token,
+        refresh_token: tokenData.refresh_token || '',
+        expires_at: expiresAt,
+        connected_at: new Date().toISOString(),
+        connected_by: pendingRow.connected_by,
+        active: true,
+        oauth_state: null,
+        state_created: null,
+      },
+    });
+    const upsertData = await upsertRes.json();
+    console.log('Gmail account upsert result:', JSON.stringify(upsertData));
 
     return htmlReply(`<!DOCTYPE html><html><body style="background:#141210;color:#e8e2da;font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;">
       <div style="text-align:center;">
