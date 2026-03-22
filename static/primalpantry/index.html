@@ -1194,70 +1194,6 @@
           </div>
         </div>
 
-        <!-- Add Price Form (hidden by default) -->
-        <div id="sp-new-price-form" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1rem;">
-          <h4 style="margin:0 0 0.75rem;font-size:0.9rem;">Add Price to: <span id="sp-price-product-name" style="color:var(--sage);"></span></h4>
-          <input type="hidden" id="sp-price-product-id">
-          <div class="mfg-form-row" style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:flex-end;">
-            <div class="form-group" style="min-width:120px;"><label>Amount ($)</label><input type="number" id="sp-price-amount" placeholder="29.95" step="0.01" min="0"></div>
-            <div class="form-group" style="min-width:100px;">
-              <label>Currency</label>
-              <select id="sp-price-currency" style="background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.5rem;font-size:0.85rem;width:100%;">
-                <option value="nzd" selected>NZD</option>
-                <option value="aud">AUD</option>
-                <option value="usd">USD</option>
-              </select>
-            </div>
-            <div class="form-group" style="flex:1;min-width:180px;"><label>Description / Label</label><input type="text" id="sp-price-nickname" placeholder="e.g. One-time NZ, Subscription AU"></div>
-            <div class="form-group" style="min-width:120px;">
-              <label>Type</label>
-              <select id="sp-price-type" style="background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.5rem;font-size:0.85rem;width:100%;">
-                <option value="one_time">One-time</option>
-                <option value="month">Monthly</option>
-                <option value="week">Weekly</option>
-                <option value="year">Yearly</option>
-              </select>
-            </div>
-            <div class="form-group" style="flex:0;">
-              <label>&nbsp;</label>
-              <div style="display:flex;gap:0.5rem;">
-                <button id="sp-create-price-btn" class="mfg-add-btn">Create Price</button>
-                <button id="sp-cancel-price-btn" style="background:var(--card);border:1px solid var(--border);color:var(--muted);padding:0.5rem 0.75rem;border-radius:6px;cursor:pointer;font-size:0.8rem;">Cancel</button>
-              </div>
-            </div>
-          </div>
-          <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:flex-end;margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid var(--border);">
-            <div style="width:100%;margin-bottom:0.25rem;font-size:0.8rem;color:var(--muted);font-weight:600;">Catalog Metadata (for YAML & form generation)</div>
-            <div class="form-group" style="min-width:100px;">
-              <label>Category</label>
-              <select id="sp-meta-category" style="background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.5rem;font-size:0.85rem;width:100%;">
-                <option value="tallow">tallow</option>
-                <option value="broth">broth</option>
-              </select>
-            </div>
-            <div class="form-group" style="min-width:130px;"><label>Product Type</label><input type="text" id="sp-meta-product-type" placeholder="e.g. balm, serum"></div>
-            <div class="form-group" style="min-width:130px;"><label>Variant</label><input type="text" id="sp-meta-variant" placeholder="e.g. vanilla-rose"></div>
-            <div class="form-group" style="min-width:90px;"><label>Size</label><input type="text" id="sp-meta-size" placeholder="e.g. 120ml"></div>
-            <div class="form-group" style="min-width:110px;">
-              <label>Order Type</label>
-              <select id="sp-meta-order-type" style="background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.5rem;font-size:0.85rem;width:100%;">
-                <option value="single">single</option>
-                <option value="pack">pack</option>
-                <option value="monthly">monthly</option>
-                <option value="quarterly">quarterly</option>
-              </select>
-            </div>
-            <div class="form-group" style="min-width:70px;">
-              <label>Market</label>
-              <select id="sp-meta-market" style="background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.5rem;font-size:0.85rem;width:100%;">
-                <option value="NZ">NZ</option>
-                <option value="AU">AU</option>
-              </select>
-            </div>
-            <div class="form-group" style="min-width:100px;"><label>Display Price ($)</label><input type="number" id="sp-meta-display-price" placeholder="29.95" step="0.01" min="0"></div>
-          </div>
-        </div>
-
         <!-- View Toggle -->
         <div style="display:flex;gap:0.5rem;margin-bottom:1rem;">
           <button class="sp-view-btn active" id="sp-view-stripe" style="background:var(--sage);color:#fff;border:none;padding:0.4rem 0.75rem;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600;">Stripe View</button>
@@ -7389,6 +7325,7 @@ let spProducts = [];
 let spPricesCache = {}; // product_id -> prices array
 let spLoaded = false;
 let spExpandedProduct = null;
+let spAddingPriceToProduct = null; // product_id currently showing inline price form
 const SP_ENDPOINT = '/.netlify/functions/stripe-products';
 
 async function spFetch(payload) {
@@ -7460,6 +7397,10 @@ function renderStripeProducts() {
         row += priceRows;
       }
     }
+    // Inline price form for this product
+    if (spAddingPriceToProduct === p.id) {
+      row += spGetInlineFormRow(p.id, p.name);
+    }
     return row;
   }).join('');
 
@@ -7487,23 +7428,105 @@ function renderStripeProducts() {
     btn.addEventListener('click', function(e) {
       e.stopPropagation();
       const pid = this.dataset.productId;
-      const pname = this.dataset.productName;
-      document.getElementById('sp-price-product-id').value = pid;
-      document.getElementById('sp-price-product-name').textContent = pname;
-      document.getElementById('sp-price-amount').value = '';
-      document.getElementById('sp-price-nickname').value = '';
-      document.getElementById('sp-price-currency').value = 'nzd';
-      document.getElementById('sp-price-type').value = 'one_time';
-      document.getElementById('sp-new-price-form').style.display = '';
-      document.getElementById('sp-new-product-form').style.display = 'none';
+      spAddingPriceToProduct = spAddingPriceToProduct === pid ? null : pid;
+      // Also expand the product to show existing prices
+      if (spAddingPriceToProduct) spExpandedProduct = pid;
+      renderStripeProducts();
     });
   });
+
+  // Attach inline price form handlers
+  const inlineCreateBtn = document.getElementById('sp-inline-create-btn');
+  if (inlineCreateBtn) {
+    inlineCreateBtn.addEventListener('click', spHandleInlineCreatePrice);
+  }
+  const inlineCancelBtn = document.getElementById('sp-inline-cancel-btn');
+  if (inlineCancelBtn) {
+    inlineCancelBtn.addEventListener('click', () => { spAddingPriceToProduct = null; renderStripeProducts(); });
+  }
+}
+
+function spGetInlineFormRow(productId, productName) {
+  const selStyle = 'background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:0.35rem;font-size:0.8rem;';
+  const inpStyle = 'background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:0.35rem 0.5rem;font-size:0.8rem;width:100%;';
+  return `<tr class="sp-inline-form-row" style="background:var(--bg);">
+    <td colspan="6" style="padding:0.75rem;">
+      <div style="font-size:0.8rem;font-weight:600;margin-bottom:0.5rem;color:var(--sage);">New price for ${esc(productName)}</div>
+      <input type="hidden" id="sp-inline-product-id" value="${productId}">
+      <input type="hidden" id="sp-inline-product-name" value="${esc(productName)}">
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:flex-end;">
+        <div style="min-width:80px;"><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Amount ($)</div><input type="number" id="sp-inline-amount" placeholder="29.95" step="0.01" min="0" style="${inpStyle}width:80px;"></div>
+        <div style="min-width:70px;"><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Currency</div><select id="sp-inline-currency" style="${selStyle}"><option value="nzd">NZD</option><option value="aud">AUD</option><option value="usd">USD</option></select></div>
+        <div style="flex:1;min-width:120px;"><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Label</div><input type="text" id="sp-inline-nickname" placeholder="e.g. One-time NZ" style="${inpStyle}"></div>
+        <div style="min-width:80px;"><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Type</div><select id="sp-inline-type" style="${selStyle}"><option value="one_time">One-time</option><option value="month">Monthly</option><option value="week">Weekly</option><option value="year">Yearly</option></select></div>
+      </div>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:flex-end;margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid var(--border);">
+        <div style="font-size:0.7rem;color:var(--muted);font-weight:600;width:100%;">Catalog Metadata</div>
+        <div><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Category</div><select id="sp-inline-category" style="${selStyle}"><option value="tallow">tallow</option><option value="broth">broth</option></select></div>
+        <div style="min-width:90px;"><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Product Type</div><input type="text" id="sp-inline-product-type" placeholder="balm" style="${inpStyle}width:90px;"></div>
+        <div style="min-width:90px;"><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Variant</div><input type="text" id="sp-inline-variant" placeholder="vanilla-rose" style="${inpStyle}width:90px;"></div>
+        <div style="min-width:70px;"><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Size</div><input type="text" id="sp-inline-size" placeholder="120ml" style="${inpStyle}width:70px;"></div>
+        <div><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Order Type</div><select id="sp-inline-order-type" style="${selStyle}"><option value="single">single</option><option value="pack">pack</option><option value="monthly">monthly</option><option value="quarterly">quarterly</option></select></div>
+        <div><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Market</div><select id="sp-inline-market" style="${selStyle}"><option value="NZ">NZ</option><option value="AU">AU</option></select></div>
+        <div style="min-width:80px;"><div style="font-size:0.7rem;color:var(--muted);margin-bottom:2px;">Display $</div><input type="number" id="sp-inline-display-price" placeholder="29.95" step="0.01" min="0" style="${inpStyle}width:80px;"></div>
+      </div>
+      <div style="display:flex;gap:0.5rem;margin-top:0.65rem;">
+        <button id="sp-inline-create-btn" class="mfg-add-btn" style="font-size:0.8rem;padding:0.4rem 0.75rem;">Create Price</button>
+        <button id="sp-inline-cancel-btn" style="background:var(--card);border:1px solid var(--border);color:var(--muted);padding:0.4rem 0.75rem;border-radius:6px;cursor:pointer;font-size:0.8rem;">Cancel</button>
+      </div>
+    </td>
+  </tr>`;
+}
+
+async function spHandleInlineCreatePrice() {
+  const btn = document.getElementById('sp-inline-create-btn');
+  const product_id = document.getElementById('sp-inline-product-id').value;
+  const amount = parseFloat(document.getElementById('sp-inline-amount').value);
+  const currency = document.getElementById('sp-inline-currency').value;
+  const nickname = document.getElementById('sp-inline-nickname').value.trim();
+  const priceType = document.getElementById('sp-inline-type').value;
+
+  if (!product_id) { alert('No product selected'); return; }
+  if (isNaN(amount) || amount < 0) { alert('Enter a valid price amount'); return; }
+
+  const unit_amount = Math.round(amount * 100);
+  const payload = { action: 'create-price', product_id, unit_amount, currency };
+  if (nickname) payload.nickname = nickname;
+  if (priceType !== 'one_time') payload.recurring_interval = priceType;
+
+  // Include catalog metadata if filled in
+  const metaPT = document.getElementById('sp-inline-product-type').value.trim();
+  const metaVariant = document.getElementById('sp-inline-variant').value.trim();
+  const metaSize = document.getElementById('sp-inline-size').value.trim();
+  if (metaPT && metaVariant && metaSize) {
+    payload.category = document.getElementById('sp-inline-category').value;
+    payload.product_type = metaPT;
+    payload.variant = metaVariant;
+    payload.size = metaSize;
+    payload.order_type = document.getElementById('sp-inline-order-type').value;
+    payload.market = document.getElementById('sp-inline-market').value;
+    payload.display_price = document.getElementById('sp-inline-display-price').value || null;
+    payload.product_name = document.getElementById('sp-inline-product-name').value;
+  }
+
+  btn.disabled = true; btn.textContent = 'Creating...';
+  const res = await spFetch(payload);
+  btn.disabled = false; btn.textContent = 'Create Price';
+  if (res.error) { alert('Error: ' + res.error); return; }
+
+  spAddingPriceToProduct = null;
+  delete spPricesCache[product_id];
+  spExpandedProduct = product_id;
+  const priceRes = await spFetch({ action: 'list-prices', product_id });
+  spPricesCache[product_id] = priceRes.prices || [];
+  spCatalogLoaded = false;
+  renderStripeProducts();
 }
 
 // New Product form
 document.getElementById('sp-new-product-btn').addEventListener('click', () => {
   document.getElementById('sp-new-product-form').style.display = '';
-  document.getElementById('sp-new-price-form').style.display = 'none';
+  spAddingPriceToProduct = null;
   document.getElementById('sp-prod-name').value = '';
   document.getElementById('sp-prod-desc').value = '';
   document.getElementById('sp-prod-name').focus();
@@ -7524,56 +7547,6 @@ document.getElementById('sp-create-product-btn').addEventListener('click', async
   document.getElementById('sp-new-product-form').style.display = 'none';
   spLoaded = false;
   await loadStripeProducts(true);
-});
-
-// New Price form
-document.getElementById('sp-cancel-price-btn').addEventListener('click', () => {
-  document.getElementById('sp-new-price-form').style.display = 'none';
-});
-
-document.getElementById('sp-create-price-btn').addEventListener('click', async () => {
-  const btn = document.getElementById('sp-create-price-btn');
-  const product_id = document.getElementById('sp-price-product-id').value;
-  const amount = parseFloat(document.getElementById('sp-price-amount').value);
-  const currency = document.getElementById('sp-price-currency').value;
-  const nickname = document.getElementById('sp-price-nickname').value.trim();
-  const priceType = document.getElementById('sp-price-type').value;
-
-  if (!product_id) { alert('No product selected'); return; }
-  if (isNaN(amount) || amount < 0) { alert('Enter a valid price amount'); return; }
-
-  const unit_amount = Math.round(amount * 100); // Convert dollars to cents
-  const payload = { action: 'create-price', product_id, unit_amount, currency };
-  if (nickname) payload.nickname = nickname;
-  if (priceType !== 'one_time') payload.recurring_interval = priceType;
-
-  // Include catalog metadata if filled in
-  const metaCat = document.getElementById('sp-meta-category').value;
-  const metaPT = document.getElementById('sp-meta-product-type').value.trim();
-  const metaVariant = document.getElementById('sp-meta-variant').value.trim();
-  const metaSize = document.getElementById('sp-meta-size').value.trim();
-  if (metaPT && metaVariant && metaSize) {
-    payload.category = metaCat;
-    payload.product_type = metaPT;
-    payload.variant = metaVariant;
-    payload.size = metaSize;
-    payload.order_type = document.getElementById('sp-meta-order-type').value;
-    payload.market = document.getElementById('sp-meta-market').value;
-    payload.display_price = document.getElementById('sp-meta-display-price').value || null;
-    payload.product_name = document.getElementById('sp-price-product-name').textContent;
-  }
-
-  btn.disabled = true; btn.textContent = 'Creating...';
-  const res = await spFetch(payload);
-  btn.disabled = false; btn.textContent = 'Create Price';
-  if (res.error) { alert('Error: ' + res.error); return; }
-  document.getElementById('sp-new-price-form').style.display = 'none';
-  // Refresh prices for this product
-  delete spPricesCache[product_id];
-  spExpandedProduct = product_id;
-  const priceRes = await spFetch({ action: 'list-prices', product_id });
-  spPricesCache[product_id] = priceRes.prices || [];
-  renderStripeProducts();
 });
 
 // Refresh button
