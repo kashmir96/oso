@@ -180,10 +180,13 @@ exports.handler = async (event) => {
     // Delete the temp pending row
     await sbFetch(`/rest/v1/gmail_accounts?id=eq.${pendingRow.id}`, { method: 'DELETE' });
 
-    // Upsert by email_address — handles both new and re-connect
-    const upsertRes = await sbFetch('/rest/v1/gmail_accounts', {
+    // Delete any existing row with this email (clean re-connect)
+    await sbFetch(`/rest/v1/gmail_accounts?email_address=eq.${encodeURIComponent(emailAddress)}`, { method: 'DELETE' });
+
+    // Insert fresh row with tokens
+    const insertRes = await sbFetch('/rest/v1/gmail_accounts', {
       method: 'POST',
-      prefer: 'resolution=merge-duplicates,return=representation',
+      prefer: 'return=representation',
       body: {
         email_address: emailAddress,
         display_name: profile.name || emailAddress,
@@ -193,12 +196,10 @@ exports.handler = async (event) => {
         connected_at: new Date().toISOString(),
         connected_by: pendingRow.connected_by,
         active: true,
-        oauth_state: null,
-        state_created: null,
       },
     });
-    const upsertData = await upsertRes.json();
-    console.log('Gmail account upsert result:', JSON.stringify(upsertData));
+    const insertData = await insertRes.json();
+    console.log('Gmail account insert result:', JSON.stringify(insertData));
 
     return htmlReply(`<!DOCTYPE html><html><body style="background:#141210;color:#e8e2da;font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;">
       <div style="text-align:center;">
