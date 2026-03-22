@@ -114,6 +114,7 @@ const db = {
       delete() { _op = 'delete'; return chain; },
       upsert(data, opts) { _op = 'upsert'; _params.data = data; if (opts?.onConflict) _params.onConflict = opts.onConflict; return chain; },
       eq(col, val) { _params.filters = _params.filters || []; _params.filters.push({ col, op: 'eq', val }); return chain; },
+      contains(col, val) { _params.filters = _params.filters || []; _params.filters.push({ col, op: 'cs', val }); return chain; },
       order(col, opts) { _params.order = { col, ascending: opts?.ascending ?? true }; return chain; },
       limit(n) { _params.limit = n; return chain; },
       single() { _params.single = true; return chain; },
@@ -7645,11 +7646,8 @@ function renderLearningPhaseWidget(campaigns) {
 // ── Marketing: Changelog ──
 async function loadMktChangelog() {
   try {
-    const res = await fetch(`${db.supabaseUrl}/rest/v1/site_changelogs?site_key=eq.primalpantry&order=deployed_at.desc&limit=20&select=*`, {
-      headers: { 'apikey': db.supabaseKey, 'Authorization': `Bearer ${db.supabaseKey}` },
-    });
-    mktChangelogData = await res.json();
-    if (!Array.isArray(mktChangelogData)) mktChangelogData = [];
+    const res = await db.from('site_changelogs').select('*').eq('site_key', 'primalpantry').order('deployed_at', { ascending: false }).limit(20);
+    mktChangelogData = res.data || [];
   } catch (e) { mktChangelogData = []; }
   mktChangelogPage = 1;
   renderMktChangelog();
@@ -7778,17 +7776,11 @@ async function openPageModal(pathname) {
 
   // Fetch changelog for this page
   try {
-    const res = await fetch(`${db.supabaseUrl}/rest/v1/site_changelogs?site_key=eq.primalpantry&funnel_pages=cs.{${encodeURIComponent(pathname)}}&order=deployed_at.desc&limit=20&select=*`, {
-      headers: { 'apikey': db.supabaseKey, 'Authorization': `Bearer ${db.supabaseKey}` },
-    });
-    let changes = await res.json();
-    if (!Array.isArray(changes)) changes = [];
+    const res = await db.from('site_changelogs').select('*').eq('site_key', 'primalpantry').contains('funnel_pages', [pathname]).order('deployed_at', { ascending: false }).limit(20);
+    let changes = res.data || [];
     // Also include changes that affect all pages (funnel_pages contains '*')
-    const res2 = await fetch(`${db.supabaseUrl}/rest/v1/site_changelogs?site_key=eq.primalpantry&funnel_pages=cs.{*}&order=deployed_at.desc&limit=20&select=*`, {
-      headers: { 'apikey': db.supabaseKey, 'Authorization': `Bearer ${db.supabaseKey}` },
-    });
-    let allPageChanges = await res2.json();
-    if (!Array.isArray(allPageChanges)) allPageChanges = [];
+    const res2 = await db.from('site_changelogs').select('*').eq('site_key', 'primalpantry').contains('funnel_pages', ['*']).order('deployed_at', { ascending: false }).limit(20);
+    let allPageChanges = res2.data || [];
     const allChanges = [...changes, ...allPageChanges].filter((v, i, a) => a.findIndex(x => x.id === v.id) === i).sort((a, b) => new Date(b.deployed_at) - new Date(a.deployed_at));
 
     if (allChanges.length === 0) {

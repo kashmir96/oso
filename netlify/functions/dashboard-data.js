@@ -129,6 +129,7 @@ exports.handler = async (event) => {
         else if (f.op === 'lt') query = query.lt(f.col, f.val);
         else if (f.op === 'lte') query = query.lte(f.col, f.val);
         else if (f.op === 'in') query = query.in(f.col, f.val);
+        else if (f.op === 'cs') query = query.contains(f.col, f.val);
       }
     }
 
