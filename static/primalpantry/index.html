@@ -1866,7 +1866,10 @@
         <button class="manual-order-btn" id="sup-add-btn">Add Supplier</button>
       </div>
       <div class="orders-card">
-        <h3>Suppliers</h3>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
+          <h3 style="margin:0;">Suppliers</h3>
+          <button class="manual-order-btn" id="sup-xero-sync" style="display:none;font-size:0.75rem;padding:4px 12px;" onclick="syncFromXero('suppliers')">Sync from Xero</button>
+        </div>
         <div style="overflow-x:auto;">
           <table>
             <thead><tr><th>Company</th><th>Contact</th><th>Email</th><th>Phone</th><th>Payment Terms</th><th></th></tr></thead>
@@ -1895,7 +1898,10 @@
         <button class="manual-order-btn" id="ws-add-btn">Add Wholesaler</button>
       </div>
       <div class="orders-card">
-        <h3>Wholesalers</h3>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
+          <h3 style="margin:0;">Wholesalers</h3>
+          <button class="manual-order-btn" id="ws-xero-sync" style="display:none;font-size:0.75rem;padding:4px 12px;" onclick="syncFromXero('wholesalers')">Sync from Xero</button>
+        </div>
         <div style="overflow-x:auto;">
           <table>
             <thead><tr><th>Company</th><th>Contact</th><th>Email</th><th>Phone</th><th>Payment Terms</th><th></th></tr></thead>
@@ -9401,13 +9407,20 @@ async function loadSettingsTab() {
 
 function renderEntityTable(tableId, data, type) {
   const tbl = document.getElementById(tableId);
+  // Show/hide Xero sync buttons
+  const supSync = document.getElementById('sup-xero-sync');
+  const wsSync = document.getElementById('ws-xero-sync');
+  if (supSync) supSync.style.display = xeroConnected ? '' : 'none';
+  if (wsSync) wsSync.style.display = xeroConnected ? '' : 'none';
+
   if (!data || data.length === 0) {
     tbl.innerHTML = '<tr><td colspan="6" class="loading">No ' + type + ' added yet</td></tr>';
     return;
   }
   tbl.innerHTML = data.map(s => {
+    const xeroBadge = s.xero_contact_id ? ' <span style="font-size:0.6rem;background:var(--sage);color:var(--bg);padding:1px 5px;border-radius:4px;margin-left:4px;vertical-align:middle;">XERO</span>' : '';
     return '<tr>'
-      + '<td style="font-weight:500;">' + esc(s.name) + '</td>'
+      + '<td style="font-weight:500;">' + esc(s.name) + xeroBadge + '</td>'
       + '<td>' + esc(s.contact_name || '-') + '</td>'
       + '<td>' + (s.email ? '<a href="mailto:' + esc(s.email) + '" style="color:var(--sage);">' + esc(s.email) + '</a>' : '-') + '</td>'
       + '<td>' + esc(s.phone || '-') + '</td>'
@@ -9439,6 +9452,22 @@ async function deleteEntity(id, type) {
     await fetch('/.netlify/functions/suppliers?token=' + currentStaff.token + '&id=' + id + '&type=' + type, { method: 'DELETE' });
     if (type === 'suppliers') loadSuppliers(); else loadWholesalers();
   } catch (e) { alert('Error: ' + e.message); }
+}
+
+async function syncFromXero(type) {
+  const btnId = type === 'suppliers' ? 'sup-xero-sync' : 'ws-xero-sync';
+  const btn = document.getElementById(btnId);
+  btn.disabled = true; btn.textContent = 'Syncing...';
+  try {
+    const res = await fetch('/.netlify/functions/xero-sync-contacts?token=' + currentStaff.token + '&action=import');
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Sync failed');
+    const imp = data.imported || {};
+    alert('Imported ' + (imp.suppliers || 0) + ' suppliers and ' + (imp.wholesalers || 0) + ' wholesalers from Xero');
+    loadSuppliers();
+    loadWholesalers();
+  } catch (e) { alert('Sync error: ' + e.message); }
+  btn.disabled = false; btn.textContent = 'Sync from Xero';
 }
 
 // ── Competitor Tracking ──

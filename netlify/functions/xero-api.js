@@ -30,6 +30,7 @@ const ALLOWED_ENDPOINTS = [
   'BankTransactions',
   'Accounts',
   'Organisation',
+  'Contacts',
 ];
 
 function reply(code, data) {
@@ -104,7 +105,7 @@ async function refreshAccessToken(tokens) {
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return reply(200, '');
-  if (event.httpMethod !== 'GET') return reply(405, { error: 'GET only' });
+  if (event.httpMethod !== 'GET' && event.httpMethod !== 'POST') return reply(405, { error: 'GET or POST only' });
 
   const qs = event.queryStringParameters || {};
   const { token, endpoint, ...params } = qs;
@@ -138,13 +139,19 @@ exports.handler = async (event) => {
   const xeroUrl = `https://api.xero.com/api.xro/2.0/${endpoint}${queryString ? '?' + queryString : ''}`;
 
   try {
-    const xeroRes = await fetch(xeroUrl, {
+    const fetchOpts = {
+      method: event.httpMethod,
       headers: {
         Authorization: `Bearer ${tokens.access_token}`,
         'xero-tenant-id': tokens.tenant_id,
         Accept: 'application/json',
       },
-    });
+    };
+    if (event.httpMethod === 'POST' && event.body) {
+      fetchOpts.headers['Content-Type'] = 'application/json';
+      fetchOpts.body = event.body;
+    }
+    const xeroRes = await fetch(xeroUrl, fetchOpts);
 
     // Handle rate limiting
     if (xeroRes.status === 429) {

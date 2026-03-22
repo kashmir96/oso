@@ -40,6 +40,68 @@ async function getStaffByToken(token) {
 
 const VALID_TYPES = ['suppliers', 'wholesalers'];
 
+async function tryPushToXero(record, type, id) {
+  try {
+    const tokRes = await sbFetch('/rest/v1/xero_tokens?id=eq.1&select=access_token,refresh_token,tenant_id,expires_at');
+    const rows = await tokRes.json();
+    if (!Array.isArray(rows) || rows.length === 0 || !rows[0].access_token || !rows[0].tenant_id) return;
+    let tokens = rows[0];
+
+    // Refresh if expired
+    if (Date.now() > new Date(tokens.expires_at).getTime() - 60000) {
+      const clientId = process.env.XERO_CLIENT_ID;
+      const clientSecret = process.env.XERO_CLIENT_SECRET;
+      if (!clientId || !clientSecret) return;
+      const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+      const refRes = await fetch('https://identity.xero.com/connect/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: `Basic ${basicAuth}` },
+        body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: tokens.refresh_token }).toString(),
+      });
+      const refData = await refRes.json();
+      if (!refRes.ok || !refData.access_token) return;
+      tokens.access_token = refData.access_token;
+      tokens.refresh_token = refData.refresh_token;
+      await sbFetch('/rest/v1/xero_tokens?id=eq.1', {
+        method: 'PATCH',
+        body: { access_token: refData.access_token, refresh_token: refData.refresh_token, expires_at: new Date(Date.now() + refData.expires_in * 1000).toISOString(), updated_at: new Date().toISOString() },
+      });
+    }
+
+    const xeroContact = {
+      Name: record.name,
+      FirstName: (record.contact_name || '').split(' ')[0] || '',
+      LastName: (record.contact_name || '').split(' ').slice(1).join(' ') || '',
+      EmailAddress: record.email || '',
+      IsSupplier: type === 'suppliers',
+      IsCustomer: type === 'wholesalers',
+    };
+    if (record.phone) xeroContact.Phones = [{ PhoneType: 'DEFAULT', PhoneNumber: record.phone }];
+    if (record.address) xeroContact.Addresses = [{ AddressType: 'STREET', AddressLine1: record.address }];
+
+    const xRes = await fetch('https://api.xero.com/api.xro/2.0/Contacts', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${tokens.access_token}`,
+        'xero-tenant-id': tokens.tenant_id,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({ Contacts: [xeroContact] }),
+    });
+
+    const xData = await xRes.json();
+    if (xRes.ok && xData.Contacts && xData.Contacts[0] && xData.Contacts[0].ContactID) {
+      await sbFetch(`/rest/v1/${type}?id=eq.${id}`, {
+        method: 'PATCH',
+        body: { xero_contact_id: xData.Contacts[0].ContactID },
+      });
+    }
+  } catch (e) {
+    console.error('Xero push failed (non-fatal):', e.message);
+  }
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return reply(200, '');
 
@@ -83,6 +145,7 @@ exports.handler = async (event) => {
       body: record,
     });
     const created = await res.json();
+    const createdRecord = created[0] || created;
 
     // Auto-register in contacts table if email provided
     if (record.email) {
@@ -99,7 +162,12 @@ exports.handler = async (event) => {
       });
     }
 
-    return reply(201, { created: created[0] || created });
+    // Auto-push to Xero (best-effort)
+    if (createdRecord.id) {
+      await tryPushToXero(record, type, createdRecord.id);
+    }
+
+    return reply(201, { created: createdRecord });
   }
 
   // ── PATCH: update ──
