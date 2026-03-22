@@ -2042,9 +2042,69 @@ function openOrderModal(orderId) {
       ['Destination', [shipment.destination?.city, shipment.destination?.country_code].filter(Boolean).join(', ') || '-'],
     ];
 
+    // Bag size editor — only for unshipped/printed orders
+    const canEditBag = ['Waiting to Print', 'Printed'].includes(shipment._shipping_status);
+    const BAG_SIZES = [
+      { label: 'DL', code: 'CPOLTPDL', desc: 'Small' },
+      { label: 'A5', code: 'CPOLTPA5', desc: 'Medium' },
+      { label: 'A4', code: 'CPOLTPA4', desc: 'Large' },
+      { label: 'Foolscap', code: 'CPOLTPA3', desc: 'Extra Large' },
+    ];
+    const currentMethod = shipment.shipping_method || '';
+    const currentBag = BAG_SIZES.find(b => b.code === currentMethod);
+    const bagLabel = currentBag ? currentBag.label : currentMethod || '-';
+
+    let bagSizeHtml = '';
+    if (canEditBag) {
+      const options = BAG_SIZES.map(b =>
+        `<option value="${b.code}" ${b.code === currentMethod ? 'selected' : ''}>${b.label} — ${b.desc}</option>`
+      ).join('');
+      bagSizeHtml = `<div class="modal-row" style="align-items:center;">
+        <span class="label">Bag Size</span>
+        <span style="display:flex;align-items:center;gap:0.5rem;">
+          <select id="modal-bag-size" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.3rem 0.5rem;border-radius:6px;font-size:0.8rem;font-family:'DM Sans',sans-serif;">
+            ${options}
+          </select>
+          <button id="modal-bag-save" style="background:var(--sage);color:#141210;border:none;padding:0.3rem 0.6rem;border-radius:4px;font-size:0.75rem;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;">Update</button>
+          <span id="modal-bag-result" style="font-size:0.75rem;"></span>
+        </span>
+      </div>`;
+    } else {
+      bagSizeHtml = `<div class="modal-row"><span class="label">Bag Size</span><span>${bagLabel}</span></div>`;
+    }
+
     detail.innerHTML = '<h4 style="margin:0 0 0.5rem;font-size:0.85rem;color:var(--muted);">eShip Shipping Details</h4>' +
-      shipRows.map(([l, v]) => `<div class="modal-row"><span class="label">${l}</span><span>${v}</span></div>`).join('');
+      shipRows.map(([l, v]) => `<div class="modal-row"><span class="label">${l}</span><span>${v}</span></div>`).join('') +
+      bagSizeHtml;
     detail.style.display = 'block';
+
+    // Attach bag size update handler
+    if (canEditBag) {
+      document.getElementById('modal-bag-save').addEventListener('click', async function() {
+        const newMethod = document.getElementById('modal-bag-size').value;
+        const resultEl = document.getElementById('modal-bag-result');
+        const btn = this;
+        btn.disabled = true; btn.textContent = 'Saving...';
+        resultEl.textContent = '';
+        try {
+          const res = await fetch('/.netlify/functions/eship-update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order_id: shipment.order_id, shipping_method: newMethod, token: currentStaff.token }),
+          });
+          const data = await res.json();
+          if (data.success) {
+            resultEl.innerHTML = '<span style="color:var(--sage);">Updated!</span>';
+            shipment.shipping_method = newMethod;
+          } else {
+            resultEl.innerHTML = '<span style="color:var(--red);">' + (data.error || 'Failed') + '</span>';
+          }
+        } catch (e) {
+          resultEl.innerHTML = '<span style="color:var(--red);">' + e.message + '</span>';
+        }
+        btn.disabled = false; btn.textContent = 'Update';
+      });
+    }
   })();
 
   // Refund amount input — update label dynamically
