@@ -89,9 +89,11 @@ exports.handler = async (event) => {
     const token = qs['hub.verify_token'];
     const challenge = qs['hub.challenge'];
 
-    if (mode === 'subscribe' && token === process.env.META_VERIFY_TOKEN) {
-      console.log('Webhook verified');
-      return { statusCode: 200, body: challenge };
+    const expectedToken = process.env.META_VERIFY_TOKEN || 'primalpantry_webhook_2026';
+    console.log('Webhook verify attempt:', { mode, tokenMatch: token === expectedToken, hasEnvVar: !!process.env.META_VERIFY_TOKEN });
+    if (mode === 'subscribe' && token === expectedToken) {
+      console.log('Webhook verified successfully');
+      return { statusCode: 200, body: challenge, headers: { 'Content-Type': 'text/plain' } };
     }
     return { statusCode: 403, body: 'Verification failed' };
   }
