@@ -2160,35 +2160,8 @@ function openOrderModal(orderId) {
           const action = this.dataset.action;
           reprintBtn.disabled = true;
 
-          // If changing size, update first
-          if (action !== 'asis') {
-            const code = SIZE_CODES[action];
-            reprintBtn.textContent = 'Changing to ' + action + '...';
-            try {
-              const upRes = await fetch('/.netlify/functions/eship-update', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ order_id: shipment.order_id, shipping_method: code, token: currentStaff.token }),
-              });
-              const upData = await upRes.json();
-              if (!upData.success) {
-                reprintBtn.textContent = 'Update failed';
-                reprintBtn.style.color = 'var(--red)';
-                setTimeout(() => { reprintBtn.disabled = false; reprintBtn.textContent = 'Reprint Label'; reprintBtn.style.color = 'var(--cyan)'; }, 2000);
-                return;
-              }
-              shipment.shipping_method = code;
-              if (upData.order_id) shipment.order_id = upData.order_id;
-            } catch (err) {
-              reprintBtn.textContent = 'Error';
-              reprintBtn.style.color = 'var(--red)';
-              setTimeout(() => { reprintBtn.disabled = false; reprintBtn.textContent = 'Reprint Label'; reprintBtn.style.color = 'var(--cyan)'; }, 2000);
-              return;
-            }
-          }
-
-          // Print — pass carrier_service_code if changing size
-          reprintBtn.textContent = 'Printing...';
+          // Print directly — pass carrier_service_code at print time if changing size
+          reprintBtn.textContent = action === 'asis' ? 'Printing...' : 'Printing as ' + action + '...';
           const printBody = { order_ids: [shipment.order_id] };
           if (action !== 'asis') printBody.carrier_service_code = SIZE_CODES[action];
           try {
@@ -2198,19 +2171,31 @@ function openOrderModal(orderId) {
               body: JSON.stringify(printBody),
             });
             const data = await res.json();
-            if (data.success || data.printed) {
+            if (data.printed > 0) {
               reprintBtn.textContent = 'Printed!';
               reprintBtn.style.borderColor = 'var(--sage)';
               reprintBtn.style.color = 'var(--sage)';
             } else {
-              reprintBtn.textContent = 'Print failed';
+              const errMsg = data.failed?.[0]?.result?.errors?.[0]?.details || data.failed?.[0]?.result?.errors?.[0]?.message || 'Print failed';
+              reprintBtn.textContent = errMsg.length > 30 ? errMsg.slice(0, 30) + '...' : errMsg;
               reprintBtn.style.color = 'var(--red)';
+              reprintBtn.style.borderColor = 'var(--red)';
+              // Auto-set status for address errors
+              if (errMsg.toLowerCase().includes('address') || errMsg.toLowerCase().includes('postcode') || errMsg.toLowerCase().includes('town')) {
+                const order = allOrders.find(o => o.stripe_session_id === shipment.order_number || o.order_number === shipment.order_number);
+                if (order) {
+                  db.from('orders').update({ status: 'Invalid Address - Fix in eShip' }).eq('id', order.id);
+                  order.status = 'Invalid Address - Fix in eShip';
+                  const statusEl = document.getElementById('modal-status');
+                  if (statusEl) statusEl.value = order.status;
+                }
+              }
             }
           } catch (err) {
             reprintBtn.textContent = 'Error';
             reprintBtn.style.color = 'var(--red)';
           }
-          setTimeout(() => { reprintBtn.disabled = false; reprintBtn.textContent = 'Reprint Label'; reprintBtn.style.borderColor = 'var(--cyan)'; reprintBtn.style.color = 'var(--cyan)'; }, 2000);
+          setTimeout(() => { reprintBtn.disabled = false; reprintBtn.textContent = 'Reprint Label'; reprintBtn.style.borderColor = 'var(--cyan)'; reprintBtn.style.color = 'var(--cyan)'; }, 3000);
         });
       });
     }
