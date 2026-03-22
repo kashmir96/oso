@@ -4460,6 +4460,20 @@ document.getElementById('eship-print-btn').addEventListener('click', async () =>
         return `Order ${f.order_id}: ${errMsg}`;
       }).join('\n');
       msg += `\n\n${data.failed.length} failed:\n${errors}`;
+      // Auto-update order status for address errors
+      for (const f of data.failed) {
+        const errDetail = (f.result?.errors?.[0]?.details || f.result?.errors?.[0]?.message || '').toLowerCase();
+        if (errDetail.includes('address') || errDetail.includes('postcode') || errDetail.includes('town')) {
+          const shipment = allShipments.find(s => s.order_id === f.order_id);
+          if (shipment) {
+            const order = allOrders.find(o => o.stripe_session_id === shipment.order_number || o.order_number === shipment.order_number);
+            if (order) {
+              await db.from('orders').update({ status: 'Invalid Address - Fix in eShip' }).eq('id', order.id);
+              order.status = 'Invalid Address - Fix in eShip';
+            }
+          }
+        }
+      }
     }
     alert(msg);
     await loadShippingData();
