@@ -626,6 +626,12 @@
     .claude-msg.assistant .claude-bubble li { margin-bottom: 0.15rem; }
     .claude-msg.assistant .claude-bubble strong { color: var(--honey); }
     .claude-msg.assistant .claude-bubble code { background: var(--card); padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.78rem; }
+    .claude-msg.prompt .claude-bubble { background: rgba(220,120,160,0.15); color: var(--text); display: inline-block; padding: 0.5rem 0.75rem; border-radius: 12px 12px 12px 2px; max-width: 90%; text-align: left; border: 1px solid rgba(220,120,160,0.3); cursor: pointer; }
+    .claude-msg.prompt .claude-bubble:hover { background: rgba(220,120,160,0.25); }
+    .claude-msg.prompt .claude-bubble .prompt-label { color: #dc78a0; font-weight: 700; font-size: 0.72rem; margin-bottom: 0.2rem; }
+    .claude-msg.prompt .claude-bubble .prompt-subject { font-weight: 600; }
+    .claude-fab.has-prompts { animation: fabPulse 2s ease-in-out infinite; }
+    @keyframes fabPulse { 0%,100% { box-shadow: 0 4px 16px rgba(0,0,0,0.3); } 50% { box-shadow: 0 4px 20px rgba(220,120,160,0.6); } }
     .claude-msg.action .claude-bubble { background: transparent; color: var(--dim); font-size: 0.75rem; font-style: italic; display: inline-block; padding: 0.2rem 0; }
     .claude-msg.thinking { text-align: center; }
     .claude-msg.thinking .claude-bubble { background: transparent; color: var(--dim); font-size: 0.75rem; }
@@ -9146,22 +9152,79 @@ async function archiveThread() {
 async function checkCommsPrompts() {
   try {
     const data = await commsApi('get_prompts', {});
-    const count = (data.prompts || []).length;
+    const prompts = data.prompts || [];
+    const count = prompts.length;
+
+    // Badge on Comms nav
     const navBtn = document.querySelector('[data-tab="comms"]');
-    if (!navBtn) return;
-    let badge = navBtn.querySelector('.comms-nav-badge');
-    if (count > 0) {
-      if (!badge) {
-        badge = document.createElement('span');
-        badge.className = 'comms-nav-badge';
-        badge.style.cssText = 'background:#dc78a0;color:#fff;font-size:0.6rem;font-weight:700;padding:0.1rem 0.35rem;border-radius:8px;margin-left:0.4rem;';
-        navBtn.appendChild(badge);
+    if (navBtn) {
+      let badge = navBtn.querySelector('.comms-nav-badge');
+      if (count > 0) {
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.className = 'comms-nav-badge';
+          badge.style.cssText = 'background:#dc78a0;color:#fff;font-size:0.6rem;font-weight:700;padding:0.1rem 0.35rem;border-radius:8px;margin-left:0.4rem;';
+          navBtn.appendChild(badge);
+        }
+        badge.textContent = count;
+      } else if (badge) {
+        badge.remove();
       }
-      badge.textContent = count;
-    } else if (badge) {
-      badge.remove();
+    }
+
+    // Inject into Claude chat bubble as pink messages
+    const fab = document.getElementById('claude-fab');
+    const chatMsgs = document.getElementById('claude-messages');
+    if (count > 0 && chatMsgs && fab) {
+      fab.classList.add('has-prompts');
+      // Remove old prompt messages
+      chatMsgs.querySelectorAll('.claude-msg.prompt').forEach(el => el.remove());
+      // Add each prompt as a pink bubble
+      for (const p of prompts) {
+        const fromName = (p.email_from || '').split('<')[0].trim() || 'Unknown';
+        const div = document.createElement('div');
+        div.className = 'claude-msg prompt';
+        div.innerHTML = '<div class="claude-bubble" onclick="handlePromptClick(\'' + (p.thread_id || '').replace(/'/g, "\\'") + '\',' + p.id + ')">'
+          + '<div class="prompt-label">Email from ' + esc(p.from_staff) + '</div>'
+          + '<div class="prompt-subject">' + esc(fromName) + ' — ' + esc(p.email_subject || '(no subject)') + '</div>'
+          + '<div style="font-size:0.75rem;color:var(--dim);margin-top:0.15rem;">' + esc((p.email_snippet || '').slice(0, 100)) + '</div>'
+          + (p.note ? '<div style="font-size:0.7rem;color:#dc78a0;margin-top:0.2rem;">Note: ' + esc(p.note) + '</div>' : '')
+          + '<div style="font-size:0.65rem;color:var(--dim);margin-top:0.25rem;">Click to view</div>'
+          + '</div>';
+        chatMsgs.appendChild(div);
+      }
+      chatMsgs.scrollTop = chatMsgs.scrollHeight;
+      // Auto-open the panel
+      const panel = document.getElementById('claude-panel');
+      if (panel && !panel.classList.contains('open')) {
+        panel.classList.add('open');
+        fab.classList.add('open');
+      }
+    } else if (fab) {
+      fab.classList.remove('has-prompts');
     }
   } catch {}
+}
+
+function handlePromptClick(threadId, promptId) {
+  // Dismiss prompt
+  commsApi('dismiss_prompt', { prompt_id: promptId }).catch(() => {});
+  // Remove the bubble
+  document.querySelectorAll('.claude-msg.prompt').forEach(el => el.remove());
+  // Switch to Comms tab and open the thread
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  const commsNav = document.querySelector('[data-tab="comms"]');
+  if (commsNav) commsNav.classList.add('active');
+  document.getElementById('tab-comms').classList.add('active');
+  activeTab = 'comms';
+  document.querySelector('.filter-bar').style.display = 'none';
+  loadCommsTab().then(() => { if (threadId) openCommsThread(threadId); });
+  // Close claude panel
+  document.getElementById('claude-panel').classList.remove('open');
+  document.getElementById('claude-fab').classList.remove('open');
+  document.getElementById('claude-fab').classList.remove('has-prompts');
+  checkCommsPrompts();
 }
 
 async function loadCommsTab() {
