@@ -146,6 +146,9 @@ exports.handler = async (event) => {
         if (skuLower.includes('60ml') || skuLower.includes('lip')) jarsPerUnit = 0.5;
         else if (skuLower.includes('scalp-bundle')) jarsPerUnit = 9;
         else if (skuLower.includes('black')) jarsPerUnit = 9;
+        else if (skuLower.includes('250')) jarsPerUnit = 9;
+        else if (skuLower.includes('sensitive-skin-kit')) jarsPerUnit = 9;
+        else if (skuLower.includes('anti-aging')) jarsPerUnit = 6;
         else if (skuLower.includes('shampoo-bottle') || skuLower.includes('conditioner')) jarsPerUnit = 6;
         else if (skuLower.includes('lotion') || skuLower.includes('liqsoap')) jarsPerUnit = 4;
         else if (skuLower.includes('liquid-bundle')) jarsPerUnit = 4;
