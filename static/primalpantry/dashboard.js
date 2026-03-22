@@ -2097,6 +2097,7 @@ function openOrderModal(orderId) {
           if (data.success) {
             resultEl.innerHTML = '<span style="color:var(--sage);">Updated!</span>';
             shipment.shipping_method = newMethod;
+            if (data.order_id) shipment.order_id = data.order_id; // ID changes on delete+recreate
           } else {
             resultEl.innerHTML = '<span style="color:var(--red);">' + (data.error || 'Failed') + '</span>';
           }
@@ -4740,8 +4741,9 @@ document.getElementById('bulk-bag-print').addEventListener('click', async () => 
   const total = bulkBagOrderIds.length;
   let updated = 0;
   let failed = 0;
+  const newOrderIds = []; // Collect new IDs since delete+recreate changes them
 
-  // Step 1: Update all selected orders' bag sizes
+  // Step 1: Update all selected orders' bag sizes (delete + recreate)
   statusEl.innerHTML = '<span style="color:var(--dim);">Updating bag sizes... 0/' + total + '</span>';
   for (const orderId of bulkBagOrderIds) {
     try {
@@ -4752,8 +4754,9 @@ document.getElementById('bulk-bag-print').addEventListener('click', async () => 
       });
       const data = await res.json();
       if (data.success) {
+        newOrderIds.push(data.order_id || orderId);
         const shipment = allShipments.find(s => s.order_id === orderId);
-        if (shipment) shipment.shipping_method = bulkBagSize;
+        if (shipment) { shipment.shipping_method = bulkBagSize; shipment.order_id = data.order_id || orderId; }
         updated++;
       } else { failed++; }
     } catch { failed++; }
@@ -4764,14 +4767,21 @@ document.getElementById('bulk-bag-print').addEventListener('click', async () => 
     statusEl.innerHTML = '<span style="color:var(--amber);">Updated ' + updated + ', failed ' + failed + '</span>';
   }
 
-  // Step 2: Print labels for updated orders
+  if (newOrderIds.length === 0) {
+    statusEl.innerHTML = '<span style="color:var(--red);">No orders updated — nothing to print</span>';
+    btn.disabled = false;
+    btn.textContent = 'Update ' + bulkBagCount + ' to ' + bulkBagSizeLabel + ' & Print';
+    return;
+  }
+
+  // Step 2: Print labels using NEW order IDs (old ones were deleted)
   statusEl.innerHTML = '<span style="color:var(--dim);">Printing labels...</span>';
   btn.textContent = 'Printing...';
   try {
     const res = await fetch('/.netlify/functions/eship-print', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ order_ids: bulkBagOrderIds }),
+      body: JSON.stringify({ order_ids: newOrderIds }),
     });
     const data = await res.json();
     if (data.success || data.printed) {
