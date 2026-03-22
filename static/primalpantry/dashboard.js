@@ -4769,8 +4769,9 @@ function startBulkBagScanning() {
   document.getElementById('bulk-bag-status').textContent = 'Tick orders or scan barcodes to select';
   document.getElementById('bulk-bag-print').style.display = 'none';
   document.getElementById('bulk-bag-banner').classList.add('active');
-  // Don't hijack scanner — search bar stays usable, barcodes still work via keydown listener
   renderShipmentsTable();
+  // Auto-focus search bar for immediate typing/scanning
+  document.getElementById('shipment-search').focus();
 }
 
 function toggleBulkBagOrder(orderId, checked) {
