@@ -1,10 +1,13 @@
 /**
  * eship-update.js
  *
- * Update a StarshipIt order's shipping method (bag size).
+ * Change a StarshipIt order's bag size by deleting and recreating
+ * the order with the new shipping_method (carrier product code).
+ * StarshipIt's rules engine ignores shipping_method on PUT updates,
+ * so delete+recreate is the reliable approach.
  *
  * POST /.netlify/functions/eship-update
- * Body: { order_id: 123, shipping_method: "CPOLTPDL", token: "staff_token" }
+ * Body: { order_id: 123, shipping_method: "CPOLTPA5", token: "staff_token" }
  *
  * Env vars required:
  *   STARSHIPIT_API_KEY
@@ -25,6 +28,8 @@ async function validateToken(token) {
   const { data } = await getSb().from('staff').select('id,role').eq('session_token', token).single();
   return data;
 }
+
+const wait = (ms) => new Promise(r => setTimeout(r, ms));
 
 exports.handler = async (event) => {
   const headers = {
@@ -52,7 +57,6 @@ exports.handler = async (event) => {
     const body = JSON.parse(event.body || '{}');
     const { order_id, shipping_method, token } = body;
 
-    // Validate staff token
     const staff = await validateToken(token);
     if (!staff) {
       return { statusCode: 401, headers, body: JSON.stringify({ error: 'Unauthorized' }) };
@@ -72,43 +76,81 @@ exports.handler = async (event) => {
       'Content-Type': 'application/json',
     };
 
-    // Map carrier product codes to NZ Post bag dimensions (metres)
-    const BAG_DIMENSIONS = {
-      CPOLTPDL: { length: 0.24, width: 0.13, height: 0.05 },   // DL
-      CPOLTPA5: { length: 0.28, width: 0.20, height: 0.05 },   // A5
-      CPOLTPA4: { length: 0.35, width: 0.25, height: 0.08 },   // A4
-      CPOLTPA3: { length: 0.44, width: 0.32, height: 0.10 },   // Foolscap
-    };
-    const dims = BAG_DIMENSIONS[shipping_method] || BAG_DIMENSIONS.CPOLTPDL;
+    // Step 1: Fetch the existing order details
+    const searchRes = await fetch(
+      `https://api.starshipit.com/api/orders/search?order_id=${order_id}`,
+      { headers: apiHeaders }
+    );
+    const searchData = await searchRes.json();
+    const existingOrder = searchData.order || searchData.orders?.[0];
 
-    // Update the order's shipping method AND package dimensions via StarshipIt API
-    const res = await fetch('https://api.starshipit.com/api/orders', {
-      method: 'PUT',
+    if (!existingOrder) {
+      return { statusCode: 404, headers, body: JSON.stringify({ error: 'Order not found in StarshipIt' }) };
+    }
+
+    // Step 2: Delete the existing order
+    const deleteRes = await fetch(
+      `https://api.starshipit.com/api/orders/${order_id}`,
+      { method: 'DELETE', headers: apiHeaders }
+    );
+
+    if (!deleteRes.ok) {
+      const deleteErr = await deleteRes.json();
+      console.error('[eship-update] Delete failed:', JSON.stringify(deleteErr));
+      return { statusCode: deleteRes.status, headers, body: JSON.stringify({ error: 'Failed to delete old order', details: deleteErr }) };
+    }
+
+    await wait(500); // Brief pause between delete and recreate
+
+    // Step 3: Recreate with new shipping method
+    const newOrder = {
+      order: {
+        order_number: existingOrder.order_number,
+        order_date: existingOrder.order_date || new Date().toISOString(),
+        reference: existingOrder.reference || '',
+        shipping_method: shipping_method,
+        signature_required: existingOrder.signature_required || false,
+        authority_to_leave: existingOrder.authority_to_leave !== false,
+        currency: existingOrder.currency || 'NZD',
+        destination: existingOrder.destination || {},
+        sender: existingOrder.sender || undefined,
+        items: existingOrder.items || [],
+        packages: existingOrder.packages || [{}],
+      },
+    };
+
+    const createRes = await fetch('https://api.starshipit.com/api/orders', {
+      method: 'POST',
       headers: apiHeaders,
-      body: JSON.stringify({
-        order: {
-          order_id: order_id,
-          shipping_method: shipping_method,
-          packages: [{
-            length: dims.length,
-            width: dims.width,
-            height: dims.height,
-          }],
-        },
-      }),
+      body: JSON.stringify(newOrder),
     });
 
-    const data = await res.json();
+    const createData = await createRes.json();
 
-    if (!res.ok) {
-      console.error('[eship-update] StarshipIt error:', JSON.stringify(data));
-      return { statusCode: res.status, headers, body: JSON.stringify({ error: data.message || 'StarshipIt update failed', details: data }) };
+    if (!createRes.ok) {
+      console.error('[eship-update] Recreate failed:', JSON.stringify(createData));
+      return {
+        statusCode: createRes.status,
+        headers,
+        body: JSON.stringify({
+          error: 'Deleted old order but failed to recreate with new bag size. Order may need manual recreation.',
+          details: createData,
+          original_order: existingOrder,
+        }),
+      };
     }
+
+    const newOrderId = createData.order?.order_id || order_id;
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ success: true, order_id, shipping_method }),
+      body: JSON.stringify({
+        success: true,
+        order_id: newOrderId,
+        old_order_id: order_id,
+        shipping_method,
+      }),
     };
   } catch (err) {
     console.error('[eship-update] Error:', err.message);
