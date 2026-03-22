@@ -662,16 +662,18 @@ async function initDashboard() {
 
   if (ordersRes.error) {
     document.getElementById('orders-table').innerHTML = `<tr><td colspan="8">DB error: ${ordersRes.error.message}</td></tr>`;
-    return;
+    // Don't return — still load the active tab (shipping role needs this)
   }
 
   allOrders = ordersRes.data || [];
   allLineItems = liRes.data || [];
-  await loadUnitCosts();
-  populateFilterDropdowns();
-  populateSegmentDropdowns();
-  renderSavedSegments();
-  await loadCustomerTags();
+  try {
+    await loadUnitCosts();
+    populateFilterDropdowns();
+    populateSegmentDropdowns();
+    renderSavedSegments();
+    await loadCustomerTags();
+  } catch (e) { console.warn('initDashboard partial error:', e.message); }
   applyFilter();
   loadAdSpend();
 
