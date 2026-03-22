@@ -360,6 +360,10 @@ function showDashboard() {
     applyTabVisibility();
   }
   initDashboard();
+  // For shipping role, load shipping data immediately (don't wait for full initDashboard)
+  if (currentStaff && currentStaff.role === 'shipping' && !shippingLoaded) {
+    loadShippingData();
+  }
   // Check for prompt notifications after login
   setTimeout(() => { if (typeof checkCommsPrompts === 'function') checkCommsPrompts(); }, 2000);
   setTimeout(() => { if (typeof checkActionAlerts === 'function') checkActionAlerts(); }, 3000);
