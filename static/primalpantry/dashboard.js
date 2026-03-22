@@ -5265,7 +5265,13 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     if (params.metric === 'campaigns') params.attr = attributionModel;
     const qs = new URLSearchParams(params).toString();
     const res = await fetch(`${WA_API}/${fn}?${qs}`);
-    if (res.status === 401) { localStorage.removeItem('pp_staff'); localStorage.removeItem('pp_staff_ts'); location.reload(); throw new Error('Session expired'); }
+    if (res.status === 401) {
+      // Retry once — deploys can cause transient 401s
+      await new Promise(r => setTimeout(r, 2000));
+      const retry = await fetch(`${WA_API}/${fn}?${qs}`);
+      if (retry.status === 401) { throw new Error('Session expired'); }
+      return retry.json();
+    }
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}));
       throw new Error('API error ' + res.status + ': ' + (errBody.error || ''));
