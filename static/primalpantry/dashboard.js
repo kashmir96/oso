@@ -4373,6 +4373,15 @@ function renderShipmentsTable() {
     return;
   }
 
+  // In bulk bag mode, sort checked orders to the top
+  if (bulkBagMode && bulkBagOrderIds.length > 0) {
+    orders.sort((a, b) => {
+      const aChecked = bulkBagOrderIds.includes(a.order_id || a.id || 0) ? 0 : 1;
+      const bChecked = bulkBagOrderIds.includes(b.order_id || b.id || 0) ? 0 : 1;
+      return aChecked - bChecked;
+    });
+  }
+
   const start = (shipmentsPage - 1) * PAGE_SIZE;
   tbody.innerHTML = orders.slice(start, start + PAGE_SIZE).map(o => {
     const dest = o.destination || {};
@@ -4763,7 +4772,7 @@ function toggleBulkBagOrder(orderId, checked) {
   if (bulkBagCount > 0) {
     document.getElementById('bulk-bag-status').innerHTML = bulkBagCount + ' selected — ready to update';
     document.getElementById('bulk-bag-print').style.display = '';
-    document.getElementById('bulk-bag-print').textContent = 'Update ' + bulkBagCount + ' to ' + bulkBagSizeLabel + ' & Print';
+    document.getElementById('bulk-bag-print').textContent = 'Print ' + bulkBagCount + ' as ' + bulkBagSizeLabel;
   } else {
     document.getElementById('bulk-bag-status').textContent = 'Tick orders or scan barcodes to select';
     document.getElementById('bulk-bag-print').style.display = 'none';
@@ -4810,75 +4819,26 @@ function handleBulkBagScan(scannedValue) {
   }
 }
 
-// Print handler for bulk bag mode — updates all selected then prints
+// Print handler for bulk bag mode — prints with carrier_service_code directly
 document.getElementById('bulk-bag-print').addEventListener('click', async () => {
   const btn = document.getElementById('bulk-bag-print');
   const statusEl = document.getElementById('bulk-bag-status');
   if (bulkBagOrderIds.length === 0) return;
 
   btn.disabled = true;
-  const total = bulkBagOrderIds.length;
-  let updated = 0;
-  let failed = 0;
-  const newOrderIds = []; // Collect new IDs since delete+recreate changes them
-
-  // Step 1: Update all selected orders' bag sizes (delete + recreate)
-  statusEl.innerHTML = '<span style="color:var(--dim);">Updating bag sizes... 0/' + total + '</span>';
-  for (const orderId of bulkBagOrderIds) {
-    try {
-      const res = await fetch('/.netlify/functions/eship-update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order_id: orderId, shipping_method: bulkBagSize, token: currentStaff.token }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        newOrderIds.push(data.order_id || orderId);
-        const shipment = allShipments.find(s => s.order_id === orderId);
-        if (shipment) { shipment.shipping_method = bulkBagSize; shipment.order_id = data.order_id || orderId; }
-        updated++;
-      } else {
-        failed++;
-        console.error('Bag update failed for order', orderId, data.error || data);
-        statusEl.innerHTML = '<span style="color:var(--red);">Failed: ' + (data.error || 'Unknown error') + '</span>';
-      }
-    } catch (e) {
-      failed++;
-      console.error('Bag update error for order', orderId, e);
-      statusEl.innerHTML = '<span style="color:var(--red);">Error: ' + e.message + '</span>';
-    }
-    if (!statusEl.innerHTML.includes('Failed') && !statusEl.innerHTML.includes('Error')) {
-      statusEl.innerHTML = '<span style="color:var(--dim);">Updating bag sizes... ' + (updated + failed) + '/' + total + '</span>';
-    }
-  }
-
-  if (failed > 0) {
-    statusEl.innerHTML = '<span style="color:var(--amber);">Updated ' + updated + ', failed ' + failed + '</span>';
-  }
-
-  // Use new IDs if available, fall back to original IDs for printing
-  const printIds = newOrderIds.length > 0 ? newOrderIds : [...bulkBagOrderIds];
-
-  if (updated === 0 && failed > 0) {
-    statusEl.innerHTML = '<span style="color:var(--amber);">Bag size update failed — printing with current size...</span>';
-  } else if (newOrderIds.length === 0) {
-    // No updates attempted or all skipped — just print as-is
-    statusEl.innerHTML = '<span style="color:var(--dim);">Printing with current bag sizes...</span>';
-  }
-
-  // Step 2: Print labels
-  statusEl.innerHTML = '<span style="color:var(--dim);">Printing labels...</span>';
+  statusEl.innerHTML = '<span style="color:var(--dim);">Printing ' + bulkBagOrderIds.length + ' as ' + bulkBagSizeLabel + '...</span>';
   btn.textContent = 'Printing...';
+
   try {
     const res = await fetch('/.netlify/functions/eship-print', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ order_ids: printIds, carrier_service_code: bulkBagSize }),
+      body: JSON.stringify({ order_ids: bulkBagOrderIds, carrier_service_code: bulkBagSize }),
     });
     const data = await res.json();
-    if (data.success || data.printed) {
-      const printCount = data.printed || printIds.length;
-      let msg = `${updated > 0 ? 'Updated ' + updated + ' to ' + bulkBagSizeLabel + '. ' : ''}Printed ${printCount} label${printCount !== 1 ? 's' : ''}.`;
+    if (data.success || data.printed !== undefined) {
+      const printCount = data.printed || 0;
+      let msg = `Printed ${printCount} label${printCount !== 1 ? 's' : ''} as ${bulkBagSizeLabel}.`;
       if (data.failed && data.failed.length > 0) {
         const errors = data.failed.map(f => {
           const errMsg = f.result?.errors?.[0]?.details || f.result?.errors?.[0]?.message || f.error || 'Unknown error';
