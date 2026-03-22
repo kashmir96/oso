@@ -36,6 +36,10 @@ const ALLOWED_TABLES = new Set([
   'meta_contacts',
   'macros',
   'live_chat_sessions',
+  'action_rules',
+  'action_alerts',
+  'action_rule_config',
+  'action_daily_summary',
 ]);
 
 const ALLOWED_OPS = new Set(['select', 'insert', 'update', 'delete', 'upsert']);

@@ -857,6 +857,11 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
       Finance
     </button>
+    <button class="nav-item" data-tab="actions">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      Action Center
+      <span id="action-nav-badge" style="display:none;background:var(--red);color:white;font-size:0.6rem;font-weight:700;padding:0.1rem 0.35rem;border-radius:8px;margin-left:auto;"></span>
+    </button>
     <button class="nav-item" data-tab="settings">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       Settings
@@ -2120,6 +2125,75 @@
     </div>
   </div><!-- /tab-finance -->
 
+  <div id="tab-actions" class="tab-content">
+    <!-- AI Summary -->
+    <div class="orders-card" style="margin-bottom:1rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+        <h3 style="margin:0;">Daily Briefing</h3>
+        <div style="display:flex;gap:0.5rem;align-items:center;">
+          <span id="action-summary-time" style="font-size:0.7rem;color:var(--dim);"></span>
+          <button class="manual-order-btn" id="action-refresh-summary" style="font-size:0.75rem;padding:4px 12px;">Refresh</button>
+        </div>
+      </div>
+      <div id="action-summary-body" style="font-size:0.85rem;line-height:1.6;color:var(--muted);">
+        <div class="loading">Loading briefing...</div>
+      </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="stats" id="action-stats-grid"></div>
+
+    <!-- Product Intelligence -->
+    <div class="orders-card" style="margin-bottom:1rem;">
+      <h3>Product Intelligence</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;" id="action-product-intel">
+        <div class="loading" style="grid-column:1/-1;">Loading product data...</div>
+      </div>
+    </div>
+
+    <!-- Sub-tabs -->
+    <div style="display:flex;gap:0.5rem;margin-bottom:1rem;">
+      <button class="wa-panel-tab active" data-action-panel="alerts" style="flex:1;">Alerts</button>
+      <button class="wa-panel-tab" data-action-panel="rules" style="flex:1;">Rule Status</button>
+      <button class="wa-panel-tab" data-action-panel="config" style="flex:1;">Settings</button>
+    </div>
+
+    <!-- Alerts Panel -->
+    <div id="action-panel-alerts">
+      <div style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap;">
+        <select id="action-filter-priority" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.35rem 0.5rem;border-radius:6px;font-size:0.8rem;font-family:'DM Sans',sans-serif;">
+          <option value="">All Priority</option><option value="P1">P1 Urgent</option><option value="P2">P2 Action</option><option value="P3">P3 Monitor</option>
+        </select>
+        <select id="action-filter-category" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.35rem 0.5rem;border-radius:6px;font-size:0.8rem;font-family:'DM Sans',sans-serif;">
+          <option value="">All Categories</option><option value="adops">Ad Ops</option><option value="inventory">Inventory</option>
+        </select>
+        <select id="action-filter-status" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.35rem 0.5rem;border-radius:6px;font-size:0.8rem;font-family:'DM Sans',sans-serif;">
+          <option value="new">New</option><option value="">All</option><option value="acknowledged">Acknowledged</option><option value="resolved">Resolved</option><option value="dismissed">Dismissed</option>
+        </select>
+      </div>
+      <div id="action-alerts-list"><div class="loading">Loading alerts...</div></div>
+      <div id="action-alerts-pagination"></div>
+    </div>
+
+    <!-- Rules Panel -->
+    <div id="action-panel-rules" style="display:none;">
+      <div id="action-rules-grid" class="loading">Loading rules...</div>
+    </div>
+
+    <!-- Config Panel -->
+    <div id="action-panel-config" style="display:none;">
+      <div class="orders-card">
+        <h3>Threshold Configuration</h3>
+        <p style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem;">Adjust thresholds for alert triggers. Changes take effect on next engine run.</p>
+        <div id="action-config-grid"></div>
+        <div style="display:flex;gap:0.75rem;align-items:center;margin-top:1rem;">
+          <button class="manual-order-btn" id="action-save-config">Save Thresholds</button>
+          <span id="action-config-result" style="font-size:0.8rem;"></span>
+        </div>
+      </div>
+    </div>
+  </div><!-- /tab-actions -->
+
   <div id="tab-settings" class="tab-content">
     <div class="settings-tabs">
       <button class="settings-tab-btn active" data-settings-tab="suppliers">Suppliers</button>
@@ -2650,9 +2724,9 @@ if (savedStaff) { try { currentStaff = JSON.parse(savedStaff); showDashboard(); 
 const ROLE_TABS = {
   manufacturing: ['manufacturing'],
   shipping: ['shipping'],
-  office: ['sales', 'orders', 'shipping', 'customers', 'comms', 'manufacturing', 'website', 'marketing', 'finance'],
-  admin: ['sales', 'orders', 'shipping', 'customers', 'comms', 'manufacturing', 'website', 'marketing', 'finance'],
-  owner: ['sales', 'orders', 'shipping', 'customers', 'comms', 'manufacturing', 'website', 'marketing', 'finance', 'settings'],
+  office: ['sales', 'orders', 'shipping', 'customers', 'comms', 'manufacturing', 'website', 'marketing', 'finance', 'actions'],
+  admin: ['sales', 'orders', 'shipping', 'customers', 'comms', 'manufacturing', 'website', 'marketing', 'finance', 'actions'],
+  owner: ['sales', 'orders', 'shipping', 'customers', 'comms', 'manufacturing', 'website', 'marketing', 'finance', 'actions', 'settings'],
 };
 
 function applyTabVisibility() {
@@ -2689,6 +2763,7 @@ function showDashboard() {
   initDashboard();
   // Check for prompt notifications after login
   setTimeout(() => { if (typeof checkCommsPrompts === 'function') checkCommsPrompts(); }, 2000);
+  setTimeout(() => { if (typeof checkActionAlerts === 'function') checkActionAlerts(); }, 3000);
 }
 
 // ── Team Management ──
@@ -5425,6 +5500,8 @@ function loadActiveTab() {
     loadCommsTab();
   } else if (activeTab === 'finance') {
     loadFinanceTab();
+  } else if (activeTab === 'actions') {
+    loadActionsTab();
   } else if (activeTab === 'settings') {
     loadSettingsTab();
   }
@@ -11866,6 +11943,303 @@ document.querySelectorAll('#fin-sub-tabs .wa-panel-tab').forEach(tab => {
     applyStatsVisibility();
   });
 });
+
+// ── Action Center Tab ──
+let actionsInited = false;
+let actionAlerts = [];
+let actionRules = [];
+let actionConfig = [];
+let actionAlertsPage = 1;
+
+async function loadActionsTab() {
+  if (!actionsInited) {
+    actionsInited = true;
+    document.querySelectorAll('[data-action-panel]').forEach(btn => {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('[data-action-panel]').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        const p = this.dataset.actionPanel;
+        ['alerts','rules','config'].forEach(k => { document.getElementById('action-panel-'+k).style.display = k===p?'':'none'; });
+      });
+    });
+    ['action-filter-priority','action-filter-category','action-filter-status'].forEach(id => {
+      document.getElementById(id).addEventListener('change', () => { actionAlertsPage=1; renderActionAlerts(); });
+    });
+    document.getElementById('action-refresh-summary').addEventListener('click', refreshActionSummary);
+    document.getElementById('action-save-config').addEventListener('click', saveActionConfig);
+  }
+
+  document.getElementById('action-alerts-list').innerHTML = '<div class="loading">Loading alerts...</div>';
+
+  const [alertsRes, rulesRes, configRes, summaryRes] = await Promise.all([
+    db.from('action_alerts').select('*').order('created_at', { ascending: false }).limit(200).then(r=>r).catch(()=>({data:[]})),
+    db.from('action_rules').select('*').order('category').then(r=>r).catch(()=>({data:[]})),
+    db.from('action_rule_config').select('*').order('category').then(r=>r).catch(()=>({data:[]})),
+    db.from('action_daily_summary').select('*').order('summary_date', { ascending: false }).limit(1).then(r=>r).catch(()=>({data:[]})),
+  ]);
+
+  actionAlerts = alertsRes.data || [];
+  actionRules = rulesRes.data || [];
+  actionConfig = configRes.data || [];
+
+  renderActionStats();
+  renderActionAlerts();
+  renderActionRules();
+  renderActionConfig();
+  renderActionSummary(summaryRes.data?.[0]);
+  renderProductIntelligence();
+}
+
+function renderActionStats() {
+  const active = actionAlerts.filter(a => a.status === 'new' || a.status === 'acknowledged');
+  const p1 = active.filter(a => a.priority === 'P1').length;
+  const p2 = active.filter(a => a.priority === 'P2').length;
+  const p3 = active.filter(a => a.priority === 'P3').length;
+  const today = new Date().toISOString().split('T')[0];
+  const todayCount = actionAlerts.filter(a => (a.created_at||'').startsWith(today)).length;
+
+  document.getElementById('action-stats-grid').innerHTML =
+    '<div class="stat-card" style="border-left:3px solid var(--red);"><div class="label">P1 Urgent</div><div class="value" style="color:var(--red);">'+p1+'</div><div class="sub">immediate action</div></div>'
+    +'<div class="stat-card" style="border-left:3px solid var(--honey);"><div class="label">P2 Action</div><div class="value" style="color:var(--honey);">'+p2+'</div><div class="sub">this week</div></div>'
+    +'<div class="stat-card" style="border-left:3px solid var(--dim);"><div class="label">P3 Monitor</div><div class="value">'+p3+'</div><div class="sub">watch</div></div>'
+    +'<div class="stat-card"><div class="label">New Today</div><div class="value">'+todayCount+'</div><div class="sub">triggered</div></div>';
+}
+
+function renderActionAlerts() {
+  const pf = document.getElementById('action-filter-priority').value;
+  const cf = document.getElementById('action-filter-category').value;
+  const sf = document.getElementById('action-filter-status').value;
+
+  let filtered = actionAlerts.filter(a => {
+    if (pf && a.priority !== pf) return false;
+    if (cf && a.category !== cf) return false;
+    if (sf && a.status !== sf) return false;
+    return true;
+  });
+
+  const start = (actionAlertsPage - 1) * PAGE_SIZE;
+  const page = filtered.slice(start, start + PAGE_SIZE);
+  const catLabels = { adops: 'Ad Ops', inventory: 'Inventory', customer: 'Customer', website: 'Website' };
+  const priColors = { P1: 'var(--red)', P2: 'var(--honey)', P3: 'var(--dim)' };
+
+  if (!page.length) {
+    document.getElementById('action-alerts-list').innerHTML = '<div style="text-align:center;padding:2rem;color:var(--dim);">No alerts matching filters</div>';
+    document.getElementById('action-alerts-pagination').innerHTML = '';
+    return;
+  }
+
+  document.getElementById('action-alerts-list').innerHTML = page.map(a => {
+    const time = new Date(a.created_at).toLocaleDateString('en-NZ', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+    const isActive = a.status === 'new' || a.status === 'acknowledged';
+    const pc = priColors[a.priority] || 'var(--dim)';
+    return '<div style="background:var(--card);border:1px solid var(--border);border-left:3px solid '+pc+';border-radius:10px;padding:1rem;margin-bottom:0.75rem;">'
+      +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.4rem;">'
+      +'<span style="font-weight:600;font-size:0.9rem;">'+esc(a.title)+'</span>'
+      +'<span style="font-size:0.65rem;font-weight:700;padding:0.1rem 0.4rem;border-radius:4px;background:'+pc+'22;color:'+pc+';">'+a.priority+'</span>'
+      +'</div>'
+      +(a.detail ? '<div style="font-size:0.8rem;color:var(--muted);margin-bottom:0.5rem;line-height:1.5;">'+esc(a.detail)+'</div>' : '')
+      +'<div style="font-size:0.7rem;color:var(--dim);display:flex;gap:1rem;align-items:center;">'
+      +'<span>'+(catLabels[a.category]||a.category)+'</span><span>'+time+'</span><span style="text-transform:capitalize;">'+a.status+'</span>'
+      +(isActive ? '<div style="display:flex;gap:0.4rem;margin-left:auto;">'
+        +(a.status==='new' ? '<button onclick="updateActionAlert('+a.id+',\'acknowledged\')" style="background:none;border:1px solid var(--border);color:var(--muted);padding:0.2rem 0.5rem;border-radius:6px;font-size:0.7rem;cursor:pointer;">Ack</button>' : '')
+        +'<button onclick="updateActionAlert('+a.id+',\'resolved\')" style="background:none;border:1px solid var(--sage);color:var(--sage);padding:0.2rem 0.5rem;border-radius:6px;font-size:0.7rem;cursor:pointer;">Resolve</button>'
+        +'<button onclick="updateActionAlert('+a.id+',\'dismissed\')" style="background:none;border:1px solid var(--dim);color:var(--dim);padding:0.2rem 0.5rem;border-radius:6px;font-size:0.7rem;cursor:pointer;">Dismiss</button>'
+        +'</div>' : '')
+      +'</div></div>';
+  }).join('');
+
+  renderPagination('action-alerts-pagination', actionAlertsPage, filtered.length, p => { actionAlertsPage=p; renderActionAlerts(); });
+}
+
+async function updateActionAlert(id, status) {
+  await db.from('action_alerts').update({ status, resolved_by: currentStaff?.display_name||'unknown', resolved_at: new Date().toISOString() }).eq('id', id);
+  const a = actionAlerts.find(x => x.id === id);
+  if (a) { a.status = status; a.resolved_by = currentStaff?.display_name; }
+  renderActionAlerts();
+  renderActionStats();
+  checkActionAlerts();
+}
+
+function renderActionRules() {
+  const alertsByRule = {};
+  actionAlerts.filter(a => a.status==='new').forEach(a => { alertsByRule[a.rule_key] = (alertsByRule[a.rule_key]||0)+1; });
+
+  if (!actionRules.length) {
+    document.getElementById('action-rules-grid').innerHTML = '<div style="color:var(--dim);text-align:center;padding:1rem;">No rules configured. Run the SQL schema to seed rules.</div>';
+    return;
+  }
+
+  document.getElementById('action-rules-grid').innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">'
+    + actionRules.map(r => {
+      const cnt = alertsByRule[r.rule_key]||0;
+      const dotColor = !r.enabled ? 'var(--dim)' : cnt > 0 ? 'var(--red)' : 'var(--sage)';
+      const label = !r.enabled ? 'Disabled' : cnt > 0 ? cnt+' alert(s)' : 'OK';
+      return '<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:0.75rem;display:flex;justify-content:space-between;align-items:center;">'
+        +'<div><div style="font-size:0.85rem;font-weight:600;">'+esc(r.name)+'</div><div style="font-size:0.7rem;color:var(--dim);">'+esc(r.category)+' &middot; '+r.priority+'</div></div>'
+        +'<div style="display:flex;align-items:center;gap:0.5rem;"><span style="font-size:0.7rem;color:var(--dim);">'+label+'</span><span style="width:10px;height:10px;border-radius:50%;background:'+dotColor+';display:inline-block;"></span></div>'
+        +'</div>';
+    }).join('') + '</div>';
+}
+
+function renderActionConfig() {
+  if (!actionConfig.length) {
+    document.getElementById('action-config-grid').innerHTML = '<div style="color:var(--dim);">No config loaded. Run the SQL schema to seed thresholds.</div>';
+    return;
+  }
+  const byCategory = {};
+  actionConfig.forEach(c => { if (!byCategory[c.category]) byCategory[c.category]=[]; byCategory[c.category].push(c); });
+  const catLabels = { adops:'Ad Ops', inventory:'Inventory' };
+  let html = '';
+  for (const [cat, items] of Object.entries(byCategory)) {
+    html += '<div style="font-size:0.7rem;color:var(--honey);text-transform:uppercase;font-weight:600;letter-spacing:0.04em;margin:1rem 0 0.5rem;padding-bottom:0.3rem;border-bottom:1px solid var(--border);">'+esc(catLabels[cat]||cat)+'</div>';
+    items.forEach(c => {
+      html += '<div style="display:grid;grid-template-columns:1fr 120px 60px;gap:0.75rem;align-items:center;padding:0.5rem 0;border-bottom:1px solid rgba(232,226,218,0.1);">'
+        +'<label style="font-size:0.85rem;">'+esc(c.label)+'</label>'
+        +'<input type="number" step="any" data-config-key="'+c.config_key+'" value="'+c.value+'" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.4rem 0.5rem;border-radius:6px;font-size:0.85rem;font-family:\'DM Sans\',sans-serif;text-align:right;">'
+        +'<span style="font-size:0.75rem;color:var(--dim);">'+esc(c.unit||'')+'</span></div>';
+    });
+  }
+  document.getElementById('action-config-grid').innerHTML = html;
+}
+
+async function saveActionConfig() {
+  const inputs = document.querySelectorAll('#action-config-grid input[data-config-key]');
+  const updates = [];
+  inputs.forEach(input => {
+    const key = input.dataset.configKey;
+    const val = parseFloat(input.value);
+    if (!isNaN(val)) {
+      const existing = actionConfig.find(c => c.config_key === key);
+      if (existing && existing.value !== val) updates.push({ config_key: key, value: val });
+    }
+  });
+  if (!updates.length) { document.getElementById('action-config-result').textContent='No changes.'; return; }
+  for (const u of updates) {
+    await db.from('action_rule_config').update({ value: u.value, updated_at: new Date().toISOString() }).eq('config_key', u.config_key);
+    const c = actionConfig.find(c => c.config_key === u.config_key);
+    if (c) c.value = u.value;
+  }
+  const r = document.getElementById('action-config-result');
+  r.textContent = 'Updated '+updates.length+' threshold(s).';
+  r.style.color = 'var(--sage)';
+  setTimeout(() => { r.textContent=''; }, 3000);
+}
+
+function renderActionSummary(summary) {
+  const body = document.getElementById('action-summary-body');
+  const time = document.getElementById('action-summary-time');
+  if (!summary) {
+    body.innerHTML = '<div style="color:var(--dim);font-style:italic;">No briefing generated yet. Click Refresh to generate one.</div>';
+    time.textContent = '';
+    return;
+  }
+  body.innerHTML = summary.summary_text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+  time.textContent = 'Generated ' + new Date(summary.generated_at).toLocaleDateString('en-NZ', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+}
+
+async function refreshActionSummary() {
+  const btn = document.getElementById('action-refresh-summary');
+  btn.disabled = true; btn.textContent = 'Generating...';
+  document.getElementById('action-summary-body').innerHTML = '<div class="loading">Generating AI briefing...</div>';
+  try {
+    const res = await fetch('/.netlify/functions/action-engine?token='+encodeURIComponent(currentStaff.token)+'&refresh=1&summary=1');
+    const data = await res.json();
+    if (data.summary) renderActionSummary({ summary_text: data.summary, generated_at: new Date().toISOString() });
+    else document.getElementById('action-summary-body').innerHTML = '<div style="color:var(--dim);">Summary generated. '+data.alerts_created+' alerts created.</div>';
+    // Reload alerts
+    const ar = await db.from('action_alerts').select('*').order('created_at', { ascending: false }).limit(200);
+    actionAlerts = ar.data || [];
+    renderActionStats(); renderActionAlerts();
+  } catch (e) {
+    document.getElementById('action-summary-body').innerHTML = '<div style="color:var(--red);">Failed: '+e.message+'</div>';
+  }
+  btn.disabled = false; btn.textContent = 'Refresh';
+}
+
+function renderProductIntelligence() {
+  if (!allOrders.length || !allLineItems.length) {
+    document.getElementById('action-product-intel').innerHTML = '<div class="loading" style="grid-column:1/-1;">No order data loaded</div>';
+    return;
+  }
+  const [from, to] = getDateRange();
+  const orders = allOrders.filter(o => o.order_date >= from && o.order_date <= to);
+  const liMap = {};
+  allLineItems.forEach(li => { if (!liMap[li.order_id]) liMap[li.order_id]=[]; liMap[li.order_id].push(li); });
+
+  // Group by email for repeat analysis
+  const emailOrders = {};
+  orders.forEach(o => { if (o.email) { if (!emailOrders[o.email]) emailOrders[o.email]=[]; emailOrders[o.email].push(o); } });
+
+  // Product metrics
+  const productData = {};
+  orders.forEach(o => {
+    const items = liMap[o.id] || [];
+    const isFirst = emailOrders[o.email] && emailOrders[o.email].sort((a,b)=>a.order_date.localeCompare(b.order_date))[0]?.id === o.id;
+    items.forEach(li => {
+      const name = li.description || li.sku || 'Unknown';
+      if (!productData[name]) productData[name] = { revenue: 0, units: 0, orders: 0, firstPurchase: 0, upsell: 0 };
+      productData[name].revenue += (li.unit_price||0) * (li.quantity||1);
+      productData[name].units += li.quantity||1;
+      productData[name].orders++;
+      if (isFirst && items.indexOf(li) === 0) productData[name].firstPurchase++;
+      if (!isFirst || items.indexOf(li) > 0) productData[name].upsell++;
+    });
+  });
+
+  const products = Object.entries(productData);
+  const winners = products.sort((a,b)=>b[1].revenue-a[1].revenue).slice(0,5);
+  const magnets = products.sort((a,b)=>b[1].firstPurchase-a[1].firstPurchase).slice(0,5);
+  const upsells = products.sort((a,b)=>b[1].upsell-a[1].upsell).slice(0,5);
+
+  function renderCol(title, items, metric, label) {
+    let h = '<div><h4 style="font-size:0.8rem;color:var(--sage);margin:0 0 0.5rem;">'+title+'</h4>';
+    items.forEach(([name, d]) => {
+      h += '<div style="padding:0.4rem 0;border-bottom:1px solid rgba(232,226,218,0.1);font-size:0.8rem;">'
+        +'<div style="font-weight:600;">'+esc(name)+'</div>'
+        +'<div style="color:var(--dim);font-size:0.7rem;">'+d[metric]+' '+label+' &middot; $'+d.revenue.toFixed(0)+' rev</div></div>';
+    });
+    return h+'</div>';
+  }
+
+  document.getElementById('action-product-intel').innerHTML =
+    renderCol('Winners (Revenue)', winners, 'units', 'units')
+    + renderCol('Best Magnets (Acquisition)', magnets, 'firstPurchase', 'first purchases')
+    + renderCol('Best Upsells (Cross-sell)', upsells, 'upsell', 'upsell orders');
+}
+
+// Login banner for P1 alerts
+async function checkActionAlerts() {
+  try {
+    const res = await db.from('action_alerts').select('id,priority,title').eq('status', 'new');
+    const alerts = res.data || [];
+    const p1 = alerts.filter(a => a.priority === 'P1').length;
+    const badge = document.getElementById('action-nav-badge');
+    if (p1 > 0) { badge.textContent = p1; badge.style.display = ''; } else { badge.style.display = 'none'; }
+
+    if (p1 > 0 && !sessionStorage.getItem('pp_action_banner_dismissed')) {
+      if (!document.getElementById('action-login-banner')) {
+        const banner = document.createElement('div');
+        banner.id = 'action-login-banner';
+        banner.style.cssText = 'background:rgba(224,96,80,0.1);border:1px solid rgba(224,96,80,0.3);border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;display:flex;align-items:center;gap:0.75rem;cursor:pointer;';
+        banner.innerHTML = '<span style="font-size:1.2rem;">&#9888;</span><span style="font-size:0.85rem;flex:1;"><strong style="color:var(--red);">'+p1+' urgent alert'+(p1>1?'s':'')+' </strong>need'+(p1===1?'s':'')+' your attention</span><button onclick="event.stopPropagation();this.parentElement.remove();sessionStorage.setItem(\'pp_action_banner_dismissed\',\'1\');" style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:1rem;">&times;</button>';
+        banner.addEventListener('click', function() {
+          document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
+          document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+          const btn = document.querySelector('[data-tab="actions"]');
+          if (btn) btn.classList.add('active');
+          document.getElementById('tab-actions').classList.add('active');
+          activeTab = 'actions';
+          loadActionsTab();
+          this.remove();
+          sessionStorage.setItem('pp_action_banner_dismissed','1');
+        });
+        const dashboard = document.getElementById('dashboard');
+        const first = dashboard.querySelector('.stats, .filter-bar, .orders-card');
+        if (first) dashboard.insertBefore(banner, first);
+      }
+    }
+  } catch (e) { /* silent */ }
+}
 </script>
 
 <!-- Claude AI Chat Widget -->

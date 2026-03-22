@@ -32,3 +32,6 @@
 
 [functions."gmail-sync"]
   schedule = "7 */4 * * *"
+
+[functions."action-engine"]
+  schedule = "0 18 * * *"
