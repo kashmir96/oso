@@ -30,7 +30,7 @@ function reply(code, data) {
 }
 
 function htmlReply(html) {
-  return { statusCode: 200, headers: { 'Content-Type': 'text/html' }, body: html };
+  return { statusCode: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' }, body: html };
 }
 
 function sbFetch(path, opts = {}) {

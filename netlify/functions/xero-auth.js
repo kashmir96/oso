@@ -25,7 +25,7 @@ function reply(code, data) {
 }
 
 function htmlReply(html) {
-  return { statusCode: 200, headers: { 'Content-Type': 'text/html' }, body: html };
+  return { statusCode: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' }, body: html };
 }
 
 function sbFetch(path, opts = {}) {
@@ -102,7 +102,7 @@ exports.handler = async (event) => {
     // Validate state
     const stateRes = await sbFetch('/rest/v1/xero_tokens?id=eq.1&select=oauth_state,state_created,connected_by');
     const stateRows = await stateRes.json();
-    if (!stateRows || stateRows.length === 0 || stateRows[0].oauth_state !== qs.state) {
+    if (!Array.isArray(stateRows) || stateRows.length === 0 || stateRows[0].oauth_state !== qs.state) {
       return htmlReply('<html><body><h2>Invalid state — please try again.</h2><script>setTimeout(()=>window.close(),3000)</script></body></html>');
     }
 
