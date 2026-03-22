@@ -2873,7 +2873,7 @@ async function initDashboard() {
 
 // ── Refresh stats (lightweight: re-fetch data, update stat cards only) ──
 async function refreshStats() {
-  if (!sb) return;
+  if (!currentStaff) return;
   try {
     const [ordersRes, liRes] = await Promise.all([
       db.from('orders').select('*').order('created_at', { ascending: false }),
@@ -2920,7 +2920,7 @@ function startStatsRefresh() {
 
 // ── Auto-refresh: re-fetch data and update all widgets silently ──
 async function autoRefresh() {
-  if (!sb) return;
+  if (!currentStaff) return;
   try {
     const [ordersRes, liRes] = await Promise.all([
       db.from('orders').select('*').order('created_at', { ascending: false }),
@@ -7554,6 +7554,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     const bucket = utmMapLookup[field];
     return bucket && bucket[value] ? bucket[value] : value;
   }
+  window.utmTranslate = utmTranslate;
 
   function utmBuildLookup() {
     Object.keys(utmMapLookup).forEach(k => delete utmMapLookup[k]);
