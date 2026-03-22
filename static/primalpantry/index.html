@@ -1412,6 +1412,63 @@
         </table>
       </div>
     </div>
+
+    <!-- Competitor Tracking -->
+    <div class="orders-card" style="margin-bottom:1.5rem;" id="mkt-competitors-section">
+      <h3 style="display:flex;justify-content:space-between;align-items:center;">
+        Competitor Tracking
+        <span id="mkt-comp-count" style="font-size:0.7rem;font-weight:400;color:var(--muted);"></span>
+      </h3>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:end;margin-bottom:1rem;">
+        <div class="form-group" style="flex:1;min-width:160px;">
+          <label>Competitor Name</label>
+          <input type="text" id="comp-name-input" placeholder="e.g. Primally Pure" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;width:100%;">
+        </div>
+        <div class="form-group" style="flex:2;min-width:240px;">
+          <label>Website URL</label>
+          <input type="text" id="comp-url-input" placeholder="https://primallypure.com" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;width:100%;">
+        </div>
+        <button id="comp-add-btn" class="manual-order-btn" style="height:fit-content;white-space:nowrap;">Add Competitor</button>
+      </div>
+      <div style="overflow-x:auto;margin-bottom:1.5rem;">
+        <table>
+          <thead>
+            <tr>
+              <th>Competitor</th>
+              <th>URL</th>
+              <th>Last Checked</th>
+              <th>Changes</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="comp-list-table">
+            <tr><td colspan="5" class="loading">Loading competitors...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 style="display:flex;justify-content:space-between;align-items:center;">
+        Change Log
+        <select id="comp-filter" style="background:var(--bg);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:0.75rem;">
+          <option value="all">All Competitors</option>
+        </select>
+      </h3>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Competitor</th>
+              <th>Type</th>
+              <th>Summary</th>
+            </tr>
+          </thead>
+          <tbody id="comp-changes-table">
+            <tr><td colspan="4" class="loading">No changes detected yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div><!-- /tab-marketing -->
 
   <div id="tab-finance" class="tab-content">
@@ -7358,6 +7415,124 @@ async function loadMarketingTab() {
   if(gmcP.length>0){gmcWrap.style.display='table';gmcLoad.style.display='none';gmcTbl.innerHTML=gmcP.map(p=>{const iss=p.issues.length>0?p.issues.map(i=>i.description).join('; '):'-';const rc=p.status==='disapproved'?' style="background:rgba(224,96,80,0.08);"':'';return '<tr'+rc+'><td>'+p.title+'</td><td><span class="dummy-badge '+p.status+'">'+p.status.charAt(0).toUpperCase()+p.status.slice(1)+'</span></td><td>'+iss+'</td></tr>';}).join('');}
   else if(gSt.connected&&gSt.merchantId){gmcLoad.textContent=gmcD.error||'No products found';gmcLoad.style.display='block';gmcWrap.style.display='none';}
   else{gmcLoad.textContent=gSt.connected?'Enter your Merchant Center ID above':'Connect Google to view product statuses';gmcLoad.style.display='block';gmcWrap.style.display='none';}
+  // Load competitors section
+  loadCompetitorsSection();
+}
+
+// ── Competitor Tracking ──
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+let compInited = false;
+let compData = { competitors: [], recent_changes: [] };
+
+function compTypeBadge(type) {
+  const map = {
+    title: { bg:'rgba(66,133,244,0.15)', fg:'#6ba3f7', label:'Title' },
+    meta: { bg:'rgba(140,180,122,0.15)', fg:'var(--sage)', label:'SEO' },
+    hero: { bg:'rgba(212,168,75,0.15)', fg:'var(--honey)', label:'Hero' },
+    pricing: { bg:'rgba(224,96,80,0.15)', fg:'#e06050', label:'Pricing' },
+    products: { bg:'rgba(180,140,210,0.15)', fg:'#b48cd2', label:'Products' },
+    new_pages: { bg:'rgba(80,180,200,0.15)', fg:'#50b4c8', label:'New Pages' },
+    content: { bg:'rgba(156,146,135,0.15)', fg:'var(--muted)', label:'Content' },
+  };
+  const s = map[type] || map.content;
+  return '<span class="source-pill" style="background:'+s.bg+';color:'+s.fg+'">'+s.label+'</span>';
+}
+
+function renderCompList() {
+  const tbl = document.getElementById('comp-list-table');
+  if (!compData.competitors || compData.competitors.length === 0) {
+    tbl.innerHTML = '<tr><td colspan="5" class="loading">No competitors added yet. Add one above.</td></tr>';
+    return;
+  }
+  tbl.innerHTML = compData.competitors.map(c => {
+    const lastCheck = c.last_checked ? new Date(c.last_checked).toLocaleDateString('en-NZ', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : 'Never';
+    return '<tr>'
+      + '<td style="font-weight:500;">'+esc(c.name)+'</td>'
+      + '<td><a href="'+esc(c.url)+'" target="_blank" rel="noopener" style="color:var(--sage);text-decoration:underline;">'+esc(c.url.replace(/^https?:\/\//,''))+'</a></td>'
+      + '<td style="color:var(--muted);font-size:0.8rem;">'+lastCheck+'</td>'
+      + '<td>'+(c.change_count > 0 ? '<span style="background:rgba(224,96,80,0.15);color:#e06050;padding:2px 8px;border-radius:10px;font-size:0.75rem;font-weight:600;">'+c.change_count+'</span>' : '<span style="color:var(--dim);font-size:0.8rem;">0</span>')+'</td>'
+      + '<td><button class="delete-btn" onclick="deleteCompetitor('+c.id+')" style="font-size:0.7rem;padding:3px 8px;">Remove</button></td>'
+      + '</tr>';
+  }).join('');
+  document.getElementById('mkt-comp-count').textContent = compData.competitors.length + ' tracked';
+}
+
+function renderCompChanges(filter) {
+  const tbl = document.getElementById('comp-changes-table');
+  let changes = compData.recent_changes || [];
+  if (filter && filter !== 'all') {
+    const fid = parseInt(filter);
+    changes = changes.filter(c => c.competitor_id === fid);
+  }
+  if (changes.length === 0) {
+    tbl.innerHTML = '<tr><td colspan="4" class="loading">No changes detected yet</td></tr>';
+    return;
+  }
+  // Map competitor names
+  const nameMap = {};
+  (compData.competitors || []).forEach(c => { nameMap[c.id] = c.name; });
+  tbl.innerHTML = changes.map(c => {
+    const dt = new Date(c.detected_at);
+    const dateStr = dt.toLocaleDateString('en-NZ', { day:'numeric', month:'short', year:'numeric' });
+    return '<tr' + (c.change_type === 'pricing' ? ' style="background:rgba(224,96,80,0.05);"' : '') + '>'
+      + '<td style="color:var(--muted);font-size:0.8rem;white-space:nowrap;">'+dateStr+'</td>'
+      + '<td style="font-weight:500;">'+esc(nameMap[c.competitor_id] || 'Unknown')+'</td>'
+      + '<td>'+compTypeBadge(c.change_type)+'</td>'
+      + '<td style="font-size:0.85rem;">'+esc(c.summary)+'</td>'
+      + '</tr>';
+  }).join('');
+}
+
+async function loadCompetitorsSection() {
+  if (!compInited) {
+    compInited = true;
+    document.getElementById('comp-add-btn').addEventListener('click', addCompetitor);
+    document.getElementById('comp-name-input').addEventListener('keydown', e => { if (e.key === 'Enter') addCompetitor(); });
+    document.getElementById('comp-url-input').addEventListener('keydown', e => { if (e.key === 'Enter') addCompetitor(); });
+    document.getElementById('comp-filter').addEventListener('change', function() { renderCompChanges(this.value); });
+  }
+  try {
+    compData = await mktApi('competitors', {});
+    renderCompList();
+    // Populate filter dropdown
+    const sel = document.getElementById('comp-filter');
+    const current = sel.value;
+    sel.innerHTML = '<option value="all">All Competitors</option>' + (compData.competitors || []).map(c => '<option value="'+c.id+'">'+esc(c.name)+'</option>').join('');
+    sel.value = current;
+    renderCompChanges(sel.value);
+  } catch (e) {
+    document.getElementById('comp-list-table').innerHTML = '<tr><td colspan="5" class="loading">Failed to load competitors</td></tr>';
+  }
+}
+
+async function addCompetitor() {
+  const nameEl = document.getElementById('comp-name-input');
+  const urlEl = document.getElementById('comp-url-input');
+  const name = nameEl.value.trim();
+  const url = urlEl.value.trim();
+  if (!name || !url) return;
+  const btn = document.getElementById('comp-add-btn');
+  btn.disabled = true; btn.textContent = 'Adding...';
+  try {
+    await fetch('/.netlify/functions/competitors?token=' + currentStaff.token, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, url }),
+    });
+    nameEl.value = ''; urlEl.value = '';
+    await loadCompetitorsSection();
+  } catch (e) { console.error('Add competitor error:', e); }
+  btn.disabled = false; btn.textContent = 'Add Competitor';
+}
+
+async function deleteCompetitor(id) {
+  if (!confirm('Remove this competitor?')) return;
+  try {
+    await fetch('/.netlify/functions/competitors?token=' + currentStaff.token + '&id=' + id, { method: 'DELETE' });
+    await loadCompetitorsSection();
+  } catch (e) { console.error('Delete competitor error:', e); }
 }
 
 // ── Finance Tab ──
