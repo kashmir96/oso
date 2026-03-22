@@ -1911,7 +1911,16 @@ function openOrderModal(orderId) {
   // Action buttons row (Email + Reprint)
   html += `<div style="margin-top:0.75rem;text-align:center;display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap;">
     <button onclick="openComposeModal({to: '${(order.email || '').replace(/'/g, "\\'")}', subject: 'Re: Your Primal Pantry Order #${orderId}'})" style="background:none;border:1px solid var(--sage);color:var(--sage);border-radius:6px;padding:0.5rem 1.2rem;font-size:0.85rem;cursor:pointer;font-weight:600;font-family:'DM Sans',sans-serif;">Email Customer</button>
-    <button id="modal-reprint-btn" data-order-session="${(order.stripe_session_id || '').replace(/"/g, '&quot;')}" style="background:none;border:1px solid var(--cyan);color:var(--cyan);border-radius:6px;padding:0.5rem 1.2rem;font-size:0.85rem;cursor:pointer;font-weight:600;font-family:'DM Sans',sans-serif;display:none;">Reprint Label</button>
+    <span id="modal-reprint-wrap" style="display:none;position:relative;">
+      <button id="modal-reprint-btn" style="background:none;border:1px solid var(--cyan);color:var(--cyan);border-radius:6px;padding:0.5rem 1.2rem;font-size:0.85rem;cursor:pointer;font-weight:600;font-family:'DM Sans',sans-serif;">Reprint Label</button>
+      <div id="modal-reprint-menu" style="display:none;position:absolute;bottom:110%;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--border);border-radius:8px;padding:0.4rem;min-width:180px;z-index:10;box-shadow:0 4px 12px rgba(0,0,0,0.3);">
+        <button class="reprint-opt" data-action="asis" style="width:100%;text-align:left;background:none;border:none;color:var(--text);padding:0.5rem 0.75rem;border-radius:6px;cursor:pointer;font-size:0.8rem;font-family:'DM Sans',sans-serif;">Print As Is</button>
+        <button class="reprint-opt" data-action="DL" style="width:100%;text-align:left;background:none;border:none;color:var(--text);padding:0.5rem 0.75rem;border-radius:6px;cursor:pointer;font-size:0.8rem;font-family:'DM Sans',sans-serif;">Change to DL &amp; Print</button>
+        <button class="reprint-opt" data-action="A5" style="width:100%;text-align:left;background:none;border:none;color:var(--text);padding:0.5rem 0.75rem;border-radius:6px;cursor:pointer;font-size:0.8rem;font-family:'DM Sans',sans-serif;">Change to A5 &amp; Print</button>
+        <button class="reprint-opt" data-action="A4" style="width:100%;text-align:left;background:none;border:none;color:var(--text);padding:0.5rem 0.75rem;border-radius:6px;cursor:pointer;font-size:0.8rem;font-family:'DM Sans',sans-serif;">Change to A4 &amp; Print</button>
+        <button class="reprint-opt" data-action="Foolscap" style="width:100%;text-align:left;background:none;border:none;color:var(--text);padding:0.5rem 0.75rem;border-radius:6px;cursor:pointer;font-size:0.8rem;font-family:'DM Sans',sans-serif;">Change to Foolscap &amp; Print</button>
+      </div>
+    </span>
   </div>`;
 
   // Only owner/admin can see refund/delete buttons
@@ -2110,37 +2119,82 @@ function openOrderModal(orderId) {
     }
 
     // Show reprint button and attach handler
+    const reprintWrap = document.getElementById('modal-reprint-wrap');
     const reprintBtn = document.getElementById('modal-reprint-btn');
-    if (reprintBtn && shipment.order_id) {
-      reprintBtn.style.display = '';
-      reprintBtn.addEventListener('click', async function() {
-        this.disabled = true; this.textContent = 'Printing...';
-        try {
-          const res = await fetch('/.netlify/functions/eship-print', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ order_ids: [shipment.order_id] }),
-          });
-          const data = await res.json();
-          if (data.success || data.printed) {
-            this.textContent = 'Printed!';
-            this.style.borderColor = 'var(--sage)';
-            this.style.color = 'var(--sage)';
-          } else {
-            this.textContent = 'Failed';
-            this.style.borderColor = 'var(--red)';
-            this.style.color = 'var(--red)';
+    const reprintMenu = document.getElementById('modal-reprint-menu');
+    if (reprintWrap && reprintBtn && shipment.order_id) {
+      reprintWrap.style.display = '';
+
+      const SIZE_CODES = { DL: 'CPOLTPDL', A5: 'CPOLTPA5', A4: 'CPOLTPA4', Foolscap: 'CPOLTPA3' };
+
+      // Toggle menu on button click
+      reprintBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        reprintMenu.style.display = reprintMenu.style.display === 'none' ? 'block' : 'none';
+      });
+      // Close menu on outside click
+      document.addEventListener('click', () => { reprintMenu.style.display = 'none'; }, { once: false });
+
+      // Handle menu option clicks
+      reprintMenu.querySelectorAll('.reprint-opt').forEach(opt => {
+        opt.addEventListener('mouseenter', function() { this.style.background = 'var(--bg)'; });
+        opt.addEventListener('mouseleave', function() { this.style.background = 'none'; });
+        opt.addEventListener('click', async function(e) {
+          e.stopPropagation();
+          reprintMenu.style.display = 'none';
+          const action = this.dataset.action;
+          reprintBtn.disabled = true;
+
+          // If changing size, update first
+          if (action !== 'asis') {
+            const code = SIZE_CODES[action];
+            reprintBtn.textContent = 'Changing to ' + action + '...';
+            try {
+              const upRes = await fetch('/.netlify/functions/eship-update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ order_id: shipment.order_id, shipping_method: code, token: currentStaff.token }),
+              });
+              const upData = await upRes.json();
+              if (!upData.success) {
+                reprintBtn.textContent = 'Update failed';
+                reprintBtn.style.color = 'var(--red)';
+                setTimeout(() => { reprintBtn.disabled = false; reprintBtn.textContent = 'Reprint Label'; reprintBtn.style.color = 'var(--cyan)'; }, 2000);
+                return;
+              }
+              shipment.shipping_method = code;
+              if (upData.order_id) shipment.order_id = upData.order_id;
+            } catch (err) {
+              reprintBtn.textContent = 'Error';
+              reprintBtn.style.color = 'var(--red)';
+              setTimeout(() => { reprintBtn.disabled = false; reprintBtn.textContent = 'Reprint Label'; reprintBtn.style.color = 'var(--cyan)'; }, 2000);
+              return;
+            }
           }
-        } catch (e) {
-          this.textContent = 'Error';
-          this.style.color = 'var(--red)';
-        }
-        setTimeout(() => {
-          this.disabled = false;
-          this.textContent = 'Reprint Label';
-          this.style.borderColor = 'var(--cyan)';
-          this.style.color = 'var(--cyan)';
-        }, 2000);
+
+          // Print
+          reprintBtn.textContent = 'Printing...';
+          try {
+            const res = await fetch('/.netlify/functions/eship-print', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ order_ids: [shipment.order_id] }),
+            });
+            const data = await res.json();
+            if (data.success || data.printed) {
+              reprintBtn.textContent = 'Printed!';
+              reprintBtn.style.borderColor = 'var(--sage)';
+              reprintBtn.style.color = 'var(--sage)';
+            } else {
+              reprintBtn.textContent = 'Print failed';
+              reprintBtn.style.color = 'var(--red)';
+            }
+          } catch (err) {
+            reprintBtn.textContent = 'Error';
+            reprintBtn.style.color = 'var(--red)';
+          }
+          setTimeout(() => { reprintBtn.disabled = false; reprintBtn.textContent = 'Reprint Label'; reprintBtn.style.borderColor = 'var(--cyan)'; reprintBtn.style.color = 'var(--cyan)'; }, 2000);
+        });
       });
     }
   })();
