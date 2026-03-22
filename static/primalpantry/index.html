@@ -910,6 +910,37 @@
     <div id="customers-pagination"></div>
   </div><!-- /tab-customers -->
 
+  <div id="tab-comms" class="tab-content">
+    <div class="comms-layout">
+      <div class="comms-sidebar">
+        <div class="comms-toolbar">
+          <input type="text" id="comms-search" placeholder="Search conversations...">
+          <button class="comms-compose-btn" id="comms-compose-btn">+ Compose</button>
+        </div>
+        <div class="comms-accounts" id="comms-accounts-bar">
+          <span style="color:var(--dim);">No Gmail accounts connected</span>
+          <button class="comms-connect-btn" id="comms-connect-btn" style="margin-left:0.5rem;">Connect Gmail</button>
+        </div>
+        <div class="comms-thread-list" id="comms-thread-list">
+          <div class="comms-empty">Connect a Gmail account to start</div>
+        </div>
+      </div>
+      <div class="comms-main">
+        <div class="comms-thread-header" id="comms-thread-header" style="display:none;"></div>
+        <div class="comms-messages" id="comms-messages">
+          <div class="comms-empty">Select a conversation to view messages</div>
+        </div>
+        <div class="comms-reply-box" id="comms-reply-box" style="display:none;">
+          <textarea id="comms-reply-text" placeholder="Type your reply..."></textarea>
+          <div class="comms-reply-actions">
+            <select id="comms-reply-from"></select>
+            <button class="comms-send-btn" id="comms-reply-send">Send</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div><!-- /tab-comms -->
+
   <div id="tab-shipping" class="tab-content">
     <div class="shipping-stats" id="shipping-stats"></div>
     <div class="charts-row">
@@ -1194,9 +1225,47 @@
               </div>
             </div>
           </div>
+          <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:flex-end;margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid var(--border);">
+            <div style="width:100%;margin-bottom:0.25rem;font-size:0.8rem;color:var(--muted);font-weight:600;">Catalog Metadata (for YAML & form generation)</div>
+            <div class="form-group" style="min-width:100px;">
+              <label>Category</label>
+              <select id="sp-meta-category" style="background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.5rem;font-size:0.85rem;width:100%;">
+                <option value="tallow">tallow</option>
+                <option value="broth">broth</option>
+              </select>
+            </div>
+            <div class="form-group" style="min-width:130px;"><label>Product Type</label><input type="text" id="sp-meta-product-type" placeholder="e.g. balm, serum"></div>
+            <div class="form-group" style="min-width:130px;"><label>Variant</label><input type="text" id="sp-meta-variant" placeholder="e.g. vanilla-rose"></div>
+            <div class="form-group" style="min-width:90px;"><label>Size</label><input type="text" id="sp-meta-size" placeholder="e.g. 120ml"></div>
+            <div class="form-group" style="min-width:110px;">
+              <label>Order Type</label>
+              <select id="sp-meta-order-type" style="background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.5rem;font-size:0.85rem;width:100%;">
+                <option value="single">single</option>
+                <option value="pack">pack</option>
+                <option value="monthly">monthly</option>
+                <option value="quarterly">quarterly</option>
+              </select>
+            </div>
+            <div class="form-group" style="min-width:70px;">
+              <label>Market</label>
+              <select id="sp-meta-market" style="background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.5rem;font-size:0.85rem;width:100%;">
+                <option value="NZ">NZ</option>
+                <option value="AU">AU</option>
+              </select>
+            </div>
+            <div class="form-group" style="min-width:100px;"><label>Display Price ($)</label><input type="number" id="sp-meta-display-price" placeholder="29.95" step="0.01" min="0"></div>
+          </div>
         </div>
 
-        <!-- Products Table -->
+        <!-- View Toggle -->
+        <div style="display:flex;gap:0.5rem;margin-bottom:1rem;">
+          <button class="sp-view-btn active" id="sp-view-stripe" style="background:var(--sage);color:#fff;border:none;padding:0.4rem 0.75rem;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600;">Stripe View</button>
+          <button class="sp-view-btn" id="sp-view-yaml" style="background:var(--card);color:var(--text);border:1px solid var(--border);padding:0.4rem 0.75rem;border-radius:6px;cursor:pointer;font-size:0.8rem;">Generate YAML</button>
+          <button class="sp-view-btn" id="sp-view-formbuilder" style="background:var(--card);color:var(--text);border:1px solid var(--border);padding:0.4rem 0.75rem;border-radius:6px;cursor:pointer;font-size:0.8rem;">Form Builder</button>
+        </div>
+
+        <!-- Products Table (Stripe View) -->
+        <div id="sp-stripe-view">
         <div style="overflow-x:auto;">
           <table>
             <thead>
@@ -1214,6 +1283,35 @@
             </tbody>
           </table>
         </div>
+        </div>
+
+        <!-- Generate YAML View -->
+        <div id="sp-yaml-view" style="display:none;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+            <h4 style="margin:0;font-size:0.9rem;">Generated pricing-new.yaml</h4>
+            <button id="sp-copy-yaml" style="background:var(--sage);color:#fff;border:none;padding:0.5rem 0.85rem;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600;">Copy to Clipboard</button>
+          </div>
+          <p style="font-size:0.8rem;color:var(--muted);margin-bottom:0.75rem;">Paste this into <code>primebroth/data/pricing-new.yaml</code>. Existing pricing.yaml is not affected.</p>
+          <pre id="sp-yaml-output" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:1rem;font-size:0.8rem;max-height:600px;overflow:auto;white-space:pre;font-family:monospace;color:var(--text);"></pre>
+        </div>
+
+        <!-- Form Builder View -->
+        <div id="sp-formbuilder-view" style="display:none;">
+          <div style="margin-bottom:1rem;">
+            <label style="font-size:0.8rem;color:var(--muted);display:block;margin-bottom:0.35rem;">Select Product</label>
+            <select id="sp-fb-product-select" style="background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.5rem;font-size:0.85rem;min-width:300px;">
+              <option value="">-- Select a product --</option>
+            </select>
+          </div>
+          <div id="sp-fb-entries" style="margin-bottom:1rem;"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+            <h4 style="margin:0;font-size:0.9rem;">Generated Product Form HTML</h4>
+            <button id="sp-copy-form" style="background:var(--sage);color:#fff;border:none;padding:0.5rem 0.85rem;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600;">Copy HTML</button>
+          </div>
+          <p style="font-size:0.8rem;color:var(--muted);margin-bottom:0.75rem;">Paste this into your new product page template. Uses <code>pricing-new.yaml</code> via Hugo.</p>
+          <pre id="sp-form-output" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:1rem;font-size:0.8rem;max-height:600px;overflow:auto;white-space:pre;font-family:monospace;color:var(--text);"></pre>
+        </div>
+
       </div>
     </div>
 
@@ -1792,6 +1890,57 @@
       </div>
       <div id="activity-log-list" style="max-height:300px;overflow-y:auto;font-size:0.8rem;"></div>
     </div>
+  </div>
+</div>
+
+<!-- Email Compose modal -->
+<div class="modal-overlay" id="email-compose-modal">
+  <div class="modal" style="max-width:640px;">
+    <button class="modal-close" id="compose-close">&times;</button>
+    <h2 id="compose-title">Compose Email</h2>
+    <div style="display:flex;flex-direction:column;gap:0.75rem;">
+      <div class="form-group">
+        <label>From</label>
+        <select id="compose-from" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;width:100%;"></select>
+      </div>
+      <div class="form-group">
+        <label>To</label>
+        <input type="email" id="compose-to" placeholder="customer@email.com" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;width:100%;">
+      </div>
+      <div style="display:flex;gap:0.75rem;">
+        <div class="form-group" style="flex:1;">
+          <label>CC</label>
+          <input type="text" id="compose-cc" placeholder="Optional" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;width:100%;">
+        </div>
+        <div class="form-group" style="flex:1;">
+          <label>BCC</label>
+          <input type="text" id="compose-bcc" placeholder="Optional" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;width:100%;">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Subject</label>
+        <input type="text" id="compose-subject" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;width:100%;">
+      </div>
+      <div class="form-group">
+        <label>Message</label>
+        <textarea id="compose-body" rows="10" style="width:100%;padding:0.5rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.85rem;resize:vertical;"></textarea>
+      </div>
+    </div>
+    <div style="margin-top:1rem;display:flex;justify-content:space-between;align-items:center;gap:0.5rem;">
+      <div class="form-group" style="margin:0;">
+        <label style="font-size:0.7rem;">Type</label>
+        <select id="compose-send-type" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.35rem 0.5rem;border-radius:6px;font-size:0.8rem;font-family:'DM Sans',sans-serif;">
+          <option value="direct">Direct</option>
+          <option value="bulk">Bulk</option>
+          <option value="automated">Automated</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:0.5rem;">
+        <button id="compose-cancel" style="background:none;border:1px solid var(--border);color:var(--muted);padding:0.5rem 1rem;border-radius:6px;cursor:pointer;font-size:0.85rem;font-family:'DM Sans',sans-serif;">Cancel</button>
+        <button id="compose-send" style="background:var(--sage);color:#141210;border:none;padding:0.5rem 1.5rem;border-radius:6px;font-weight:600;cursor:pointer;font-size:0.85rem;font-family:'DM Sans',sans-serif;">Send</button>
+      </div>
+    </div>
+    <div id="compose-result" style="margin-top:0.5rem;font-size:0.85rem;text-align:center;"></div>
   </div>
 </div>
 
@@ -3304,6 +3453,11 @@ function openOrderModal(orderId) {
     }
   }
 
+  // Email Customer button
+  html += `<div style="margin-top:0.75rem;text-align:center;">
+    <button onclick="openComposeModal({to: '${(order.email || '').replace(/'/g, "\\'")}', subject: 'Re: Your Primal Pantry Order #${orderId}'})" style="background:none;border:1px solid var(--sage);color:var(--sage);border-radius:6px;padding:0.5rem 1.2rem;font-size:0.85rem;cursor:pointer;font-weight:600;font-family:'DM Sans',sans-serif;">Email Customer</button>
+  </div>`;
+
   // Only owner/admin can see refund/delete buttons
   if (currentStaff && (currentStaff.role === 'owner' || currentStaff.role === 'admin')) {
     const isStripe = order.stripe_session_id && !order.stripe_session_id.startsWith('manual_');
@@ -4416,7 +4570,7 @@ async function loadOrderJourney(order) {
 const navDrawer = document.getElementById('nav-drawer');
 const navOverlay = document.getElementById('nav-overlay');
 const navLabel = document.getElementById('nav-active-label');
-const navNames = { sales: 'Overview', orders: 'Orders', shipping: 'Shipping', customers: 'Customers', manufacturing: 'Product & Inventory', website: 'Website Analytics', marketing: 'Marketing', finance: 'Finance' };
+const navNames = { sales: 'Overview', orders: 'Orders', shipping: 'Shipping', customers: 'Customers', comms: 'Communications', manufacturing: 'Product & Inventory', website: 'Website Analytics', marketing: 'Marketing', finance: 'Finance' };
 
 function openNav() { navDrawer.classList.add('open'); navOverlay.classList.add('open'); }
 function closeNav() { navDrawer.classList.remove('open'); navOverlay.classList.remove('open'); }
@@ -4436,13 +4590,13 @@ document.querySelectorAll('.nav-item').forEach(btn => {
     navLabel.textContent = navNames[activeTab] || activeTab;
     closeNav();
     // Hide irrelevant filters on manufacturing/finance tab
-    const hideFilters = activeTab === 'manufacturing' || activeTab === 'finance';
+    const hideFilters = activeTab === 'manufacturing' || activeTab === 'finance' || activeTab === 'comms';
     document.querySelectorAll('.filter-bar .filter-group').forEach((g, i) => {
       if (i === 0) return; // Keep Period filter visible
       g.style.display = hideFilters ? 'none' : '';
     });
     // Hide entire filter bar on finance (has its own date context)
-    document.querySelector('.filter-bar').style.display = activeTab === 'finance' ? 'none' : '';
+    document.querySelector('.filter-bar').style.display = (activeTab === 'finance' || activeTab === 'comms') ? 'none' : '';
     loadActiveTab();
   });
 });
@@ -4487,6 +4641,8 @@ function loadActiveTab() {
     waInit();
   } else if (activeTab === 'marketing') {
     loadMarketingTab();
+  } else if (activeTab === 'comms') {
+    loadCommsTab();
   } else if (activeTab === 'finance') {
     loadFinanceTab();
   }
@@ -4845,6 +5001,7 @@ function renderCustomersTab() {
           ${c.phone ? `<span>${c.phone}</span>` : ''}
           <span>Last: ${c.lastOrder}</span>
           <button class="tl-btn" onclick="event.stopPropagation(); openCustomerTimeline('${c.email.replace(/'/g, "\\'")}')">Timeline</button>
+          <button class="tl-btn" onclick="event.stopPropagation(); openComposeModal({to: '${c.email.replace(/'/g, "\\'")}'})">Email</button>
         </div>
       </div>
       <div class="customer-orders-list">
@@ -4976,6 +5133,16 @@ async function openCustomerTimeline(email) {
       });
     });
 
+    // Fetch email communications for this customer
+    try {
+      const emailData = await db.from('email_messages').select('*').eq('customer_email', email.toLowerCase()).order('date', { ascending: true });
+      if (emailData.data && emailData.data.length > 0) {
+        emailData.data.forEach(em => {
+          timelineEvents.push({ type: 'email', time: em.date, email: em });
+        });
+      }
+    } catch {}
+
     // Sort by time
     timelineEvents.sort((a, b) => new Date(a.time) - new Date(b.time));
 
@@ -5016,7 +5183,7 @@ async function openCustomerTimeline(email) {
             <div class="tl-pages">${ev.pages.map(p => `<span class="tl-page">${p}</span>`).join('')}</div>
           </div>
         </div>`;
-      } else {
+      } else if (ev.type === 'order') {
         const items = ev.items;
         const itemStr = items.map(li => `<span style="font-size:0.75rem;">${li.quantity}x ${li.description || li.sku || '?'}</span>`).join('<br>');
         const ship = getShipStatus(ev.order);
@@ -5033,6 +5200,31 @@ async function openCustomerTimeline(email) {
             </div>
             <div style="margin-bottom:0.3rem;">${itemStr}</div>
             <div style="font-weight:700;font-size:0.9rem;color:var(--text);">$${Number(ev.order.total_value || 0).toFixed(2)}</div>
+          </div>
+        </div>`;
+      } else if (ev.type === 'email') {
+        const em = ev.email;
+        const dirColor = em.direction === 'outbound' ? 'var(--sage)' : 'var(--honey)';
+        const sendType = em.send_type || 'direct';
+        const typeColors = { direct: { bg:'rgba(140,180,122,0.15)', fg:'var(--sage)' }, bulk: { bg:'rgba(212,168,75,0.15)', fg:'var(--honey)' }, automated: { bg:'rgba(180,140,210,0.15)', fg:'#b48cd2' } };
+        const tc = typeColors[sendType] || typeColors.direct;
+        const typeLabel = sendType.charAt(0).toUpperCase() + sendType.slice(1);
+        const staffBadge = em.staff_name ? `<span class="comms-staff-badge">${em.staff_name}</span>` : '';
+        const emailId = 'tl-email-' + em.id;
+        const bodyText = (em.body_text || em.snippet || '').replace(/</g, '&lt;').replace(/\n/g, '<br>');
+        html += `<div class="tl-node">
+          <div class="tl-dot" style="background:${dirColor};"></div>
+          <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:0.75rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+              <span style="cursor:pointer;background:${tc.bg};color:${tc.fg};padding:0.15rem 0.5rem;border-radius:9999px;font-size:0.7rem;font-weight:600;" onclick="event.stopPropagation();var el=document.getElementById('${emailId}');el.style.display=el.style.display==='none'?'block':'none';">${typeLabel}</span>
+              ${staffBadge}
+              <span style="color:var(--dim);font-size:0.65rem;">${timeStr}</span>
+            </div>
+            <div style="font-size:0.8rem;color:var(--muted);margin-top:0.25rem;">${(em.subject || '(no subject)').replace(/</g, '&lt;')}</div>
+            <div id="${emailId}" style="display:none;margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid var(--border);font-size:0.8rem;color:var(--text);line-height:1.5;">
+              <div style="font-weight:600;margin-bottom:0.25rem;color:var(--muted);font-size:0.75rem;">Subject: ${(em.subject || '').replace(/</g, '&lt;')}</div>
+              <div>${bodyText || '<span style="color:var(--dim);">(no content)</span>'}</div>
+            </div>
           </div>
         </div>`;
       }
@@ -7352,6 +7544,22 @@ document.getElementById('sp-create-price-btn').addEventListener('click', async (
   if (nickname) payload.nickname = nickname;
   if (priceType !== 'one_time') payload.recurring_interval = priceType;
 
+  // Include catalog metadata if filled in
+  const metaCat = document.getElementById('sp-meta-category').value;
+  const metaPT = document.getElementById('sp-meta-product-type').value.trim();
+  const metaVariant = document.getElementById('sp-meta-variant').value.trim();
+  const metaSize = document.getElementById('sp-meta-size').value.trim();
+  if (metaPT && metaVariant && metaSize) {
+    payload.category = metaCat;
+    payload.product_type = metaPT;
+    payload.variant = metaVariant;
+    payload.size = metaSize;
+    payload.order_type = document.getElementById('sp-meta-order-type').value;
+    payload.market = document.getElementById('sp-meta-market').value;
+    payload.display_price = document.getElementById('sp-meta-display-price').value || null;
+    payload.product_name = document.getElementById('sp-price-product-name').textContent;
+  }
+
   btn.disabled = true; btn.textContent = 'Creating...';
   const res = await spFetch(payload);
   btn.disabled = false; btn.textContent = 'Create Price';
@@ -7368,6 +7576,412 @@ document.getElementById('sp-create-price-btn').addEventListener('click', async (
 // Refresh button
 document.getElementById('sp-refresh-btn').addEventListener('click', () => {
   loadStripeProducts(true);
+});
+
+// ── Stripe Products: View Switching, YAML Generator, Form Builder ──
+let spCatalog = [];
+let spCatalogLoaded = false;
+let spCurrentView = 'stripe';
+
+// View toggle
+document.querySelectorAll('.sp-view-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.sp-view-btn').forEach(b => {
+      b.style.background = 'var(--card)'; b.style.color = 'var(--text)'; b.style.border = '1px solid var(--border)';
+    });
+    this.style.background = 'var(--sage)'; this.style.color = '#fff'; this.style.border = 'none';
+    spCurrentView = this.id.replace('sp-view-', '');
+    document.getElementById('sp-stripe-view').style.display = spCurrentView === 'stripe' ? '' : 'none';
+    document.getElementById('sp-yaml-view').style.display = spCurrentView === 'yaml' ? '' : 'none';
+    document.getElementById('sp-formbuilder-view').style.display = spCurrentView === 'formbuilder' ? '' : 'none';
+    if (spCurrentView === 'yaml') loadAndGenerateYaml();
+    if (spCurrentView === 'formbuilder') loadFormBuilder();
+  });
+});
+
+// ── YAML Generator ──
+async function loadCatalog(force) {
+  if (spCatalogLoaded && !force) return;
+  const { data, error } = await db.from('product_price_map').select('*').order('category,product_type,variant,size');
+  if (error) { console.error('Catalog load error:', error); return; }
+  spCatalog = data || [];
+  spCatalogLoaded = true;
+}
+
+async function loadAndGenerateYaml() {
+  await loadCatalog();
+  document.getElementById('sp-yaml-output').textContent = spCatalog.length ? generatePricingYaml(spCatalog) : '# No catalog entries yet.\n# Create prices with catalog metadata to generate YAML.';
+}
+
+function generatePricingYaml(rows) {
+  // Build nested: category.ids.product_type.order_type.variant.size.market = price_id
+  const tree = {};
+  for (const r of rows) {
+    const { category, product_type, order_type, variant, size, market, stripe_price_id } = r;
+    if (!tree[category]) tree[category] = {};
+    if (!tree[category][product_type]) tree[category][product_type] = {};
+    if (!tree[category][product_type][order_type]) tree[category][product_type][order_type] = {};
+    if (!tree[category][product_type][order_type][variant]) tree[category][product_type][order_type][variant] = {};
+    if (!tree[category][product_type][order_type][variant][size]) tree[category][product_type][order_type][variant][size] = {};
+    tree[category][product_type][order_type][variant][size][market] = stripe_price_id;
+  }
+
+  // Build display pricing: category.pricing.product_type[] = { size, prices: { market: { order_label: price } } }
+  const displayTree = {};
+  const labelMap = { single: 'single_purchase', monthly: 'recurring_monthly', quarterly: 'recurring_quarterly', pack: 'three_pack' };
+  for (const r of rows) {
+    if (!r.display_price) continue;
+    const { category, product_type, size, market, order_type } = r;
+    if (!displayTree[category]) displayTree[category] = {};
+    if (!displayTree[category][product_type]) displayTree[category][product_type] = {};
+    if (!displayTree[category][product_type][size]) displayTree[category][product_type][size] = {};
+    if (!displayTree[category][product_type][size][market]) displayTree[category][product_type][size][market] = {};
+    displayTree[category][product_type][size][market][labelMap[order_type] || order_type] = Number(r.display_price);
+  }
+
+  // Serialize
+  let out = '';
+  for (const cat of Object.keys(tree).sort()) {
+    out += `${cat}:\n  ids:\n`;
+    for (const pt of Object.keys(tree[cat]).sort()) {
+      out += `    ${pt}:\n`;
+      for (const ot of Object.keys(tree[cat][pt]).sort()) {
+        out += `      ${ot}:\n`;
+        for (const v of Object.keys(tree[cat][pt][ot]).sort()) {
+          out += `        ${v}:\n`;
+          for (const sz of Object.keys(tree[cat][pt][ot][v]).sort()) {
+            out += `          ${sz}:\n`;
+            for (const mkt of Object.keys(tree[cat][pt][ot][v][sz]).sort()) {
+              out += `            ${mkt}: "${tree[cat][pt][ot][v][sz][mkt]}"\n`;
+            }
+          }
+        }
+      }
+    }
+    // Display pricing section
+    if (displayTree[cat]) {
+      out += `  pricing:\n`;
+      for (const pt of Object.keys(displayTree[cat]).sort()) {
+        out += `    ${pt}:\n`;
+        for (const sz of Object.keys(displayTree[cat][pt]).sort()) {
+          out += `      - size: "${sz}"\n        prices:\n`;
+          for (const mkt of Object.keys(displayTree[cat][pt][sz]).sort()) {
+            out += `          ${mkt}:\n`;
+            for (const lbl of Object.keys(displayTree[cat][pt][sz][mkt]).sort()) {
+              out += `            ${lbl}: ${displayTree[cat][pt][sz][mkt][lbl]}\n`;
+            }
+          }
+        }
+      }
+    }
+    out += '\n';
+  }
+  return out;
+}
+
+document.getElementById('sp-copy-yaml').addEventListener('click', () => {
+  const yaml = document.getElementById('sp-yaml-output').textContent;
+  navigator.clipboard.writeText(yaml).then(() => {
+    const btn = document.getElementById('sp-copy-yaml');
+    btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy to Clipboard', 2000);
+  });
+});
+
+// ── Form Builder ──
+async function loadFormBuilder() {
+  await loadCatalog();
+  // Also need Stripe products loaded for the dropdown
+  if (!spLoaded) await loadStripeProducts();
+
+  const select = document.getElementById('sp-fb-product-select');
+  // Get unique stripe_product_ids from catalog
+  const catalogProductIds = [...new Set(spCatalog.map(r => r.stripe_product_id))];
+  const opts = catalogProductIds.map(pid => {
+    const name = spCatalog.find(r => r.stripe_product_id === pid)?.product_name || pid;
+    const spProd = spProducts.find(p => p.id === pid);
+    const displayName = spProd ? spProd.name : name;
+    return `<option value="${pid}">${esc(displayName)}</option>`;
+  }).join('');
+  select.innerHTML = '<option value="">-- Select a product --</option>' + opts;
+
+  renderFormBuilder();
+}
+
+document.getElementById('sp-fb-product-select').addEventListener('change', renderFormBuilder);
+
+function renderFormBuilder() {
+  const pid = document.getElementById('sp-fb-product-select').value;
+  const entriesDiv = document.getElementById('sp-fb-entries');
+  const outputPre = document.getElementById('sp-form-output');
+
+  if (!pid) {
+    entriesDiv.innerHTML = '<p style="color:var(--muted);font-size:0.85rem;">Select a product to see its catalog entries and generate a form.</p>';
+    outputPre.textContent = '';
+    return;
+  }
+
+  const entries = spCatalog.filter(r => r.stripe_product_id === pid);
+  if (!entries.length) {
+    entriesDiv.innerHTML = '<p style="color:var(--muted);font-size:0.85rem;">No catalog entries for this product. Add prices with metadata first.</p>';
+    outputPre.textContent = '';
+    return;
+  }
+
+  // Show entries table
+  entriesDiv.innerHTML = `<table style="margin-bottom:1rem;"><thead><tr><th>Variant</th><th>Size</th><th>Order Type</th><th>Market</th><th>Price</th><th>Price ID</th></tr></thead><tbody>${
+    entries.map(r => `<tr>
+      <td>${esc(r.variant)}</td>
+      <td>${esc(r.size)}</td>
+      <td>${esc(r.order_type)}</td>
+      <td>${esc(r.market)}</td>
+      <td>$${r.display_price || (r.unit_amount / 100).toFixed(2)}</td>
+      <td style="font-size:0.75rem;font-family:monospace;color:var(--dim);">${r.stripe_price_id}</td>
+    </tr>`).join('')
+  }</tbody></table>`;
+
+  // Generate form HTML
+  outputPre.textContent = generateFormHtml(entries);
+}
+
+function generateFormHtml(entries) {
+  const productName = entries[0]?.product_name || 'Product';
+  const category = entries[0]?.category || 'tallow';
+  const productType = entries[0]?.product_type || 'product';
+
+  // Extract unique values
+  const variants = [...new Set(entries.map(r => r.variant))];
+  const sizes = [...new Set(entries.map(r => r.size))];
+  const orderTypes = [...new Set(entries.map(r => r.order_type))];
+  const defaultPrice = entries[0]?.display_price || (entries[0]?.unit_amount / 100).toFixed(2);
+
+  // Build hidden form radios
+  let formInputs = '';
+  variants.forEach((v, i) => {
+    formInputs += `    <input type="radio" id="${v}" name="flavor" value="${v}"${i === 0 ? ' checked' : ''}>\n`;
+  });
+  orderTypes.forEach((ot, i) => {
+    formInputs += `    <input type="radio" id="${ot}" name="orderType" value="${ot}"${i === 0 ? ' checked' : ''}>\n`;
+  });
+  sizes.forEach((sz, i) => {
+    formInputs += `    <input type="radio" id="size${sz}" name="size" value="${sz}"${i === 0 ? ' checked' : ''}>\n`;
+  });
+
+  // Build purchase options
+  const orderTypeLabels = { single: 'Single', pack: '3 Pack', monthly: 'Monthly', quarterly: 'Quarterly' };
+  let purchaseOpts = '';
+  if (orderTypes.length > 1) {
+    purchaseOpts = `<div class="purchase-options" style="flex-direction:row;gap:8px;">\n`;
+    orderTypes.forEach((ot, i) => {
+      const label = orderTypeLabels[ot] || ot;
+      purchaseOpts += `    <label class="purchase-option${i === 0 ? ' selected' : ''}" data-value="${ot}" style="flex:1;padding:8.5px 10px;">\n`;
+      purchaseOpts += `        <div class="option-left" style="gap:6px;white-space:nowrap;">\n`;
+      purchaseOpts += `            <div class="option-radio" style="width:14px;height:14px;"><div class="dot-inner" style="width:7px;height:7px;"></div></div>\n`;
+      purchaseOpts += `            <div class="option-label" style="font-size:13px;">${label}</div>\n`;
+      purchaseOpts += `        </div>\n`;
+      purchaseOpts += `    </label>\n`;
+    });
+    purchaseOpts += `</div>\n`;
+  }
+
+  // Build size pills
+  let sizePills = '';
+  if (sizes.length > 1) {
+    sizePills = `<div class="pp-selector-group" id="wrap-sizes">\n    <div class="pp-selector-label">Size</div>\n    <div class="scent-pills">\n`;
+    sizes.forEach((sz, i) => {
+      sizePills += `        <div class="scent-pill${i === 0 ? ' active' : ''}" data-size="${sz}">${sz}</div>\n`;
+    });
+    sizePills += `    </div>\n</div>\n`;
+  }
+
+  // Build variant/scent pills
+  let variantPills = '';
+  if (variants.length > 1) {
+    variantPills = `<div class="pp-selector-group">\n    <div class="pp-selector-label">Scent</div>\n    <div class="scent-pills" style="flex-wrap:nowrap;gap:6px;">\n`;
+    variants.forEach((v, i) => {
+      const displayName = v.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      variantPills += `        <div class="scent-pill${i === 0 ? ' active' : ''}" data-flavor="${v}" style="font-size:12px;padding:5px 10px;">${displayName}</div>\n`;
+    });
+    variantPills += `    </div>\n</div>\n`;
+  }
+
+  // Build price map JS object
+  // Structure: { order_type: { variant: { size: { market: "price_id" } } } }
+  const priceMap = {};
+  entries.forEach(r => {
+    if (!priceMap[r.order_type]) priceMap[r.order_type] = {};
+    if (!priceMap[r.order_type][r.variant]) priceMap[r.order_type][r.variant] = {};
+    if (!priceMap[r.order_type][r.variant][r.size]) priceMap[r.order_type][r.variant][r.size] = {};
+    priceMap[r.order_type][r.variant][r.size][r.market] = r.stripe_price_id;
+  });
+
+  // Build display price map
+  const displayPriceMap = {};
+  entries.filter(r => r.display_price).forEach(r => {
+    const key = `${r.order_type}|${r.variant}|${r.size}`;
+    displayPriceMap[key] = Number(r.display_price);
+  });
+
+  let html = '';
+  html += `<!-- ═══ PRODUCT FORM: ${productName} ═══ -->\n`;
+  html += `<!-- Generated by OSO Dashboard — paste into your product page template -->\n\n`;
+
+  // Pricing display
+  html += `<div class="pp-pricing-section">\n`;
+  html += `    <span class="pp-price-main"><span id="price">$${defaultPrice}</span></span>\n`;
+  html += `    <p class="afterpay-note">or 4 interest free payments of $<span id="afterpay_price">${(defaultPrice / 4).toFixed(2)}</span> with <img src="/img/afterpay.webp" class="d-inline" height="18" alt="afterpay"></p>\n`;
+  html += `</div>\n\n`;
+
+  // Hidden form
+  html += `<form id="productForm" autocomplete="off" style="display:none;">\n${formInputs}</form>\n\n`;
+
+  // Purchase options
+  if (purchaseOpts) html += purchaseOpts + '\n';
+
+  // Size pills
+  if (sizePills) html += sizePills + '\n';
+
+  // Variant pills
+  if (variantPills) html += variantPills + '\n';
+
+  // Stock indicator
+  html += `<div class="stock-indicator">\n    <span class="stock-dot"></span> In Stock · Ships within 1–3 business days\n</div>\n\n`;
+
+  // Action row
+  html += `<div class="action-row">\n`;
+  html += `    <div class="pp-qty-selector">\n`;
+  html += `        <button type="button" class="btn-decrease">−</button>\n`;
+  html += `        <input type="number" class="form-control" id="quantityAll" name="quantity" min="1" value="1" readonly>\n`;
+  html += `        <button type="button" class="btn-increase">+</button>\n`;
+  html += `    </div>\n`;
+  html += `    <button class="btn-add-to-cart buy-now" type="button" data-price-id="" data-quantity-id="quantityAll">\n`;
+  html += `        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="position:relative;z-index:1;"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>\n`;
+  html += `        <span style="position:relative;z-index:1;">Add To Cart — $<span id="cartPriceDisplay">${defaultPrice}</span></span>\n`;
+  html += `    </button>\n`;
+  html += `</div>\n\n`;
+
+  html += `<p class="sub-cta">Money back guarantee · Speedy NZ-wide shipping</p>\n\n`;
+
+  // Guarantee bar
+  html += `<div class="guarantee-bar">\n`;
+  html += `    <div class="guarantee-item"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>NZ Made</div>\n`;
+  html += `    <div class="guarantee-item"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>Gentle on Skin</div>\n`;
+  html += `    <div class="guarantee-item"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>Money Back</div>\n`;
+  html += `</div>\n\n`;
+
+  // JavaScript
+  html += `<script>\n`;
+  html += `// Price data from pricing-new.yaml via Hugo\n`;
+  html += `const pricingNewData = JSON.parse('{{ .Site.Data.pricing_new | jsonify }}');\n`;
+  html += `const productPrices = pricingNewData?.${category}?.ids?.${productType} || {};\n`;
+  html += `const country_code = window.country_code || 'NZ';\n\n`;
+
+  // Display price map
+  if (Object.keys(displayPriceMap).length) {
+    html += `const displayPrices = ${JSON.stringify(displayPriceMap, null, 2)};\n\n`;
+  }
+
+  // updatePriceId
+  html += `function updatePriceId() {\n`;
+  html += `    const size = document.querySelector('input[name="size"]:checked')?.value || '${sizes[0]}';\n`;
+  html += `    const flavor = document.querySelector('input[name="flavor"]:checked')?.value || '${variants[0]}';\n`;
+  html += `    const orderType = document.querySelector('input[name="orderType"]:checked')?.value || '${orderTypes[0]}';\n`;
+  html += `    try {\n`;
+  html += `        const priceId = productPrices?.[orderType]?.[flavor]?.[size]?.[country_code] || '';\n`;
+  html += `        document.querySelector('.buy-now')?.setAttribute('data-price-id', priceId);\n`;
+  html += `    } catch(e) { console.error('Price ID lookup error:', e); }\n`;
+
+  if (Object.keys(displayPriceMap).length) {
+    html += `    const dpKey = orderType + '|' + flavor + '|' + size;\n`;
+    html += `    const dp = displayPrices[dpKey];\n`;
+    html += `    if (dp) {\n`;
+    html += `        document.getElementById('price').textContent = '$' + dp.toFixed(2);\n`;
+    html += `        document.getElementById('afterpay_price').textContent = (dp / 4).toFixed(2);\n`;
+    html += `        document.getElementById('cartPriceDisplay').textContent = dp.toFixed(2);\n`;
+    html += `    }\n`;
+  }
+
+  html += `}\n\n`;
+
+  // handleAddToCart
+  html += `function handleAddToCart(event) {\n`;
+  html += `    event.preventDefault();\n`;
+  html += `    const button = event.target.closest('.buy-now');\n`;
+  html += `    const priceId = button.getAttribute('data-price-id');\n`;
+  html += `    if (!priceId) { alert('Please select valid options before adding to cart.'); return; }\n`;
+  html += `    const size = document.querySelector('input[name="size"]:checked')?.value || '${sizes[0]}';\n`;
+  html += `    const flavor = document.querySelector('input[name="flavor"]:checked')?.value || '${variants[0]}';\n`;
+  html += `    const orderType = document.querySelector('input[name="orderType"]:checked')?.value || '${orderTypes[0]}';\n`;
+  html += `    const unitPrice = parseFloat(document.getElementById('price')?.textContent?.replace('$','')) || 0;\n`;
+  html += `    const quantity = parseInt(document.getElementById('quantityAll')?.value) || 1;\n`;
+  html += `    const cart = JSON.parse(localStorage.getItem('cartV2')) || [];\n`;
+  html += `    cart.push({ priceId, title: '${productName.replace(/'/g, "\\'")}', size, flavor, orderType, quantity, unitPrice, eligibleForDiscount: false });\n`;
+  html += `    localStorage.setItem('cartV2', JSON.stringify(cart));\n`;
+  html += `    alert('Item added to cart!');\n`;
+  html += `}\n\n`;
+
+  // Init
+  html += `document.addEventListener('DOMContentLoaded', function() {\n`;
+  html += `    document.getElementById('productForm').addEventListener('change', updatePriceId);\n`;
+  html += `    updatePriceId();\n`;
+  html += `    document.querySelector('.buy-now')?.addEventListener('click', handleAddToCart);\n\n`;
+
+  // Quantity buttons
+  html += `    document.querySelector('.btn-increase')?.addEventListener('click', () => {\n`;
+  html += `        const q = document.getElementById('quantityAll'); q.value = Math.min(10, (parseInt(q.value)||1) + 1);\n`;
+  html += `    });\n`;
+  html += `    document.querySelector('.btn-decrease')?.addEventListener('click', () => {\n`;
+  html += `        const q = document.getElementById('quantityAll'); q.value = Math.max(1, (parseInt(q.value)||1) - 1);\n`;
+  html += `    });\n\n`;
+
+  // Size pill click handlers
+  if (sizes.length > 1) {
+    html += `    document.querySelectorAll('[data-size]').forEach(pill => {\n`;
+    html += `        pill.addEventListener('click', function() {\n`;
+    html += `            document.querySelectorAll('[data-size]').forEach(p => p.classList.remove('active'));\n`;
+    html += `            this.classList.add('active');\n`;
+    html += `            document.getElementById('size' + this.dataset.size).checked = true;\n`;
+    html += `            document.getElementById('productForm').dispatchEvent(new Event('change'));\n`;
+    html += `        });\n`;
+    html += `    });\n\n`;
+  }
+
+  // Variant pill click handlers
+  if (variants.length > 1) {
+    html += `    document.querySelectorAll('[data-flavor]').forEach(pill => {\n`;
+    html += `        pill.addEventListener('click', function() {\n`;
+    html += `            document.querySelectorAll('[data-flavor]').forEach(p => p.classList.remove('active'));\n`;
+    html += `            this.classList.add('active');\n`;
+    html += `            document.getElementById(this.dataset.flavor).checked = true;\n`;
+    html += `            document.getElementById('productForm').dispatchEvent(new Event('change'));\n`;
+    html += `        });\n`;
+    html += `    });\n\n`;
+  }
+
+  // Purchase option click handlers
+  if (orderTypes.length > 1) {
+    html += `    document.querySelectorAll('.purchase-option').forEach(opt => {\n`;
+    html += `        opt.addEventListener('click', function() {\n`;
+    html += `            document.querySelectorAll('.purchase-option').forEach(o => o.classList.remove('selected'));\n`;
+    html += `            this.classList.add('selected');\n`;
+    html += `            document.getElementById(this.dataset.value).checked = true;\n`;
+    html += `            document.getElementById('productForm').dispatchEvent(new Event('change'));\n`;
+    html += `        });\n`;
+    html += `    });\n`;
+  }
+
+  html += `});\n`;
+  html += `<\/script>\n`;
+  html += `<!-- ═══ END PRODUCT FORM ═══ -->\n`;
+
+  return html;
+}
+
+document.getElementById('sp-copy-form').addEventListener('click', () => {
+  const html = document.getElementById('sp-form-output').textContent;
+  navigator.clipboard.writeText(html).then(() => {
+    const btn = document.getElementById('sp-copy-form');
+    btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy HTML', 2000);
+  });
 });
 
 // ── Inventory Tab ──
@@ -7727,6 +8341,337 @@ async function loadMarketingTab() {
   // Load competitors section
   loadCompetitorsSection();
 }
+
+// ── Communications Tab ──
+
+let commsInited = false;
+let commsThreads = [];
+let commsActiveThread = null;
+let commsAccounts = [];
+
+function commsApi(action, params = {}) {
+  params.action = action;
+  params.token = currentStaff.token;
+  return fetch('/.netlify/functions/google-gmail', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  }).then(r => r.json());
+}
+
+function commsTimeAgo(dateStr) {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diff = (now - d) / 1000;
+  if (diff < 60) return 'now';
+  if (diff < 3600) return Math.floor(diff / 60) + 'm';
+  if (diff < 86400) return Math.floor(diff / 3600) + 'h';
+  if (diff < 604800) return Math.floor(diff / 86400) + 'd';
+  return d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
+}
+
+function renderCommsAccounts() {
+  const bar = document.getElementById('comms-accounts-bar');
+  const isAdmin = currentStaff && (currentStaff.role === 'owner' || currentStaff.role === 'admin');
+  if (commsAccounts.length === 0) {
+    bar.innerHTML = '<span style="color:var(--dim);">No Gmail accounts connected</span>' +
+      (isAdmin ? ' <button class="comms-connect-btn" id="comms-connect-btn">Connect Gmail</button>' : '');
+  } else {
+    bar.innerHTML = commsAccounts.map(a =>
+      '<span class="comms-account-pill">' + esc(a.email_address) +
+      (isAdmin ? ' <span class="acct-x" onclick="disconnectGmailAccount(' + a.id + ')">&times;</span>' : '') +
+      '</span>'
+    ).join('') +
+    (isAdmin ? ' <button class="comms-connect-btn" id="comms-connect-btn" style="font-size:0.65rem;padding:0.2rem 0.5rem;">+ Add</button>' : '');
+  }
+  // Re-bind connect button
+  const btn = document.getElementById('comms-connect-btn');
+  if (btn) btn.addEventListener('click', connectGmailAccount);
+  // Populate from dropdowns
+  const fromOpts = commsAccounts.map(a => '<option value="' + a.id + '">' + esc(a.email_address) + '</option>').join('');
+  document.getElementById('comms-reply-from').innerHTML = fromOpts;
+  document.getElementById('compose-from').innerHTML = fromOpts;
+}
+
+function renderCommsThreadList(filter) {
+  const list = document.getElementById('comms-thread-list');
+  let threads = commsThreads;
+  if (filter) {
+    const q = filter.toLowerCase();
+    threads = threads.filter(t =>
+      (t.customer_name || '').toLowerCase().includes(q) ||
+      (t.customer_email || '').toLowerCase().includes(q) ||
+      (t.last_subject || '').toLowerCase().includes(q)
+    );
+  }
+  if (threads.length === 0) {
+    list.innerHTML = '<div class="comms-empty">' + (commsAccounts.length === 0 ? 'Connect a Gmail account to start' : 'No conversations found') + '</div>';
+    return;
+  }
+  list.innerHTML = threads.map(t => {
+    const isActive = commsActiveThread && commsActiveThread.thread_id === t.thread_id;
+    return '<div class="comms-thread-item' + (isActive ? ' active' : '') + (t.unread_count > 0 ? ' unread' : '') + '" onclick="openCommsThread(\'' + (t.thread_id || '').replace(/'/g, "\\'") + '\')">'
+      + '<div class="comms-thread-name">'
+      + (t.unread_count > 0 ? '<span class="comms-unread-dot"></span>' : '')
+      + '<span>' + esc(t.customer_name || t.customer_email || 'Unknown') + '</span>'
+      + '<span class="comms-thread-time">' + commsTimeAgo(t.last_date) + '</span>'
+      + '</div>'
+      + '<div class="comms-thread-subject">' + esc(t.last_subject || '(no subject)') + '</div>'
+      + '<div class="comms-thread-snippet">' + esc(t.last_snippet || '') + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+async function openCommsThread(threadId) {
+  commsActiveThread = commsThreads.find(t => t.thread_id === threadId) || { thread_id: threadId };
+  renderCommsThreadList();
+
+  const header = document.getElementById('comms-thread-header');
+  const messagesEl = document.getElementById('comms-messages');
+  const replyBox = document.getElementById('comms-reply-box');
+
+  header.style.display = 'flex';
+  header.innerHTML = '<div><strong>' + esc(commsActiveThread.customer_name || commsActiveThread.customer_email || 'Unknown') + '</strong> <span style="color:var(--dim);font-size:0.8rem;">' + esc(commsActiveThread.customer_email || '') + '</span></div>';
+
+  messagesEl.innerHTML = '<div class="comms-empty">Loading...</div>';
+
+  try {
+    const data = await commsApi('thread_messages', { thread_id: threadId });
+    const msgs = data.messages || [];
+
+    if (msgs.length === 0) {
+      messagesEl.innerHTML = '<div class="comms-empty">No messages in this thread</div>';
+      replyBox.style.display = 'none';
+      return;
+    }
+
+    messagesEl.innerHTML = msgs.map(m => {
+      const isOut = m.direction === 'outbound';
+      const timeStr = new Date(m.date).toLocaleString('en-NZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+      // Use body_text for display, fall back to stripping HTML
+      let displayText = m.body_text || '';
+      if (!displayText && m.body_html) {
+        const div = document.createElement('div');
+        div.innerHTML = m.body_html;
+        displayText = div.textContent || div.innerText || '';
+      }
+      // Truncate very long messages
+      if (displayText.length > 2000) displayText = displayText.slice(0, 2000) + '...';
+
+      return '<div class="comms-msg ' + (isOut ? 'outbound' : 'inbound') + '">'
+        + '<div class="comms-msg-bubble">'
+        + '<div style="font-weight:600;font-size:0.8rem;margin-bottom:0.25rem;color:var(--muted);">' + esc(m.subject || '') + '</div>'
+        + '<div>' + esc(displayText).replace(/\n/g, '<br>') + '</div>'
+        + '</div>'
+        + '<div class="comms-msg-meta">'
+        + (isOut && m.staff_name ? '<span class="comms-staff-badge">' + esc(m.staff_name) + '</span>' : '')
+        + '<span>' + timeStr + '</span>'
+        + (isOut ? '<span style="color:var(--sage);">Sent</span>' : '<span>from ' + esc(m.from_address || '').split('<')[0].trim() + '</span>')
+        + '</div>'
+        + '</div>';
+    }).join('');
+
+    // Scroll to bottom
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    // Show reply box
+    replyBox.style.display = 'block';
+    document.getElementById('comms-reply-text').value = '';
+
+    // Set from to the account that received messages in this thread
+    const lastMsg = msgs[msgs.length - 1];
+    if (lastMsg.account_id) {
+      document.getElementById('comms-reply-from').value = lastMsg.account_id;
+    }
+
+    // Mark unread messages as read
+    for (const m of msgs) {
+      if (!m.is_read && m.direction === 'inbound' && m.gmail_id && m.account_id) {
+        commsApi('mark_read', { message_id: m.gmail_id, account_id: m.account_id }).catch(() => {});
+      }
+    }
+  } catch (e) {
+    messagesEl.innerHTML = '<div class="comms-empty">Failed to load messages</div>';
+  }
+}
+
+async function loadCommsTab() {
+  if (!commsInited) {
+    commsInited = true;
+    // Search
+    document.getElementById('comms-search').addEventListener('input', function() {
+      renderCommsThreadList(this.value.trim());
+    });
+    // Compose button
+    document.getElementById('comms-compose-btn').addEventListener('click', () => openComposeModal({}));
+    // Reply send button
+    document.getElementById('comms-reply-send').addEventListener('click', sendCommsReply);
+    // Gmail connected message listener
+    window.addEventListener('message', e => { if (e.data && e.data.gmailConnected) loadCommsTab(); });
+  }
+
+  // Load accounts
+  try {
+    const acctData = await fetch('/.netlify/functions/gmail-auth?action=status&token=' + currentStaff.token).then(r => r.json());
+    commsAccounts = acctData.accounts || [];
+  } catch { commsAccounts = []; }
+  renderCommsAccounts();
+
+  // Sync then load threads
+  if (commsAccounts.length > 0) {
+    document.getElementById('comms-thread-list').innerHTML = '<div class="comms-empty">Syncing messages...</div>';
+    try {
+      await commsApi('sync', { maxResults: 30 });
+    } catch {}
+    try {
+      const data = await commsApi('threads', { limit: 50 });
+      commsThreads = data.threads || [];
+      renderCommsThreadList();
+    } catch {
+      document.getElementById('comms-thread-list').innerHTML = '<div class="comms-empty">Failed to load threads</div>';
+    }
+  }
+}
+
+async function sendCommsReply() {
+  if (!commsActiveThread) return;
+  const text = document.getElementById('comms-reply-text').value.trim();
+  if (!text) return;
+  const accountId = parseInt(document.getElementById('comms-reply-from').value);
+  if (!accountId) return;
+
+  const btn = document.getElementById('comms-reply-send');
+  btn.disabled = true; btn.textContent = 'Sending...';
+
+  try {
+    const lastSubject = commsActiveThread.last_subject || '';
+    const subject = lastSubject.startsWith('Re:') ? lastSubject : 'Re: ' + lastSubject;
+    const to = commsActiveThread.customer_email || '';
+
+    await commsApi('send', {
+      account_id: accountId,
+      to: to,
+      subject: subject,
+      body: text,
+      threadId: commsActiveThread.thread_id,
+    });
+
+    document.getElementById('comms-reply-text').value = '';
+    // Reload thread
+    await openCommsThread(commsActiveThread.thread_id);
+    // Refresh thread list
+    const data = await commsApi('threads', { limit: 50 });
+    commsThreads = data.threads || [];
+    renderCommsThreadList();
+  } catch (e) {
+    alert('Failed to send: ' + e.message);
+  }
+
+  btn.disabled = false; btn.textContent = 'Send';
+}
+
+function connectGmailAccount() {
+  fetch('/.netlify/functions/gmail-auth?action=authorize&token=' + currentStaff.token)
+    .then(r => r.json())
+    .then(d => { if (d.url) window.open(d.url, 'gmail-auth', 'width=600,height=700'); });
+}
+
+async function disconnectGmailAccount(id) {
+  if (!confirm('Disconnect this Gmail account?')) return;
+  await fetch('/.netlify/functions/gmail-auth?action=disconnect&token=' + currentStaff.token + '&id=' + id);
+  loadCommsTab();
+}
+
+// ── Email Compose Modal ──
+
+function openComposeModal(opts) {
+  opts = opts || {};
+  const modal = document.getElementById('email-compose-modal');
+  document.getElementById('compose-to').value = opts.to || '';
+  document.getElementById('compose-subject').value = opts.subject || '';
+  document.getElementById('compose-cc').value = opts.cc || '';
+  document.getElementById('compose-bcc').value = opts.bcc || '';
+  document.getElementById('compose-body').value = opts.body || '';
+  document.getElementById('compose-title').textContent = opts.threadId ? 'Reply' : 'Compose Email';
+  document.getElementById('compose-result').textContent = '';
+  document.getElementById('compose-send-type').value = opts.sendType || 'direct';
+  modal.dataset.threadId = opts.threadId || '';
+
+  // Populate from dropdown if not already done
+  if (commsAccounts.length > 0) {
+    document.getElementById('compose-from').innerHTML = commsAccounts.map(a =>
+      '<option value="' + a.id + '">' + esc(a.email_address) + '</option>'
+    ).join('');
+    if (opts.accountId) document.getElementById('compose-from').value = opts.accountId;
+  } else {
+    // Try loading accounts
+    fetch('/.netlify/functions/gmail-auth?action=status&token=' + currentStaff.token)
+      .then(r => r.json())
+      .then(d => {
+        commsAccounts = d.accounts || [];
+        document.getElementById('compose-from').innerHTML = commsAccounts.map(a =>
+          '<option value="' + a.id + '">' + esc(a.email_address) + '</option>'
+        ).join('');
+      }).catch(() => {});
+  }
+
+  modal.classList.add('open');
+}
+
+document.getElementById('compose-close').addEventListener('click', () => {
+  document.getElementById('email-compose-modal').classList.remove('open');
+});
+document.getElementById('compose-cancel').addEventListener('click', () => {
+  document.getElementById('email-compose-modal').classList.remove('open');
+});
+document.getElementById('email-compose-modal').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.remove('open');
+});
+
+document.getElementById('compose-send').addEventListener('click', async () => {
+  const modal = document.getElementById('email-compose-modal');
+  const accountId = parseInt(document.getElementById('compose-from').value);
+  const to = document.getElementById('compose-to').value.trim();
+  const subject = document.getElementById('compose-subject').value.trim();
+  const body = document.getElementById('compose-body').value.trim();
+
+  if (!to) { document.getElementById('compose-result').innerHTML = '<span style="color:var(--red);">To address required</span>'; return; }
+  if (!accountId) { document.getElementById('compose-result').innerHTML = '<span style="color:var(--red);">No Gmail account connected</span>'; return; }
+
+  const btn = document.getElementById('compose-send');
+  btn.disabled = true; btn.textContent = 'Sending...';
+
+  try {
+    const res = await commsApi('send', {
+      account_id: accountId,
+      to: to,
+      cc: document.getElementById('compose-cc').value.trim(),
+      bcc: document.getElementById('compose-bcc').value.trim(),
+      subject: subject,
+      body: body,
+      threadId: modal.dataset.threadId || undefined,
+      send_type: document.getElementById('compose-send-type').value,
+    });
+
+    if (res.success) {
+      document.getElementById('compose-result').innerHTML = '<span style="color:var(--sage);">Email sent!</span>';
+      setTimeout(() => modal.classList.remove('open'), 1000);
+      // Refresh comms tab if active
+      if (activeTab === 'comms') {
+        const data = await commsApi('threads', { limit: 50 });
+        commsThreads = data.threads || [];
+        renderCommsThreadList();
+        if (commsActiveThread) openCommsThread(commsActiveThread.thread_id);
+      }
+    } else {
+      document.getElementById('compose-result').innerHTML = '<span style="color:var(--red);">' + esc(res.error || 'Send failed') + '</span>';
+    }
+  } catch (e) {
+    document.getElementById('compose-result').innerHTML = '<span style="color:var(--red);">' + esc(e.message) + '</span>';
+  }
+
+  btn.disabled = false; btn.textContent = 'Send';
+});
 
 // ── Competitor Tracking ──
 

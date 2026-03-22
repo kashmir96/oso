@@ -26,6 +26,9 @@ const ALLOWED_TABLES = new Set([
   'inventory_reorder_points',
   'supplier_orders',
   'customer_reviews',
+  'email_messages',
+  'gmail_accounts',
+  'product_price_map',
 ]);
 
 const ALLOWED_OPS = new Set(['select', 'insert', 'update', 'delete', 'upsert']);

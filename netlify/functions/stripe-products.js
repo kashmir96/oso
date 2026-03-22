@@ -42,6 +42,20 @@ async function getStaffByToken(token) {
   return rows && rows.length > 0 ? rows[0] : null;
 }
 
+async function supabaseInsert(table, row) {
+  const res = await fetch(`${process.env.SUPABASE_URL}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: {
+      'apikey': process.env.SUPABASE_SERVICE_KEY,
+      'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation',
+    },
+    body: JSON.stringify(row),
+  });
+  return res.json();
+}
+
 async function stripeGet(path, key) {
   const res = await fetch(`https://api.stripe.com/v1/${path}`, {
     headers: { 'Authorization': `Bearer ${key}` },
@@ -130,7 +144,31 @@ exports.handler = async (event) => {
 
       const { status, data } = await stripePost('prices', params, STRIPE_KEY);
       if (data.error) return reply(status, { error: data.error.message });
-      return reply(200, { price: data });
+
+      // If YAML metadata provided, also save to product_price_map
+      let catalogEntry = null;
+      if (body.category && body.product_type && body.variant && body.size && body.order_type) {
+        try {
+          catalogEntry = await supabaseInsert('product_price_map', {
+            stripe_product_id: product_id,
+            stripe_price_id: data.id,
+            product_name: body.product_name || '',
+            category: body.category,
+            product_type: body.product_type,
+            variant: body.variant,
+            size: body.size,
+            order_type: body.order_type,
+            market: body.market || 'NZ',
+            unit_amount: Math.round(Number(unit_amount)),
+            currency: currency || 'nzd',
+            display_price: body.display_price || null,
+          });
+        } catch (e) {
+          console.error('[stripe-products] Catalog save error:', e);
+        }
+      }
+
+      return reply(200, { price: data, catalogEntry });
     }
 
     return reply(400, { error: `Unknown action: ${action}` });
