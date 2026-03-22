@@ -8521,13 +8521,16 @@ async function loadCommsTab() {
   if (commsAccounts.length > 0) {
     document.getElementById('comms-thread-list').innerHTML = '<div class="comms-empty">Syncing messages...</div>';
     try {
-      await commsApi('sync', { maxResults: 30 });
-    } catch {}
+      const syncRes = await commsApi('sync', { maxResults: 15 });
+      console.log('Comms sync result:', syncRes);
+    } catch (e) { console.error('Comms sync error:', e); }
     try {
       const data = await commsApi('threads', { limit: 50 });
+      console.log('Comms threads result:', data);
       commsThreads = data.threads || [];
       renderCommsThreadList();
-    } catch {
+    } catch (e) {
+      console.error('Comms threads error:', e);
       document.getElementById('comms-thread-list').innerHTML = '<div class="comms-empty">Failed to load threads</div>';
     }
   }

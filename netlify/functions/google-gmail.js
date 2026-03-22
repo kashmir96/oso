@@ -171,16 +171,19 @@ async function getKnownEmails() {
 
 async function syncAccount(account, knownEmails, maxResults = 100) {
   const tokens = await getAccountTokens(account.id);
-  if (!tokens) return 0;
+  if (!tokens) { console.log('No tokens for account', account.id); return 0; }
 
   // Fetch recent messages
+  console.log(`Fetching messages for ${account.email_address}...`);
   const listData = await gmailFetch(tokens.access_token, `/messages?maxResults=${maxResults}&q=newer_than:2d`);
+  console.log(`Gmail list response:`, listData.messages ? listData.messages.length + ' messages' : 'no messages', listData.error || '');
+  if (listData.error) { console.error('Gmail API error:', JSON.stringify(listData.error)); return 0; }
   if (!listData.messages || listData.messages.length === 0) return 0;
 
   let synced = 0;
-  // Process in batches of 10
-  for (let i = 0; i < listData.messages.length; i += 10) {
-    const batch = listData.messages.slice(i, i + 10);
+  // Process in batches of 5 (smaller to avoid timeouts)
+  for (let i = 0; i < listData.messages.length; i += 5) {
+    const batch = listData.messages.slice(i, i + 5);
     const details = await Promise.all(
       batch.map(m => gmailFetch(tokens.access_token, `/messages/${m.id}?format=full`))
     );
