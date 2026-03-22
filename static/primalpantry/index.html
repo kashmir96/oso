@@ -362,6 +362,8 @@
     .settings-tab-btn { background: var(--card); border: 1px solid var(--border); color: var(--muted); padding: 0.4rem 1rem; border-radius: 20px; cursor: pointer; font-size: 0.85rem; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
     .settings-tab-btn.active { background: var(--sage); color: #141210; border-color: var(--sage); font-weight: 600; }
     .settings-tab-btn:hover:not(.active) { border-color: var(--sage); color: var(--sage); }
+    .retail-settings-gear { background: none; border: 1px solid var(--border); color: var(--muted); width: 30px; height: 30px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+    .retail-settings-gear:hover { border-color: var(--sage); color: var(--sage); }
     /* Channel color strips */
     .comms-thread-item.channel-email { border-left: 4px solid #8cb47a; }
     .comms-thread-item.channel-facebook { border-left: 4px solid #1877F2; }
@@ -958,64 +960,132 @@
   </div><!-- /tab-orders -->
 
   <div id="tab-customers" class="tab-content">
-    <div class="stats" id="customer-stats-grid"></div>
-    <div class="segment-bar">
-      <div class="segment-filters">
-        <select id="seg-type">
-          <option value="">All Customers</option>
-          <option value="new">New (1 order)</option>
-          <option value="returning">Returning (2+)</option>
-        </select>
-        <select id="seg-spend">
-          <option value="">All Spend</option>
-          <option value="0-50">$0 – $50</option>
-          <option value="50-200">$50 – $200</option>
-          <option value="200-500">$200 – $500</option>
-          <option value="500+">$500+</option>
-        </select>
-        <select id="seg-orders">
-          <option value="">All Orders</option>
-          <option value="1">Exactly 1</option>
-          <option value="2-5">2 – 5</option>
-          <option value="5+">5+</option>
-        </select>
-        <select id="seg-recency">
-          <option value="">All Recency</option>
-          <option value="7">Last 7 days</option>
-          <option value="30">Last 30 days</option>
-          <option value="60">Last 60 days</option>
-          <option value="90">Last 90 days</option>
-          <option value="lapsed">Lapsed (90d+)</option>
-        </select>
-        <select id="seg-city"></select>
-        <select id="seg-source"></select>
-        <select id="seg-tag">
-          <option value="">All Tags</option>
-          <option value="VIP">VIP</option>
-          <option value="Wholesale">Wholesale</option>
-          <option value="Influencer">Influencer</option>
-          <option value="Staff">Staff</option>
-          <option value="Flagged">Flagged</option>
+    <div class="settings-tabs" id="customers-sub-tabs">
+      <button class="settings-tab-btn active" data-customers-tab="ecommerce">E-Commerce Customers</button>
+      <button class="settings-tab-btn" data-customers-tab="retail">Retail Customers</button>
+    </div>
+
+    <!-- E-Commerce Customers sub-tab -->
+    <div id="customers-ecommerce" class="customers-panel">
+      <div class="stats" id="customer-stats-grid"></div>
+      <div class="segment-bar">
+        <div class="segment-filters">
+          <select id="seg-type">
+            <option value="">All Customers</option>
+            <option value="new">New (1 order)</option>
+            <option value="returning">Returning (2+)</option>
+          </select>
+          <select id="seg-spend">
+            <option value="">All Spend</option>
+            <option value="0-50">$0 – $50</option>
+            <option value="50-200">$50 – $200</option>
+            <option value="200-500">$200 – $500</option>
+            <option value="500+">$500+</option>
+          </select>
+          <select id="seg-orders">
+            <option value="">All Orders</option>
+            <option value="1">Exactly 1</option>
+            <option value="2-5">2 – 5</option>
+            <option value="5+">5+</option>
+          </select>
+          <select id="seg-recency">
+            <option value="">All Recency</option>
+            <option value="7">Last 7 days</option>
+            <option value="30">Last 30 days</option>
+            <option value="60">Last 60 days</option>
+            <option value="90">Last 90 days</option>
+            <option value="lapsed">Lapsed (90d+)</option>
+          </select>
+          <select id="seg-city"></select>
+          <select id="seg-source"></select>
+          <select id="seg-tag">
+            <option value="">All Tags</option>
+            <option value="VIP">VIP</option>
+            <option value="Wholesale">Wholesale</option>
+            <option value="Influencer">Influencer</option>
+            <option value="Staff">Staff</option>
+            <option value="Flagged">Flagged</option>
+          </select>
+        </div>
+        <div class="segment-actions">
+          <select id="seg-saved"><option value="">Saved Segments…</option></select>
+          <button class="seg-btn seg-btn-save" id="seg-save-btn">Save</button>
+          <button class="seg-btn seg-btn-clear" id="seg-clear-btn">Clear</button>
+          <span class="seg-count" id="seg-count"></span>
+        </div>
+      </div>
+      <div class="customer-sort">
+        <input type="text" id="customer-search" placeholder="Search by name or email...">
+        <select id="customer-sort">
+          <option value="spend">Sort by Spend</option>
+          <option value="orders">Sort by Orders</option>
+          <option value="recent">Sort by Most Recent</option>
+          <option value="name">Sort by Name</option>
         </select>
       </div>
-      <div class="segment-actions">
-        <select id="seg-saved"><option value="">Saved Segments…</option></select>
-        <button class="seg-btn seg-btn-save" id="seg-save-btn">Save</button>
-        <button class="seg-btn seg-btn-clear" id="seg-clear-btn">Clear</button>
-        <span class="seg-count" id="seg-count"></span>
+      <div id="customers-list"></div>
+      <div id="customers-pagination"></div>
+    </div>
+
+    <!-- Retail Customers sub-tab -->
+    <div id="customers-retail" class="customers-panel" style="display:none;">
+      <div class="stats" id="retail-stats-grid">
+        <div class="stat-card"><div class="label">Invoices Today</div><div class="value" style="color:var(--blue)" id="retail-inv-count">–</div><div class="sub">created today</div></div>
+        <div class="stat-card"><div class="label">Invoice Value Today</div><div class="value" style="color:var(--green)" id="retail-inv-value">–</div><div class="sub">total excl. tax</div></div>
+        <div class="stat-card"><div class="label">Total Retailers</div><div class="value" style="color:var(--purple)" id="retail-count">–</div><div class="sub">active accounts</div></div>
+      </div>
+
+      <div class="orders-card" style="margin-top:1rem;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+          <h3 style="margin:0;">Today's Invoices</h3>
+        </div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead><tr><th>Invoice #</th><th>Customer</th><th>Date</th><th>Due</th><th>Amount</th><th>Status</th></tr></thead>
+            <tbody id="retail-invoices-table"><tr><td colspan="6" class="loading">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:0.5rem;margin-top:1.5rem;margin-bottom:0.5rem;">
+        <h3 style="margin:0;">Retail Customers</h3>
+        <button class="retail-settings-gear" id="retail-settings-gear" title="Manage Retail Customers" onclick="document.getElementById('retail-manage-panel').style.display = document.getElementById('retail-manage-panel').style.display === 'none' ? 'block' : 'none';">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
+
+      <!-- Manage retailers panel (hidden by default, toggled by gear) -->
+      <div id="retail-manage-panel" style="display:none;">
+        <div class="orders-card" style="margin-bottom:1.5rem;">
+          <h3>Add Retailer</h3>
+          <div class="form-grid" style="margin-bottom:0.75rem;">
+            <div class="form-group"><label>Company Name *</label><input type="text" id="rc-name" placeholder="Retailer name" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;"></div>
+            <div class="form-group"><label>Contact Name</label><input type="text" id="rc-contact" placeholder="Primary contact" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;"></div>
+            <div class="form-group"><label>Email</label><input type="email" id="rc-email" placeholder="orders@retailer.com" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;"></div>
+            <div class="form-group"><label>Phone</label><input type="text" id="rc-phone" placeholder="+64..." style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;"></div>
+            <div class="form-group"><label>Website</label><input type="text" id="rc-website" placeholder="https://..." style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;"></div>
+            <div class="form-group"><label>Payment Terms</label><input type="text" id="rc-terms" placeholder="e.g. Net 30, COD" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;"></div>
+          </div>
+          <div class="form-grid full" style="margin-bottom:0.75rem;">
+            <div class="form-group"><label>Address</label><input type="text" id="rc-address" placeholder="Full address" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;"></div>
+            <div class="form-group"><label>Notes</label><textarea id="rc-notes" rows="2" placeholder="Any notes about this retailer..." style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;resize:vertical;"></textarea></div>
+          </div>
+          <button class="manual-order-btn" id="rc-add-btn">Add Retailer</button>
+        </div>
+        <div class="orders-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
+            <h3 style="margin:0;">Retailers</h3>
+            <button class="manual-order-btn" id="rc-xero-sync" style="display:none;font-size:0.75rem;padding:4px 12px;" onclick="syncFromXero('wholesalers')">Sync from Xero</button>
+          </div>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead><tr><th>Company</th><th>Contact</th><th>Email</th><th>Phone</th><th>Payment Terms</th><th></th></tr></thead>
+              <tbody id="rc-table"><tr><td colspan="6" class="loading">Loading...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
-    <div class="customer-sort">
-      <input type="text" id="customer-search" placeholder="Search by name or email...">
-      <select id="customer-sort">
-        <option value="spend">Sort by Spend</option>
-        <option value="orders">Sort by Orders</option>
-        <option value="recent">Sort by Most Recent</option>
-        <option value="name">Sort by Name</option>
-      </select>
-    </div>
-    <div id="customers-list"></div>
-    <div id="customers-pagination"></div>
   </div><!-- /tab-customers -->
 
   <div id="tab-comms" class="tab-content">
@@ -1728,7 +1798,10 @@
     <div class="orders-card" style="margin-bottom:1.5rem;" id="mkt-competitors-section">
       <h3 style="display:flex;justify-content:space-between;align-items:center;">
         Competitor Tracking
-        <span id="mkt-comp-count" style="font-size:0.7rem;font-weight:400;color:var(--muted);"></span>
+        <span style="display:flex;align-items:center;gap:0.75rem;">
+          <span id="mkt-comp-count" style="font-size:0.7rem;font-weight:400;color:var(--muted);"></span>
+          <button id="comp-run-check-btn" class="manual-order-btn" onclick="runCompetitorCheck()" style="font-size:0.7rem;padding:4px 12px;">Run Check Now</button>
+        </span>
       </h3>
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:end;margin-bottom:1rem;">
         <div class="form-group" style="flex:1;min-width:160px;">
@@ -1889,7 +1962,6 @@
   <div id="tab-settings" class="tab-content">
     <div class="settings-tabs">
       <button class="settings-tab-btn active" data-settings-tab="suppliers">Suppliers</button>
-      <button class="settings-tab-btn" data-settings-tab="wholesalers">Retailers</button>
       <button class="settings-tab-btn" data-settings-tab="macros">Macros</button>
     </div>
 
@@ -1925,37 +1997,6 @@
       </div>
     </div>
 
-    <!-- Retailers sub-tab -->
-    <div id="settings-wholesalers" class="settings-panel" style="display:none;">
-      <div class="orders-card" style="margin-bottom:1.5rem;">
-        <h3>Add Retailer</h3>
-        <div class="form-grid" style="margin-bottom:0.75rem;">
-          <div class="form-group"><label>Company Name *</label><input type="text" id="ws-name" placeholder="Retailer name" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;"></div>
-          <div class="form-group"><label>Contact Name</label><input type="text" id="ws-contact" placeholder="Primary contact" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;"></div>
-          <div class="form-group"><label>Email</label><input type="email" id="ws-email" placeholder="orders@retailer.com" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;"></div>
-          <div class="form-group"><label>Phone</label><input type="text" id="ws-phone" placeholder="+64..." style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;"></div>
-          <div class="form-group"><label>Website</label><input type="text" id="ws-website" placeholder="https://..." style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;"></div>
-          <div class="form-group"><label>Payment Terms</label><input type="text" id="ws-terms" placeholder="e.g. Net 30, COD" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;"></div>
-        </div>
-        <div class="form-grid full" style="margin-bottom:0.75rem;">
-          <div class="form-group"><label>Address</label><input type="text" id="ws-address" placeholder="Full address" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;"></div>
-          <div class="form-group"><label>Notes</label><textarea id="ws-notes" rows="2" placeholder="Any notes about this retailer..." style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;resize:vertical;"></textarea></div>
-        </div>
-        <button class="manual-order-btn" id="ws-add-btn">Add Retailer</button>
-      </div>
-      <div class="orders-card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
-          <h3 style="margin:0;">Retailers</h3>
-          <button class="manual-order-btn" id="ws-xero-sync" style="display:none;font-size:0.75rem;padding:4px 12px;" onclick="syncFromXero('wholesalers')">Sync from Xero</button>
-        </div>
-        <div style="overflow-x:auto;">
-          <table>
-            <thead><tr><th>Company</th><th>Contact</th><th>Email</th><th>Phone</th><th>Payment Terms</th><th></th></tr></thead>
-            <tbody id="ws-table"><tr><td colspan="6" class="loading">Loading...</td></tr></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
     <!-- Macros sub-tab -->
     <div id="settings-macros" class="settings-panel" style="display:none;">
       <div class="orders-card" style="margin-bottom:1.5rem;">
@@ -2431,7 +2472,7 @@ const ROLE_TABS = {
   manufacturing: ['manufacturing'],
   shipping: ['shipping'],
   office: ['sales', 'orders', 'shipping', 'customers', 'comms', 'manufacturing', 'website', 'marketing', 'finance'],
-  admin: ['sales', 'orders', 'shipping', 'customers', 'comms', 'manufacturing', 'website', 'marketing', 'finance', 'settings'],
+  admin: ['sales', 'orders', 'shipping', 'customers', 'comms', 'manufacturing', 'website', 'marketing', 'finance'],
   owner: ['sales', 'orders', 'shipping', 'customers', 'comms', 'manufacturing', 'website', 'marketing', 'finance', 'settings'],
 };
 
@@ -4899,6 +4940,7 @@ function loadActiveTab() {
   } else if (activeTab === 'shipping' && !shippingLoaded) {
     loadShippingData();
   } else if (activeTab === 'customers') {
+    initCustomersSubTabs();
     renderCustomersTab();
   } else if (activeTab === 'manufacturing') {
     loadManufacturingTab();
@@ -9974,6 +10016,22 @@ async function deleteCompetitor(id) {
     await fetch('/.netlify/functions/competitors?token=' + currentStaff.token + '&id=' + id, { method: 'DELETE' });
     await loadCompetitorsSection();
   } catch (e) { console.error('Delete competitor error:', e); }
+}
+
+async function runCompetitorCheck() {
+  const btn = document.getElementById('comp-run-check-btn');
+  btn.disabled = true; btn.textContent = 'Checking...';
+  try {
+    const res = await fetch('/.netlify/functions/competitor-check?token=' + currentStaff.token);
+    if (!res.ok) throw new Error('Check failed: ' + res.status);
+    await loadCompetitorsSection();
+    btn.textContent = 'Done!';
+    setTimeout(() => { btn.textContent = 'Run Check Now'; btn.disabled = false; }, 2000);
+  } catch (e) {
+    console.error('Competitor check error:', e);
+    btn.textContent = 'Failed';
+    setTimeout(() => { btn.textContent = 'Run Check Now'; btn.disabled = false; }, 2000);
+  }
 }
 
 // ── Finance Tab ──
