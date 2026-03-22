@@ -360,6 +360,28 @@
     .settings-tab-btn { background: var(--card); border: 1px solid var(--border); color: var(--muted); padding: 0.4rem 1rem; border-radius: 20px; cursor: pointer; font-size: 0.85rem; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
     .settings-tab-btn.active { background: var(--sage); color: #141210; border-color: var(--sage); font-weight: 600; }
     .settings-tab-btn:hover:not(.active) { border-color: var(--sage); color: var(--sage); }
+    /* Channel color strips */
+    .comms-thread-item.channel-email { border-left: 4px solid #8cb47a; }
+    .comms-thread-item.channel-facebook { border-left: 4px solid #1877F2; }
+    .comms-thread-item.channel-instagram { border-left: 4px solid #E1306C; }
+    .comms-thread-item.channel-livechat { border-left: 4px solid #50b4c8; }
+    .comms-channel-badge { padding: 0.05rem 0.35rem; border-radius: 4px; font-size: 0.6rem; font-weight: 700; margin-left: 0.3rem; }
+    .comms-channel-badge.ch-email { background: rgba(140,180,122,0.15); color: #8cb47a; }
+    .comms-channel-badge.ch-facebook { background: rgba(24,119,242,0.15); color: #1877F2; }
+    .comms-channel-badge.ch-instagram { background: rgba(225,48,108,0.15); color: #E1306C; }
+    .comms-channel-badge.ch-livechat { background: rgba(80,180,200,0.15); color: #50b4c8; }
+    .comms-filter-btn.filter-ch-email.active { background: #8cb47a; border-color: #8cb47a; color: #141210; }
+    .comms-filter-btn.filter-ch-facebook.active { background: #1877F2; border-color: #1877F2; color: #fff; }
+    .comms-filter-btn.filter-ch-instagram.active { background: #E1306C; border-color: #E1306C; color: #fff; }
+    .comms-filter-btn.filter-ch-livechat.active { background: #50b4c8; border-color: #50b4c8; color: #141210; }
+    /* Macros button */
+    .comms-macro-btn { position: absolute; top: 6px; right: 8px; background: var(--card); border: 1px solid var(--border); color: var(--muted); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; cursor: pointer; font-family: 'DM Sans', sans-serif; z-index: 2; }
+    .comms-macro-btn:hover { color: var(--sage); border-color: var(--sage); }
+    .comms-macro-dropdown { position: absolute; top: 28px; right: 8px; background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 0.25rem; z-index: 99; min-width: 200px; max-height: 240px; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+    .comms-macro-item { padding: 0.4rem 0.6rem; cursor: pointer; font-size: 0.8rem; border-radius: 4px; }
+    .comms-macro-item:hover { background: rgba(140,180,122,0.12); }
+    .comms-macro-item .macro-name { font-weight: 600; color: var(--text); }
+    .comms-macro-item .macro-preview { font-size: 0.7rem; color: var(--dim); margin-top: 0.1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     @media (max-width: 768px) { .comms-layout { grid-template-columns: 1fr; height: auto; } .comms-sidebar { max-height: 40vh; } }
 
     /* Manual order form */
@@ -1010,6 +1032,13 @@
             <option value="all">All Inboxes</option>
           </select>
         </div>
+        <div class="comms-filter-bar" id="comms-channel-bar">
+          <button class="comms-filter-btn active" data-channel="all">All</button>
+          <button class="comms-filter-btn filter-ch-email" data-channel="email">Email</button>
+          <button class="comms-filter-btn filter-ch-facebook" data-channel="facebook">Facebook</button>
+          <button class="comms-filter-btn filter-ch-instagram" data-channel="instagram">Instagram</button>
+          <button class="comms-filter-btn filter-ch-livechat" data-channel="livechat">Chat</button>
+        </div>
         <div class="comms-filter-bar" id="comms-filter-bar">
           <button class="comms-filter-btn active" data-filter="all">All</button>
           <button class="comms-filter-btn" data-filter="customers">Customers</button>
@@ -1028,7 +1057,10 @@
           <div class="comms-empty">Select a conversation to view messages</div>
         </div>
         <div class="comms-reply-box" id="comms-reply-box" style="display:none;">
-          <textarea id="comms-reply-text" placeholder="Type your reply..."></textarea>
+          <div style="position:relative;">
+            <textarea id="comms-reply-text" placeholder="Type your reply..." style="padding-right:70px;"></textarea>
+            <button class="comms-macro-btn" onclick="toggleMacroDropdown('comms-reply-text')">&#9889; Macros</button>
+          </div>
           <div class="comms-reply-actions">
             <div style="display:flex;gap:0.5rem;align-items:center;">
               <select id="comms-reply-from"></select>
@@ -1856,6 +1888,7 @@
     <div class="settings-tabs">
       <button class="settings-tab-btn active" data-settings-tab="suppliers">Suppliers</button>
       <button class="settings-tab-btn" data-settings-tab="wholesalers">Retailers</button>
+      <button class="settings-tab-btn" data-settings-tab="macros">Macros</button>
     </div>
 
     <!-- Suppliers sub-tab -->
@@ -1917,6 +1950,28 @@
           <table>
             <thead><tr><th>Company</th><th>Contact</th><th>Email</th><th>Phone</th><th>Payment Terms</th><th></th></tr></thead>
             <tbody id="ws-table"><tr><td colspan="6" class="loading">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <!-- Macros sub-tab -->
+    <div id="settings-macros" class="settings-panel" style="display:none;">
+      <div class="orders-card" style="margin-bottom:1.5rem;">
+        <h3>Add Macro</h3>
+        <div class="form-grid" style="margin-bottom:0.75rem;">
+          <div class="form-group"><label>Macro Name *</label><input type="text" id="macro-name" placeholder="e.g. Shipping Update" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;"></div>
+        </div>
+        <div class="form-grid full" style="margin-bottom:0.75rem;">
+          <div class="form-group"><label>Content *</label><textarea id="macro-content" rows="4" placeholder="Hi {name},&#10;&#10;Thank you for your order..." style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem;border-radius:10px;font-size:0.85rem;font-family:'DM Sans',sans-serif;resize:vertical;"></textarea></div>
+        </div>
+        <button class="manual-order-btn" id="macro-add-btn">Add Macro</button>
+      </div>
+      <div class="orders-card">
+        <h3>Saved Macros</h3>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead><tr><th>Name</th><th>Preview</th><th></th></tr></thead>
+            <tbody id="macro-table"><tr><td colspan="3" class="loading">Loading...</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -2055,7 +2110,10 @@
       </div>
       <div class="form-group">
         <label>Message</label>
-        <textarea id="compose-body" rows="10" style="width:100%;padding:0.5rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.85rem;resize:vertical;"></textarea>
+        <div style="position:relative;">
+          <textarea id="compose-body" rows="10" style="width:100%;padding:0.5rem;padding-right:70px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.85rem;resize:vertical;"></textarea>
+          <button class="comms-macro-btn" onclick="toggleMacroDropdown('compose-body')">&#9889; Macros</button>
+        </div>
       </div>
     </div>
     <div style="margin-top:1rem;display:flex;justify-content:space-between;align-items:center;gap:0.5rem;">
@@ -4745,6 +4803,10 @@ document.querySelectorAll('.nav-item').forEach(btn => {
     });
     // Hide entire filter bar on finance (has its own date context)
     document.querySelector('.filter-bar').style.display = (activeTab === 'finance' || activeTab === 'comms' || activeTab === 'settings') ? 'none' : '';
+    // Attribution toggle: only on website, marketing, overview
+    document.getElementById('attr-toggle').style.display = (activeTab === 'website' || activeTab === 'marketing' || activeTab === 'sales') ? '' : 'none';
+    // Ad spend banner: only on marketing and overview
+    document.getElementById('adspend-banner').style.display = (activeTab === 'marketing' || activeTab === 'sales') ? '' : 'none';
     loadActiveTab();
     checkCommsPrompts(); // Check for pending prompts on every tab switch
   });
@@ -8887,6 +8949,8 @@ function renderCommsAccounts() {
 
 let commsFilter = 'all';
 let commsInboxFilter = 'all';
+let commsChannelFilter = 'all';
+let commsMacros = [];
 let commsStaffList = [];
 let commsPrompts = [];
 
@@ -8932,19 +8996,23 @@ function renderCommsThreadList(searchFilter) {
       html += '<div class="comms-date-group">' + group + '</div>';
     }
     const isActive = commsActiveThread && commsActiveThread.thread_id === t.thread_id;
+    const ch = t.channel || 'email';
+    const chLabels = { email: 'Email', facebook: 'FB', instagram: 'IG', livechat: 'Chat' };
     const dotClass = t.contact_type === 'supplier' ? 'comms-dot-supplier' : t.contact_type === 'wholesaler' ? 'comms-dot-wholesaler' : '';
     const showDot = t.unread_count > 0;
-    html += '<div class="comms-thread-item' + (isActive ? ' active' : '') + (t.unread_count > 0 ? ' unread' : '') + '" onclick="openCommsThread(\'' + (t.thread_id || '').replace(/'/g, "\\'") + '\')">'
+    html += '<div class="comms-thread-item channel-' + ch + (isActive ? ' active' : '') + (t.unread_count > 0 ? ' unread' : '') + '" onclick="openCommsThread(\'' + (t.thread_id || '').replace(/'/g, "\\'") + '\')">'
       + '<div class="comms-thread-name">'
-      + (showDot ? '<span class="comms-unread-dot ' + dotClass + '"></span>' : (t.contact_type === 'supplier' ? '<span class="comms-unread-dot comms-dot-supplier" style="opacity:0.4;"></span>' : t.contact_type === 'wholesaler' ? '<span class="comms-unread-dot comms-dot-wholesaler" style="opacity:0.4;"></span>' : ''))
-      + '<span>' + esc(t.customer_name || t.customer_email || 'Unknown') + '</span>'
+      + (showDot ? '<span class="comms-unread-dot ' + dotClass + '"></span>' : '')
+      + '<span>' + esc(t.customer_name || t.customer_email || 'Unknown')
+      + '<span class="comms-channel-badge ch-' + ch + '">' + chLabels[ch] + '</span>'
+      + '</span>'
       + '<span class="comms-thread-time">' + commsTimeAgo(t.last_date)
       + (t.order_flagged ? ' <svg class="comms-order-flag" viewBox="0 0 24 24" fill="none" stroke="#e06050" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' : '')
       + '</span>'
       + '</div>'
       + '<div class="comms-thread-subject">'
       + (t.contact_type !== 'customer' ? '<span class="comms-type-badge ' + t.contact_type + '">' + t.contact_type + '</span> ' : '')
-      + esc(t.last_subject || '(no subject)') + '</div>'
+      + esc(t.last_subject || t.last_snippet || '(no subject)') + '</div>'
       + '<div class="comms-thread-snippet">' + esc(t.last_snippet || '') + '</div>'
       + '</div>';
   }
@@ -9284,6 +9352,17 @@ async function loadCommsTab() {
       commsInboxFilter = this.value;
       loadCommsThreads();
     });
+    // Channel filter buttons
+    document.querySelectorAll('#comms-channel-bar .comms-filter-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('#comms-channel-bar .comms-filter-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        commsChannelFilter = this.dataset.channel;
+        // Show/hide inbox dropdown (only relevant for email)
+        document.getElementById('comms-inbox-filter').parentElement.style.display = (commsChannelFilter === 'all' || commsChannelFilter === 'email') ? '' : 'none';
+        loadCommsThreads();
+      });
+    });
     window.addEventListener('message', e => { if (e.data && e.data.gmailConnected) loadCommsTab(); });
   }
 
@@ -9306,7 +9385,7 @@ async function loadCommsTab() {
 
 async function loadCommsThreads() {
   try {
-    const data = await commsApi('threads', { limit: 50, filter: commsFilter });
+    const data = await commsApi('threads', { limit: 50, filter: commsFilter, channel: commsChannelFilter });
     commsThreads = data.threads || [];
     renderCommsThreadList();
   } catch (e) {
@@ -9320,25 +9399,34 @@ async function sendCommsReply() {
   const textEl = document.getElementById('comms-reply-text');
   let text = textEl.value.trim();
   if (!text) return;
-  const accountId = parseInt(document.getElementById('comms-reply-from').value);
-  if (!accountId) return;
 
-  // Append quoted text
-  if (commsActiveThread._quoteBlock) text += commsActiveThread._quoteBlock;
-
+  const ch = commsActiveThread.channel || 'email';
   const btn = document.getElementById('comms-reply-send');
   btn.disabled = true; btn.textContent = 'Sending...';
 
   try {
-    const lastSubject = commsActiveThread.last_subject || '';
-    const subject = lastSubject.startsWith('Re:') ? lastSubject : 'Re: ' + lastSubject;
-    await commsApi('send', {
-      account_id: accountId,
-      to: commsActiveThread.customer_email || '',
-      subject: subject,
-      body: text,
-      threadId: commsActiveThread.thread_id,
-    });
+    if (ch === 'facebook' || ch === 'instagram') {
+      // Extract recipient ID from thread_id (format: facebook_PSID or instagram_IGSID)
+      const recipientId = (commsActiveThread.thread_id || '').replace(/^(facebook|instagram)_/, '');
+      await fetch('/.netlify/functions/meta-send', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: currentStaff.token, platform: ch, recipient_id: recipientId, text, thread_id: commsActiveThread.thread_id }),
+      }).then(r => r.json());
+    } else {
+      // Email send (existing)
+      const accountId = parseInt(document.getElementById('comms-reply-from').value);
+      if (!accountId) { btn.disabled = false; btn.textContent = 'Send'; return; }
+      if (commsActiveThread._quoteBlock) text += commsActiveThread._quoteBlock;
+      const lastSubject = commsActiveThread.last_subject || '';
+      const subject = lastSubject.startsWith('Re:') ? lastSubject : 'Re: ' + lastSubject;
+      await commsApi('send', {
+        account_id: accountId,
+        to: commsActiveThread.customer_email || '',
+        subject: subject,
+        body: text,
+        threadId: commsActiveThread.thread_id,
+      });
+    }
     textEl.value = '';
     await openCommsThread(commsActiveThread.thread_id);
     await loadCommsThreads();
@@ -9468,7 +9556,26 @@ async function loadSettingsTab() {
         document.getElementById('settings-' + settingsActiveTab).style.display = 'block';
         if (settingsActiveTab === 'suppliers') loadSuppliers();
         else if (settingsActiveTab === 'wholesalers') loadWholesalers();
+        else if (settingsActiveTab === 'macros') loadMacros();
       });
+    });
+    // Add macro
+    document.getElementById('macro-add-btn').addEventListener('click', async () => {
+      const name = document.getElementById('macro-name').value.trim();
+      const content = document.getElementById('macro-content').value.trim();
+      if (!name || !content) return;
+      const btn = document.getElementById('macro-add-btn');
+      btn.disabled = true; btn.textContent = 'Adding...';
+      try {
+        await fetch('/.netlify/functions/dashboard-data', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: currentStaff.token, table: 'macros', operation: 'insert', params: { body: { name, content, created_by: currentStaff.id } } }),
+        });
+        document.getElementById('macro-name').value = '';
+        document.getElementById('macro-content').value = '';
+        await loadMacros();
+      } catch (e) { alert('Error: ' + e.message); }
+      btn.disabled = false; btn.textContent = 'Add Macro';
     });
     // Add supplier
     document.getElementById('sup-add-btn').addEventListener('click', async () => {
@@ -9528,7 +9635,8 @@ async function loadSettingsTab() {
     });
   }
   if (settingsActiveTab === 'suppliers') loadSuppliers();
-  else loadWholesalers();
+  else if (settingsActiveTab === 'wholesalers') loadWholesalers();
+  else if (settingsActiveTab === 'macros') loadMacros();
 }
 
 function renderEntityTable(tableId, data, type) {
@@ -9591,6 +9699,95 @@ async function deleteEntity(id, type) {
     await fetch('/.netlify/functions/suppliers?token=' + currentStaff.token + '&id=' + id + '&type=' + type, { method: 'DELETE' });
     if (type === 'suppliers') loadSuppliers(); else loadWholesalers();
   } catch (e) { alert('Error: ' + e.message); }
+}
+
+// ── Macros ──
+
+async function loadMacros() {
+  try {
+    const res = await fetch('/.netlify/functions/dashboard-data', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: currentStaff.token, table: 'macros', operation: 'select', params: { select: '*', eq: ['active', 'true'], order: 'name.asc' } }),
+    });
+    const data = await res.json();
+    commsMacros = data.data || [];
+    const tbl = document.getElementById('macro-table');
+    if (commsMacros.length === 0) {
+      tbl.innerHTML = '<tr><td colspan="3" class="loading">No macros added yet</td></tr>';
+      return;
+    }
+    tbl.innerHTML = commsMacros.map(m => '<tr>'
+      + '<td style="font-weight:500;">' + esc(m.name) + '</td>'
+      + '<td style="color:var(--dim);font-size:0.8rem;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(m.content.slice(0, 80)) + '</td>'
+      + '<td><button class="delete-btn" onclick="deleteMacro(' + m.id + ')" style="font-size:0.7rem;padding:3px 8px;">Remove</button></td>'
+      + '</tr>').join('');
+  } catch { document.getElementById('macro-table').innerHTML = '<tr><td colspan="3" class="loading">Failed to load</td></tr>'; }
+}
+
+async function deleteMacro(id) {
+  if (!confirm('Delete this macro?')) return;
+  try {
+    await fetch('/.netlify/functions/dashboard-data', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: currentStaff.token, table: 'macros', operation: 'update', params: { eq: ['id', String(id)], body: { active: false } } }),
+    });
+    await loadMacros();
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+function toggleMacroDropdown(targetTextareaId) {
+  // Remove existing dropdown
+  const existing = document.querySelector('.comms-macro-dropdown');
+  if (existing) { existing.remove(); return; }
+
+  // Load macros if not loaded
+  if (commsMacros.length === 0) {
+    fetch('/.netlify/functions/dashboard-data', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: currentStaff.token, table: 'macros', operation: 'select', params: { select: '*', eq: ['active', 'true'], order: 'name.asc' } }),
+    }).then(r => r.json()).then(data => {
+      commsMacros = data.data || [];
+      toggleMacroDropdown(targetTextareaId);
+    });
+    return;
+  }
+
+  const textarea = document.getElementById(targetTextareaId);
+  const wrapper = textarea.parentElement;
+  const dd = document.createElement('div');
+  dd.className = 'comms-macro-dropdown';
+  if (commsMacros.length === 0) {
+    dd.innerHTML = '<div style="padding:0.5rem;color:var(--dim);font-size:0.8rem;">No macros saved. Add them in Settings.</div>';
+  } else {
+    dd.innerHTML = commsMacros.map(m =>
+      '<div class="comms-macro-item" onclick="insertMacro(\'' + targetTextareaId + '\',' + m.id + ')">'
+      + '<div class="macro-name">' + esc(m.name) + '</div>'
+      + '<div class="macro-preview">' + esc(m.content.slice(0, 60)) + '</div>'
+      + '</div>'
+    ).join('');
+  }
+  wrapper.appendChild(dd);
+  // Close on click outside
+  setTimeout(() => {
+    document.addEventListener('click', function closeMD(e) {
+      if (!dd.contains(e.target) && !e.target.classList.contains('comms-macro-btn')) { dd.remove(); document.removeEventListener('click', closeMD); }
+    });
+  }, 50);
+}
+
+function insertMacro(targetId, macroId) {
+  const macro = commsMacros.find(m => m.id === macroId);
+  if (!macro) return;
+  const textarea = document.getElementById(targetId);
+  const start = textarea.selectionStart;
+  const before = textarea.value.substring(0, start);
+  const after = textarea.value.substring(textarea.selectionEnd);
+  textarea.value = before + macro.content + after;
+  textarea.selectionStart = textarea.selectionEnd = start + macro.content.length;
+  textarea.focus();
+  // Remove dropdown
+  const dd = document.querySelector('.comms-macro-dropdown');
+  if (dd) dd.remove();
 }
 
 async function syncFromXero(type) {
