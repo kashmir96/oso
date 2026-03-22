@@ -7005,7 +7005,10 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     const qs = new URLSearchParams(params).toString();
     const res = await fetch(`${WA_API}/${fn}?${qs}`);
     if (res.status === 401) { sessionStorage.removeItem('pp_staff'); location.reload(); throw new Error('Session expired'); }
-    if (!res.ok) throw new Error('API error ' + res.status);
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error('API error ' + res.status + ': ' + (errBody.error || ''));
+    }
     return res.json();
   }
 
