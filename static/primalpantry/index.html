@@ -5190,16 +5190,16 @@ document.querySelectorAll('.nav-item').forEach(btn => {
     document.getElementById('tab-' + activeTab).classList.add('active');
     navLabel.textContent = navNames[activeTab] || activeTab;
     closeNav();
-    // Source/Medium/Campaign/City filters: only on website, marketing, overview
-    const showUtmFilters = activeTab === 'website' || activeTab === 'marketing' || activeTab === 'sales';
+    // Source/Medium/Campaign/City filters: only on website, marketing
+    const showUtmFilters = activeTab === 'website' || activeTab === 'marketing';
     document.querySelectorAll('.filter-bar .filter-group').forEach((g, i) => {
       if (i === 0) return; // Keep Period filter visible
       g.style.display = showUtmFilters ? '' : 'none';
     });
     // Hide entire filter bar on finance (has its own date context)
     document.querySelector('.filter-bar').style.display = (activeTab === 'finance' || activeTab === 'comms' || activeTab === 'settings') ? 'none' : '';
-    // Attribution toggle: only on website, marketing, overview
-    document.getElementById('attr-toggle').style.display = (activeTab === 'website' || activeTab === 'marketing' || activeTab === 'sales') ? '' : 'none';
+    // Attribution toggle: only on website, marketing
+    document.getElementById('attr-toggle').style.display = (activeTab === 'website' || activeTab === 'marketing') ? '' : 'none';
     // Stats mode toggle: only on overview and sales
     document.getElementById('stats-mode-toggle').style.display = (activeTab === 'sales') ? '' : 'none';
     // Ad spend banner: only on marketing tab
