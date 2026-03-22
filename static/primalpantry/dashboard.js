@@ -4878,7 +4878,29 @@ document.getElementById('bulk-bag-print').addEventListener('click', async () => 
     const data = await res.json();
     if (data.success || data.printed) {
       const printCount = data.printed || printIds.length;
-      alert(`${updated > 0 ? 'Updated ' + updated + ' to ' + bulkBagSizeLabel + '. ' : ''}Printed ${printCount} label${printCount !== 1 ? 's' : ''}.`);
+      let msg = `${updated > 0 ? 'Updated ' + updated + ' to ' + bulkBagSizeLabel + '. ' : ''}Printed ${printCount} label${printCount !== 1 ? 's' : ''}.`;
+      if (data.failed && data.failed.length > 0) {
+        const errors = data.failed.map(f => {
+          const errMsg = f.result?.errors?.[0]?.details || f.result?.errors?.[0]?.message || f.error || 'Unknown error';
+          return `Order ${f.order_id}: ${errMsg}`;
+        }).join('\n');
+        msg += `\n\n${data.failed.length} failed:\n${errors}`;
+        // Auto-set invalid address status for failed orders
+        for (const f of data.failed) {
+          const errDetail = (f.result?.errors?.[0]?.details || f.result?.errors?.[0]?.message || '').toLowerCase();
+          if (errDetail.includes('address') || errDetail.includes('postcode') || errDetail.includes('town')) {
+            const shipment = allShipments.find(s => s.order_id === f.order_id);
+            if (shipment) {
+              const order = allOrders.find(o => o.stripe_session_id === shipment.order_number || o.order_number === shipment.order_number);
+              if (order) {
+                db.from('orders').update({ status: 'Invalid Address - Fix in eShip' }).eq('id', order.id);
+                order.status = 'Invalid Address - Fix in eShip';
+              }
+            }
+          }
+        }
+      }
+      alert(msg);
       exitBulkBagMode();
       loadShippingData();
       return;
