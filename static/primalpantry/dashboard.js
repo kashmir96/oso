@@ -4845,25 +4845,29 @@ document.getElementById('bulk-bag-print').addEventListener('click', async () => 
     statusEl.innerHTML = '<span style="color:var(--amber);">Updated ' + updated + ', failed ' + failed + '</span>';
   }
 
-  if (newOrderIds.length === 0) {
-    statusEl.innerHTML = '<span style="color:var(--red);">No orders updated — nothing to print</span>';
-    btn.disabled = false;
-    btn.textContent = 'Update ' + bulkBagCount + ' to ' + bulkBagSizeLabel + ' & Print';
-    return;
+  // Use new IDs if available, fall back to original IDs for printing
+  const printIds = newOrderIds.length > 0 ? newOrderIds : [...bulkBagOrderIds];
+
+  if (updated === 0 && failed > 0) {
+    statusEl.innerHTML = '<span style="color:var(--amber);">Bag size update failed — printing with current size...</span>';
+  } else if (newOrderIds.length === 0) {
+    // No updates attempted or all skipped — just print as-is
+    statusEl.innerHTML = '<span style="color:var(--dim);">Printing with current bag sizes...</span>';
   }
 
-  // Step 2: Print labels using NEW order IDs (old ones were deleted)
+  // Step 2: Print labels
   statusEl.innerHTML = '<span style="color:var(--dim);">Printing labels...</span>';
   btn.textContent = 'Printing...';
   try {
     const res = await fetch('/.netlify/functions/eship-print', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ order_ids: newOrderIds }),
+      body: JSON.stringify({ order_ids: printIds }),
     });
     const data = await res.json();
     if (data.success || data.printed) {
-      alert(`Updated ${updated} order${updated !== 1 ? 's' : ''} to ${bulkBagSizeLabel} and printed ${data.printed || updated} label${(data.printed || updated) !== 1 ? 's' : ''}.`);
+      const printCount = data.printed || printIds.length;
+      alert(`${updated > 0 ? 'Updated ' + updated + ' to ' + bulkBagSizeLabel + '. ' : ''}Printed ${printCount} label${printCount !== 1 ? 's' : ''}.`);
       exitBulkBagMode();
       loadShippingData();
       return;
