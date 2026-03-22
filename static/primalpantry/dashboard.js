@@ -4570,10 +4570,13 @@ async function handleBulkScan(scannedValue) {
   const val = scannedValue.trim();
   const nzPostMatch = val.match(/[A-Z]{2}\d{9}[A-Z]{2}/i);
   const trackingVal = nzPostMatch ? nzPostMatch[0].toUpperCase() : null;
+  const valUpper = val.toUpperCase();
   const shipment = allShipments.find(s =>
     s.order_number === val ||
-    (s.tracking_number && (s.tracking_number === val || s.tracking_number.toUpperCase() === trackingVal)) ||
-    (s.tracking_numbers && s.tracking_numbers.some(t => t === val || (trackingVal && t.toUpperCase() === trackingVal)))
+    (s.tracking_number && (s.tracking_number === val || s.tracking_number.toUpperCase() === valUpper)) ||
+    (trackingVal && s.tracking_number && s.tracking_number.toUpperCase() === trackingVal) ||
+    (s.tracking_number && val.length >= 6 && (val.includes(s.tracking_number) || s.tracking_number.includes(val))) ||
+    (s.tracking_numbers && s.tracking_numbers.some(t => t === val || t.toUpperCase() === valUpper || val.includes(t) || t.includes(val)))
   );
   if (!shipment) {
     const table = document.getElementById('shipments-table');
@@ -4689,26 +4692,38 @@ function toggleBulkBagOrder(orderId, checked) {
 
 function handleBulkBagScan(scannedValue) {
   const val = scannedValue.trim();
+  const valUpper = val.toUpperCase();
   const nzPostMatch = val.match(/[A-Z]{2}\d{9}[A-Z]{2}/i);
   const trackingVal = nzPostMatch ? nzPostMatch[0].toUpperCase() : null;
-  const shipment = allShipments.find(s =>
-    s.order_number === val ||
-    (s.tracking_number && (s.tracking_number === val || s.tracking_number.toUpperCase() === trackingVal)) ||
-    (s.tracking_numbers && s.tracking_numbers.some(t => t === val || (trackingVal && t.toUpperCase() === trackingVal)))
-  );
+  const shipment = allShipments.find(s => {
+    if (s.order_number === val) return true;
+    // Exact tracking match
+    if (s.tracking_number && (s.tracking_number === val || s.tracking_number.toUpperCase() === valUpper)) return true;
+    // NZ Post letter pattern extracted from barcode
+    if (trackingVal && s.tracking_number && s.tracking_number.toUpperCase() === trackingVal) return true;
+    // Barcode contains tracking number or vice versa (for long NZ Post numeric barcodes)
+    if (s.tracking_number && val.length >= 6 && (val.includes(s.tracking_number) || s.tracking_number.includes(val))) return true;
+    // Check tracking_numbers array
+    if (s.tracking_numbers && s.tracking_numbers.some(t => t === val || t.toUpperCase() === valUpper || val.includes(t) || t.includes(val))) return true;
+    // Match by destination name (for manual search)
+    const destName = (s.destination?.name || s.name || '').toLowerCase();
+    if (destName && val.toLowerCase() === destName) return true;
+    return false;
+  });
 
   const table = document.getElementById('shipments-table');
-  if (!shipment || !shipment.order_id) {
+  const shipOrderId = shipment ? (shipment.order_id || shipment.id) : null;
+  if (!shipment || !shipOrderId) {
     table.classList.add('scan-flash-err');
     setTimeout(() => table.classList.remove('scan-flash-err'), 400);
     return;
   }
 
   // Toggle the checkbox for this order
-  if (!bulkBagOrderIds.includes(shipment.order_id)) {
-    toggleBulkBagOrder(shipment.order_id, true);
+  if (!bulkBagOrderIds.includes(shipOrderId)) {
+    toggleBulkBagOrder(shipOrderId, true);
     // Tick the checkbox in the table if visible
-    const cb = table.querySelector(`.bulk-bag-check[data-order-id="${shipment.order_id}"]`);
+    const cb = table.querySelector(`.bulk-bag-check[data-order-id="${shipOrderId}"]`);
     if (cb) cb.checked = true;
     table.classList.add('scan-flash');
     setTimeout(() => table.classList.remove('scan-flash'), 400);
