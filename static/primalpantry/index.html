@@ -41,7 +41,9 @@
     .team-table .role-badge { padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
     .role-owner { background: rgba(212,168,75,0.15); color: var(--honey); }
     .role-admin { background: rgba(140,180,122,0.15); color: var(--sage); }
-    .role-staff { background: rgba(219,191,168,0.12); color: var(--blush); }
+    .role-office { background: rgba(219,191,168,0.12); color: var(--blush); }
+    .role-shipping { background: rgba(107,142,176,0.15); color: #6B8EB0; }
+    .role-manufacturing { background: rgba(176,142,107,0.15); color: #B08E6B; }
     .team-actions button { background: none; border: 1px solid var(--border); color: var(--muted); padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.7rem; cursor: pointer; margin-right: 0.25rem; }
     .team-actions button:hover { border-color: var(--sage); color: var(--text); }
     .team-actions button.danger { border-color: var(--red); color: var(--red); }
@@ -2058,7 +2060,7 @@
         <div class="form-group"><label>Username *</label><input type="text" id="team-username"></div>
         <div class="form-group"><label>Display Name *</label><input type="text" id="team-display"></div>
         <div class="form-group"><label>Role</label>
-          <select id="team-role"><option value="staff">Staff</option><option value="admin">Admin</option></select>
+          <select id="team-role"><option value="office">Office</option><option value="shipping">Shipping</option><option value="manufacturing">Manufacturing</option><option value="admin">Admin</option></select>
         </div>
         <div class="form-group" style="display:flex;align-items:center;gap:0.5rem;padding-top:1.5rem;">
           <input type="checkbox" id="team-manage"> <label for="team-manage" style="font-size:0.85rem;">Can manage users</label>
@@ -2424,6 +2426,36 @@ async function doTOTPVerify() {
 const savedStaff = sessionStorage.getItem('pp_staff');
 if (savedStaff) { try { currentStaff = JSON.parse(savedStaff); showDashboard(); } catch { sessionStorage.removeItem('pp_staff'); } }
 
+// Tab access by role
+const ROLE_TABS = {
+  manufacturing: ['manufacturing'],
+  shipping: ['shipping'],
+  office: ['sales', 'orders', 'shipping', 'customers', 'comms', 'manufacturing', 'website', 'marketing', 'finance'],
+  admin: ['sales', 'orders', 'shipping', 'customers', 'comms', 'manufacturing', 'website', 'marketing', 'finance', 'settings'],
+  owner: ['sales', 'orders', 'shipping', 'customers', 'comms', 'manufacturing', 'website', 'marketing', 'finance', 'settings'],
+};
+
+function applyTabVisibility() {
+  if (!currentStaff) return;
+  const allowed = ROLE_TABS[currentStaff.role] || ROLE_TABS.office;
+  document.querySelectorAll('.nav-item').forEach(btn => {
+    const tab = btn.dataset.tab;
+    btn.style.display = allowed.includes(tab) ? '' : 'none';
+  });
+  // Set default tab to first allowed tab
+  const activeBtn = document.querySelector('.nav-item.active');
+  if (activeBtn && !allowed.includes(activeBtn.dataset.tab)) {
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    const firstBtn = document.querySelector('.nav-item[data-tab="' + allowed[0] + '"]');
+    if (firstBtn) {
+      firstBtn.classList.add('active');
+      document.getElementById('tab-' + allowed[0]).classList.add('active');
+      activeTab = allowed[0];
+    }
+  }
+}
+
 function showDashboard() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('dashboard').style.display = 'block';
@@ -2432,6 +2464,7 @@ function showDashboard() {
   if (currentStaff) {
     document.getElementById('staff-greeting').textContent = currentStaff.display_name;
     if (currentStaff.can_manage_users) document.getElementById('team-btn').style.display = '';
+    applyTabVisibility();
   }
   initDashboard();
   // Check for prompt notifications after login
@@ -2453,10 +2486,17 @@ async function openTeamModal() {
     if (!data.success) { document.getElementById('team-list').innerHTML = '<p style="color:var(--red);">' + data.error + '</p>'; return; }
     let html = '<table class="team-table"><thead><tr><th>Username</th><th>Name</th><th>Role</th><th>2FA</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
     data.users.forEach(u => {
-      const roleCls = u.role === 'owner' ? 'role-owner' : u.role === 'admin' ? 'role-admin' : 'role-staff';
+      const roleCls = 'role-' + u.role;
       const totpStatus = u.totp_enabled ? '<span style="color:var(--green);">Enabled</span>' : '<span style="color:var(--amber);">Not set</span>';
       const statusText = u.must_change_password ? '<span style="color:var(--amber);">Needs password</span>' : '<span style="color:var(--green);">Active</span>';
-      html += '<tr><td>' + u.username + '</td><td>' + u.display_name + '</td><td><span class="role-badge ' + roleCls + '">' + u.role + '</span></td><td>' + totpStatus + '</td><td>' + statusText + '</td><td class="team-actions"><button onclick="resetStaffPassword(' + u.id + ')">Reset PW</button><button onclick="resetStaffTOTP(' + u.id + ',\'' + u.username + '\')">Reset 2FA</button>' + (u.id !== currentStaff.id ? '<button class="danger" onclick="deleteStaffMember(' + u.id + ',\'' + u.username + '\')">Remove</button>' : '') + '</td></tr>';
+      let roleCell;
+      if (currentStaff.role === 'owner' && u.id !== currentStaff.id) {
+        roleCell = '<select onchange="updateStaffRole(' + u.id + ',this.value)" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.15rem 0.3rem;border-radius:4px;font-size:0.7rem;">' +
+          ['owner','admin','office','shipping','manufacturing'].map(r => '<option value="' + r + '"' + (u.role === r ? ' selected' : '') + '>' + r + '</option>').join('') + '</select>';
+      } else {
+        roleCell = '<span class="role-badge ' + roleCls + '">' + u.role + '</span>';
+      }
+      html += '<tr><td>' + u.username + '</td><td>' + u.display_name + '</td><td>' + roleCell + '</td><td>' + totpStatus + '</td><td>' + statusText + '</td><td class="team-actions"><button onclick="resetStaffPassword(' + u.id + ')">Reset PW</button><button onclick="resetStaffTOTP(' + u.id + ',\'' + u.username + '\')">Reset 2FA</button>' + (u.id !== currentStaff.id ? '<button class="danger" onclick="deleteStaffMember(' + u.id + ',\'' + u.username + '\')">Remove</button>' : '') + '</td></tr>';
     });
     html += '</tbody></table>';
     document.getElementById('team-list').innerHTML = html;
@@ -2465,6 +2505,10 @@ async function openTeamModal() {
     const filterEl = document.getElementById('activity-staff-filter');
     filterEl.innerHTML = '<option value="">All Staff</option>' + data.users.map(u => '<option value="' + u.username + '">' + u.display_name + '</option>').join('');
   } catch { document.getElementById('team-list').innerHTML = '<p style="color:var(--red);">Failed to load team</p>'; }
+
+  // Only owner can see the "can manage users" checkbox
+  const manageGroup = document.getElementById('team-manage').closest('.form-group');
+  if (manageGroup) manageGroup.style.display = currentStaff.role === 'owner' ? '' : 'none';
 
   // Show activity log for owner
   if (currentStaff.role === 'owner') {
@@ -2517,6 +2561,16 @@ async function addStaffMember() {
       openTeamModal();
     } else { resultEl.textContent = data.error || 'Failed'; resultEl.style.color = 'var(--red)'; }
   } catch { resultEl.textContent = 'Connection error'; resultEl.style.color = 'var(--red)'; }
+}
+async function updateStaffRole(userId, newRole) {
+  try {
+    const res = await fetch('/.netlify/functions/staff-auth', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'update-user', token: currentStaff.token, user_id: userId, role: newRole }),
+    });
+    const data = await res.json();
+    if (!data.success) alert(data.error || 'Failed to update role');
+  } catch { alert('Connection error'); }
 }
 async function resetStaffPassword(userId) {
   if (!confirm('Reset password? They will need to set a new one on next login.')) return;
@@ -4795,11 +4849,11 @@ document.querySelectorAll('.nav-item').forEach(btn => {
     document.getElementById('tab-' + activeTab).classList.add('active');
     navLabel.textContent = navNames[activeTab] || activeTab;
     closeNav();
-    // Hide irrelevant filters on manufacturing/finance tab
-    const hideFilters = activeTab === 'manufacturing' || activeTab === 'finance' || activeTab === 'comms';
+    // Source/Medium/Campaign/City filters: only on website, marketing, overview
+    const showUtmFilters = activeTab === 'website' || activeTab === 'marketing' || activeTab === 'sales';
     document.querySelectorAll('.filter-bar .filter-group').forEach((g, i) => {
       if (i === 0) return; // Keep Period filter visible
-      g.style.display = hideFilters ? 'none' : '';
+      g.style.display = showUtmFilters ? '' : 'none';
     });
     // Hide entire filter bar on finance (has its own date context)
     document.querySelector('.filter-bar').style.display = (activeTab === 'finance' || activeTab === 'comms' || activeTab === 'settings') ? 'none' : '';
