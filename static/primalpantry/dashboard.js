@@ -716,9 +716,22 @@ function startStatsRefresh() {
 }
 
 // ── Auto-refresh: re-fetch data and update all widgets silently ──
+let lastAutoRefresh = '';
 async function autoRefresh() {
   if (!currentStaff) return;
+  // Only re-fetch if tab is active (visible)
+  if (document.hidden) return;
   try {
+    // Fetch only orders created since last known order to check for new ones
+    const latestCreatedAt = allOrders.length > 0 ? allOrders[0].created_at : null;
+    if (latestCreatedAt && latestCreatedAt === lastAutoRefresh) {
+      // Quick check: any new orders since last refresh?
+      const checkRes = await db.from('orders').select('id').order('created_at', { ascending: false }).limit(1);
+      if (checkRes.data?.[0]?.id === allOrders[0]?.id) {
+        updateRefreshTime();
+        return; // No new orders, skip full reload
+      }
+    }
     const [ordersRes, liRes] = await Promise.all([
       db.from('orders').select('*').order('created_at', { ascending: false }),
       db.from('order_line_items').select('*'),
@@ -726,6 +739,7 @@ async function autoRefresh() {
     if (ordersRes.error) return;
     allOrders = ordersRes.data || [];
     allLineItems = liRes.data || [];
+    lastAutoRefresh = allOrders.length > 0 ? allOrders[0].created_at : '';
     populateFilterDropdowns();
     populateSegmentDropdowns();
     applyFilter();
@@ -7803,9 +7817,14 @@ async function openPageModal(pathname) {
 document.getElementById('wa-page-modal').addEventListener('click', function(e) { if (e.target === this) this.classList.remove('open'); });
 document.getElementById('wa-page-modal-close').addEventListener('click', function() { document.getElementById('wa-page-modal').classList.remove('open'); });
 
+let mktLastLoaded = 0;
+let mktLastDateRange = '';
 async function loadMarketingTab() {
   if (typeof utmEnsureLoaded === 'function') await utmEnsureLoaded();
   const [from, to] = getDateRange();
+  const dateKey = from + '|' + to;
+  // Cache for 5 minutes unless date range changed
+  if (mktInited && mktLastLoaded && dateKey === mktLastDateRange && Date.now() - mktLastLoaded < 300000) return;
   if (!mktInited) {
     mktInited = true;
     document.getElementById('mkt-campaign-search').addEventListener('input', function() { renderMktCT(this.value.toLowerCase().trim()); });
@@ -7878,6 +7897,8 @@ async function loadMarketingTab() {
   if(gmcP.length>0){mktGmcPage=1;gmcWrap.style.display='table';gmcLoad.style.display='none';renderMktGmc(gmcP);}
   else if(gSt.connected&&gSt.merchantId){gmcLoad.textContent=gmcD.error||'No products found';gmcLoad.style.display='block';gmcWrap.style.display='none';}
   else{gmcLoad.textContent=gSt.connected?'Enter your Merchant Center ID above':'Connect Google to view product statuses';gmcLoad.style.display='block';gmcWrap.style.display='none';}
+  mktLastLoaded = Date.now();
+  mktLastDateRange = from + '|' + to;
   // Load competitors section
   loadCompetitorsSection();
   // Load changelog
@@ -9606,12 +9627,15 @@ document.querySelectorAll('#fin-sub-tabs .wa-panel-tab').forEach(tab => {
 
 // ── Action Center Tab ──
 let actionsInited = false;
+let actionsLastLoaded = 0;
 let actionAlerts = [];
 let actionRules = [];
 let actionConfig = [];
 let actionAlertsPage = 1;
 
 async function loadActionsTab() {
+  // Cache for 2 minutes
+  if (actionsInited && actionsLastLoaded && Date.now() - actionsLastLoaded < 120000) return;
   if (!actionsInited) {
     actionsInited = true;
     document.querySelectorAll('[data-action-panel]').forEach(btn => {
@@ -9648,6 +9672,7 @@ async function loadActionsTab() {
   renderActionConfig();
   renderActionSummary(summaryRes.data?.[0]);
   renderProductIntelligence();
+  actionsLastLoaded = Date.now();
 }
 
 function renderActionStats() {
