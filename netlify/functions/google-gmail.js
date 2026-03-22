@@ -257,6 +257,22 @@ exports.handler = async (event) => {
   const staff = await getStaffByToken(token);
   if (!staff) return reply(401, { error: 'Unauthorized' });
 
+  // ── debug: test raw Gmail API access ──
+  if (action === 'debug') {
+    const acctRes = await sbFetch('/rest/v1/gmail_accounts?active=eq.true&select=id,email_address');
+    const accounts = await acctRes.json();
+    if (!accounts || accounts.length === 0) return reply(200, { error: 'No active accounts' });
+
+    const acct = await getAccountTokens(accounts[0].id);
+    if (!acct) return reply(200, { error: 'Could not get tokens for account ' + accounts[0].id });
+
+    // Try listing messages with no query filter
+    const listRes = await gmailFetch(acct.access_token, '/messages?maxResults=3');
+    // Also try profile
+    const profileRes = await gmailFetch(acct.access_token, '/profile');
+    return reply(200, { account: accounts[0].email_address, profile: profileRes, messages: listRes });
+  }
+
   // ── accounts: list connected Gmail accounts ──
   if (action === 'accounts') {
     const res = await sbFetch('/rest/v1/gmail_accounts?active=eq.true&select=id,email_address,display_name,connected_at&order=connected_at.asc');
