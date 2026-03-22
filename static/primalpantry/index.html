@@ -4028,7 +4028,7 @@ function renderOrdersTable() {
       <td>$${Number(o.total_value || 0).toFixed(2)}</td>
       <td>${(() => { const cg = getOrderCOGS(o.id); return cg > 0 ? '$' + cg.toFixed(2) : '-'; })()}</td>
       <td>${(() => { const cg = getOrderCOGS(o.id); const tv = Number(o.total_value || 0); return cg > 0 && tv > 0 ? ((tv - cg) / tv * 100).toFixed(0) + '%' : '-'; })()}</td>
-      <td>${orderSourcePill(o) || '-'}</td>
+      <td>${sourcePill(resolveOrderSource(o)) || '-'}</td>
       <td style="font-size:0.82rem;">${itemsHtml}</td>
       <td>${shipStatusPill(o)}</td>
     </tr>`;
@@ -5690,7 +5690,7 @@ function renderCustomersTab() {
       return `<div class="customer-order-row" onclick="event.stopPropagation(); openOrderModal(${o.id});">
         <span>${o.order_date}</span>
         <span>$${Number(o.total_value || 0).toFixed(2)}</span>
-        ${orderSourcePill(o)} ${magnet ? sourcePill(magnet) : ''} ${shipPill} ${daysWaitingBadge(o)}
+        ${sourcePill(resolveOrderSource(o))} ${magnet ? sourcePill(magnet) : ''} ${shipPill} ${daysWaitingBadge(o)}
         <span style="font-size:0.7rem;color:var(--muted);" title="Time to ship">Ship: ${shipTimeStr}</span>
         <span style="font-size:0.7rem;color:var(--muted);" title="Total wait time">Wait: ${waitStr}</span>
         <div class="customer-order-items" style="width:100%;">${itemStr || 'No items'}</div>
