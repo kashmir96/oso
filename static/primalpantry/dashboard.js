@@ -1724,7 +1724,8 @@ function renderOrdersTable() {
     orderLineItemMap[li.order_id].push(li);
   });
 
-  let orders = [...filteredOrders];
+  // When searching, search across ALL orders (not just date-filtered)
+  let orders = query ? [...allOrders] : [...filteredOrders];
   if (query) {
     orders = orders.filter(o => {
       const fields = [o.customer_name, o.email, o.city, o.utm_source, o.status].join(' ').toLowerCase();

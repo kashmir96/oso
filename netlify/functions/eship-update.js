@@ -78,19 +78,26 @@ exports.handler = async (event) => {
     };
 
     // Update the order via StarshipIt PUT API
+    // Try all possible field names for carrier product code
+    const updateBody = {
+      order: {
+        order_id: order_id,
+        carrier: 'CourierPost',
+        carrier_service_code: shipping_method,
+        shipping_method: shipping_method,
+        shipping_description: shipping_method,
+      },
+    };
+    console.log('[eship-update] Sending:', JSON.stringify(updateBody));
+
     const res = await fetch('https://api.starshipit.com/api/orders', {
       method: 'PUT',
       headers: apiHeaders,
-      body: JSON.stringify({
-        order: {
-          order_id: order_id,
-          shipping_method: shipping_method,
-          shipping_description: shipping_method,
-        },
-      }),
+      body: JSON.stringify(updateBody),
     });
 
     const data = await res.json();
+    console.log('[eship-update] Response:', JSON.stringify(data));
 
     if (!res.ok) {
       console.error('[eship-update] StarshipIt error:', JSON.stringify(data));
