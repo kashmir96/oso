@@ -17,13 +17,14 @@
  */
 
 function sbFetch(path, opts = {}) {
+  const headers = {
+    'apikey': process.env.SUPABASE_SERVICE_KEY,
+    'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}`,
+    'Content-Type': 'application/json',
+  };
+  if (opts.prefer) headers['Prefer'] = opts.prefer;
   return fetch(`${process.env.SUPABASE_URL}${path}`, {
-    headers: {
-      'apikey': process.env.SUPABASE_SERVICE_KEY,
-      'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}`,
-      'Content-Type': 'application/json',
-      'Prefer': opts.prefer || '',
-    },
+    headers,
     method: opts.method || 'GET',
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   });
@@ -395,13 +396,22 @@ Keep it to 3-4 paragraphs. Bold key numbers and actions.`;
     const text = data.content?.[0]?.text || '';
     if (!text) return null;
 
-    // Store summary
+    // Store summary — upsert by date+type
     const summaryType = isMonday ? 'weekly' : 'daily';
-    await sbFetch('/rest/v1/action_daily_summary', {
-      method: 'POST',
-      prefer: 'resolution=merge-duplicates',
-      body: { summary_date: yesterday, summary_type: summaryType, summary_text: text, alert_snapshot: { total: alerts.length, p1: alerts.filter(a => a.priority === 'P1').length }, generated_at: new Date().toISOString() },
-    });
+    // Check if exists first
+    const existingRes = await sbFetch(`/rest/v1/action_daily_summary?summary_date=eq.${yesterday}&summary_type=eq.${summaryType}&select=id`);
+    const existing = await existingRes.json();
+    if (existing && existing.length > 0) {
+      await sbFetch(`/rest/v1/action_daily_summary?id=eq.${existing[0].id}`, {
+        method: 'PATCH',
+        body: { summary_text: text, alert_snapshot: { total: alerts.length, p1: alerts.filter(a => a.priority === 'P1').length }, generated_at: new Date().toISOString() },
+      });
+    } else {
+      await sbFetch('/rest/v1/action_daily_summary', {
+        method: 'POST',
+        body: { summary_date: yesterday, summary_type: summaryType, summary_text: text, alert_snapshot: { total: alerts.length, p1: alerts.filter(a => a.priority === 'P1').length }, generated_at: new Date().toISOString() },
+      });
+    }
 
     return text;
   } catch (e) {
