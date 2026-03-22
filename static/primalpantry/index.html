@@ -1428,9 +1428,9 @@
 
     <!-- Sub-tabs -->
     <div style="display:flex;gap:0.5rem;margin-bottom:1rem;">
-      <button class="wa-panel-tab active" data-action-panel="alerts" style="flex:1;">Alerts</button>
-      <button class="wa-panel-tab" data-action-panel="rules" style="flex:1;">Rule Status</button>
-      <button class="wa-panel-tab" data-action-panel="config" style="flex:1;">Settings</button>
+      <button class="action-tab active" data-action-panel="alerts" style="flex:1;background:none;border:1px solid var(--border);color:var(--muted);padding:0.4rem 0.8rem;border-radius:6px;font-size:0.8rem;cursor:pointer;font-family:'DM Sans',sans-serif;">Alerts</button>
+      <button class="action-tab" data-action-panel="rules" style="flex:1;background:none;border:1px solid var(--border);color:var(--muted);padding:0.4rem 0.8rem;border-radius:6px;font-size:0.8rem;cursor:pointer;font-family:'DM Sans',sans-serif;">Rule Status</button>
+      <button class="action-tab" data-action-panel="config" style="flex:1;background:none;border:1px solid var(--border);color:var(--muted);padding:0.4rem 0.8rem;border-radius:6px;font-size:0.8rem;cursor:pointer;font-family:'DM Sans',sans-serif;">Settings</button>
     </div>
 
     <!-- Alerts Panel -->
@@ -1700,6 +1700,48 @@
       </div>
     </div>
     <div id="compose-result" style="margin-top:0.5rem;font-size:0.85rem;text-align:center;"></div>
+  </div>
+</div>
+
+<!-- Recovery Email Preview Modal -->
+<div class="modal-overlay" id="recovery-email-modal">
+  <div class="modal" style="max-width:680px;max-height:90vh;overflow-y:auto;">
+    <button class="modal-close" id="recovery-close">&times;</button>
+    <h2 style="margin-bottom:0.25rem;">Recovery Email</h2>
+    <p style="font-size:0.8rem;color:var(--dim);margin-bottom:1rem;">Preview what the customer will receive. Edit the text fields to customise.</p>
+    <div style="display:flex;flex-direction:column;gap:0.75rem;margin-bottom:1rem;">
+      <div style="display:flex;gap:0.75rem;">
+        <div class="form-group" style="flex:1;">
+          <label style="font-size:0.7rem;">From</label>
+          <select id="recovery-from" class="recovery-field"></select>
+        </div>
+        <div class="form-group" style="flex:1;">
+          <label style="font-size:0.7rem;">To</label>
+          <input type="email" id="recovery-to" class="recovery-field" readonly>
+        </div>
+      </div>
+      <div class="form-group">
+        <label style="font-size:0.7rem;">Subject</label>
+        <input type="text" id="recovery-subject" class="recovery-field" oninput="updateRecoveryPreview()">
+      </div>
+      <div style="display:flex;gap:0.75rem;">
+        <div class="form-group" style="flex:1;">
+          <label style="font-size:0.7rem;">Greeting</label>
+          <input type="text" id="recovery-greeting" class="recovery-field" oninput="updateRecoveryPreview()">
+        </div>
+      </div>
+      <div class="form-group">
+        <label style="font-size:0.7rem;">Message</label>
+        <textarea id="recovery-message" class="recovery-field" rows="3" oninput="updateRecoveryPreview()"></textarea>
+      </div>
+    </div>
+    <div class="recovery-preview-label">Email Preview</div>
+    <div id="recovery-preview" class="recovery-preview-pane"></div>
+    <div style="margin-top:1rem;display:flex;justify-content:flex-end;gap:0.5rem;">
+      <button id="recovery-cancel" style="background:none;border:1px solid var(--border);color:var(--muted);padding:0.5rem 1rem;border-radius:6px;cursor:pointer;font-size:0.85rem;font-family:'DM Sans',sans-serif;">Cancel</button>
+      <button id="recovery-send" style="background:var(--sage);color:#141210;border:none;padding:0.5rem 1.5rem;border-radius:6px;font-weight:600;cursor:pointer;font-size:0.85rem;font-family:'DM Sans',sans-serif;">Send Email</button>
+    </div>
+    <div id="recovery-result" style="margin-top:0.5rem;font-size:0.85rem;text-align:center;"></div>
   </div>
 </div>
 
