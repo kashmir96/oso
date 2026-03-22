@@ -305,21 +305,16 @@ exports.handler = async (event) => {
     const search = body.search || '';
     const filter = body.filter || 'all'; // all|customers|suppliers|wholesalers|flagged
 
-    // Fetch messages, contacts, and names in parallel
-    const [res, contactRes, nameRes] = await Promise.all([
-      sbFetch('/rest/v1/email_messages?select=thread_id,customer_email,from_address,to_address,subject,snippet,date,direction,is_read,staff_name,account_id,order_flagged&order=date.desc&limit=500'),
+    // Fetch messages and contacts in parallel (skip heavy orders query, use customer_email from messages)
+    const [res, contactRes] = await Promise.all([
+      sbFetch('/rest/v1/email_messages?select=thread_id,customer_email,from_address,to_address,subject,snippet,date,direction,is_read,staff_name,account_id,order_flagged&order=date.desc&limit=200'),
       sbFetch('/rest/v1/contacts?select=email,name,company,type'),
-      sbFetch('/rest/v1/orders?select=email,customer_name&limit=5000'),
     ]);
-    const [msgs, contactRows, nameRows] = await Promise.all([res.json(), contactRes.json(), nameRes.json()]);
+    const [msgs, contactRows] = await Promise.all([res.json(), contactRes.json()]);
 
     const contactMap = {};
     if (Array.isArray(contactRows)) {
       contactRows.forEach(c => { contactMap[c.email.toLowerCase()] = c; });
-    }
-    const nameMap = {};
-    if (Array.isArray(nameRows)) {
-      nameRows.forEach(r => { if (r.email && r.customer_name) nameMap[r.email.toLowerCase()] = r.customer_name; });
     }
 
     // Group by thread_id (prefer) or customer_email
@@ -370,7 +365,7 @@ exports.handler = async (event) => {
 
     threads = threads.slice(0, limit).map(t => ({
       ...t,
-      customer_name: t.contact_name || nameMap[t.customer_email] || t.customer_email || 'Unknown',
+      customer_name: t.contact_name || t.customer_email || 'Unknown',
     }));
 
     return reply(200, { threads });
