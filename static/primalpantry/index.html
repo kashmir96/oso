@@ -2365,6 +2365,8 @@ function showDashboard() {
     if (currentStaff.can_manage_users) document.getElementById('team-btn').style.display = '';
   }
   initDashboard();
+  // Check for prompt notifications after login
+  setTimeout(() => { if (typeof checkCommsPrompts === 'function') checkCommsPrompts(); }, 2000);
 }
 
 // ── Team Management ──
@@ -4733,6 +4735,7 @@ document.querySelectorAll('.nav-item').forEach(btn => {
     // Hide entire filter bar on finance (has its own date context)
     document.querySelector('.filter-bar').style.display = (activeTab === 'finance' || activeTab === 'comms' || activeTab === 'settings') ? 'none' : '';
     loadActiveTab();
+    checkCommsPrompts(); // Check for pending prompts on every tab switch
   });
 });
 
@@ -8977,6 +8980,7 @@ async function openCommsThread(threadId) {
     + '<div class="comms-header-actions">'
     + '<label><input type="checkbox" id="comms-order-flag" ' + (isFlagged ? 'checked' : '') + ' onchange="toggleOrderFlag(this.checked)"> Order</label>'
     + '<button id="comms-prompt-btn" onclick="showPromptDropdown()">Prompt</button>'
+    + '<button onclick="archiveThread()" style="font-size:0.7rem;">Archive</button>'
     + '</div>';
 
   messagesEl.innerHTML = '<div class="comms-empty">Loading...</div>';
@@ -9119,8 +9123,45 @@ async function sendPrompt(staffId, staffName) {
     btn.textContent = 'Prompted ' + staffName;
     btn.style.color = '#dc78a0';
     btn.style.borderColor = '#dc78a0';
-    setTimeout(() => { btn.textContent = 'Prompt'; btn.style.color = ''; btn.style.borderColor = ''; }, 2000);
+    btn.style.background = 'rgba(220,120,160,0.12)';
+    // Don't reset — stays pink until thread changes
   } catch (e) { alert('Failed to prompt: ' + e.message); }
+}
+
+async function archiveThread() {
+  if (!commsActiveThread) return;
+  if (!confirm('Archive this conversation?')) return;
+  try {
+    await commsApi('flag_archive', { thread_id: commsActiveThread.thread_id, archived: true });
+    commsThreads = commsThreads.filter(t => t.thread_id !== commsActiveThread.thread_id);
+    commsActiveThread = null;
+    renderCommsThreadList();
+    document.getElementById('comms-thread-header').style.display = 'none';
+    document.getElementById('comms-messages').innerHTML = '<div class="comms-empty">Select a conversation to view messages</div>';
+    document.getElementById('comms-reply-box').style.display = 'none';
+  } catch (e) { alert('Failed to archive: ' + e.message); }
+}
+
+// Check for pending prompts on any tab load and show badge on Comms nav
+async function checkCommsPrompts() {
+  try {
+    const data = await commsApi('get_prompts', {});
+    const count = (data.prompts || []).length;
+    const navBtn = document.querySelector('[data-tab="comms"]');
+    if (!navBtn) return;
+    let badge = navBtn.querySelector('.comms-nav-badge');
+    if (count > 0) {
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'comms-nav-badge';
+        badge.style.cssText = 'background:#dc78a0;color:#fff;font-size:0.6rem;font-weight:700;padding:0.1rem 0.35rem;border-radius:8px;margin-left:0.4rem;';
+        navBtn.appendChild(badge);
+      }
+      badge.textContent = count;
+    } else if (badge) {
+      badge.remove();
+    }
+  } catch {}
 }
 
 async function loadCommsTab() {

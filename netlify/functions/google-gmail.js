@@ -308,7 +308,7 @@ exports.handler = async (event) => {
     const filter = body.filter || 'all';
 
     // Single lightweight query
-    const res = await sbFetch('/rest/v1/email_messages?select=thread_id,customer_email,from_address,to_address,subject,snippet,date,direction,is_read,account_id,order_flagged&order=date.desc&limit=200');
+    const res = await sbFetch('/rest/v1/email_messages?select=thread_id,customer_email,from_address,to_address,subject,snippet,date,direction,is_read,account_id,order_flagged&archived=eq.false&order=date.desc&limit=200');
     const msgs = await res.json();
     if (!Array.isArray(msgs)) return reply(200, { threads: [] });
 
@@ -609,6 +609,19 @@ exports.handler = async (event) => {
     await sbFetch(`/rest/v1/email_messages?thread_id=eq.${encodeURIComponent(thread_id)}`, {
       method: 'PATCH',
       body: { order_flagged: flagged !== false },
+    });
+
+    return reply(200, { success: true });
+  }
+
+  // ── flag_archive: archive/unarchive a thread ──
+  if (action === 'flag_archive') {
+    const { thread_id, archived } = body;
+    if (!thread_id) return reply(400, { error: 'thread_id required' });
+
+    await sbFetch(`/rest/v1/email_messages?thread_id=eq.${encodeURIComponent(thread_id)}`, {
+      method: 'PATCH',
+      body: { archived: archived !== false },
     });
 
     return reply(200, { success: true });
