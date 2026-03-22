@@ -145,7 +145,13 @@ exports.handler = async (event) => {
         let jarsPerUnit = 1;
         if (skuLower.includes('60ml') || skuLower.includes('lip')) jarsPerUnit = 0.5;
         else if (skuLower.includes('scalp-bundle')) jarsPerUnit = 9;
+        else if (skuLower.includes('black')) jarsPerUnit = 9;
         else if (skuLower.includes('shampoo-bottle') || skuLower.includes('conditioner')) jarsPerUnit = 6;
+        else if (skuLower.includes('lotion') || skuLower.includes('liqsoap')) jarsPerUnit = 4;
+        else if (skuLower.includes('liquid-bundle')) jarsPerUnit = 4;
+        else if (skuLower.includes('vitallow')) jarsPerUnit = 3;
+        else if (skuLower.includes('200ml') || skuLower.includes('powder')) jarsPerUnit = 2;
+        else if (skuLower.includes('cleanser')) jarsPerUnit = 2;
 
         let packMultiplier = 1;
         if (skuLower.includes('-3pk') || skuLower.includes('trio')) packMultiplier = 3;
