@@ -57,49 +57,33 @@ exports.handler = async (event) => {
       'Content-Type': 'application/json',
     };
 
-    // Try batch update endpoint first (most direct way to set product code)
-    const batchBody = {
-      order_ids: ids,
-      product_code: shipping_method,
-    };
-
-    console.log('[eship-update] Batch updating', ids.length, 'orders to product_code:', shipping_method);
-
-    const batchRes = await fetch('https://api.starshipit.com/api/orders/update', {
-      method: 'PUT',
-      headers: apiHeaders,
-      body: JSON.stringify(batchBody),
-    });
-
-    const batchData = await batchRes.json();
-    console.log('[eship-update] Batch response:', batchRes.status, JSON.stringify(batchData).slice(0, 300));
-
-    if (batchRes.ok) {
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({ success: true, order_id: ids[0], order_ids: ids, shipping_method }),
-      };
-    }
-
-    // Fallback: try single PUT with carrier_service_code for each order
-    console.log('[eship-update] Batch failed, falling back to single updates');
+    // Update each order via PUT /api/orders with carrier_service_code
     let updated = 0;
+    let lastError = '';
     for (const oid of ids) {
-      const res = await fetch('https://api.starshipit.com/api/orders', {
-        method: 'PUT',
-        headers: apiHeaders,
-        body: JSON.stringify({
-          order: {
-            order_id: oid,
-            carrier_service_code: shipping_method,
-            shipping_method: shipping_method,
-          },
-        }),
-      });
-      const data = await res.json();
-      console.log('[eship-update] Single update', oid, ':', res.status, JSON.stringify(data).slice(0, 200));
-      if (res.ok) updated++;
+      try {
+        console.log('[eship-update] Updating order', oid, 'to', shipping_method);
+        const res = await fetch('https://api.starshipit.com/api/orders', {
+          method: 'PUT',
+          headers: apiHeaders,
+          body: JSON.stringify({
+            order: {
+              order_id: oid,
+              carrier_service_code: shipping_method,
+              shipping_method: shipping_method,
+            },
+          }),
+        });
+        const text = await res.text();
+        console.log('[eship-update] Response for', oid, ':', res.status, text.slice(0, 300));
+        let data;
+        try { data = JSON.parse(text); } catch { data = { raw: text }; }
+        if (res.ok) updated++;
+        else lastError = data.message || text.slice(0, 200);
+      } catch (e) {
+        console.error('[eship-update] Error for', oid, ':', e.message);
+        lastError = e.message;
+      }
     }
 
     if (updated > 0) {
@@ -113,7 +97,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: 'Both batch and single update failed', batch_response: batchData }),
+      body: JSON.stringify({ error: lastError || 'Update failed for all orders' }),
     };
   } catch (err) {
     console.error('[eship-update] Error:', err.message);
