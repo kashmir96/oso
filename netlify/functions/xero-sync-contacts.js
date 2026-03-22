@@ -33,7 +33,7 @@ function sbFetch(path, opts = {}) {
       'Content-Type': 'application/json',
       apikey: key,
       Authorization: `Bearer ${key}`,
-      Prefer: opts.prefer || '',
+      ...(opts.prefer ? { Prefer: opts.prefer } : {}),
     },
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   });

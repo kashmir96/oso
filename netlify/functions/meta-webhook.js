@@ -17,13 +17,14 @@ const HEADERS = {
 };
 
 function sbFetch(path, opts = {}) {
+  const headers = {
+    'apikey': process.env.SUPABASE_SERVICE_KEY,
+    'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}`,
+    'Content-Type': 'application/json',
+  };
+  if (opts.prefer) headers['Prefer'] = opts.prefer;
   return fetch(`${process.env.SUPABASE_URL}${path}`, {
-    headers: {
-      'apikey': process.env.SUPABASE_SERVICE_KEY,
-      'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}`,
-      'Content-Type': 'application/json',
-      'Prefer': opts.prefer || '',
-    },
+    headers,
     method: opts.method || 'GET',
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   });
