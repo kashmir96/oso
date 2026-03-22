@@ -143,7 +143,7 @@ exports.handler = async (event) => {
 
     const state = crypto.randomBytes(32).toString('hex');
 
-    await sbFetch('/rest/v1/google_tokens', {
+    const upsertRes = await sbFetch('/rest/v1/google_tokens?on_conflict=id', {
       method: 'POST',
       headers: { Prefer: 'resolution=merge-duplicates' },
       body: JSON.stringify({
@@ -156,6 +156,12 @@ exports.handler = async (event) => {
         expires_at: new Date(0).toISOString(),
       }),
     });
+
+    if (!upsertRes.ok) {
+      const errBody = await upsertRes.text();
+      console.error('Failed to save OAuth state:', upsertRes.status, errBody);
+      return reply(500, { error: 'Failed to initiate auth — could not save state' });
+    }
 
     const url = `https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(getRedirectUri())}&scope=${encodeURIComponent(SCOPES)}&state=${state}&access_type=offline&prompt=consent`;
 
