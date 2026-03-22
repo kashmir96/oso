@@ -95,6 +95,24 @@
     .stat-card .sparkline .spark-bar { flex: 1; min-width: 0; border-radius: 1px 1px 0 0; background: var(--border); transition: background 0.2s; }
     .stat-card:hover .sparkline .spark-bar { background: var(--dim); }
 
+    /* Live mode */
+    .live-hero { grid-column: 1 / -1; background: linear-gradient(135deg, rgba(59,165,196,0.12), rgba(140,180,122,0.08)); border: 1px solid var(--cyan); border-radius: 12px; padding: 1.5rem; display: none; }
+    .stats.live-mode .live-hero { display: block; }
+    .stats.live-mode .stat-card:not(.live-hero) { opacity: 0.5; order: 1; }
+    .live-hero { order: 0; }
+    .live-hero .live-count { font-size: 3.5rem; font-weight: 800; color: var(--cyan); line-height: 1; }
+    .live-hero .live-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.25rem; }
+    .live-hero .live-sub { font-size: 0.85rem; color: var(--dim); margin-top: 0.25rem; }
+    .live-hero .live-pulse { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--cyan); margin-right: 0.5rem; animation: live-pulse 1.5s ease-in-out infinite; vertical-align: middle; }
+    @keyframes live-pulse { 0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(59,165,196,0.5); } 50% { opacity: 0.6; box-shadow: 0 0 12px 4px rgba(59,165,196,0.3); } }
+    .live-pages { margin-top: 1rem; display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+    .live-pages .live-page { background: rgba(255,255,255,0.04); border-radius: 8px; padding: 0.5rem 0.75rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; }
+    .live-pages .live-page .page-path { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 80%; }
+    .live-pages .live-page .page-count { color: var(--cyan); font-weight: 700; font-size: 0.9rem; }
+    .live-visitors-list { margin-top: 0.75rem; }
+    .live-visitors-list .live-visitor { font-size: 0.75rem; color: var(--dim); padding: 0.25rem 0; border-bottom: 1px solid var(--border); display: flex; gap: 1rem; }
+    .live-visitors-list .live-visitor:last-child { border: none; }
+
     /* Section */
     .section { margin-bottom: 1.5rem; }
     .section-title { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem; }
@@ -794,7 +812,10 @@
     </div>
   </div>
 
-  <!-- adspend banner removed — adspend now shown in stats grid -->
+  <div id="adspend-banner" style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:0.75rem 1.25rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:0.75rem;">
+    <span style="font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">Ad Spend Today</span>
+    <span id="adspend-value" style="font-size:1.5rem;font-weight:700;color:var(--honey);">—</span>
+  </div>
 
   <!-- Nav drawer -->
   <div class="nav-overlay" id="nav-overlay"></div>
@@ -859,6 +880,7 @@
         <option value="month">This Month</option>
         <option value="all">All Time</option>
         <option value="custom">Custom Range</option>
+        <option value="live">⚡ Live</option>
       </select>
       <input type="date" id="date-from" class="filter-date" title="From" style="display:none;">
       <input type="date" id="date-to" class="filter-date" title="To" style="display:none;">
@@ -2685,11 +2707,22 @@ async function deleteStaffMember(userId, username) {
 let currentRange = 'today';
 
 // Date range dropdown
+let liveInterval = null;
 document.getElementById('date-range').addEventListener('change', function() {
   currentRange = this.value;
   const custom = currentRange === 'custom';
+  const live = currentRange === 'live';
   document.getElementById('date-from').style.display = custom ? '' : 'none';
   document.getElementById('date-to').style.display = custom ? '' : 'none';
+  // Toggle live mode
+  const grid = document.getElementById('stats-grid');
+  if (live) {
+    grid.classList.add('live-mode');
+    startLiveMode();
+  } else {
+    grid.classList.remove('live-mode');
+    stopLiveMode();
+  }
   applyFilter();
 });
 document.getElementById('date-from').addEventListener('change', applyFilter);
@@ -2730,6 +2763,7 @@ function getDateRange() {
       const to = document.getElementById('date-to').value || today;
       return [from, to];
     }
+    case 'live': return [today, today]; // live mode still shows today's orders
     default: return [today, today];
   }
 }
@@ -2796,8 +2830,12 @@ async function loadAdSpend() {
     const res = await fetch(`/.netlify/functions/facebook-adspend?token=${encodeURIComponent(currentStaff.token)}`);
     const json = await res.json();
     currentAdSpend = Number(json.spend || 0);
+    const el = document.getElementById('adspend-value');
+    if (el) el.textContent = currentAdSpend > 0 ? '$' + currentAdSpend.toFixed(2) : '—';
   } catch (e) {
     currentAdSpend = 0;
+    const el = document.getElementById('adspend-value');
+    if (el) el.textContent = '—';
   }
 }
 
@@ -2948,6 +2986,29 @@ document.getElementById('refresh-btn').addEventListener('click', fullRefresh);
   lastBtn.addEventListener('click', () => { setAttrModel('last'); fullRefresh(); });
   // Restore saved state on load
   setAttrModel(attributionModel);
+})();
+
+// ── Stats mode toggle (Total / Avg Per Order) ──
+(function() {
+  const totalBtn = document.getElementById('stats-mode-total');
+  const avgBtn = document.getElementById('stats-mode-avg');
+  function setStatsMode(mode) {
+    statsMode = mode;
+    localStorage.setItem('oso_stats_mode', mode);
+    totalBtn.style.background = mode === 'total' ? 'var(--sage)' : 'var(--card)';
+    totalBtn.style.color = mode === 'total' ? '#141210' : 'var(--muted)';
+    avgBtn.style.background = mode === 'avg' ? 'var(--sage)' : 'var(--card)';
+    avgBtn.style.color = mode === 'avg' ? '#141210' : 'var(--muted)';
+  }
+  function refreshStats() {
+    const ords = filteredOrders.length > 0 ? filteredOrders : allOrders;
+    const ordIds = new Set(ords.map(o => o.id));
+    const li = allLineItems.filter(l => ordIds.has(l.order_id));
+    renderStats(ords, li);
+  }
+  totalBtn.addEventListener('click', () => { setStatsMode('total'); refreshStats(); });
+  avgBtn.addEventListener('click', () => { setStatsMode('avg'); refreshStats(); });
+  setStatsMode(statsMode);
 })();
 
 // ── Render all ──
@@ -3137,6 +3198,12 @@ function renderStats(orders, lineItems) {
   const blendedCPA = orderCount > 0 ? currentAdSpend / orderCount : 0;
   const priorAvgCOGS = priorOrderCount > 0 ? priorCOGS / priorOrderCount : 0;
 
+  // Wait-time stats (computed from ALL orders, not just filtered period)
+  const waitingOrders = allOrders.filter(o => orderDaysWaiting(o) >= 0);
+  const waitDays = waitingOrders.map(o => orderDaysWaiting(o));
+  const longestWait = waitDays.length > 0 ? Math.max(...waitDays) : 0;
+  const waitOver2 = waitDays.filter(d => d > 2).length;
+
   // Total refund $ value
   const refundTotal = refundedOrders.reduce((s, o) => s + Number(o.total_value || 0), 0);
 
@@ -3176,7 +3243,18 @@ function renderStats(orders, lineItems) {
     </div>`;
   }
 
-  document.getElementById('stats-grid').innerHTML = stats.map(renderStatCard).join('');
+  const liveHeroHtml = `<div class="stat-card live-hero" id="live-hero-card">
+    <div class="live-label"><span class="live-pulse"></span>Live right now</div>
+    <div class="live-count" id="live-hero-count">-</div>
+    <div class="live-sub">active visitors on site</div>
+    <div class="live-pages" id="live-pages-grid"></div>
+    <div class="live-visitors-list" id="live-visitors-list"></div>
+  </div>`;
+  document.getElementById('stats-grid').innerHTML = liveHeroHtml + stats.map(renderStatCard).join('');
+  if (currentRange === 'live') {
+    document.getElementById('stats-grid').classList.add('live-mode');
+    fetchLiveDetail();
+  }
 
   // Orders tab stats
   const ordersTabEl = document.getElementById('orders-stats-grid');
@@ -3216,6 +3294,50 @@ function renderStats(orders, lineItems) {
         if (el) el.textContent = d.active_visitors || 0;
       }).catch(() => {});
   }
+}
+
+// ── Live mode ──
+async function fetchLiveDetail() {
+  if (!currentStaff || !currentStaff.token) return;
+  try {
+    const res = await fetch(`/.netlify/functions/analytics-realtime?site=PrimalPantry.co.nz&detail=1&token=${currentStaff.token}`);
+    const d = await res.json();
+    const count = d.active_visitors || 0;
+    const heroCount = document.getElementById('live-hero-count');
+    if (heroCount) heroCount.textContent = count;
+    const liveCount = document.getElementById('wa-live-count');
+    if (liveCount) liveCount.textContent = count;
+
+    // Render active pages
+    const pagesGrid = document.getElementById('live-pages-grid');
+    if (pagesGrid && d.pages && d.pages.length) {
+      pagesGrid.innerHTML = d.pages.slice(0, 10).map(p =>
+        `<div class="live-page"><span class="page-path" title="${p.page || p.pathname || ''}">${p.page || p.pathname || '/'}</span><span class="page-count">${p.visitors || p.count || 0}</span></div>`
+      ).join('');
+    } else if (pagesGrid) {
+      pagesGrid.innerHTML = '<div style="color:var(--dim);font-size:0.8rem;grid-column:1/-1">No active pages</div>';
+    }
+
+    // Render visitor list
+    const visList = document.getElementById('live-visitors-list');
+    if (visList && d.visitors && d.visitors.length) {
+      visList.innerHTML = d.visitors.slice(0, 15).map(v =>
+        `<div class="live-visitor"><span>${v.country || ''} ${v.city || ''}</span><span>${v.page || v.pathname || '/'}</span><span style="color:var(--muted)">${v.browser || ''}</span></div>`
+      ).join('');
+    } else if (visList) {
+      visList.innerHTML = '';
+    }
+  } catch (e) { console.warn('Live fetch failed', e); }
+}
+
+function startLiveMode() {
+  stopLiveMode();
+  fetchLiveDetail();
+  liveInterval = setInterval(fetchLiveDetail, 10000); // refresh every 10s
+}
+
+function stopLiveMode() {
+  if (liveInterval) { clearInterval(liveInterval); liveInterval = null; }
 }
 
 // ── Comms response stats (populates overview + comms sidebar) ──
@@ -5078,7 +5200,9 @@ document.querySelectorAll('.nav-item').forEach(btn => {
     document.querySelector('.filter-bar').style.display = (activeTab === 'finance' || activeTab === 'comms' || activeTab === 'settings') ? 'none' : '';
     // Attribution toggle: only on website, marketing, overview
     document.getElementById('attr-toggle').style.display = (activeTab === 'website' || activeTab === 'marketing' || activeTab === 'sales') ? '' : 'none';
-    // Ad spend banner: only on marketing and overview
+    // Stats mode toggle: only on overview and sales
+    document.getElementById('stats-mode-toggle').style.display = (activeTab === 'sales') ? '' : 'none';
+    // Ad spend banner: on marketing and overview
     document.getElementById('adspend-banner').style.display = (activeTab === 'marketing' || activeTab === 'sales') ? '' : 'none';
     loadActiveTab();
     checkCommsPrompts(); // Check for pending prompts on every tab switch
