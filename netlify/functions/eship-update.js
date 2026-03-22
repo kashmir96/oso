@@ -72,7 +72,16 @@ exports.handler = async (event) => {
       'Content-Type': 'application/json',
     };
 
-    // Update the order's shipping method via StarshipIt API
+    // Map carrier product codes to NZ Post bag dimensions (metres)
+    const BAG_DIMENSIONS = {
+      CPOLTPDL: { length: 0.24, width: 0.13, height: 0.05 },   // DL
+      CPOLTPA5: { length: 0.28, width: 0.20, height: 0.05 },   // A5
+      CPOLTPA4: { length: 0.35, width: 0.25, height: 0.08 },   // A4
+      CPOLTPA3: { length: 0.44, width: 0.32, height: 0.10 },   // Foolscap
+    };
+    const dims = BAG_DIMENSIONS[shipping_method] || BAG_DIMENSIONS.CPOLTPDL;
+
+    // Update the order's shipping method AND package dimensions via StarshipIt API
     const res = await fetch('https://api.starshipit.com/api/orders', {
       method: 'PUT',
       headers: apiHeaders,
@@ -80,6 +89,11 @@ exports.handler = async (event) => {
         order: {
           order_id: order_id,
           shipping_method: shipping_method,
+          packages: [{
+            length: dims.length,
+            width: dims.width,
+            height: dims.height,
+          }],
         },
       }),
     });
