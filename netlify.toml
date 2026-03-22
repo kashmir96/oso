@@ -14,3 +14,9 @@
 
 [functions."deploy-alert"]
   schedule = "*/15 * * * *"
+
+[functions."traffic-alert"]
+  schedule = "0 * * * *"
+
+[functions."competitor-check"]
+  schedule = "17 14 * * *"
