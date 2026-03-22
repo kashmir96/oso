@@ -1777,6 +1777,42 @@
       </div>
     </div>
 
+    <div class="charts-row" style="grid-template-columns:1fr;">
+      <div class="chart-card">
+        <h3>Sales by Source Over Time</h3>
+        <div class="chart-wrap" style="height:260px;"><canvas id="mkt-source-time-chart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="charts-row" style="grid-template-columns:1fr;">
+      <div class="chart-card">
+        <h3>Sales by Ad Creative Over Time</h3>
+        <div class="chart-wrap" style="height:260px;"><canvas id="mkt-creative-time-chart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="orders-card" style="margin-bottom:1.5rem;">
+      <h3>Sales by Source</h3>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Source</th><th>Traffic</th><th>Sales</th><th>Revenue</th><th>Adspend</th><th>CPA</th><th>ROAS</th></tr></thead>
+          <tbody id="mkt-source-table"><tr><td colspan="7" class="loading">Loading...</td></tr></tbody>
+        </table>
+      </div>
+      <div id="mkt-source-pagination"></div>
+    </div>
+
+    <div class="orders-card" style="margin-bottom:1.5rem;">
+      <h3>Ad Creatives</h3>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Creative</th><th>Traffic</th><th>Sales</th><th>Revenue</th><th>Adspend</th><th>CPA</th><th>ROAS</th></tr></thead>
+          <tbody id="mkt-creative-table"><tr><td colspan="7" class="loading">Loading...</td></tr></tbody>
+        </table>
+      </div>
+      <div id="mkt-creative-pagination"></div>
+    </div>
+
     <div class="orders-card" style="margin-bottom:1.5rem;">
       <h3>Campaign Performance</h3>
       <input type="text" class="search-bar" id="mkt-campaign-search" placeholder="Search campaigns...">
@@ -1798,6 +1834,27 @@
           <tbody id="mkt-campaign-table"></tbody>
         </table>
       </div>
+      <div id="mkt-campaign-pagination"></div>
+    </div>
+
+    <div class="orders-card" style="margin-bottom:1.5rem;">
+      <h3>Google Ads Performance</h3>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Campaign</th>
+              <th>Revenue</th>
+              <th>Cost</th>
+              <th>ROAS</th>
+              <th>Clicks</th>
+              <th>UTM Tracked Sales</th>
+            </tr>
+          </thead>
+          <tbody id="mkt-gads-table"><tr><td colspan="6" class="loading">Connect Google Ads to view data</td></tr></tbody>
+        </table>
+      </div>
+      <div id="mkt-gads-pagination"></div>
     </div>
 
     <div class="orders-card" style="margin-bottom:1.5rem;">
@@ -1844,6 +1901,7 @@
           <tbody id="mkt-gmc-table"></tbody>
         </table>
       </div>
+      <div id="mkt-gmc-pagination"></div>
     </div>
 
     <!-- Competitor Tracking -->
@@ -2771,18 +2829,18 @@ function getDateRange() {
 function populateFilterDropdowns() {
   // UTM sources
   const utmSelect = document.getElementById('filter-utm');
-  const sources = [...new Set(allOrders.map(o => o.utm_source || getUtmFromUrl(o.thank_you_url, 'utm_source') || '').filter(Boolean))].sort();
-  utmSelect.innerHTML = '<option value="">All</option>' + sources.map(s => `<option value="${s}">${s}</option>`).join('');
+  const sources = [...new Set(allOrders.map(o => resolveOrderSource(o)).filter(Boolean))].sort();
+  utmSelect.innerHTML = '<option value="">All</option>' + sources.map(s => `<option value="${s}">${utmTranslate('utm_source', s)}</option>`).join('');
 
   // UTM mediums
   const mediumSelect = document.getElementById('filter-utm-medium');
   const mediums = [...new Set(allOrders.map(o => o.utm_medium || getUtmFromUrl(o.thank_you_url, 'utm_medium') || '').filter(Boolean))].sort();
-  mediumSelect.innerHTML = '<option value="">All</option>' + mediums.map(m => `<option value="${m}">${m}</option>`).join('');
+  mediumSelect.innerHTML = '<option value="">All</option>' + mediums.map(m => `<option value="${m}">${utmTranslate('utm_medium', m)}</option>`).join('');
 
   // UTM campaigns
   const campaignSelect = document.getElementById('filter-utm-campaign');
   const campaigns = [...new Set(allOrders.map(o => o.utm_campaign || getUtmFromUrl(o.thank_you_url, 'utm_campaign') || '').filter(Boolean))].sort();
-  campaignSelect.innerHTML = '<option value="">All</option>' + campaigns.map(c => `<option value="${c}">${c}</option>`).join('');
+  campaignSelect.innerHTML = '<option value="">All</option>' + campaigns.map(c => `<option value="${c}">${utmTranslate('utm_campaign', c)}</option>`).join('');
 
   // Cities
   const citySelect = document.getElementById('filter-city');
@@ -2798,7 +2856,7 @@ function applyFilter() {
   const cityFilter = document.getElementById('filter-city').value;
   filteredOrders = allOrders.filter(o => {
     if (o.order_date < from || o.order_date > to) return false;
-    if (utmFilter && (o.utm_source || getUtmFromUrl(o.thank_you_url, 'utm_source') || '') !== utmFilter) return false;
+    if (utmFilter && resolveOrderSource(o) !== utmFilter) return false;
     if (mediumFilter && (o.utm_medium || getUtmFromUrl(o.thank_you_url, 'utm_medium') || '') !== mediumFilter) return false;
     if (campaignFilter && (o.utm_campaign || getUtmFromUrl(o.thank_you_url, 'utm_campaign') || '') !== campaignFilter) return false;
     if (cityFilter && o.city !== cityFilter) return false;
@@ -2827,9 +2885,14 @@ function applyFilter() {
 async function loadAdSpend() {
   if (!currentStaff || !currentStaff.token) return;
   try {
-    const res = await fetch(`/.netlify/functions/facebook-adspend?token=${encodeURIComponent(currentStaff.token)}`);
-    const json = await res.json();
-    currentAdSpend = Number(json.spend || 0);
+    const today = new Date().toISOString().slice(0, 10);
+    const [fbRes, gRes] = await Promise.all([
+      fetch(`/.netlify/functions/facebook-adspend?token=${encodeURIComponent(currentStaff.token)}`).then(r => r.json()).catch(() => ({ spend: 0 })),
+      fetch(`/.netlify/functions/google-ads?token=${encodeURIComponent(currentStaff.token)}&from=${today}&to=${today}`).then(r => r.json()).catch(() => ({ campaigns: [] })),
+    ]);
+    const fbSpend = Number(fbRes.spend || 0);
+    const gAdsSpend = (gRes.campaigns || []).reduce((s, c) => s + (c.spend || 0), 0);
+    currentAdSpend = fbSpend + gAdsSpend;
     const el = document.getElementById('adspend-value');
     if (el) el.textContent = currentAdSpend > 0 ? '$' + currentAdSpend.toFixed(2) : '—';
   } catch (e) {
@@ -2891,7 +2954,7 @@ async function refreshStats() {
     const cityFilter = document.getElementById('filter-city').value;
     filteredOrders = allOrders.filter(o => {
       if (o.order_date < from || o.order_date > to) return false;
-      if (utmFilter && (o.utm_source || getUtmFromUrl(o.thank_you_url, 'utm_source') || '') !== utmFilter) return false;
+      if (utmFilter && resolveOrderSource(o) !== utmFilter) return false;
       if (mediumFilter && (o.utm_medium || getUtmFromUrl(o.thank_you_url, 'utm_medium') || '') !== mediumFilter) return false;
       if (campaignFilter && (o.utm_campaign || getUtmFromUrl(o.thank_you_url, 'utm_campaign') || '') !== campaignFilter) return false;
       if (cityFilter && o.city !== cityFilter) return false;
@@ -3643,7 +3706,7 @@ function renderProductsChart(lineItems) {
 function renderUTM(orders) {
   const sources = {};
   orders.forEach(o => {
-    const src = o.utm_source || (o.thank_you_url && getUtmFromUrl(o.thank_you_url, 'utm_source')) || 'Direct';
+    const src = resolveOrderSource(o) || 'Direct';
     sources[src] = (sources[src] || 0) + 1;
   });
 
@@ -3663,7 +3726,7 @@ function renderUTM(orders) {
     <thead><tr><th>Source</th><th>Orders</th><th></th></tr></thead>
     <tbody>${page.map(([src, count]) => `
       <tr>
-        <td>${src}</td>
+        <td>${utmTranslate('utm_source', src)}</td>
         <td>${count}</td>
         <td><span class="utm-bar" style="width:${(count / max) * 100}px"></span></td>
       </tr>
@@ -3682,6 +3745,18 @@ function getUtmFromUrl(url, param) {
     if (landing) { try { return new URL(landing).searchParams.get(p) || ''; } catch { return ''; } }
     return '';
   } catch { return ''; }
+}
+
+// Resolve order source with gclid/fbclid fallback (checks landing_page + thank_you_url)
+function resolveOrderSource(o) {
+  const src = o.utm_source || o.analytics_source || getUtmFromUrl(o.thank_you_url, 'utm_source') || getUtmFromUrl(o.landing_page, 'utm_source') || '';
+  if (src) return src;
+  // Check landing_page and thank_you_url for click IDs
+  const lp = o.landing_page || '';
+  const tu = o.thank_you_url || '';
+  if (o.gclid || getUtmFromUrl(lp, 'gclid') || getUtmFromUrl(tu, 'gclid')) return 'google';
+  if (o.fbclid || getUtmFromUrl(lp, 'fbclid') || getUtmFromUrl(tu, 'fbclid')) return 'facebook';
+  return '';
 }
 
 function sourceColor(src) {
@@ -3704,7 +3779,8 @@ function sourceColor(src) {
 function sourcePill(src) {
   if (!src) return '';
   const c = sourceColor(src);
-  return `<span class="source-pill" style="background:${c.bg};color:${c.fg}">${src}</span>`;
+  const display = typeof utmTranslateAny === 'function' ? utmTranslateAny(src) : src;
+  return `<span class="source-pill" style="background:${c.bg};color:${c.fg}">${display}</span>`;
 }
 
 // ── Heatmap (Day of week x Hour) ──
@@ -3856,7 +3932,7 @@ function getOrderSortValue(o, col, orderLineItemMap) {
     case 'total': return Number(o.total_value || 0);
     case 'cogs': return getOrderCOGS(o.id);
     case 'margin': { const cg = getOrderCOGS(o.id); const tv = Number(o.total_value || 0); return cg > 0 && tv > 0 ? (tv - cg) / tv : -1; }
-    case 'source': return (o.analytics_source || o.utm_source || getUtmFromUrl(o.thank_you_url, 'utm_source') || '').toLowerCase();
+    case 'source': return resolveOrderSource(o).toLowerCase();
     default: return '';
   }
 }
@@ -3913,7 +3989,7 @@ function renderOrdersTable() {
     const itemsHtml = magnet
       ? `<span style="color:var(--red);font-weight:600;">${magnet}</span>${addons.length ? ' – ' + addons.join(', ') : ''}`
       : '-';
-    const src = o.analytics_source || o.utm_source || getUtmFromUrl(o.thank_you_url, 'utm_source') || '';
+    const src = resolveOrderSource(o);
     return `
     <tr class="clickable" data-id="${o.id}">
       <td>${daysWaitingBadge(o)}</td>
@@ -3959,7 +4035,7 @@ function openOrderModal(orderId) {
   document.getElementById('modal-title').style.cssText = 'display:flex;align-items:center;gap:0.75rem;';
 
   // Analytics pills at top of modal
-  const oSrc = order.analytics_source || order.utm_source || getUtmFromUrl(order.thank_you_url, 'utm_source') || '';
+  const oSrc = resolveOrderSource(order);
   const magnetItem = (items[0] || {}).description || '';
   let pillsHtml = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">';
   if (oSrc) pillsHtml += sourcePill(oSrc);
@@ -3995,7 +4071,7 @@ function openOrderModal(orderId) {
     ['Magnet Product', magnetItem || '-'],
     ['Last Product Page', order.last_product_page || '-'],
     ['Analytics Source', order.analytics_source || '-'],
-    ['UTM Source', utmTranslate('utm_source', order.utm_source || getUtmFromUrl(order.thank_you_url, 'utm_source')) || '-'],
+    ['UTM Source', utmTranslate('utm_source', resolveOrderSource(order)) || '-'],
     ['UTM Medium', utmTranslate('utm_medium', order.utm_medium || getUtmFromUrl(order.thank_you_url, 'utm_medium')) || '-'],
     ['UTM Campaign', utmTranslate('utm_campaign', order.utm_campaign || getUtmFromUrl(order.thank_you_url, 'utm_campaign')) || '-'],
     ['Thank You URL', order.thank_you_url ? `<a href="${order.thank_you_url}" target="_blank" rel="noopener" style="color:var(--accent);word-break:break-all;font-size:0.8rem;">${order.thank_you_url}</a>` : '-'],
@@ -5309,7 +5385,7 @@ function applySegmentFilters(customerList) {
     // Source (first order's utm_source)
     if (f.source) {
       const firstOrder = c.orders[c.orders.length - 1];
-      const src = firstOrder?.utm_source || firstOrder?.analytics_source || getUtmFromUrl(firstOrder?.thank_you_url, 'utm_source') || '';
+      const src = firstOrder ? resolveOrderSource(firstOrder) : '';
       if (src !== f.source) return false;
     }
     // Tag
@@ -5327,7 +5403,7 @@ function populateSegmentDropdowns() {
     if (!o.email) return;
     if (!customers[o.email]) customers[o.email] = { city: '', sources: new Set() };
     if (o.city) customers[o.email].city = o.city;
-    const src = o.utm_source || o.analytics_source || getUtmFromUrl(o.thank_you_url, 'utm_source') || '';
+    const src = resolveOrderSource(o);
     if (src) customers[o.email].sources.add(src);
   });
 
@@ -5338,7 +5414,7 @@ function populateSegmentDropdowns() {
   citySelect.innerHTML = '<option value="">All Cities</option>' + cities.map(c => `<option value="${c}">${c}</option>`).join('');
 
   const srcSelect = document.getElementById('seg-source');
-  srcSelect.innerHTML = '<option value="">All Sources</option>' + sources.map(s => `<option value="${s}">${s}</option>`).join('');
+  srcSelect.innerHTML = '<option value="">All Sources</option>' + sources.map(s => `<option value="${s}">${utmTranslate('utm_source', s)}</option>`).join('');
 }
 
 function getSavedSegments() {
@@ -5561,7 +5637,7 @@ function renderCustomersTab() {
     const orderItems = c.orders.map(o => {
       const items = allLineItems.filter(li => li.order_id === o.id);
       const itemStr = items.map(li => `${li.quantity}x ${li.description || li.sku || '?'}`).join(', ');
-      const src = o.analytics_source || o.utm_source || getUtmFromUrl(o.thank_you_url, 'utm_source') || '';
+      const src = resolveOrderSource(o);
       const magnet = items[0] ? items[0].description : '';
       const ship = getShipStatus(o);
       const shipPill = ship ? `<span class="ship-status-badge ${(ship._shipping_status || '').toLowerCase().replace(/\s+/g, '-')}">${ship._shipping_status}</span>` : '';
@@ -5930,7 +6006,7 @@ async function openCustomerTimeline(email) {
     custOrders.forEach((o, idx) => {
       const items = allLineItems.filter(li => li.order_id === o.id);
       const journey = journeyResults[idx] || [];
-      const src = o.analytics_source || o.utm_source || getUtmFromUrl(o.thank_you_url, 'utm_source') || '';
+      const src = resolveOrderSource(o);
       const campaign = o.utm_campaign || getUtmFromUrl(o.thank_you_url, 'utm_campaign') || '';
       const content = o.utm_content || '';
 
@@ -5997,9 +6073,9 @@ async function openCustomerTimeline(email) {
 
       // Source pill
       const srcParts = [];
-      if (ev.source) srcParts.push(ev.source);
+      if (ev.source) srcParts.push(utmTranslate('utm_source', ev.source));
       const detail = ev.campaign || ev.content || '';
-      if (detail) srcParts.push(detail);
+      if (detail) srcParts.push(utmTranslateAny(detail));
       const pill = srcParts.length
         ? `<span style="display:inline-block;background:var(--sage);color:var(--bg);font-size:0.6rem;font-weight:600;padding:0.1rem 0.4rem;border-radius:9999px;">${srcParts.join(' – ')}</span>`
         : ev.referrer
@@ -6847,7 +6923,8 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
   function waAddFilter(col, val, labelPrefix) {
     // Remove existing filter on same column
     waFilters = waFilters.filter(f => f.col !== col);
-    waFilters.push({ col, val, label: labelPrefix + ': ' + val });
+    const displayVal = col.startsWith('utm_') || col.startsWith('ft_') || col.startsWith('lt_') ? utmTranslate(col, val) : val;
+    waFilters.push({ col, val, label: labelPrefix + ': ' + displayVal });
     waRenderFilterBar();
     waLoadDashboard();
   }
@@ -7402,7 +7479,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
           revByPage[lp] = (revByPage[lp] || 0) + rev;
         }
         // UTM source
-        const src = o.utm_source || (o.thank_you_url ? getUtmFromUrl(o.thank_you_url, 'utm_source') : '') || '';
+        const src = resolveOrderSource(o);
         if (src) revBySource[src] = (revBySource[src] || 0) + rev;
         // UTM medium
         const med = o.utm_medium || (o.thank_you_url ? getUtmFromUrl(o.thank_you_url, 'utm_medium') : '') || '';
@@ -7557,7 +7634,16 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     const bucket = utmMapLookup[field];
     return bucket && bucket[value] ? bucket[value] : value;
   }
+  // Translate a UTM value when the field is unknown — checks all fields
+  function utmTranslateAny(value) {
+    if (!value) return value;
+    for (const field of Object.keys(utmMapLookup)) {
+      if (utmMapLookup[field][value]) return utmMapLookup[field][value];
+    }
+    return value;
+  }
   window.utmTranslate = utmTranslate;
+  window.utmTranslateAny = utmTranslateAny;
 
   function utmBuildLookup() {
     Object.keys(utmMapLookup).forEach(k => delete utmMapLookup[k]);
@@ -7954,7 +8040,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     } else if (col === 'country') {
       options = (waTrafficData.countries || []).map(r => r.name).filter(Boolean);
     }
-    valSelect.innerHTML = '<option value="">All</option>' + options.map(o => `<option value="${o.replace(/"/g,'&quot;')}">${o}</option>`).join('');
+    valSelect.innerHTML = '<option value="">All</option>' + options.map(o => `<option value="${o.replace(/"/g,'&quot;')}">${col.startsWith('utm_') ? utmTranslate(col, o) : o}</option>`).join('');
     valSelect.style.display = '';
   });
 
@@ -9457,11 +9543,197 @@ document.getElementById('so-status-filter').addEventListener('change', () => { r
 // ── Marketing Tab ──
 let mktInited = false;
 let mktAllCampaigns = [];
+let mktCampaignPage = 1;
+let mktGmcPage = 1;
+let mktGadsPage = 1;
+let mktGadsCampaigns = [];
+let mktSourcePage = 1;
+let mktCreativePage = 1;
+let mktSourceData = [];
+let mktCreativeData = [];
 function mktApi(ep, p) { p = p || {}; p.token = currentStaff.token; return fetch('/.netlify/functions/' + ep + '?' + new URLSearchParams(p)).then(r => r.json()); }
 function mktStatCard(label, value, sub, sp, color) { color = color || 'var(--sage)'; const mx = Math.max(...sp, 0.01); const sk = '<div class="sparkline">' + sp.map(v => '<div class="spark-bar" style="height:' + Math.max(1,(v/mx)*24) + 'px;background:' + (v > 0 ? color : 'var(--border)') + '"></div>').join('') + '</div>'; return '<div class="stat-card"><div class="label">' + label + '</div><div class="value" style="color:' + color + '">' + value + '</div><div class="sub" style="color:var(--dim);">' + sub + '</div>' + sk + '</div>'; }
 function mktPill(p) { const c = { facebook: { bg:'rgba(66,103,178,0.15)', fg:'#6d8dc7' }, google: { bg:'rgba(66,133,244,0.15)', fg:'#6ba3f7' }, instagram: { bg:'rgba(225,48,108,0.15)', fg:'#e1306c' }, email: { bg:'rgba(140,180,122,0.15)', fg:'var(--sage)' } }; const x = c[p] || { bg:'rgba(156,146,135,0.15)', fg:'var(--muted)' }; return '<span class="source-pill" style="background:' + x.bg + ';color:' + x.fg + '">' + p + '</span>'; }
 function renderMktFunnel(vi,at,ch,pu) { const cols = ['var(--sage)','#a3c995','var(--honey)','var(--blush)']; const st = [{l:'Visitors',c:vi},{l:'Add to Cart',c:at},{l:'Checkout',c:ch},{l:'Purchase',c:pu}]; let h = '<div class="mkt-funnel">'; st.forEach((s,i) => { const dr = i > 0 ? ((1-s.c/st[i-1].c)*100).toFixed(0)+'% drop' : ''; h += '<div class="mkt-funnel-stage"><div class="mkt-funnel-bar" style="background:'+cols[i]+'"><span class="mkt-funnel-count" style="color:#fff">'+s.c.toLocaleString()+'</span><span class="mkt-funnel-label">'+s.l+'</span></div>'+(dr?'<div class="mkt-funnel-drop">'+dr+'</div>':'')+'</div>'; if(i<st.length-1) h+='<div class="mkt-funnel-arrow">\u2192</div>'; }); return h+'</div>'; }
-function renderMktCT(filter) { const fl = filter ? mktAllCampaigns.filter(c => (c.name+c.platform).toLowerCase().includes(filter)) : mktAllCampaigns; document.getElementById('mkt-campaign-table').innerHTML = fl.map(c => { const roas = c.spend>0?(c.conversions_value/c.spend).toFixed(1)+'x':'-'; const cpa = c.conversions>0&&c.spend>0?'$'+(c.spend/c.conversions).toFixed(2):'-'; return '<tr><td>'+c.name+'</td><td>'+mktPill(c.platform)+'</td><td>$'+c.spend.toFixed(2)+'</td><td>'+(c.impressions||0).toLocaleString()+'</td><td>'+(c.clicks||0).toLocaleString()+'</td><td>$'+c.conversions_value.toFixed(2)+'</td><td>'+roas+'</td><td>'+(c.conversions||0)+'</td><td>'+cpa+'</td></tr>'; }).join('') || '<tr><td colspan="9" class="loading">No campaign data</td></tr>'; }
+function renderMktCT(filter) { mktCampaignPage = 1; renderMktCTPaged(filter); }
+function renderMktCTPaged(filter) { const fl = filter ? mktAllCampaigns.filter(c => (c.name+c.platform).toLowerCase().includes(filter)) : mktAllCampaigns; const start = (mktCampaignPage - 1) * PAGE_SIZE; const page = fl.slice(start, start + PAGE_SIZE); document.getElementById('mkt-campaign-table').innerHTML = page.map(c => { const roas = c.spend>0?(c.conversions_value/c.spend).toFixed(1)+'x':'-'; const cpa = c.conversions>0&&c.spend>0?'$'+(c.spend/c.conversions).toFixed(2):'-'; return '<tr><td>'+c.name+'</td><td>'+mktPill(c.platform)+'</td><td>$'+c.spend.toFixed(2)+'</td><td>'+(c.impressions||0).toLocaleString()+'</td><td>'+(c.clicks||0).toLocaleString()+'</td><td>$'+c.conversions_value.toFixed(2)+'</td><td>'+roas+'</td><td>'+(c.conversions||0)+'</td><td>'+cpa+'</td></tr>'; }).join('') || '<tr><td colspan="9" class="loading">No campaign data</td></tr>'; renderPagination('mkt-campaign-pagination', mktCampaignPage, fl.length, p => { mktCampaignPage = p; renderMktCTPaged(filter); }); }
+// ── Marketing: resolve order source (with gclid/fbclid fallback) ──
+function mktGetOrderSource(o) {
+  return resolveOrderSource(o).toLowerCase() || 'direct';
+}
+function mktGetOrderCreative(o) {
+  return o.utm_content || getUtmFromUrl(o.thank_you_url, 'utm_content') || '';
+}
+
+// ── Marketing: build blended source data ──
+function buildMktSourceData(orders, trafficBySource, fbCampaigns, gCampaigns) {
+  const bySource = {};
+  orders.forEach(o => {
+    const src = mktGetOrderSource(o);
+    if (!bySource[src]) bySource[src] = { sales: 0, revenue: 0 };
+    bySource[src].sales++;
+    bySource[src].revenue += Number(o.total_value || 0);
+  });
+  const adspendMap = {};
+  (fbCampaigns || []).forEach(c => { adspendMap['facebook'] = (adspendMap['facebook'] || 0) + c.spend; });
+  (gCampaigns || []).forEach(c => { adspendMap['google'] = (adspendMap['google'] || 0) + c.spend; });
+  const trafficMap = {};
+  (trafficBySource || []).forEach(r => { trafficMap[(r.name || '').toLowerCase() || 'direct'] = r.visitors || 0; });
+  const allSources = new Set([...Object.keys(bySource), ...Object.keys(trafficMap)]);
+  const rows = [];
+  allSources.forEach(src => {
+    const sales = bySource[src]?.sales || 0;
+    const revenue = bySource[src]?.revenue || 0;
+    const traffic = trafficMap[src] || 0;
+    const adspend = adspendMap[src] || 0;
+    rows.push({ source: src, traffic, sales, revenue, adspend, cpa: sales > 0 && adspend > 0 ? adspend / sales : 0, roas: adspend > 0 ? revenue / adspend : 0 });
+  });
+  return rows.sort((a, b) => b.revenue - a.revenue);
+}
+
+// ── Marketing: build blended creative data ──
+function buildMktCreativeData(orders, trafficByContent) {
+  const byCreative = {};
+  orders.forEach(o => {
+    const cr = mktGetOrderCreative(o) || '(none)';
+    if (!byCreative[cr]) byCreative[cr] = { sales: 0, revenue: 0 };
+    byCreative[cr].sales++;
+    byCreative[cr].revenue += Number(o.total_value || 0);
+  });
+  const trafficMap = {};
+  (trafficByContent || []).forEach(r => { trafficMap[r.name || '(none)'] = r.visitors || 0; });
+  const allCreatives = new Set([...Object.keys(byCreative), ...Object.keys(trafficMap)]);
+  const rows = [];
+  allCreatives.forEach(cr => {
+    const sales = byCreative[cr]?.sales || 0;
+    const revenue = byCreative[cr]?.revenue || 0;
+    const traffic = trafficMap[cr] || 0;
+    rows.push({ creative: cr, traffic, sales, revenue, adspend: 0, cpa: 0, roas: 0 });
+  });
+  return rows.sort((a, b) => b.revenue - a.revenue);
+}
+
+// ── Marketing: render source table ──
+function renderMktSourceTable() {
+  const start = (mktSourcePage - 1) * PAGE_SIZE;
+  const page = mktSourceData.slice(start, start + PAGE_SIZE);
+  document.getElementById('mkt-source-table').innerHTML = page.map(r => {
+    const display = utmTranslate('utm_source', r.source);
+    return '<tr><td>' + mktPill(display) + '</td>'
+      + '<td>' + r.traffic.toLocaleString() + '</td>'
+      + '<td>' + r.sales + '</td>'
+      + '<td>$' + r.revenue.toFixed(2) + '</td>'
+      + '<td>' + (r.adspend > 0 ? '$' + r.adspend.toFixed(2) : '-') + '</td>'
+      + '<td>' + (r.cpa > 0 ? '$' + r.cpa.toFixed(2) : '-') + '</td>'
+      + '<td>' + (r.roas > 0 ? r.roas.toFixed(1) + 'x' : '-') + '</td></tr>';
+  }).join('') || '<tr><td colspan="7" class="loading">No source data</td></tr>';
+  renderPagination('mkt-source-pagination', mktSourcePage, mktSourceData.length, p => { mktSourcePage = p; renderMktSourceTable(); });
+}
+
+// ── Marketing: render creative table ──
+function renderMktCreativeTable() {
+  const start = (mktCreativePage - 1) * PAGE_SIZE;
+  const page = mktCreativeData.slice(start, start + PAGE_SIZE);
+  document.getElementById('mkt-creative-table').innerHTML = page.map(r => {
+    const display = utmTranslateAny(r.creative);
+    return '<tr><td>' + esc(display) + '</td>'
+      + '<td>' + r.traffic.toLocaleString() + '</td>'
+      + '<td>' + r.sales + '</td>'
+      + '<td>$' + r.revenue.toFixed(2) + '</td>'
+      + '<td>-</td><td>-</td><td>-</td></tr>';
+  }).join('') || '<tr><td colspan="7" class="loading">No creative data</td></tr>';
+  renderPagination('mkt-creative-pagination', mktCreativePage, mktCreativeData.length, p => { mktCreativePage = p; renderMktCreativeTable(); });
+}
+
+// ── Marketing: enhanced Google Ads table ──
+function renderMktGads() {
+  const [from, to] = getDateRange();
+  const googleOrders = allOrders.filter(o => o.order_date >= from && o.order_date <= to && mktGetOrderSource(o) === 'google');
+  const start = (mktGadsPage - 1) * PAGE_SIZE;
+  const page = mktGadsCampaigns.slice(start, start + PAGE_SIZE);
+  document.getElementById('mkt-gads-table').innerHTML = page.map(c => {
+    const roas = c.spend > 0 ? (c.conversions_value / c.spend).toFixed(1) + 'x' : '-';
+    const nameLower = c.name.toLowerCase();
+    const utmSales = googleOrders.filter(o => {
+      const camp = (o.utm_campaign || getUtmFromUrl(o.thank_you_url, 'utm_campaign') || '').toLowerCase();
+      return camp === nameLower || utmTranslate('utm_campaign', camp).toLowerCase() === nameLower;
+    }).length;
+    return '<tr><td>' + esc(c.name) + '</td>'
+      + '<td>$' + (c.conversions_value || 0).toFixed(2) + '</td>'
+      + '<td>$' + c.spend.toFixed(2) + '</td>'
+      + '<td>' + roas + '</td>'
+      + '<td>' + (c.clicks || 0).toLocaleString() + '</td>'
+      + '<td>' + utmSales + '</td></tr>';
+  }).join('') || '<tr><td colspan="6" class="loading">No Google Ads data</td></tr>';
+  renderPagination('mkt-gads-pagination', mktGadsPage, mktGadsCampaigns.length, p => { mktGadsPage = p; renderMktGads(); });
+}
+
+// ── Marketing: sales by source over time chart ──
+function renderMktSourceTimeChart(orders) {
+  const dateSourceMap = {};
+  const sourceTotals = {};
+  orders.forEach(o => {
+    const d = o.order_date;
+    const src = mktGetOrderSource(o);
+    sourceTotals[src] = (sourceTotals[src] || 0) + 1;
+    if (!dateSourceMap[d]) dateSourceMap[d] = {};
+    dateSourceMap[d][src] = (dateSourceMap[d][src] || 0) + 1;
+  });
+  const sortedDates = Object.keys(dateSourceMap).sort().slice(-30);
+  const labels = sortedDates.map(d => new Date(d + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }));
+  const palette = ['#8CB47A','#D4A84B','#6d8dc7','#e1306c','#6ba3f7','#DBBFA8','#e06050','#a3c995','#c4b09a','#d4b88a'];
+  const topSources = Object.entries(sourceTotals).sort((a, b) => b[1] - a[1]).slice(0, 10).map(e => e[0]);
+  const datasets = topSources.map((src, i) => ({
+    label: utmTranslate('utm_source', src),
+    data: sortedDates.map(d => dateSourceMap[d]?.[src] || 0),
+    borderColor: palette[i % palette.length],
+    backgroundColor: 'transparent',
+    tension: 0.4, pointRadius: 2, borderWidth: 2,
+  }));
+  if (charts.mktSourceTime) charts.mktSourceTime.destroy();
+  charts.mktSourceTime = new Chart(document.getElementById('mkt-source-time-chart'), {
+    type: 'line', data: { labels, datasets },
+    options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { labels: { color: '#9c9287', font: { size: 11, family: 'DM Sans' } } } },
+      scales: { y: { ticks: { color: '#9c9287', stepSize: 1 }, grid: { color: '#252220' }, title: { display: true, text: 'Sales', color: '#6e6259', font: { size: 10 } } },
+        x: { ticks: { color: '#9c9287', maxTicksLimit: 15, font: { size: 10 } }, grid: { display: false } } },
+    },
+  });
+}
+
+// ── Marketing: sales by creative over time chart ──
+function renderMktCreativeTimeChart(orders) {
+  const dateCreativeMap = {};
+  const creativeTotals = {};
+  orders.forEach(o => {
+    const d = o.order_date;
+    const cr = mktGetOrderCreative(o) || '(none)';
+    creativeTotals[cr] = (creativeTotals[cr] || 0) + 1;
+    if (!dateCreativeMap[d]) dateCreativeMap[d] = {};
+    dateCreativeMap[d][cr] = (dateCreativeMap[d][cr] || 0) + 1;
+  });
+  const sortedDates = Object.keys(dateCreativeMap).sort().slice(-30);
+  const labels = sortedDates.map(d => new Date(d + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }));
+  const palette = ['#D4A84B','#8CB47A','#6d8dc7','#e1306c','#6ba3f7','#DBBFA8','#e06050','#a3c995','#c4b09a','#d4b88a'];
+  const topCreatives = Object.entries(creativeTotals).sort((a, b) => b[1] - a[1]).slice(0, 10).map(e => e[0]);
+  const datasets = topCreatives.map((cr, i) => ({
+    label: utmTranslateAny(cr),
+    data: sortedDates.map(d => dateCreativeMap[d]?.[cr] || 0),
+    borderColor: palette[i % palette.length],
+    backgroundColor: 'transparent',
+    tension: 0.4, pointRadius: 2, borderWidth: 2,
+  }));
+  if (charts.mktCreativeTime) charts.mktCreativeTime.destroy();
+  charts.mktCreativeTime = new Chart(document.getElementById('mkt-creative-time-chart'), {
+    type: 'line', data: { labels, datasets },
+    options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { labels: { color: '#9c9287', font: { size: 11, family: 'DM Sans' } } } },
+      scales: { y: { ticks: { color: '#9c9287', stepSize: 1 }, grid: { color: '#252220' }, title: { display: true, text: 'Sales', color: '#6e6259', font: { size: 10 } } },
+        x: { ticks: { color: '#9c9287', maxTicksLimit: 15, font: { size: 10 } }, grid: { display: false } } },
+    },
+  });
+}
+function renderMktGmc(products) { const start = (mktGmcPage - 1) * PAGE_SIZE; const page = products.slice(start, start + PAGE_SIZE); document.getElementById('mkt-gmc-table').innerHTML = page.map(p => { const iss = p.issues.length>0?p.issues.map(i=>i.description).join('; '):'-'; const rc = p.status==='disapproved'?' style="background:rgba(224,96,80,0.08);"':''; return '<tr'+rc+'><td>'+p.title+'</td><td><span class="dummy-badge '+p.status+'">'+p.status.charAt(0).toUpperCase()+p.status.slice(1)+'</span></td><td>'+iss+'</td></tr>'; }).join(''); renderPagination('mkt-gmc-pagination', mktGmcPage, products.length, p => { mktGmcPage = p; renderMktGmc(products); }); }
 async function loadMarketingTab() {
   const [from, to] = getDateRange();
   if (!mktInited) {
@@ -9484,17 +9756,21 @@ async function loadMarketingTab() {
   const gBanner = document.getElementById('mkt-google-banner'), gIds = document.getElementById('mkt-google-ids');
   if (gSt.connected) { gBanner.style.display = 'none'; gIds.style.display = 'block'; document.getElementById('mkt-google-status').innerHTML = '<span style="color:var(--sage);">\u25cf Connected</span>'; if (gSt.adsCustomerId) document.getElementById('mkt-ads-customer-id').value = gSt.adsCustomerId; if (gSt.merchantId) document.getElementById('mkt-merchant-id').value = gSt.merchantId; }
   else { gBanner.style.display = 'flex'; gIds.style.display = 'none'; document.getElementById('mkt-google-status').innerHTML = '<span style="color:var(--dim);">\u25cb Not connected</span>'; }
-  const [fbC, gC, fbD, gD, gmcD] = await Promise.all([
+  const [fbC, gC, fbD, gD, gmcD, trafficBySource, trafficByContent] = await Promise.all([
     mktApi('facebook-campaigns', { from, to }).catch(() => ({ campaigns: [] })),
     gSt.connected && gSt.adsCustomerId ? mktApi('google-ads', { from, to }).catch(() => ({ campaigns: [] })) : { campaigns: [] },
     mktApi('facebook-campaigns', { from, to, daily: '1' }).catch(() => ({ daily: [] })),
     gSt.connected && gSt.adsCustomerId ? mktApi('google-ads', { from, to, daily: '1' }).catch(() => ({ daily: [] })) : { daily: [] },
     gSt.connected && gSt.merchantId ? mktApi('google-merchant', {}).catch(() => ({ products: [] })) : { products: [] },
+    mktApi('analytics-dashboard', { site: 'PrimalPantry.co.nz', from, to, metric: 'campaigns', col: 'utm_source' }).catch(() => []),
+    mktApi('analytics-dashboard', { site: 'PrimalPantry.co.nz', from, to, metric: 'campaigns', col: 'utm_content' }).catch(() => []),
   ]);
   mktAllCampaigns = [...(fbC.campaigns||[]).map(c=>({...c,platform:'facebook'})), ...(gC.campaigns||[]).map(c=>({...c,platform:'google'}))].sort((a,b)=>b.spend-a.spend);
+  mktGadsCampaigns = (gC.campaigns||[]).sort((a,b)=>b.spend-a.spend);
   const tSpend = mktAllCampaigns.reduce((s,c)=>s+c.spend,0), tRev = mktAllCampaigns.reduce((s,c)=>s+c.conversions_value,0);
   const tClicks = mktAllCampaigns.reduce((s,c)=>s+c.clicks,0), tConv = mktAllCampaigns.reduce((s,c)=>s+c.conversions,0);
   const tImpr = mktAllCampaigns.reduce((s,c)=>s+c.impressions,0);
+  const gSpend = mktGadsCampaigns.reduce((s,c)=>s+c.spend,0), gConv = mktGadsCampaigns.reduce((s,c)=>s+c.conversions,0), gCPA = gConv>0?gSpend/gConv:0;
   const byDate = {}; (fbD.daily||[]).concat(gD.daily||[]).forEach(d => { if (!byDate[d.date]) byDate[d.date] = {spend:0,rev:0}; byDate[d.date].spend += d.spend; byDate[d.date].rev += d.conversions_value; });
   const sortedDates = Object.keys(byDate).sort();
   const spSpark = sortedDates.map(d=>byDate[d].spend), rvSpark = sortedDates.map(d=>byDate[d].rev), roSpark = sortedDates.map(d=>byDate[d].spend>0?byDate[d].rev/byDate[d].spend:0);
@@ -9505,6 +9781,7 @@ async function loadMarketingTab() {
     mktStatCard('Paid Revenue','$'+tRev.toFixed(2),tClicks.toLocaleString()+' clicks',rvSpark.length>1?rvSpark:[0],'var(--green)'),
     mktStatCard('Blended CVR',tClicks>0?(tConv/tClicks*100).toFixed(1)+'%':'-','clicks to conversion',roSpark.length>1?roSpark:[0],'var(--cyan)'),
     mktStatCard('Avg CPC',tClicks>0?'$'+(tSpend/tClicks).toFixed(2):'-','cost per click',spSpark.length>1?spSpark:[0],'var(--purple)'),
+    mktStatCard('Google Ads Spend','$'+gSpend.toFixed(2),gConv+' conv · CPA '+(gCPA>0?'$'+gCPA.toFixed(2):'-'),spSpark.length>1?spSpark:[0],'#4285F4'),
   ].join('');
   const fbSp=(fbC.campaigns||[]).reduce((s,c)=>s+c.spend,0),gSp=(gC.campaigns||[]).reduce((s,c)=>s+c.spend,0);const chL=[],chD=[],chC=[];if(fbSp>0){chL.push('Facebook');chD.push(fbSp);chC.push('#4267B2');}if(gSp>0){chL.push('Google Ads');chD.push(gSp);chC.push('#4285F4');}if(!chL.length){chL.push('No data');chD.push(1);chC.push('#332d27');}
   if(charts.mktChannel)charts.mktChannel.destroy();
@@ -9515,10 +9792,19 @@ async function loadMarketingTab() {
   if(charts.mktRoas)charts.mktRoas.destroy();
   charts.mktRoas = new Chart(document.getElementById('mkt-roas-chart'),{type:'line',data:{labels:lbls,datasets:[{label:'ROAS',data:roSpark,borderColor:'var(--sage)',backgroundColor:'rgba(140,180,122,0.15)',fill:true,tension:0.4,pointRadius:2,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>'ROAS: '+ctx.parsed.y.toFixed(1)+'x'}}},scales:{y:{ticks:{color:'#9c9287',callback:v=>v.toFixed(1)+'x'},grid:{color:'#252220'}},x:{ticks:{color:'#9c9287',maxTicksLimit:10,font:{size:10}},grid:{display:false}}}}});
   try{const fr=await mktApi('analytics-dashboard',{site:'PrimalPantry.co.nz',from,to,metric:'funnel_stages'});if(Array.isArray(fr)&&fr.length>0){const f=fr[0];document.getElementById('mkt-funnel-container').innerHTML=renderMktFunnel(f.visitors||0,f.add_to_cart||0,f.checkout||0,f.purchase||0);}else{document.getElementById('mkt-funnel-container').innerHTML='<div class="loading">No funnel data</div>';}}catch(e){document.getElementById('mkt-funnel-container').innerHTML='<div class="loading">Funnel unavailable</div>';}
-  renderMktCT('');
+  mktCampaignPage = 1; renderMktCT('');
+  // Blended source + creative tables and charts
+  const mktOrders = allOrders.filter(o => o.order_date >= from && o.order_date <= to);
+  mktSourceData = buildMktSourceData(mktOrders, trafficBySource, fbC.campaigns, gC.campaigns);
+  mktSourcePage = 1; renderMktSourceTable();
+  mktCreativeData = buildMktCreativeData(mktOrders, trafficByContent);
+  mktCreativePage = 1; renderMktCreativeTable();
+  renderMktSourceTimeChart(mktOrders);
+  renderMktCreativeTimeChart(mktOrders);
+  mktGadsPage = 1; renderMktGads();
   try{const lr=await mktApi('analytics-dashboard',{site:'PrimalPantry.co.nz',from,to,metric:'entry_pages'});if(Array.isArray(lr)&&lr.length>0){document.getElementById('mkt-landing-table').innerHTML=lr.slice(0,10).map(l=>'<tr><td>'+(l.value||l.pathname||'-')+'</td><td>'+(l.visitors||l.count||0)+'</td><td>-</td><td>-</td><td>-</td><td>'+(l.bounce_rate?l.bounce_rate.toFixed(1)+'%':'-')+'</td></tr>').join('');}}catch(e){}
   const gmcP=gmcD.products||[];const gmcTbl=document.getElementById('mkt-gmc-table'),gmcWrap=document.getElementById('mkt-gmc-table-wrap'),gmcLoad=document.getElementById('mkt-gmc-loading');
-  if(gmcP.length>0){gmcWrap.style.display='table';gmcLoad.style.display='none';gmcTbl.innerHTML=gmcP.map(p=>{const iss=p.issues.length>0?p.issues.map(i=>i.description).join('; '):'-';const rc=p.status==='disapproved'?' style="background:rgba(224,96,80,0.08);"':'';return '<tr'+rc+'><td>'+p.title+'</td><td><span class="dummy-badge '+p.status+'">'+p.status.charAt(0).toUpperCase()+p.status.slice(1)+'</span></td><td>'+iss+'</td></tr>';}).join('');}
+  if(gmcP.length>0){mktGmcPage=1;gmcWrap.style.display='table';gmcLoad.style.display='none';renderMktGmc(gmcP);}
   else if(gSt.connected&&gSt.merchantId){gmcLoad.textContent=gmcD.error||'No products found';gmcLoad.style.display='block';gmcWrap.style.display='none';}
   else{gmcLoad.textContent=gSt.connected?'Enter your Merchant Center ID above':'Connect Google to view product statuses';gmcLoad.style.display='block';gmcWrap.style.display='none';}
   // Load competitors section
