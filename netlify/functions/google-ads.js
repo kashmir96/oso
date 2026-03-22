@@ -115,7 +115,7 @@ exports.handler = async (event) => {
     if (daily) {
       query = `SELECT segments.date, metrics.cost_micros, metrics.conversions_value FROM campaign WHERE segments.date BETWEEN '${from}' AND '${to}' AND campaign.status = 'ENABLED' ORDER BY segments.date ASC`;
     } else {
-      query = `SELECT campaign.name, campaign.id, metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions, metrics.conversions_value FROM campaign WHERE segments.date BETWEEN '${from}' AND '${to}' AND campaign.status = 'ENABLED' ORDER BY metrics.cost_micros DESC`;
+      query = `SELECT campaign.name, campaign.id, campaign.primary_status, campaign.primary_status_reasons, metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions, metrics.conversions_value FROM campaign WHERE segments.date BETWEEN '${from}' AND '${to}' AND campaign.status = 'ENABLED' ORDER BY metrics.cost_micros DESC`;
     }
 
     const apiRes = await fetch(
@@ -163,6 +163,8 @@ exports.handler = async (event) => {
           campaignMap[id] = {
             name: row.campaign?.name || '',
             id,
+            primary_status: row.campaign?.primaryStatus || '',
+            primary_status_reasons: row.campaign?.primaryStatusReasons || [],
             impressions: 0,
             clicks: 0,
             spend: 0,

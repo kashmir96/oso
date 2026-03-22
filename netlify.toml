@@ -24,5 +24,11 @@
 [functions."merchant-alert"]
   schedule = "0 * * * *"
 
+[functions."changelog-sync"]
+  schedule = "*/15 * * * *"
+
+[functions."changelog-followup"]
+  schedule = "0 * * * *"
+
 [functions."gmail-sync"]
   schedule = "7 */4 * * *"

@@ -1881,6 +1881,33 @@
       <div id="mkt-gads-pagination"></div>
     </div>
 
+    <div id="mkt-cooldown-banner" style="display:none;background:rgba(212,168,75,0.12);border:1px solid var(--honey);border-radius:10px;padding:0.75rem 1.25rem;margin-bottom:1.25rem;font-size:0.85rem;color:var(--honey);">
+      <strong>⏳ Funnel change in cooldown</strong> — <span id="mkt-cooldown-text"></span>
+    </div>
+
+    <div class="orders-card" style="margin-bottom:1.5rem;">
+      <h3>Recent Changes</h3>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Change</th>
+              <th>Files</th>
+              <th>Status</th>
+              <th>Visitors</th>
+              <th>ATC</th>
+              <th>ATC%</th>
+              <th>Conv</th>
+              <th>Conv%</th>
+            </tr>
+          </thead>
+          <tbody id="mkt-changelog-table"><tr><td colspan="9" class="loading">Loading changes...</td></tr></tbody>
+        </table>
+      </div>
+      <div id="mkt-changelog-pagination"></div>
+    </div>
+
     <div class="orders-card" style="margin-bottom:1.5rem;">
       <h3>Landing Page Performance</h3>
       <div style="overflow-x:auto;">
@@ -2163,6 +2190,22 @@
     <button class="modal-close" id="modal-close">&times;</button>
     <h2 id="modal-title">Order Details</h2>
     <div id="modal-body"></div>
+  </div>
+</div>
+
+<!-- Page Drill-Down Modal -->
+<div class="modal-overlay" id="wa-page-modal">
+  <div class="modal" style="max-width:720px;max-height:90vh;overflow-y:auto;">
+    <button class="modal-close" id="wa-page-modal-close">&times;</button>
+    <h2 id="wa-page-modal-title" style="word-break:break-all;"></h2>
+    <div id="wa-page-modal-stats" class="wa-stats" style="margin-bottom:1rem;"></div>
+    <h3 style="font-size:0.85rem;margin-bottom:0.5rem;">Change History</h3>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead><tr><th>Date</th><th>Change</th><th>Files</th><th>Before</th><th>After</th></tr></thead>
+        <tbody id="wa-page-modal-changelog"><tr><td colspan="5" class="loading">No changes recorded</td></tr></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -7225,6 +7268,18 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
         });
       });
     }
+    // Add page drill-down click handlers for page tables
+    const isPageTable = ['wa-pages-table', 'wa-entry-table', 'wa-exit-table'].includes(containerId);
+    if (isPageTable) {
+      el.querySelectorAll('tr[data-wa-val]').forEach(row => {
+        row.style.cursor = 'pointer';
+        row.addEventListener('dblclick', function(e) {
+          e.stopPropagation();
+          const pathname = this.dataset.waVal;
+          if (pathname && typeof openPageModal === 'function') openPageModal(pathname);
+        });
+      });
+    }
   }
 
   let waRealtimePages = [], waRealtimeVisitors = [];
@@ -9610,6 +9665,8 @@ let mktCampaignPage = 1;
 let mktGmcPage = 1;
 let mktGadsPage = 1;
 let mktGadsCampaigns = [];
+let mktChangelogData = [];
+let mktChangelogPage = 1;
 let mktSourcePage = 1;
 let mktCreativePage = 1;
 let mktSourceData = [];
@@ -9814,6 +9871,201 @@ function renderMktCreativeTimeChart(orders) {
   });
 }
 function renderMktGmc(products) { const start = (mktGmcPage - 1) * PAGE_SIZE; const page = products.slice(start, start + PAGE_SIZE); document.getElementById('mkt-gmc-table').innerHTML = page.map(p => { const iss = p.issues.length>0?p.issues.map(i=>i.description).join('; '):'-'; const rc = p.status==='disapproved'?' style="background:rgba(224,96,80,0.08);"':''; return '<tr'+rc+'><td>'+p.title+'</td><td><span class="dummy-badge '+p.status+'">'+p.status.charAt(0).toUpperCase()+p.status.slice(1)+'</span></td><td>'+iss+'</td></tr>'; }).join(''); renderPagination('mkt-gmc-pagination', mktGmcPage, products.length, p => { mktGmcPage = p; renderMktGmc(products); }); }
+// ── Marketing: Learning Phase Widget ──
+function renderLearningPhaseWidget(campaigns) {
+  const learning = campaigns.filter(c => c.primary_status === 'LEARNING');
+  const count = learning.length;
+  const color = count > 0 ? 'var(--amber)' : 'var(--sage)';
+  const label = count > 0 ? count + ' campaign' + (count > 1 ? 's' : '') : 'None';
+  const sub = count > 0 ? 'in learning phase' : 'all stable';
+  // Return a clickable stat card
+  const detailHtml = count > 0 ? learning.map(c => {
+    const reasons = (c.primary_status_reasons || []).join(', ') || 'optimizing';
+    return '<div style="padding:0.3rem 0;border-bottom:1px solid var(--border);font-size:0.8rem;"><strong>' + esc(c.name) + '</strong><br><span style="color:var(--dim);">' + esc(reasons) + '</span></div>';
+  }).join('') : '';
+  return '<div class="stat-card" style="cursor:' + (count > 0 ? 'pointer' : 'default') + ';" onclick="this.querySelector(\'.lp-detail\').style.display=this.querySelector(\'.lp-detail\').style.display===\'none\'?\'block\':\'none\'">'
+    + '<div class="label">Learning Phase</div>'
+    + '<div class="value" style="color:' + color + '">' + label + '</div>'
+    + '<div class="sub" style="color:var(--dim);">' + sub + '</div>'
+    + '<div class="lp-detail" style="display:none;margin-top:0.5rem;max-height:150px;overflow-y:auto;">' + detailHtml + '</div>'
+    + '</div>';
+}
+
+// ── Marketing: Changelog ──
+async function loadMktChangelog() {
+  try {
+    const res = await fetch(`${db.supabaseUrl}/rest/v1/site_changelogs?site_key=eq.primalpantry&order=deployed_at.desc&limit=20&select=*`, {
+      headers: { 'apikey': db.supabaseKey, 'Authorization': `Bearer ${db.supabaseKey}` },
+    });
+    mktChangelogData = await res.json();
+    if (!Array.isArray(mktChangelogData)) mktChangelogData = [];
+  } catch (e) { mktChangelogData = []; }
+  mktChangelogPage = 1;
+  renderMktChangelog();
+  renderMktCooldownBanner();
+}
+
+function renderMktChangelog() {
+  const start = (mktChangelogPage - 1) * PAGE_SIZE;
+  const page = mktChangelogData.slice(start, start + PAGE_SIZE);
+  const tbody = document.getElementById('mkt-changelog-table');
+  if (page.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" class="loading">No changes recorded yet</td></tr>';
+    renderPagination('mkt-changelog-pagination', 1, 0, () => {});
+    return;
+  }
+  tbody.innerHTML = page.map(r => {
+    const date = new Date(r.deployed_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    const files = (r.files_changed || []).length;
+    const fileStr = files + ' file' + (files !== 1 ? 's' : '');
+    // Cooldown status
+    let statusHtml;
+    if (!r.is_funnel_related) {
+      statusHtml = '<span style="color:var(--dim);">—</span>';
+    } else if (r.cooldown_complete) {
+      statusHtml = '<span class="ship-status-badge" style="background:rgba(140,180,122,0.15);color:var(--sage);">Complete</span>';
+    } else {
+      const daysSince = Math.floor((Date.now() - new Date(r.deployed_at).getTime()) / 86400000);
+      const conv = r.cooldown_conversions || 0;
+      statusHtml = '<span class="ship-status-badge" style="background:rgba(212,168,75,0.15);color:var(--honey);">Cooldown (' + conv + '/50 conv · ' + daysSince + '/7d)</span>';
+    }
+    // Before/after metrics (normalize 30-day baseline to 7-day)
+    const bV = Math.round((r.baseline_visitors || 0) / 30 * 7);
+    const bA = Math.round((r.baseline_atc || 0) / 30 * 7);
+    const bC = Math.round((r.baseline_conv || 0) / 30 * 7);
+    const pV = r.post_visitors; const pA = r.post_atc; const pC = r.post_conv;
+    const hasPost = pV !== null && pV !== undefined;
+    const arrow = (b, a) => { if (!hasPost) return ''; const d = a - b; return d > 0 ? ' <span style="color:var(--sage);">↑</span>' : d < 0 ? ' <span style="color:var(--red);">↓</span>' : ''; };
+    const bAtcPct = bV > 0 ? (bA / bV * 100).toFixed(1) + '%' : '-';
+    const pAtcPct = hasPost && pV > 0 ? (pA / pV * 100).toFixed(1) + '%' : '-';
+    const bConvPct = bV > 0 ? (bC / bV * 100).toFixed(1) + '%' : '-';
+    const pConvPct = hasPost && pV > 0 ? (pC / pV * 100).toFixed(1) + '%' : '-';
+    const metric = (b, p) => hasPost ? b + ' → ' + p + arrow(b, p) : String(b);
+    const metricPct = (bPct, pPct, bNum, pNum) => hasPost ? bPct + ' → ' + pPct + arrow(parseFloat(bPct), parseFloat(pPct)) : bPct;
+    const rc = r.is_funnel_related ? ' style="background:rgba(212,168,75,0.05);"' : '';
+    return '<tr' + rc + ' class="clickable" onclick="expandChangelog(' + r.id + ')" title="Click for details">'
+      + '<td style="white-space:nowrap;">' + date + '</td>'
+      + '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(r.commit_message || 'Deploy') + '</td>'
+      + '<td>' + fileStr + '</td>'
+      + '<td>' + statusHtml + '</td>'
+      + '<td>' + metric(bV, hasPost ? pV : 0) + '</td>'
+      + '<td>' + metric(bA, hasPost ? pA : 0) + '</td>'
+      + '<td>' + metricPct(bAtcPct, pAtcPct, bA, pA) + '</td>'
+      + '<td>' + metric(bC, hasPost ? pC : 0) + '</td>'
+      + '<td>' + metricPct(bConvPct, pConvPct, bC, pC) + '</td>'
+      + '</tr>';
+  }).join('');
+  renderPagination('mkt-changelog-pagination', mktChangelogPage, mktChangelogData.length, p => { mktChangelogPage = p; renderMktChangelog(); });
+}
+
+function expandChangelog(id) {
+  const r = mktChangelogData.find(c => c.id === id);
+  if (!r) return;
+  const existing = document.getElementById('changelog-detail-' + id);
+  if (existing) { existing.remove(); return; }
+  const files = (r.files_changed || []).map(f => '<li>' + esc(f) + '</li>').join('') || '<li>No file details available</li>';
+  const row = document.querySelector('#mkt-changelog-table tr[onclick*="' + id + '"]');
+  if (!row) return;
+  const detail = document.createElement('tr');
+  detail.id = 'changelog-detail-' + id;
+  detail.innerHTML = '<td colspan="9" style="background:var(--bg);padding:1rem;">'
+    + '<div style="display:flex;gap:2rem;flex-wrap:wrap;">'
+    + '<div><strong>Commit:</strong> ' + esc(r.commit_message || '-') + '<br><strong>SHA:</strong> ' + (r.commit_sha ? r.commit_sha.slice(0, 8) : '-') + '</div>'
+    + '<div><strong>Files changed:</strong><ul style="margin:0.25rem 0 0 1rem;font-size:0.8rem;">' + files + '</ul></div>'
+    + '</div></td>';
+  row.after(detail);
+}
+
+function renderMktCooldownBanner() {
+  const banner = document.getElementById('mkt-cooldown-banner');
+  const textEl = document.getElementById('mkt-cooldown-text');
+  const activeCooldowns = mktChangelogData.filter(r => r.is_funnel_related && !r.cooldown_complete);
+  if (activeCooldowns.length === 0) { banner.style.display = 'none'; return; }
+  const latest = activeCooldowns[0]; // most recent
+  const daysSince = Math.floor((Date.now() - new Date(latest.deployed_at).getTime()) / 86400000);
+  const daysLeft = Math.max(0, 7 - daysSince);
+  const conv = latest.cooldown_conversions || 0;
+  const convLeft = Math.max(0, 50 - conv);
+  textEl.innerHTML = convLeft + ' conversions or ' + daysLeft + ' days remaining. Wait before making more funnel changes.';
+  banner.style.display = 'block';
+}
+
+// ── Page Drill-Down Modal ──
+async function openPageModal(pathname) {
+  const modal = document.getElementById('wa-page-modal');
+  document.getElementById('wa-page-modal-title').textContent = pathname;
+  document.getElementById('wa-page-modal-stats').innerHTML = '<div class="wa-loading">Loading...</div>';
+  document.getElementById('wa-page-modal-changelog').innerHTML = '<tr><td colspan="5" class="loading">Loading...</td></tr>';
+  modal.classList.add('open');
+
+  // Fetch page funnel stats
+  try {
+    const token = currentStaff ? currentStaff.token : '';
+    const [from, to] = getDateRange();
+    const params = new URLSearchParams({ token, site: 'PrimalPantry.co.nz', from, to, metric: 'funnel', col: 'pathname' });
+    const res = await fetch('/.netlify/functions/analytics-dashboard?' + params);
+    const data = await res.json();
+    const pageData = (Array.isArray(data) ? data : []).find(p => p.name === pathname);
+    if (pageData) {
+      const atcPct = pageData.visitors > 0 ? (pageData.atc / pageData.visitors * 100).toFixed(1) : '0';
+      const convPct = pageData.visitors > 0 ? (pageData.sales / pageData.visitors * 100).toFixed(1) : '0';
+      const rev = pageData._revenue || 0;
+      document.getElementById('wa-page-modal-stats').innerHTML = [
+        '<div class="wa-stat"><div class="wa-val">' + (pageData.visitors || 0).toLocaleString() + '</div><div class="wa-lbl">Visits</div></div>',
+        '<div class="wa-stat"><div class="wa-val">' + (pageData.atc || 0) + '</div><div class="wa-lbl">ATC</div></div>',
+        '<div class="wa-stat"><div class="wa-val">' + atcPct + '%</div><div class="wa-lbl">ATC%</div></div>',
+        '<div class="wa-stat"><div class="wa-val">' + (pageData.sales || 0) + '</div><div class="wa-lbl">Conv</div></div>',
+        '<div class="wa-stat"><div class="wa-val">' + convPct + '%</div><div class="wa-lbl">Conv%</div></div>',
+        '<div class="wa-stat"><div class="wa-val">$' + Number(rev).toFixed(2) + '</div><div class="wa-lbl">Revenue</div></div>',
+      ].join('');
+    } else {
+      document.getElementById('wa-page-modal-stats').innerHTML = '<span style="color:var(--dim);">No funnel data for this page</span>';
+    }
+  } catch (e) {
+    document.getElementById('wa-page-modal-stats').innerHTML = '<span style="color:var(--dim);">Error loading stats</span>';
+  }
+
+  // Fetch changelog for this page
+  try {
+    const res = await fetch(`${db.supabaseUrl}/rest/v1/site_changelogs?site_key=eq.primalpantry&funnel_pages=cs.{${encodeURIComponent(pathname)}}&order=deployed_at.desc&limit=20&select=*`, {
+      headers: { 'apikey': db.supabaseKey, 'Authorization': `Bearer ${db.supabaseKey}` },
+    });
+    let changes = await res.json();
+    if (!Array.isArray(changes)) changes = [];
+    // Also include changes that affect all pages (funnel_pages contains '*')
+    const res2 = await fetch(`${db.supabaseUrl}/rest/v1/site_changelogs?site_key=eq.primalpantry&funnel_pages=cs.{*}&order=deployed_at.desc&limit=20&select=*`, {
+      headers: { 'apikey': db.supabaseKey, 'Authorization': `Bearer ${db.supabaseKey}` },
+    });
+    let allPageChanges = await res2.json();
+    if (!Array.isArray(allPageChanges)) allPageChanges = [];
+    const allChanges = [...changes, ...allPageChanges].filter((v, i, a) => a.findIndex(x => x.id === v.id) === i).sort((a, b) => new Date(b.deployed_at) - new Date(a.deployed_at));
+
+    if (allChanges.length === 0) {
+      document.getElementById('wa-page-modal-changelog').innerHTML = '<tr><td colspan="5" class="loading">No changes recorded for this page</td></tr>';
+    } else {
+      document.getElementById('wa-page-modal-changelog').innerHTML = allChanges.slice(0, 10).map(r => {
+        const date = new Date(r.deployed_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
+        const files = (r.files_changed || []).slice(0, 3).join(', ') + ((r.files_changed || []).length > 3 ? '...' : '');
+        const bV7 = Math.round((r.baseline_visitors || 0) / 30 * 7);
+        const bA7 = Math.round((r.baseline_atc || 0) / 30 * 7);
+        const bC7 = Math.round((r.baseline_conv || 0) / 30 * 7);
+        const hasPost = r.post_visitors !== null && r.post_visitors !== undefined;
+        const beforeStr = bV7 + ' vis · ' + bA7 + ' atc · ' + bC7 + ' conv';
+        const afterStr = hasPost ? r.post_visitors + ' vis · ' + r.post_atc + ' atc · ' + r.post_conv + ' conv' : 'Pending...';
+        const arrow = (b, a) => a > b ? '↑' : a < b ? '↓' : '→';
+        const afterColor = hasPost ? (r.post_conv >= bC7 ? 'var(--sage)' : 'var(--red)') : 'var(--dim)';
+        return '<tr><td style="white-space:nowrap;">' + date + '</td><td>' + esc(r.commit_message || 'Deploy') + '</td><td style="font-size:0.75rem;max-width:150px;overflow:hidden;text-overflow:ellipsis;">' + esc(files) + '</td><td style="font-size:0.75rem;">' + beforeStr + '</td><td style="font-size:0.75rem;color:' + afterColor + ';">' + afterStr + '</td></tr>';
+      }).join('');
+    }
+  } catch (e) {
+    document.getElementById('wa-page-modal-changelog').innerHTML = '<tr><td colspan="5" class="loading">Error loading changelog</td></tr>';
+  }
+}
+
+// Close page modal
+document.getElementById('wa-page-modal').addEventListener('click', function(e) { if (e.target === this) this.classList.remove('open'); });
+document.getElementById('wa-page-modal-close').addEventListener('click', function() { document.getElementById('wa-page-modal').classList.remove('open'); });
+
 async function loadMarketingTab() {
   if (typeof utmEnsureLoaded === 'function') await utmEnsureLoaded();
   const [from, to] = getDateRange();
@@ -9863,6 +10115,7 @@ async function loadMarketingTab() {
     mktStatCard('Blended CVR',tClicks>0?(tConv/tClicks*100).toFixed(1)+'%':'-','clicks to conversion',roSpark.length>1?roSpark:[0],'var(--cyan)'),
     mktStatCard('Avg CPC',tClicks>0?'$'+(tSpend/tClicks).toFixed(2):'-','cost per click',spSpark.length>1?spSpark:[0],'var(--purple)'),
     mktStatCard('Google Ads Spend','$'+gSpend.toFixed(2),gConv+' conv · CPA '+(gCPA>0?'$'+gCPA.toFixed(2):'-'),spSpark.length>1?spSpark:[0],'#4285F4'),
+    renderLearningPhaseWidget(gC.campaigns||[]),
   ].join('');
   const fbSp=(fbC.campaigns||[]).reduce((s,c)=>s+c.spend,0),gSp=(gC.campaigns||[]).reduce((s,c)=>s+c.spend,0);const chL=[],chD=[],chC=[];if(fbSp>0){chL.push('Facebook');chD.push(fbSp);chC.push('#4267B2');}if(gSp>0){chL.push('Google Ads');chD.push(gSp);chC.push('#4285F4');}if(!chL.length){chL.push('No data');chD.push(1);chC.push('#332d27');}
   if(charts.mktChannel)charts.mktChannel.destroy();
@@ -9883,13 +10136,15 @@ async function loadMarketingTab() {
   renderMktSourceTimeChart(mktOrders);
   renderMktCreativeTimeChart(mktOrders);
   mktGadsPage = 1; renderMktGads();
-  try{const lr=await mktApi('analytics-dashboard',{site:'PrimalPantry.co.nz',from,to,metric:'entry_pages'});if(Array.isArray(lr)&&lr.length>0){document.getElementById('mkt-landing-table').innerHTML=lr.slice(0,10).map(l=>'<tr><td>'+(l.value||l.pathname||'-')+'</td><td>'+(l.visitors||l.count||0)+'</td><td>-</td><td>-</td><td>-</td><td>'+(l.bounce_rate?l.bounce_rate.toFixed(1)+'%':'-')+'</td></tr>').join('');}}catch(e){}
+  try{const lr=await mktApi('analytics-dashboard',{site:'PrimalPantry.co.nz',from,to,metric:'entry_pages'});if(Array.isArray(lr)&&lr.length>0){document.getElementById('mkt-landing-table').innerHTML=lr.slice(0,10).map(l=>{const pg=l.value||l.pathname||'-';return '<tr style="cursor:pointer;" onclick="openPageModal(\''+pg.replace(/'/g,"\\'")+'\')""><td>'+pg+'</td><td>'+(l.visitors||l.count||0)+'</td><td>-</td><td>-</td><td>-</td><td>'+(l.bounce_rate?l.bounce_rate.toFixed(1)+'%':'-')+'</td></tr>';}).join('');}}catch(e){}
   const gmcP=gmcD.products||[];const gmcTbl=document.getElementById('mkt-gmc-table'),gmcWrap=document.getElementById('mkt-gmc-table-wrap'),gmcLoad=document.getElementById('mkt-gmc-loading');
   if(gmcP.length>0){mktGmcPage=1;gmcWrap.style.display='table';gmcLoad.style.display='none';renderMktGmc(gmcP);}
   else if(gSt.connected&&gSt.merchantId){gmcLoad.textContent=gmcD.error||'No products found';gmcLoad.style.display='block';gmcWrap.style.display='none';}
   else{gmcLoad.textContent=gSt.connected?'Enter your Merchant Center ID above':'Connect Google to view product statuses';gmcLoad.style.display='block';gmcWrap.style.display='none';}
   // Load competitors section
   loadCompetitorsSection();
+  // Load changelog
+  loadMktChangelog();
 }
 
 // ── Communications Tab ──
