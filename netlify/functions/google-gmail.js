@@ -286,11 +286,13 @@ exports.handler = async (event) => {
     const accounts = await acctRes.json();
     if (!accounts || accounts.length === 0) return reply(200, { synced: 0, message: 'No Gmail accounts connected' });
 
-    const knownEmails = await getKnownEmails();
+    // Use empty set for customer matching to keep sync fast
+    const knownEmails = new Set();
     let total = 0;
+    const maxResults = Math.min(body.maxResults || 10, 10); // Cap at 10 to stay within timeout
     for (const acct of accounts) {
       try {
-        const count = await syncAccount(acct, knownEmails, body.maxResults || 50);
+        const count = await syncAccount(acct, knownEmails, maxResults);
         total += count;
       } catch (e) {
         console.error(`Sync error for ${acct.email_address}:`, e.message);
@@ -303,30 +305,23 @@ exports.handler = async (event) => {
   if (action === 'threads') {
     const limit = body.limit || 50;
     const search = body.search || '';
-    const filter = body.filter || 'all'; // all|customers|suppliers|wholesalers|flagged
+    const filter = body.filter || 'all';
 
-    // Fetch messages and contacts in parallel (skip heavy orders query, use customer_email from messages)
-    const [res, contactRes] = await Promise.all([
-      sbFetch('/rest/v1/email_messages?select=thread_id,customer_email,from_address,to_address,subject,snippet,date,direction,is_read,staff_name,account_id,order_flagged&order=date.desc&limit=200'),
-      sbFetch('/rest/v1/contacts?select=email,name,company,type'),
-    ]);
-    const [msgs, contactRows] = await Promise.all([res.json(), contactRes.json()]);
+    // Single lightweight query
+    const res = await sbFetch('/rest/v1/email_messages?select=thread_id,customer_email,from_address,to_address,subject,snippet,date,direction,is_read,account_id,order_flagged&order=date.desc&limit=200');
+    const msgs = await res.json();
+    if (!Array.isArray(msgs)) return reply(200, { threads: [] });
 
-    const contactMap = {};
-    if (Array.isArray(contactRows)) {
-      contactRows.forEach(c => { contactMap[c.email.toLowerCase()] = c; });
-    }
-
-    // Group by thread_id (prefer) or customer_email
+    // Group by thread_id
     const threadMap = {};
     for (const m of msgs) {
       const key = m.thread_id || m.customer_email || m.from_address;
       if (!threadMap[key]) {
         const email = m.customer_email || (m.direction === 'inbound' ? parseEmailAddress(m.from_address) : parseEmailAddress(m.to_address));
-        const contact = contactMap[email] || null;
         threadMap[key] = {
           thread_id: m.thread_id,
           customer_email: email,
+          customer_name: email || 'Unknown',
           last_subject: m.subject,
           last_snippet: m.snippet,
           last_date: m.date,
@@ -334,8 +329,8 @@ exports.handler = async (event) => {
           message_count: 0,
           account_id: m.account_id,
           order_flagged: false,
-          contact_type: contact ? contact.type : 'customer',
-          contact_name: contact ? (contact.company || contact.name) : null,
+          contact_type: 'customer',
+          contact_name: null,
         };
       }
       threadMap[key].message_count++;
@@ -346,29 +341,40 @@ exports.handler = async (event) => {
     let threads = Object.values(threadMap)
       .sort((a, b) => new Date(b.last_date) - new Date(a.last_date));
 
-    // Filter by contact type
+    // Enrich with contact types (non-blocking, best-effort)
+    try {
+      const contactRes = await sbFetch('/rest/v1/contacts?select=email,name,company,type');
+      const contactRows = await contactRes.json();
+      if (Array.isArray(contactRows) && contactRows.length > 0) {
+        const contactMap = {};
+        contactRows.forEach(c => { contactMap[c.email.toLowerCase()] = c; });
+        for (const t of threads) {
+          const contact = contactMap[t.customer_email];
+          if (contact) {
+            t.contact_type = contact.type;
+            t.contact_name = contact.company || contact.name;
+            t.customer_name = t.contact_name;
+          }
+        }
+      }
+    } catch { /* contacts lookup failed, continue without */ }
+
+    // Filter
     if (filter === 'suppliers') threads = threads.filter(t => t.contact_type === 'supplier');
     else if (filter === 'wholesalers') threads = threads.filter(t => t.contact_type === 'wholesaler');
     else if (filter === 'customers') threads = threads.filter(t => t.contact_type === 'customer');
     else if (filter === 'flagged') threads = threads.filter(t => t.order_flagged);
 
-    // Search filter
     if (search) {
       const q = search.toLowerCase();
       threads = threads.filter(t =>
         (t.customer_email || '').toLowerCase().includes(q) ||
         (t.last_subject || '').toLowerCase().includes(q) ||
-        (t.last_snippet || '').toLowerCase().includes(q) ||
-        (t.contact_name || '').toLowerCase().includes(q)
+        (t.last_snippet || '').toLowerCase().includes(q)
       );
     }
 
-    threads = threads.slice(0, limit).map(t => ({
-      ...t,
-      customer_name: t.contact_name || t.customer_email || 'Unknown',
-    }));
-
-    return reply(200, { threads });
+    return reply(200, { threads: threads.slice(0, limit) });
   }
 
   // ── get: fetch single message detail ──
