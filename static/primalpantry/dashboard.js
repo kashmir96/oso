@@ -4327,7 +4327,7 @@ function renderShipmentsTable() {
     const displayDate = date !== '-' ? new Date(date).toLocaleString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : '-';
 
     // Match to order data for $ value, # items, days waiting badge
-    const matched = allOrders.find(ord => ord.order_number === o.order_number);
+    const matched = allOrders.find(ord => ord.order_number === o.order_number || ord.stripe_session_id === o.order_number);
     const orderValue = matched ? '$' + Number(matched.total_value || 0).toFixed(2) : '-';
     const itemCount = matched ? allLineItems.filter(li => li.order_id === matched.id).reduce((s, li) => s + (li.quantity || 1), 0) : '-';
     const badge = matched ? daysWaitingBadge(matched) : '';
