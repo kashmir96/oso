@@ -5202,8 +5202,8 @@ document.querySelectorAll('.nav-item').forEach(btn => {
     document.getElementById('attr-toggle').style.display = (activeTab === 'website' || activeTab === 'marketing' || activeTab === 'sales') ? '' : 'none';
     // Stats mode toggle: only on overview and sales
     document.getElementById('stats-mode-toggle').style.display = (activeTab === 'sales') ? '' : 'none';
-    // Ad spend banner: on marketing and overview
-    document.getElementById('adspend-banner').style.display = (activeTab === 'marketing' || activeTab === 'sales') ? '' : 'none';
+    // Ad spend banner: only on marketing tab
+    document.getElementById('adspend-banner').style.display = (activeTab === 'marketing') ? '' : 'none';
     loadActiveTab();
     checkCommsPrompts(); // Check for pending prompts on every tab switch
   });
