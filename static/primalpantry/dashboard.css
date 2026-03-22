@@ -722,3 +722,11 @@
     .fin-overdue { color: var(--red); }
     .fin-current { color: var(--sage); }
     @media (max-width: 768px) { .fin-stats { grid-template-columns: repeat(2, 1fr); } }
+
+    /* Recovery email preview */
+    .recovery-field { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 0.5rem; border-radius: 10px; font-size: 0.85rem; font-family: 'DM Sans', sans-serif; width: 100%; }
+    .recovery-field:focus { outline: none; border-color: var(--sage); box-shadow: 0 0 0 3px rgba(140,180,122,0.2); }
+    .recovery-field[readonly] { opacity: 0.7; cursor: default; }
+    .recovery-preview-label { font-size: 0.65rem; font-weight: 600; color: var(--dim); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.4rem; }
+    .recovery-preview-pane { background: #ffffff; color: #2d2a26; border-radius: 10px; padding: 24px; border: 1px solid var(--border); min-height: 200px; max-height: 400px; overflow-y: auto; }
+    textarea.recovery-field { resize: vertical; }

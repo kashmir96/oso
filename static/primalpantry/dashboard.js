@@ -5662,74 +5662,137 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     }).join('');
   }
 
+  // ── Recovery Email Preview Modal ──
+  let recoveryItemsHtml = '';
+  let recoveryTotal = '';
+  let recoveryAc = null;
+
+  function buildRecoveryEmailHtml() {
+    const greeting = document.getElementById('recovery-greeting').value;
+    const message = document.getElementById('recovery-message').value;
+    return `<div style="max-width:560px;margin:0 auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <div style="text-align:center;margin-bottom:24px;">
+    <h1 style="font-size:22px;color:#2d2a26;margin:0;">Primal Pantry</h1>
+    <p style="font-size:12px;color:#9c9287;margin:4px 0 0;">Natural Tallow Skincare — Made in New Zealand</p>
+  </div>
+  <div style="background:#fff;border-radius:12px;padding:32px;border:1px solid #e8e2da;">
+    <h2 style="font-size:18px;color:#2d2a26;margin:0 0 16px;">${esc(greeting)}</h2>
+    <p style="font-size:14px;color:#6e6259;line-height:1.6;margin:0 0 20px;white-space:pre-line;">${esc(message)}</p>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+      <thead><tr style="background:#f8f5f0;"><th style="padding:8px 12px;text-align:left;font-size:12px;color:#9c9287;text-transform:uppercase;">Item</th><th style="padding:8px 12px;text-align:center;font-size:12px;color:#9c9287;text-transform:uppercase;">Qty</th><th style="padding:8px 12px;text-align:right;font-size:12px;color:#9c9287;text-transform:uppercase;">Price</th></tr></thead>
+      <tbody>${recoveryItemsHtml}</tbody>
+      ${recoveryTotal ? `<tfoot><tr><td colspan="2" style="padding:10px 12px;font-size:14px;font-weight:600;color:#2d2a26;">Total</td><td style="padding:10px 12px;font-size:14px;font-weight:600;color:#2d2a26;text-align:right;">${recoveryTotal}</td></tr></tfoot>` : ''}
+    </table>
+    <div style="text-align:center;margin:24px 0;">
+      <a href="https://www.primalpantry.co.nz/cart/" style="display:inline-block;background:#8CB47A;color:#141210;padding:14px 36px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">Complete Your Order</a>
+    </div>
+    <p style="font-size:13px;color:#9c9287;line-height:1.5;margin:16px 0 0;text-align:center;">Questions? Just hit reply — we'd love to help.</p>
+  </div>
+  <div style="text-align:center;margin-top:16px;">
+    <p style="font-size:11px;color:#bbb;">Primal Pantry · Christchurch, New Zealand</p>
+  </div>
+</div>`;
+  }
+
+  function updateRecoveryPreview() {
+    document.getElementById('recovery-email-preview').innerHTML = buildRecoveryEmailHtml();
+  }
+
   function previewRecoveryEmail(idx) {
     const ac = abandonedCheckouts[idx];
     if (!ac) return;
-    acRecoveryTarget = ac;
+    recoveryAc = ac;
 
     const firstName = (ac.name || '').split(' ')[0] || 'there';
     const currencySymbol = '$';
-    const total = ac.amount_total ? currencySymbol + (ac.amount_total / 100).toFixed(2) : '';
-    const itemsHtml = (ac.line_items || []).map(li =>
+    recoveryTotal = ac.amount_total ? currencySymbol + (ac.amount_total / 100).toFixed(2) : '';
+    recoveryItemsHtml = (ac.line_items || []).map(li =>
       `<tr><td style="padding:8px 12px;border-bottom:1px solid #f0ebe5;font-size:14px;color:#2d2a26;">${li.description || 'Product'}</td><td style="padding:8px 12px;border-bottom:1px solid #f0ebe5;font-size:14px;color:#6e6259;text-align:center;">${li.quantity || 1}</td><td style="padding:8px 12px;border-bottom:1px solid #f0ebe5;font-size:14px;color:#2d2a26;text-align:right;">${currencySymbol}${((li.amount || 0) / 100).toFixed(2)}</td></tr>`
     ).join('');
 
-    const emailBody = `<div style="max-width:560px;margin:0 auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-  <div style="text-align:center;margin-bottom:24px;"><h1 style="font-size:22px;color:#2d2a26;margin:0;">Primal Pantry</h1></div>
-  <div style="background:#fff;border-radius:12px;padding:32px;border:1px solid #e8e2da;">
-    <h2 style="font-size:18px;color:#2d2a26;margin:0 0 16px;">Hey ${firstName},</h2>
-    <p style="font-size:14px;color:#6e6259;line-height:1.6;margin:0 0 20px;">We noticed you left some items in your cart. No worries — they're still waiting for you!</p>
-    <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
-      <thead><tr style="background:#f8f5f0;"><th style="padding:8px 12px;text-align:left;font-size:12px;color:#9c9287;text-transform:uppercase;">Item</th><th style="padding:8px 12px;text-align:center;font-size:12px;color:#9c9287;text-transform:uppercase;">Qty</th><th style="padding:8px 12px;text-align:right;font-size:12px;color:#9c9287;text-transform:uppercase;">Price</th></tr></thead>
-      <tbody>${itemsHtml}</tbody>
-      ${total ? `<tfoot><tr><td colspan="2" style="padding:10px 12px;font-size:14px;font-weight:600;color:#2d2a26;">Total</td><td style="padding:10px 12px;font-size:14px;font-weight:600;color:#2d2a26;text-align:right;">${total}</td></tr></tfoot>` : ''}
-    </table>
-    <div style="text-align:center;margin:24px 0;">
-      <a href="https://www.primalpantry.co.nz/cart/" style="display:inline-block;background:#8CB47A;color:#141210;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Complete Your Order</a>
-    </div>
-    <p style="font-size:13px;color:#9c9287;line-height:1.5;margin:16px 0 0;text-align:center;">Need help? Just reply to this email — we're happy to assist.</p>
-  </div>
-</div>`;
+    // Populate fields
+    document.getElementById('recovery-to').value = ac.email;
+    document.getElementById('recovery-subject').value = `${firstName}, your cart is still waiting for you`;
+    document.getElementById('recovery-greeting').value = `Hey ${firstName},`;
+    document.getElementById('recovery-message').value = `We noticed you were checking out some of our products but didn't quite finish your order — no stress at all!\n\nYour items are still saved and ready to go. We handcraft everything in small batches here in Christchurch, so stock can move quickly — just wanted to make sure you don't miss out.`;
 
-    // Open the Gmail compose modal with the recovery template pre-filled
-    openComposeModal({
-      to: ac.email,
-      subject: firstName + ', you left something behind!',
-      body: emailBody,
-      sendType: 'direct',
-    });
+    // Populate from dropdown and auto-select hello@primalpantry.co.nz
+    const fromEl = document.getElementById('recovery-from');
+    if (commsAccounts.length > 0) {
+      fromEl.innerHTML = commsAccounts.map(a => '<option value="' + a.id + '">' + esc(a.email_address) + '</option>').join('');
+      const helloAcct = commsAccounts.find(a => a.email_address === 'hello@primalpantry.co.nz');
+      if (helloAcct) fromEl.value = helloAcct.id;
+    } else {
+      fetch('/.netlify/functions/gmail-auth?action=status&token=' + currentStaff.token)
+        .then(r => r.json())
+        .then(d => {
+          commsAccounts = d.accounts || [];
+          fromEl.innerHTML = commsAccounts.map(a => '<option value="' + a.id + '">' + esc(a.email_address) + '</option>').join('');
+          const helloAcct = commsAccounts.find(a => a.email_address === 'hello@primalpantry.co.nz');
+          if (helloAcct) fromEl.value = helloAcct.id;
+        }).catch(() => {});
+    }
 
-    // Listen for send completion to update abandoned checkout status
-    const origHandler = document.getElementById('compose-send')._recoveryCleanup;
-    if (origHandler) document.getElementById('compose-send').removeEventListener('click', origHandler);
-    const onSend = async () => {
-      // Mark as contacted after Gmail send succeeds
-      try {
-        await fetch(AC_BASE + '?token=' + currentStaff.token + '&action=update_status&session_id=' + encodeURIComponent(ac.session_id) + '&status=contacted');
-      } catch {}
-      ac.status = 'contacted';
-      ac.contacted_at = new Date().toISOString();
-      renderAbandonedTable();
-      document.getElementById('compose-send').removeEventListener('click', onSend);
-      document.getElementById('compose-send')._recoveryCleanup = null;
-    };
-    // We need to fire after the actual send succeeds, so hook into the result
-    const observer = new MutationObserver((mutations) => {
-      const result = document.getElementById('compose-result');
-      if (result && result.textContent.includes('sent')) {
-        onSend();
-        observer.disconnect();
-      }
-    });
-    observer.observe(document.getElementById('compose-result'), { childList: true, characterData: true, subtree: true });
-    document.getElementById('compose-send')._recoveryCleanup = () => observer.disconnect();
-    // Disconnect observer if modal is closed without sending
-    const modal = document.getElementById('email-compose-modal');
-    const closeObserver = new MutationObserver(() => {
-      if (!modal.classList.contains('open')) { observer.disconnect(); closeObserver.disconnect(); }
-    });
-    closeObserver.observe(modal, { attributes: true, attributeFilter: ['class'] });
+    document.getElementById('recovery-result').textContent = '';
+    updateRecoveryPreview();
+    document.getElementById('recovery-email-modal').classList.add('open');
   }
+
+  // Recovery modal close handlers
+  document.getElementById('recovery-close').addEventListener('click', () => {
+    document.getElementById('recovery-email-modal').classList.remove('open');
+  });
+  document.getElementById('recovery-cancel').addEventListener('click', () => {
+    document.getElementById('recovery-email-modal').classList.remove('open');
+  });
+  document.getElementById('recovery-email-modal').addEventListener('click', function(e) {
+    if (e.target === this) this.classList.remove('open');
+  });
+
+  // Recovery modal send handler — sends via integrated Gmail
+  document.getElementById('recovery-send').addEventListener('click', async () => {
+    const accountId = parseInt(document.getElementById('recovery-from').value);
+    const to = document.getElementById('recovery-to').value.trim();
+    const subject = document.getElementById('recovery-subject').value.trim();
+    const body = buildRecoveryEmailHtml();
+    const resultEl = document.getElementById('recovery-result');
+    const btn = document.getElementById('recovery-send');
+
+    if (!accountId) { resultEl.innerHTML = '<span style="color:var(--red);">No Gmail account selected</span>'; return; }
+    if (!to) { resultEl.innerHTML = '<span style="color:var(--red);">No recipient email</span>'; return; }
+
+    btn.disabled = true; btn.textContent = 'Sending...';
+    try {
+      const res = await commsApi('send', {
+        account_id: accountId,
+        to: to,
+        subject: subject,
+        body: body,
+        send_type: 'direct',
+      });
+
+      if (res.success) {
+        resultEl.innerHTML = '<span style="color:var(--sage);">Email sent!</span>';
+        // Update abandoned checkout status
+        try {
+          await fetch(AC_BASE + '?token=' + currentStaff.token + '&action=update_status&session_id=' + encodeURIComponent(recoveryAc.session_id) + '&status=contacted');
+        } catch {}
+        recoveryAc.status = 'contacted';
+        recoveryAc.contacted_at = new Date().toISOString();
+        renderAbandonedTable();
+        setTimeout(() => document.getElementById('recovery-email-modal').classList.remove('open'), 1200);
+      } else {
+        resultEl.innerHTML = '<span style="color:var(--red);">' + esc(res.error || 'Send failed') + '</span>';
+      }
+    } catch (e) {
+      resultEl.innerHTML = '<span style="color:var(--red);">' + esc(e.message) + '</span>';
+    }
+    btn.disabled = false; btn.textContent = 'Send Email';
+  });
+
+  // Expose to global scope for onclick handlers
+  window.previewRecoveryEmail = previewRecoveryEmail;
+  window.updateRecoveryPreview = updateRecoveryPreview;
 
   // ── Country Heatmap ──
   // Simplified world map using country code → [lat, lng] centroids
