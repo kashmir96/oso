@@ -3406,9 +3406,13 @@ function renderMonthlyPace() {
   const year = now.getFullYear(), month = now.getMonth(), today = now.getDate();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const currentDaily = Array(daysInMonth).fill(0);
+  const cogsDaily = Array(daysInMonth).fill(0);
   allOrders.forEach(o => {
     const d = new Date(o.order_date + 'T00:00:00');
-    if (d.getFullYear() === year && d.getMonth() === month) currentDaily[d.getDate() - 1] += Number(o.total_value || 0);
+    if (d.getFullYear() === year && d.getMonth() === month) {
+      currentDaily[d.getDate() - 1] += Number(o.total_value || 0);
+      cogsDaily[d.getDate() - 1] += getOrderCOGS(o.id);
+    }
   });
 
   const prevMonth = month === 0 ? 11 : month - 1;
@@ -3420,11 +3424,16 @@ function renderMonthlyPace() {
     if (d.getFullYear() === prevYear && d.getMonth() === prevMonth) prevDaily[d.getDate() - 1] += Number(o.total_value || 0);
   });
 
-  const labels = [], cumCurrent = [], cumPrev = [];
-  let runCurrent = 0, runPrev = 0;
+  const labels = [], cumCurrent = [], cumPrev = [], cumCogs = [];
+  let runCurrent = 0, runPrev = 0, runCogs = 0;
   for (let i = 0; i < daysInMonth; i++) {
     labels.push(i + 1);
-    if (i < today) { runCurrent += currentDaily[i]; cumCurrent.push(runCurrent); } else cumCurrent.push(null);
+    if (i < today) {
+      runCurrent += currentDaily[i]; cumCurrent.push(runCurrent);
+      runCogs += cogsDaily[i]; cumCogs.push(runCogs);
+    } else {
+      cumCurrent.push(null); cumCogs.push(null);
+    }
     if (i < daysInPrevMonth) runPrev += prevDaily[i];
     cumPrev.push(runPrev);
   }
@@ -3441,6 +3450,7 @@ function renderMonthlyPace() {
       datasets: [
         { label: prevLabel + ' (pace)', data: cumPrev, borderColor: 'rgba(156,146,135,0.35)', backgroundColor: 'rgba(156,146,135,0.05)', fill: true, borderWidth: 1.5, borderDash: [4, 3], tension: 0.3, pointRadius: 0 },
         { label: currLabel, data: cumCurrent, borderColor: '#8CB47A', backgroundColor: 'rgba(140,180,122,0.1)', fill: true, borderWidth: 2.5, tension: 0.3, pointRadius: 0, pointHitRadius: 8 },
+        { label: 'COGs', data: cumCogs, borderColor: '#e74c3c', backgroundColor: 'transparent', fill: false, borderWidth: 1.5, tension: 0.3, pointRadius: 0, borderDash: [3, 2] },
       ],
     },
     options: {
@@ -9329,7 +9339,12 @@ async function loadMarketingTab() {
   if (!mktInited) {
     mktInited = true;
     document.getElementById('mkt-campaign-search').addEventListener('input', function() { renderMktCT(this.value.toLowerCase().trim()); });
-    document.getElementById('mkt-google-connect-btn').addEventListener('click', () => { mktApi('google-auth', { action: 'authorize' }).then(d => { if (d.url) window.open(d.url, 'google-auth', 'width=600,height=700'); }); });
+    document.getElementById('mkt-google-connect-btn').addEventListener('click', () => {
+      mktApi('google-auth', { action: 'authorize' }).then(d => {
+        if (d.url) window.open(d.url, 'google-auth', 'width=600,height=700');
+        else { console.error('Google auth response:', d); alert('Failed to start Google auth: ' + (d.error || 'no URL returned')); }
+      }).catch(e => { console.error('Google auth error:', e); alert('Failed to connect Google: ' + e.message); });
+    });
     window.addEventListener('message', e => { if (e.data && e.data.googleConnected) loadMarketingTab(); });
     document.getElementById('mkt-save-ids-btn').addEventListener('click', () => { mktApi('google-auth', { action: 'save_ids', ads_customer_id: document.getElementById('mkt-ads-customer-id').value.trim(), merchant_id: document.getElementById('mkt-merchant-id').value.trim() }).then(() => loadMarketingTab()); });
     document.getElementById('mkt-google-disconnect-btn').addEventListener('click', () => { if (!confirm('Disconnect Google?')) return; mktApi('google-auth', { action: 'disconnect' }).then(() => loadMarketingTab()); });
