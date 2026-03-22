@@ -1777,17 +1777,25 @@
       </div>
     </div>
 
-    <div class="charts-row" style="grid-template-columns:1fr;">
+    <div class="charts-row">
       <div class="chart-card">
         <h3>Sales by Source Over Time</h3>
         <div class="chart-wrap" style="height:260px;"><canvas id="mkt-source-time-chart"></canvas></div>
       </div>
+      <div class="chart-card">
+        <h3>Sales by Source</h3>
+        <div class="chart-wrap"><canvas id="mkt-source-pie-chart"></canvas></div>
+      </div>
     </div>
 
-    <div class="charts-row" style="grid-template-columns:1fr;">
+    <div class="charts-row">
       <div class="chart-card">
         <h3>Sales by Ad Creative Over Time</h3>
         <div class="chart-wrap" style="height:260px;"><canvas id="mkt-creative-time-chart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Sales by Ad Creative</h3>
+        <div class="chart-wrap"><canvas id="mkt-creative-pie-chart"></canvas></div>
       </div>
     </div>
 
@@ -9730,6 +9738,13 @@ function renderMktSourceTimeChart(orders) {
         x: { ticks: { color: '#9c9287', maxTicksLimit: 15, font: { size: 10 } }, grid: { display: false } } },
     },
   });
+  // Pie chart
+  if (charts.mktSourcePie) charts.mktSourcePie.destroy();
+  charts.mktSourcePie = new Chart(document.getElementById('mkt-source-pie-chart'), {
+    type: 'doughnut',
+    data: { labels: topSources.map(s => utmTranslate('utm_source', s)), datasets: [{ data: topSources.map(s => sourceTotals[s]), backgroundColor: topSources.map((_, i) => palette[i % palette.length]), borderColor: '#1e1b18', borderWidth: 2 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#9c9287', font: { size: 11, family: 'DM Sans' }, padding: 8, boxWidth: 12 } }, tooltip: { callbacks: { label: ctx => ctx.label + ': ' + ctx.parsed + ' sales' } } } },
+  });
 }
 
 // ── Marketing: sales by creative over time chart ──
@@ -9762,6 +9777,13 @@ function renderMktCreativeTimeChart(orders) {
       scales: { y: { ticks: { color: '#9c9287', stepSize: 1 }, grid: { color: '#252220' }, title: { display: true, text: 'Sales', color: '#6e6259', font: { size: 10 } } },
         x: { ticks: { color: '#9c9287', maxTicksLimit: 15, font: { size: 10 } }, grid: { display: false } } },
     },
+  });
+  // Pie chart
+  if (charts.mktCreativePie) charts.mktCreativePie.destroy();
+  charts.mktCreativePie = new Chart(document.getElementById('mkt-creative-pie-chart'), {
+    type: 'doughnut',
+    data: { labels: topCreatives.map(c => utmTranslateAny(c)), datasets: [{ data: topCreatives.map(c => creativeTotals[c]), backgroundColor: topCreatives.map((_, i) => palette[i % palette.length]), borderColor: '#1e1b18', borderWidth: 2 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#9c9287', font: { size: 11, family: 'DM Sans' }, padding: 8, boxWidth: 12 } }, tooltip: { callbacks: { label: ctx => ctx.label + ': ' + ctx.parsed + ' sales' } } } },
   });
 }
 function renderMktGmc(products) { const start = (mktGmcPage - 1) * PAGE_SIZE; const page = products.slice(start, start + PAGE_SIZE); document.getElementById('mkt-gmc-table').innerHTML = page.map(p => { const iss = p.issues.length>0?p.issues.map(i=>i.description).join('; '):'-'; const rc = p.status==='disapproved'?' style="background:rgba(224,96,80,0.08);"':''; return '<tr'+rc+'><td>'+p.title+'</td><td><span class="dummy-badge '+p.status+'">'+p.status.charAt(0).toUpperCase()+p.status.slice(1)+'</span></td><td>'+iss+'</td></tr>'; }).join(''); renderPagination('mkt-gmc-pagination', mktGmcPage, products.length, p => { mktGmcPage = p; renderMktGmc(products); }); }
