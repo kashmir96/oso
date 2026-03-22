@@ -4770,8 +4770,8 @@ function startBulkBagScanning() {
   document.getElementById('bulk-bag-print').style.display = 'none';
   document.getElementById('bulk-bag-banner').classList.add('active');
   renderShipmentsTable();
-  // Auto-focus search bar for immediate typing/scanning
-  document.getElementById('shipment-search').focus();
+  // Auto-focus search bar after modal closes
+  setTimeout(() => { document.getElementById('shipment-search').value = ''; document.getElementById('shipment-search').focus(); }, 300);
 }
 
 function toggleBulkBagOrder(orderId, checked) {
