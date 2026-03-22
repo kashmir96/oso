@@ -1748,6 +1748,22 @@
     </div>
   </div><!-- /tab-website -->
 
+  <!-- Macros modal -->
+  <div class="modal-overlay" id="macro-modal">
+    <div class="modal" style="max-width:520px;">
+      <button class="modal-close" onclick="document.getElementById('macro-modal').classList.remove('open')">&times;</button>
+      <h2 style="display:flex;justify-content:space-between;align-items:center;">Macros
+        <button onclick="document.getElementById('macro-modal-create-form').style.display = document.getElementById('macro-modal-create-form').style.display === 'none' ? 'block' : 'none'" style="background:var(--sage);color:#141210;border:none;padding:0.3rem 0.7rem;border-radius:6px;font-size:0.8rem;font-weight:600;cursor:pointer;">+ New</button>
+      </h2>
+      <div id="macro-modal-create-form" style="display:none;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:0.75rem;margin-bottom:0.75rem;">
+        <input type="text" id="macro-modal-name" placeholder="Macro name" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.4rem 0.6rem;border-radius:6px;font-size:0.85rem;font-family:'DM Sans',sans-serif;margin-bottom:0.5rem;box-sizing:border-box;">
+        <textarea id="macro-modal-content" rows="3" placeholder="Macro content... Use {name} for customer first name" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.4rem 0.6rem;border-radius:6px;font-size:0.85rem;font-family:'DM Sans',sans-serif;resize:vertical;margin-bottom:0.5rem;box-sizing:border-box;"></textarea>
+        <button id="macro-modal-save-btn" onclick="createMacroFromModal()" style="background:var(--sage);color:#141210;border:none;padding:0.35rem 0.8rem;border-radius:6px;font-size:0.8rem;font-weight:600;cursor:pointer;">Save</button>
+      </div>
+      <div id="macro-modal-list" style="max-height:350px;overflow-y:auto;"></div>
+    </div>
+  </div>
+
   <div id="tab-marketing" class="tab-content">
     <div class="stats" id="marketing-stats-grid"></div>
 
@@ -10692,10 +10708,11 @@ async function deleteMacro(id) {
   } catch (e) { alert('Error: ' + e.message); }
 }
 
+let macroModalTarget = '';
+
 function toggleMacroDropdown(targetTextareaId) {
-  // Remove existing dropdown
-  const existing = document.querySelector('.comms-macro-dropdown');
-  if (existing) { existing.remove(); return; }
+  macroModalTarget = targetTextareaId;
+  const modal = document.getElementById('macro-modal');
 
   // Load macros if not loaded
   if (commsMacros.length === 0) {
@@ -10704,47 +10721,82 @@ function toggleMacroDropdown(targetTextareaId) {
       body: JSON.stringify({ token: currentStaff.token, table: 'macros', operation: 'select', params: { select: '*', eq: ['active', 'true'], order: 'name.asc' } }),
     }).then(r => r.json()).then(data => {
       commsMacros = data.data || [];
-      toggleMacroDropdown(targetTextareaId);
+      renderMacroModal();
     });
-    return;
-  }
-
-  const textarea = document.getElementById(targetTextareaId);
-  const wrapper = textarea.parentElement;
-  const dd = document.createElement('div');
-  dd.className = 'comms-macro-dropdown';
-  if (commsMacros.length === 0) {
-    dd.innerHTML = '<div style="padding:0.5rem;color:var(--dim);font-size:0.8rem;">No macros saved. Add them in Settings.</div>';
   } else {
-    dd.innerHTML = commsMacros.map(m =>
-      '<div class="comms-macro-item" onclick="insertMacro(\'' + targetTextareaId + '\',' + m.id + ')">'
+    renderMacroModal();
+  }
+  modal.classList.add('open');
+}
+
+function renderMacroModal() {
+  const list = document.getElementById('macro-modal-list');
+  if (commsMacros.length === 0) {
+    list.innerHTML = '<div style="padding:1.5rem;color:var(--dim);text-align:center;font-size:0.85rem;">No macros yet. Create one below.</div>';
+  } else {
+    list.innerHTML = commsMacros.map(m =>
+      '<div class="comms-macro-item" style="display:flex;justify-content:space-between;align-items:start;gap:0.5rem;" data-macro-id="' + m.id + '">'
+      + '<div style="flex:1;cursor:pointer;" onclick="insertMacro(' + m.id + ')">'
       + '<div class="macro-name">' + esc(m.name) + '</div>'
-      + '<div class="macro-preview">' + esc(m.content.slice(0, 60)) + '</div>'
+      + '<div class="macro-preview" style="white-space:normal;">' + esc(m.content.slice(0, 120)) + (m.content.length > 120 ? '...' : '') + '</div>'
+      + '</div>'
+      + '<button onclick="deleteMacroFromModal(' + m.id + ')" style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:0.9rem;padding:0.2rem;" title="Delete">&times;</button>'
       + '</div>'
     ).join('');
   }
-  wrapper.appendChild(dd);
-  // Close on click outside
-  setTimeout(() => {
-    document.addEventListener('click', function closeMD(e) {
-      if (!dd.contains(e.target) && !e.target.classList.contains('comms-macro-btn')) { dd.remove(); document.removeEventListener('click', closeMD); }
-    });
-  }, 50);
+  // Reset create form
+  document.getElementById('macro-modal-name').value = '';
+  document.getElementById('macro-modal-content').value = '';
+  document.getElementById('macro-modal-create-form').style.display = 'none';
 }
 
-function insertMacro(targetId, macroId) {
+function insertMacro(macroId) {
   const macro = commsMacros.find(m => m.id === macroId);
-  if (!macro) return;
-  const textarea = document.getElementById(targetId);
+  if (!macro || !macroModalTarget) return;
+  const textarea = document.getElementById(macroModalTarget);
   const start = textarea.selectionStart;
   const before = textarea.value.substring(0, start);
   const after = textarea.value.substring(textarea.selectionEnd);
   textarea.value = before + macro.content + after;
   textarea.selectionStart = textarea.selectionEnd = start + macro.content.length;
   textarea.focus();
-  // Remove dropdown
-  const dd = document.querySelector('.comms-macro-dropdown');
-  if (dd) dd.remove();
+  document.getElementById('macro-modal').classList.remove('open');
+}
+
+async function deleteMacroFromModal(id) {
+  if (!confirm('Delete this macro?')) return;
+  try {
+    await fetch('/.netlify/functions/dashboard-data', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: currentStaff.token, table: 'macros', operation: 'update', params: { body: { active: false }, eq: ['id', id] } }),
+    });
+    commsMacros = commsMacros.filter(m => m.id !== id);
+    renderMacroModal();
+    if (typeof loadMacros === 'function') loadMacros();
+  } catch (e) { console.error('Delete macro error:', e); }
+}
+
+async function createMacroFromModal() {
+  const name = document.getElementById('macro-modal-name').value.trim();
+  const content = document.getElementById('macro-modal-content').value.trim();
+  if (!name || !content) { alert('Name and content are required'); return; }
+  const btn = document.getElementById('macro-modal-save-btn');
+  btn.disabled = true; btn.textContent = 'Saving...';
+  try {
+    await fetch('/.netlify/functions/dashboard-data', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: currentStaff.token, table: 'macros', operation: 'insert', params: { body: { name, content, created_by: currentStaff.id } } }),
+    });
+    // Reload macros
+    const data = await fetch('/.netlify/functions/dashboard-data', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: currentStaff.token, table: 'macros', operation: 'select', params: { select: '*', eq: ['active', 'true'], order: 'name.asc' } }),
+    }).then(r => r.json());
+    commsMacros = data.data || [];
+    renderMacroModal();
+    if (typeof loadMacros === 'function') loadMacros();
+  } catch (e) { console.error('Create macro error:', e); }
+  btn.disabled = false; btn.textContent = 'Save';
 }
 
 async function syncFromXero(type) {
