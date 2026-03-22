@@ -1907,9 +1907,10 @@ function openOrderModal(orderId) {
     </div>`;
   }
 
-  // Email Customer button
-  html += `<div style="margin-top:0.75rem;text-align:center;">
+  // Action buttons row (Email + Reprint)
+  html += `<div style="margin-top:0.75rem;text-align:center;display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap;">
     <button onclick="openComposeModal({to: '${(order.email || '').replace(/'/g, "\\'")}', subject: 'Re: Your Primal Pantry Order #${orderId}'})" style="background:none;border:1px solid var(--sage);color:var(--sage);border-radius:6px;padding:0.5rem 1.2rem;font-size:0.85rem;cursor:pointer;font-weight:600;font-family:'DM Sans',sans-serif;">Email Customer</button>
+    <button id="modal-reprint-btn" data-order-session="${(order.stripe_session_id || '').replace(/"/g, '&quot;')}" style="background:none;border:1px solid var(--cyan);color:var(--cyan);border-radius:6px;padding:0.5rem 1.2rem;font-size:0.85rem;cursor:pointer;font-weight:600;font-family:'DM Sans',sans-serif;display:none;">Reprint Label</button>
   </div>`;
 
   // Only owner/admin can see refund/delete buttons
@@ -2103,6 +2104,41 @@ function openOrderModal(orderId) {
           resultEl.innerHTML = '<span style="color:var(--red);">' + e.message + '</span>';
         }
         btn.disabled = false; btn.textContent = 'Update';
+      });
+    }
+
+    // Show reprint button and attach handler
+    const reprintBtn = document.getElementById('modal-reprint-btn');
+    if (reprintBtn && shipment.order_id) {
+      reprintBtn.style.display = '';
+      reprintBtn.addEventListener('click', async function() {
+        this.disabled = true; this.textContent = 'Printing...';
+        try {
+          const res = await fetch('/.netlify/functions/eship-print', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order_ids: [shipment.order_id] }),
+          });
+          const data = await res.json();
+          if (data.success || data.printed) {
+            this.textContent = 'Printed!';
+            this.style.borderColor = 'var(--sage)';
+            this.style.color = 'var(--sage)';
+          } else {
+            this.textContent = 'Failed';
+            this.style.borderColor = 'var(--red)';
+            this.style.color = 'var(--red)';
+          }
+        } catch (e) {
+          this.textContent = 'Error';
+          this.style.color = 'var(--red)';
+        }
+        setTimeout(() => {
+          this.disabled = false;
+          this.textContent = 'Reprint Label';
+          this.style.borderColor = 'var(--cyan)';
+          this.style.color = 'var(--cyan)';
+        }, 2000);
       });
     }
   })();
@@ -4232,6 +4268,18 @@ function renderShipmentsTable() {
   const tbody = document.getElementById('shipments-table');
   const query = (document.getElementById('shipment-search').value || '').toLowerCase();
 
+  // Add/remove checkbox column header for bulk bag mode
+  const thead = tbody.closest('table').querySelector('thead tr');
+  const existingCheckTh = thead.querySelector('.bulk-bag-th');
+  if (bulkBagMode && !existingCheckTh) {
+    const th = document.createElement('th');
+    th.className = 'bulk-bag-th';
+    th.style.width = '2rem';
+    thead.insertBefore(th, thead.firstChild);
+  } else if (!bulkBagMode && existingCheckTh) {
+    existingCheckTh.remove();
+  }
+
   let orders = allShipments;
   if (activeShipFilter === 'Awaiting Stock') {
     orders = orders.filter(o => {
@@ -4281,7 +4329,11 @@ function renderShipmentsTable() {
     const awaitingBadge = matched && matched.awaiting_sku ? ` <span class="ship-status-badge awaiting-stock">Awaiting: ${matched.awaiting_sku}</span>` : '';
     const clickHandler = matched ? `onclick="openOrderModal(${matched.id})" style="cursor:pointer;"` : '';
 
+    // Checkbox for bulk bag mode
+    const checkboxTd = bulkBagMode && o.order_id ? `<td onclick="event.stopPropagation();" style="text-align:center;width:2rem;"><input type="checkbox" class="bulk-bag-check" data-order-id="${o.order_id}" data-shipping-method="${o.shipping_method || ''}" ${bulkBagOrderIds.includes(o.order_id) ? 'checked' : ''} onchange="toggleBulkBagOrder(${o.order_id}, this.checked)" style="cursor:pointer;width:16px;height:16px;accent-color:var(--cyan);"></td>` : '';
+
     return `<tr ${clickHandler}>
+      ${checkboxTd}
       <td title="${o.order_number || ''}" style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${clippedOrder}</td>
       <td>${dest.name || o.name || '-'}</td>
       <td>${[dest.city, dest.country_code || dest.country].filter(Boolean).join(', ') || '-'}</td>
@@ -4600,16 +4652,35 @@ function startBulkBagScanning() {
   bulkBagOrderIds = [];
   document.getElementById('bulk-bag-label').textContent = bulkBagSizeLabel;
   document.getElementById('bulk-bag-count').textContent = '0';
-  document.getElementById('bulk-bag-status').textContent = '';
+  document.getElementById('bulk-bag-status').textContent = 'Tick orders or scan barcodes to select';
   document.getElementById('bulk-bag-print').style.display = 'none';
   document.getElementById('bulk-bag-banner').classList.add('active');
+  // Enable scanner for barcode scanning but don't hijack — search still works
   scannerActive = true;
   document.getElementById('barcode-scan-btn').classList.add('active');
   document.getElementById('barcode-input').value = '';
-  document.getElementById('barcode-input').focus();
+  renderShipmentsTable();
 }
 
-async function handleBulkBagScan(scannedValue) {
+function toggleBulkBagOrder(orderId, checked) {
+  if (checked && !bulkBagOrderIds.includes(orderId)) {
+    bulkBagOrderIds.push(orderId);
+  } else if (!checked) {
+    bulkBagOrderIds = bulkBagOrderIds.filter(id => id !== orderId);
+  }
+  bulkBagCount = bulkBagOrderIds.length;
+  document.getElementById('bulk-bag-count').textContent = bulkBagCount;
+  if (bulkBagCount > 0) {
+    document.getElementById('bulk-bag-status').innerHTML = bulkBagCount + ' selected — ready to update';
+    document.getElementById('bulk-bag-print').style.display = '';
+    document.getElementById('bulk-bag-print').textContent = 'Update ' + bulkBagCount + ' to ' + bulkBagSizeLabel + ' & Print';
+  } else {
+    document.getElementById('bulk-bag-status').textContent = 'Tick orders or scan barcodes to select';
+    document.getElementById('bulk-bag-print').style.display = 'none';
+  }
+}
+
+function handleBulkBagScan(scannedValue) {
   const val = scannedValue.trim();
   const nzPostMatch = val.match(/[A-Z]{2}\d{9}[A-Z]{2}/i);
   const trackingVal = nzPostMatch ? nzPostMatch[0].toUpperCase() : null;
@@ -4626,52 +4697,54 @@ async function handleBulkBagScan(scannedValue) {
     return;
   }
 
-  // Skip if already updated in this session
-  if (bulkBagOrderIds.includes(shipment.order_id)) return;
-
-  // Skip if already this bag size
-  if (shipment.shipping_method === bulkBagSize) {
-    document.getElementById('bulk-bag-status').innerHTML = '<span style="color:var(--dim);">Already ' + bulkBagSizeLabel + '</span>';
-    return;
-  }
-
-  document.getElementById('bulk-bag-status').innerHTML = '<span style="color:var(--dim);">Updating...</span>';
-
-  try {
-    const res = await fetch('/.netlify/functions/eship-update', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ order_id: shipment.order_id, shipping_method: bulkBagSize, token: currentStaff.token }),
-    });
-    const data = await res.json();
-    if (data.success) {
-      shipment.shipping_method = bulkBagSize;
-      bulkBagOrderIds.push(shipment.order_id);
-      bulkBagCount++;
-      document.getElementById('bulk-bag-count').textContent = bulkBagCount;
-      document.getElementById('bulk-bag-status').innerHTML = '<span style="color:var(--sage);">Updated!</span>';
-      table.classList.add('scan-flash');
-      setTimeout(() => table.classList.remove('scan-flash'), 400);
-    } else {
-      document.getElementById('bulk-bag-status').innerHTML = '<span style="color:var(--red);">' + (data.error || 'Failed') + '</span>';
-      table.classList.add('scan-flash-err');
-      setTimeout(() => table.classList.remove('scan-flash-err'), 400);
-    }
-  } catch (e) {
-    document.getElementById('bulk-bag-status').innerHTML = '<span style="color:var(--red);">' + e.message + '</span>';
-  }
-
-  // Show print button when at least one updated
-  if (bulkBagCount > 0) {
-    document.getElementById('bulk-bag-status').innerHTML = '<span style="color:var(--sage);">Ready to print new labels</span>';
-    document.getElementById('bulk-bag-print').style.display = '';
+  // Toggle the checkbox for this order
+  if (!bulkBagOrderIds.includes(shipment.order_id)) {
+    toggleBulkBagOrder(shipment.order_id, true);
+    // Tick the checkbox in the table if visible
+    const cb = table.querySelector(`.bulk-bag-check[data-order-id="${shipment.order_id}"]`);
+    if (cb) cb.checked = true;
+    table.classList.add('scan-flash');
+    setTimeout(() => table.classList.remove('scan-flash'), 400);
   }
 }
 
-// Print handler for bulk bag mode
+// Print handler for bulk bag mode — updates all selected then prints
 document.getElementById('bulk-bag-print').addEventListener('click', async () => {
   const btn = document.getElementById('bulk-bag-print');
-  btn.disabled = true; btn.textContent = 'Printing...';
+  const statusEl = document.getElementById('bulk-bag-status');
+  if (bulkBagOrderIds.length === 0) return;
+
+  btn.disabled = true;
+  const total = bulkBagOrderIds.length;
+  let updated = 0;
+  let failed = 0;
+
+  // Step 1: Update all selected orders' bag sizes
+  statusEl.innerHTML = '<span style="color:var(--dim);">Updating bag sizes... 0/' + total + '</span>';
+  for (const orderId of bulkBagOrderIds) {
+    try {
+      const res = await fetch('/.netlify/functions/eship-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: orderId, shipping_method: bulkBagSize, token: currentStaff.token }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        const shipment = allShipments.find(s => s.order_id === orderId);
+        if (shipment) shipment.shipping_method = bulkBagSize;
+        updated++;
+      } else { failed++; }
+    } catch { failed++; }
+    statusEl.innerHTML = '<span style="color:var(--dim);">Updating bag sizes... ' + (updated + failed) + '/' + total + '</span>';
+  }
+
+  if (failed > 0) {
+    statusEl.innerHTML = '<span style="color:var(--amber);">Updated ' + updated + ', failed ' + failed + '</span>';
+  }
+
+  // Step 2: Print labels for updated orders
+  statusEl.innerHTML = '<span style="color:var(--dim);">Printing labels...</span>';
+  btn.textContent = 'Printing...';
   try {
     const res = await fetch('/.netlify/functions/eship-print', {
       method: 'POST',
@@ -4680,16 +4753,18 @@ document.getElementById('bulk-bag-print').addEventListener('click', async () => 
     });
     const data = await res.json();
     if (data.success || data.printed) {
-      alert(`Printed ${data.printed || bulkBagCount} label${(data.printed || bulkBagCount) !== 1 ? 's' : ''} with new ${bulkBagSizeLabel} bag size.`);
+      alert(`Updated ${updated} order${updated !== 1 ? 's' : ''} to ${bulkBagSizeLabel} and printed ${data.printed || updated} label${(data.printed || updated) !== 1 ? 's' : ''}.`);
       exitBulkBagMode();
       loadShippingData();
+      return;
     } else {
-      alert('Print failed: ' + (data.error || JSON.stringify(data)));
+      statusEl.innerHTML = '<span style="color:var(--red);">Print failed: ' + (data.error || 'Unknown error') + '</span>';
     }
   } catch (e) {
-    alert('Print error: ' + e.message);
+    statusEl.innerHTML = '<span style="color:var(--red);">Print error: ' + e.message + '</span>';
   }
-  btn.disabled = false; btn.textContent = 'Print New Labels';
+  btn.disabled = false;
+  btn.textContent = 'Update ' + bulkBagCount + ' to ' + bulkBagSizeLabel + ' & Print';
 });
 
 function exitBulkBagMode() {
