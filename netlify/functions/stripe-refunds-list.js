@@ -1,13 +1,15 @@
 /**
  * stripe-refunds-list.js
  *
- * Lists Stripe refunds for a date range.
+ * Lists Stripe refunds for a date range using the Stripe SDK.
  * Returns refund amount, date, and status for dashboard stats + timeseries.
  *
  * GET ?token=...&from=YYYY-MM-DD&to=YYYY-MM-DD
  *
  * Env vars: STRIPE_SECRET_KEY, SUPABASE_URL, SUPABASE_SERVICE_KEY
  */
+
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 const HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -38,45 +40,38 @@ exports.handler = async (event) => {
   const staff = await validateToken(qs.token);
   if (!staff) return reply(401, { error: 'Unauthorized' });
 
-  const STRIPE_KEY = process.env.STRIPE_SECRET_KEY;
-  if (!STRIPE_KEY) return reply(500, { error: 'Stripe key not configured' });
+  if (!process.env.STRIPE_SECRET_KEY) return reply(500, { error: 'Stripe key not configured' });
 
   const from = qs.from; // YYYY-MM-DD
   const to = qs.to;     // YYYY-MM-DD
 
   try {
-    // Convert dates to unix timestamps for Stripe API
+    // Convert dates to unix timestamps for Stripe API (NZ timezone)
     const createdGte = from ? Math.floor(new Date(from + 'T00:00:00+13:00').getTime() / 1000) : undefined;
     const createdLte = to ? Math.floor(new Date(to + 'T23:59:59+13:00').getTime() / 1000) : undefined;
+
+    const params = { limit: 100 };
+    if (createdGte) params.created = { gte: createdGte };
+    if (createdLte) params.created = { ...(params.created || {}), lte: createdLte };
 
     const refunds = [];
     let hasMore = true;
     let startingAfter = null;
 
     while (hasMore) {
-      let url = `https://api.stripe.com/v1/refunds?limit=100`;
-      if (createdGte) url += `&created[gte]=${createdGte}`;
-      if (createdLte) url += `&created[lte]=${createdLte}`;
-      if (startingAfter) url += `&starting_after=${startingAfter}`;
+      const listParams = { ...params };
+      if (startingAfter) listParams.starting_after = startingAfter;
 
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${STRIPE_KEY}` },
-      });
-      const data = await res.json();
+      const result = await stripe.refunds.list(listParams);
 
-      if (!res.ok) {
-        return reply(res.status, { error: data.error?.message || 'Stripe API error' });
-      }
-
-      for (const r of (data.data || [])) {
-        // Convert amount from cents to dollars, use NZ timezone for date
+      for (const r of result.data) {
         const created = new Date(r.created * 1000);
         const nzDate = created.toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' });
         const nzHour = Number(created.toLocaleString('en-US', { timeZone: 'Pacific/Auckland', hour: 'numeric', hour12: false }));
 
         refunds.push({
           id: r.id,
-          amount: r.amount / 100, // cents to dollars
+          amount: r.amount / 100,
           currency: r.currency,
           status: r.status,
           date: nzDate,
@@ -85,15 +80,14 @@ exports.handler = async (event) => {
         });
       }
 
-      hasMore = data.has_more;
-      if (hasMore && data.data.length > 0) {
-        startingAfter = data.data[data.data.length - 1].id;
+      hasMore = result.has_more;
+      if (hasMore && result.data.length > 0) {
+        startingAfter = result.data[result.data.length - 1].id;
       } else {
         hasMore = false;
       }
     }
 
-    // Summary
     const totalRefunded = refunds.reduce((s, r) => s + r.amount, 0);
     const refundCount = refunds.length;
 
