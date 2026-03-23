@@ -629,6 +629,7 @@ function applyFilter() {
     renderOrdersTable();
   } else if (activeTab === 'customers') {
     renderCustomersTab();
+    if (typeof renderNewVsReturning === 'function') renderNewVsReturning(filteredOrders);
   } else if (activeTab === 'shipping' && shippingLoaded) {
     renderShipmentsTable();
   } else if (activeTab === 'manufacturing') {
@@ -638,6 +639,9 @@ function applyFilter() {
     loadMarketingTab();
   } else if (activeTab === 'website') {
     if (typeof loadWebsiteAnalytics === 'function') loadWebsiteAnalytics();
+    // Render moved widgets from Mission Control
+    if (typeof renderUTM === 'function') renderUTM(filteredOrders);
+    if (typeof renderLandingRevenue === 'function') renderLandingRevenue(filteredOrders);
   } else if (activeTab === 'finance') {
     // Only reload finance on manual filter change, not auto-refresh (would clear expense form inputs)
     if (!window._isAutoRefresh && typeof loadFinanceTab === 'function') loadFinanceTab();
@@ -892,14 +896,13 @@ function renderAll(orders, lineItems) {
   renderCumulativeRevenue();
   renderHoursChart(orders);
   renderProductsChart(lineItems);
-  renderUTM(orders);
   renderHeatmap(allOrders);
   renderMap(orders);
-  renderLandingRevenue(orders);
   renderMagnetProducts(orders);
   renderBoughtTogether(orders);
   renderTrending(orders);
-  renderNewVsReturning(orders);
+  // UTM Sources and Landing Page Revenue moved to Website tab
+  // New vs Returning moved to Customers tab
 }
 
 // ── Sale sound (cha-ching) via Web Audio API ──
@@ -1092,44 +1095,77 @@ function renderStats(orders, lineItems) {
   const refundTotal = (window._stripeRefundTotal > 0) ? window._stripeRefundTotal : refundedOrders.reduce((s, o) => s + Number(o.total_value || 0), 0);
   const refundCount = (window._stripeRefundCount > 0) ? window._stripeRefundCount : refundedOrders.length;
 
-  // Overview stats — toggled by statsMode
-  const isAvg = statsMode === 'avg';
+  // ── Mission Control: 6 core stat cards ──
+  const totalCosts = periodCOGS + currentAdSpend + periodExpenses + periodShipping + currentRefundTotal;
+  const margin = revenue > 0 ? ((profit / revenue) * 100).toFixed(1) : '0.0';
+
+  // Revenue split: Stripe (website) vs Manual (shop/invoice)
+  const stripeRev = orders.filter(o => o.stripe_session_id && !o.stripe_session_id.startsWith('manual_')).reduce((s, o) => s + Number(o.total_value || 0), 0);
+  const shopRev = revenue - stripeRev;
+
+  // Hourly cost accumulation sparkline for Total Costs
+  const costSparkData = [];
+  let runCostSpark = 0;
+  for (let h = 0; h < 24; h++) {
+    const hourOrders = orders.filter(o => {
+      const oh = o.created_at ? new Date(o.created_at).getHours() : 0;
+      return o.order_date === todayStr && oh === h;
+    });
+    runCostSpark += hourOrders.reduce((s, o) => s + getOrderCOGS(o.id), 0);
+    costSparkData.push(h <= currentHour ? runCostSpark : 0);
+  }
+
   const stats = [
-    isAvg
-      ? { label: 'Avg Profit', value: fmt_money(avgProfit), sub: 'per order after all costs', color: profit >= 0 ? 'var(--green)' : 'var(--red)' }
-      : { label: 'Profit', value: fmt_money(profit), sub: periodExpenses > 0 ? `incl $${periodExpenses.toFixed(0)} opex` : 'rev − cogs − ads − refunds', prior: fmtDelta(profit, priorProfit, true), color: profit >= 0 ? 'var(--green)' : 'var(--red)' },
-    isAvg
-      ? { label: 'AOV', value: fmt_money(aov), sub: 'avg order value', prior: fmtDelta(aov, priorAov, true), spark: renderSparkBars(sparkAov, 'var(--sage)'), color: 'var(--sage)' }
-      : { label: 'Revenue', value: fmt_money(revenue), sub: `${growthSign}${growthPct}% vs prior period`, prior: fmtDelta(revenue, priorRevenue, true), spark: renderSparkBars(sparkRevenue, 'var(--sage)'), color: 'var(--green)' },
-    isAvg
-      ? { label: 'Avg Order COGs', value: fmt_money(avgCOGS), sub: 'cost per order', prior: fmtDelta(avgCOGS, priorAvgCOGS, true), color: 'var(--honey)' }
-      : { label: 'COGs', value: fmt_money(periodCOGS), sub: `${grossMargin}% gross margin`, prior: fmtDelta(periodCOGS, priorCOGS, true), spark: renderSparkBars(sparkCOGS, 'var(--honey)'), color: 'var(--honey)' },
-    isAvg
-      ? { label: 'Blended CPA', value: fmt_money(blendedCPA), sub: 'adspend per order', color: 'var(--amber)' }
-      : { label: 'Adspend', value: fmt_money(currentAdSpend), sub: currentPaidImpr > 0 ? currentPaidImpr.toLocaleString() + ' impressions' : 'period ad spend', color: 'var(--amber)' },
-    isAvg
-      ? { label: 'Avg Items/Order', value: avgJars.toFixed(1), sub: 'line items per order', prior: fmtDelta(avgJars, priorAvgJars), color: 'var(--pink)' }
-      : { label: 'Total Items', value: totalQty, sub: 'items purchased', prior: fmtDelta(totalQty, priorTotalQty), color: 'var(--pink)' },
-    { label: 'Orders', value: orderCount, sub: `${periodEmails.size} customers`, prior: fmtDelta(orderCount, priorOrderCount), spark: renderSparkBars(sparkOrders, 'var(--blue)'), color: 'var(--blue)' },
-    { label: 'ROAS', value: currentAdSpend > 0 ? (currentPaidRev / currentAdSpend).toFixed(1) + 'x' : '-', sub: currentPaidConv > 0 ? currentPaidConv + ' paid conversions' : 'return on ad spend', color: 'var(--sage)' },
-    { label: 'Live Visitors', value: '<span id="wa-live-count">-</span>', sub: 'on site now', color: 'var(--cyan)' },
-    { label: 'Website Visitors', value: '<span id="wa-visitors-count">-</span>', sub: 'unique visitors', color: 'var(--cyan)' },
-    isAvg
-      ? { label: 'Avg Shipping', value: fmt_money(ESHIP_COST_PER_ORDER), sub: '<a href="#" onclick="editEshipRate(event)" style="color:var(--purple);text-decoration:underline;font-size:0.7rem;">edit rate</a>', color: 'var(--purple)' }
-      : { label: 'eShip Bill', value: fmt_money(periodShipping), sub: shippedCount + ' orders @ $' + ESHIP_COST_PER_ORDER.toFixed(2) + '/ea · <a href="#" onclick="editEshipRate(event)" style="color:var(--purple);text-decoration:underline;font-size:0.65rem;">edit</a>', prior: fmtDelta(periodShipping, priorShipping, true), color: 'var(--purple)' },
-    { label: 'Opex', value: fmt_money(periodExpenses), sub: periodDays === 1 ? '$' + dailyExpenses.toFixed(2) + '/day · $' + currentMonthlyExpenses.toFixed(0) + '/mo' : periodDays + 'd @ $' + dailyExpenses.toFixed(2) + '/day', color: '#E08050' },
-    { label: 'Refunds', value: `${fmt_money(refundTotal)} (${refundCount})`, sub: `${refundCount} refund${refundCount !== 1 ? 's' : ''} from Stripe`, color: 'var(--red)' },
+    {
+      label: 'Live Visitors', value: '<span id="wa-live-count">-</span>', color: 'var(--cyan)',
+      sub: 'on site now',
+      expandSub: '<span id="wa-visitors-count">-</span> unique visitors this period',
+    },
+    {
+      label: 'Profit', value: fmt_money(profit), color: profit >= 0 ? 'var(--green)' : 'var(--red)',
+      sub: `${margin}% margin`, prior: fmtDelta(profit, priorProfit, true),
+      spark: renderSparkBars(sparkRevenue, profit >= 0 ? 'var(--green)' : 'var(--red)'),
+    },
+    {
+      label: 'Revenue', value: fmt_money(revenue), color: 'var(--green)',
+      sub: `${growthSign}${growthPct}% vs prior`, prior: fmtDelta(revenue, priorRevenue, true),
+      spark: renderSparkBars(sparkRevenue, 'var(--sage)'),
+      expandSub: `Website (Stripe): ${fmt_money(stripeRev)}<br>Shop (Invoice): ${fmt_money(shopRev)}`,
+    },
+    {
+      label: 'Total Orders', value: orderCount, color: 'var(--blue)',
+      sub: `${periodEmails.size} customers`, prior: fmtDelta(orderCount, priorOrderCount),
+      spark: renderSparkBars(sparkOrders, 'var(--blue)'),
+      expandSub: `${totalQty} total items sold · AOV ${fmt_money(aov)}`,
+    },
+    {
+      label: 'Total Costs', value: fmt_money(totalCosts), color: '#E67E22',
+      sub: `${revenue > 0 ? ((totalCosts / revenue) * 100).toFixed(0) : 0}% of revenue`,
+      spark: renderSparkBars(costSparkData.slice(0, currentHour + 1), '#E67E22'),
+      expandSub: `<ul style="margin:0.3rem 0 0;padding-left:1rem;list-style:disc;font-size:0.7rem;line-height:1.6;">
+        <li>COGS: ${fmt_money(periodCOGS)}</li>
+        <li>Adspend: ${fmt_money(currentAdSpend)}</li>
+        <li>Opex: ${fmt_money(periodExpenses)}</li>
+        <li>Shipping: ${fmt_money(periodShipping)}</li>
+        <li>Refunds: ${fmt_money(currentRefundTotal)} (${refundCount})</li>
+      </ul>`,
+    },
+    {
+      label: 'ROAS', value: currentAdSpend > 0 ? (currentPaidRev / currentAdSpend).toFixed(1) + 'x' : '-', color: 'var(--sage)',
+      sub: 'return on ad spend',
+      expandSub: `Adspend: ${fmt_money(currentAdSpend)}<br>Paid conversions: ${currentPaidConv}`,
+    },
   ];
 
   function renderStatCard(s) {
-    const sensitive = ['Revenue', 'Orders', 'Profit', 'AOV', 'Avg Profit'].includes(s.label);
-    const isRevCard = s.label === 'Revenue' || s.label === 'AOV';
-    return `<div class="stat-card${sensitive ? ' sensitive-stat' : ''}" ${isRevCard ? 'id="revenue-stat-card"' : ''}>
+    const sensitive = ['Revenue', 'Profit', 'Total Orders'].includes(s.label);
+    return `<div class="stat-card${sensitive ? ' sensitive-stat' : ''}" onclick="this.classList.toggle('expanded')">
       <div class="label">${s.label}</div>
       <div class="value" style="color:${s.color}">${s.value}</div>
       <div class="sub">${s.sub}</div>
       ${s.prior ? `<div class="prior">${s.prior}</div>` : ''}
       ${s.spark || ''}
+      ${s.expandSub ? `<div class="stat-sub">${s.expandSub}</div>` : ''}
     </div>`;
   }
 

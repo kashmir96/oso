@@ -98,7 +98,7 @@
     <div class="nav-drawer-header"><h2>Primal Pantry</h2></div>
     <button class="nav-item active" data-tab="sales">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-      Overview
+      Mission Control
     </button>
     <button class="nav-item" data-tab="orders">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
@@ -227,20 +227,6 @@
   </div>
 
   <div class="charts-row">
-    <div class="chart-card" style="grid-column:1/-1;">
-      <h3>UTM Sources</h3>
-      <div id="utm-container"></div>
-    </div>
-  </div>
-
-  <div class="charts-row">
-    <div class="chart-card" style="grid-column:1/-1;">
-      <h3>Landing Page Revenue</h3>
-      <div id="landing-rev-container"></div>
-    </div>
-  </div>
-
-  <div class="charts-row">
     <div class="chart-card">
       <h3>Magnet Products (Most Common First Item in Cart)</h3>
       <div id="magnet-container"></div>
@@ -255,10 +241,6 @@
     <div class="chart-card">
       <h3>Trending Products <span style="font-size:0.65rem;color:var(--dim);font-weight:400;">(vs prior period)</span></h3>
       <div id="trending-container"></div>
-    </div>
-    <div class="chart-card">
-      <h3>New vs Returning Customers</h3>
-      <div class="chart-wrap"><canvas id="newret-chart"></canvas></div>
     </div>
   </div>
 
@@ -419,6 +401,10 @@
           </div>
         </div>
       </div>
+    </div>
+    <div class="chart-card" style="margin-top:1.5rem;">
+      <h3>New vs Returning Customers</h3>
+      <div class="chart-wrap"><canvas id="newret-chart"></canvas></div>
     </div>
   </div><!-- /tab-customers -->
 
@@ -1108,6 +1094,16 @@
         </div>
         <div id="wa-fm-body-modal" class="wa-fm-body"><div class="wa-loading">Loading funnel data...</div></div>
       </div>
+    </div>
+
+    <div class="wa-panel" style="margin-bottom:1.5rem;">
+      <h3>UTM Sources</h3>
+      <div id="utm-container"></div>
+    </div>
+
+    <div class="wa-panel" style="margin-bottom:1.5rem;">
+      <h3>Landing Page Revenue</h3>
+      <div id="landing-rev-container"></div>
     </div>
 
   </div><!-- /tab-website -->
