@@ -3056,6 +3056,12 @@ function renderMap(orders) {
       attribution: '',
       maxZoom: 18,
     }).addTo(mapInstance);
+
+    // Wire up dropdown listeners
+    var mapLayerSel = document.getElementById('map-layer');
+    var mapAdSrcSel = document.getElementById('map-ad-source');
+    if (mapLayerSel) mapLayerSel.addEventListener('change', function() { refreshMapLayers(); });
+    if (mapAdSrcSel) mapAdSrcSel.addEventListener('change', function() { refreshMapLayers(); });
   }
 
   // Always load adspend data (uses currentStaff token)
