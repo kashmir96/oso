@@ -825,6 +825,91 @@
       </div>
     </div>
 
+    <!-- Ingredient Stocktake -->
+    <div class="orders-card" style="margin-top:1.25rem;">
+      <h3 style="display:flex;justify-content:space-between;align-items:center;">
+        Ingredient Stocktake
+        <button id="ing-add-btn" class="manual-order-btn" style="font-size:0.7rem;padding:4px 12px;">+ Add Ingredient</button>
+      </h3>
+      <div id="ing-add-form" style="display:none;margin-bottom:1rem;padding:0.75rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;">
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:end;">
+          <div class="form-group" style="flex:2;min-width:150px;">
+            <label>Ingredient Name</label>
+            <input type="text" id="ing-name" placeholder="e.g. Jojoba Oil" style="background:var(--card);border:1px solid var(--border);color:var(--text);padding:0.4rem;border-radius:6px;font-size:0.8rem;width:100%;box-sizing:border-box;">
+          </div>
+          <div class="form-group" style="flex:1;min-width:100px;">
+            <label>Price/kg ($)</label>
+            <input type="number" id="ing-price" placeholder="0.00" step="0.01" min="0" style="background:var(--card);border:1px solid var(--border);color:var(--text);padding:0.4rem;border-radius:6px;font-size:0.8rem;width:100%;box-sizing:border-box;">
+          </div>
+          <div class="form-group" style="flex:1;min-width:100px;">
+            <label>Stock (kg)</label>
+            <input type="number" id="ing-stock" placeholder="0" step="0.1" min="0" style="background:var(--card);border:1px solid var(--border);color:var(--text);padding:0.4rem;border-radius:6px;font-size:0.8rem;width:100%;box-sizing:border-box;">
+          </div>
+          <div class="form-group" style="flex:1;min-width:100px;">
+            <label>Category</label>
+            <select id="ing-category" style="background:var(--card);border:1px solid var(--border);color:var(--text);padding:0.4rem;border-radius:6px;font-size:0.8rem;width:100%;">
+              <option value="Raw Material">Raw Material</option>
+              <option value="Essential Oil">Essential Oil</option>
+              <option value="Active">Active</option>
+              <option value="Preservative">Preservative</option>
+              <option value="Antioxidant">Antioxidant</option>
+              <option value="Surfactant">Surfactant</option>
+              <option value="Fragrance">Fragrance</option>
+              <option value="Packaging">Packaging</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex:1;min-width:120px;">
+            <label>Supplier</label>
+            <input type="text" id="ing-supplier" placeholder="e.g. NZ Oils" style="background:var(--card);border:1px solid var(--border);color:var(--text);padding:0.4rem;border-radius:6px;font-size:0.8rem;width:100%;box-sizing:border-box;">
+          </div>
+          <button id="ing-save-btn" class="manual-order-btn" style="height:fit-content;">Save</button>
+          <button id="ing-cancel-btn" style="height:fit-content;background:var(--card);border:1px solid var(--border);color:var(--muted);padding:0.35rem 0.75rem;border-radius:6px;font-size:0.8rem;cursor:pointer;">Cancel</button>
+        </div>
+      </div>
+      <input type="text" class="search-bar" id="ing-search" placeholder="Search ingredients...">
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Ingredient</th>
+              <th>Category</th>
+              <th style="text-align:right;">Price/kg</th>
+              <th style="text-align:right;">Stock (kg)</th>
+              <th>Supplier</th>
+              <th>Used In</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="ing-table"><tr><td colspan="7" class="loading">Loading...</td></tr></tbody>
+        </table>
+      </div>
+      <div id="ing-pagination"></div>
+    </div>
+
+    <!-- Product Formulations -->
+    <div class="orders-card" style="margin-top:1.25rem;">
+      <h3>Product Formulations</h3>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;">
+        <select id="formulation-product" style="background:var(--card);border:1px solid var(--border);color:var(--text);padding:0.4rem 0.6rem;border-radius:6px;font-size:0.8rem;">
+          <option value="">Select product...</option>
+        </select>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Ingredient</th>
+              <th style="text-align:right;">%</th>
+              <th style="text-align:right;">Cost/kg</th>
+              <th style="text-align:right;">Cost Contribution</th>
+            </tr>
+          </thead>
+          <tbody id="formulation-table"><tr><td colspan="4" class="loading">Select a product above</td></tr></tbody>
+        </table>
+      </div>
+      <div id="formulation-total" style="text-align:right;padding:0.5rem 0;font-weight:600;color:var(--honey);font-size:0.85rem;"></div>
+    </div>
+
   </div><!-- /tab-manufacturing -->
 
   <div id="tab-website" class="tab-content">
