@@ -954,6 +954,10 @@
             <button class="wa-fm-toggle-btn active" id="wa-fm-tog-conv" onclick="waFunnelToggle('conversions')">Users / Conversions</button>
             <button class="wa-fm-toggle-btn" id="wa-fm-tog-rev" onclick="waFunnelToggle('revenue')">Users / Revenue</button>
           </div>
+          <div class="wa-fm-toggle" style="margin-left:0.5rem;">
+            <button class="wa-fm-toggle-btn active" id="wa-fm-conv-next" onclick="waFunnelConvToggle('next')">Next Step %</button>
+            <button class="wa-fm-toggle-btn" id="wa-fm-conv-purchase" onclick="waFunnelConvToggle('purchase')">Purchase %</button>
+          </div>
           <button class="modal-close" onclick="waCloseFunnelModal()">&times;</button>
         </div>
         <div id="wa-fm-body" class="wa-fm-body"><div class="wa-loading">Loading funnel data...</div></div>

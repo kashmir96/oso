@@ -6325,6 +6325,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
   let waFmProductsExpanded = false;
   let waFmProductPages = [];
   let waFmSelectedProduct = null; // selected product slug for filtering funnel
+  let waFmConvMode = 'next'; // 'next' = proceed to next step, 'purchase' = eventual purchase
 
   window.waSelectProduct = function(idx) {
     if (waFmSelectedProduct === idx) {
@@ -6459,9 +6460,25 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     waFmRender();
   };
 
+  window.waFunnelConvToggle = function(mode) {
+    waFmConvMode = mode;
+    document.getElementById('wa-fm-conv-next').classList.toggle('active', mode === 'next');
+    document.getElementById('wa-fm-conv-purchase').classList.toggle('active', mode === 'purchase');
+    waFmRender();
+  };
+
   window.waToggleProductBreakdown = function() {
     waFmProductsExpanded = !waFmProductsExpanded;
     waFmRender();
+  };
+
+  // Define funnel step order for "proceed to next step" conv rate
+  const FUNNEL_NEXT = {
+    'Homepage': 'Cart',
+    'Shop Page': 'Cart',
+    'Product Pages': 'Cart',
+    'Cart': 'Checkout',
+    'Checkout': 'Purchased',
   };
 
   function waFmCard(label, data, opts = {}) {
@@ -6472,14 +6489,28 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     // Entry %: share of TOTAL site visitors who entered at this page
     const totalEntries = ['Homepage', 'Shop Page', 'Product Pages', 'Cart', 'Checkout'].reduce((s, k) => s + ((waFmData[k] && waFmData[k].entry_visitors) || 0), 0) || 1;
     const entryPct = data.entry_visitors > 0 ? Math.round(data.entry_visitors / totalEntries * 100) : 0;
-    // Conv rate: what % of THIS page's visitors went on to purchase
-    const purchasedCount = (waFmData['Purchased'] && waFmData['Purchased'].visitors) || 0;
+    // Conv rate: depends on toggle mode
+    const src = opts._filteredData || waFmData;
     let convRate = '0.0';
-    if (visitors > 0 && purchasedCount > 0) {
-      const raw = purchasedCount / visitors * 100;
-      convRate = (isFinite(raw) ? Math.min(raw, 100) : 100).toFixed(1);
+    let convLabel = 'Conv Rate';
+    if (waFmConvMode === 'next') {
+      // % who proceed to next funnel step
+      const nextStep = FUNNEL_NEXT[label];
+      const nextVisitors = nextStep && src[nextStep] ? (src[nextStep].visitors || 0) : 0;
+      if (visitors > 0 && nextVisitors > 0) {
+        const raw = nextVisitors / visitors * 100;
+        convRate = (isFinite(raw) ? Math.min(raw, 100) : 100).toFixed(1);
+      }
+      convLabel = 'Next Step';
+    } else {
+      // % who eventually purchase
+      const purchasedCount = src['Purchased'] ? (src['Purchased'].visitors || 0) : 0;
+      if (visitors > 0 && purchasedCount > 0) {
+        const raw = purchasedCount / visitors * 100;
+        convRate = (isFinite(raw) ? Math.min(raw, 100) : 100).toFixed(1);
+      }
+      convLabel = 'Conv Rate';
     }
-    const convCount = waFmData['Purchased'].visitors || 0;
     const isHighlightRev = waFmMode === 'revenue';
     const clickable = opts.clickable ? ' clickable' : '';
     const centerClass = opts.center ? ' center-card' : '';
@@ -6499,7 +6530,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
         <div class="wa-fm-stat">Users <span class="wa-fm-stat-val">${fmtNum(visitors)}</span></div>
         <div class="wa-fm-stat">Bounce <span class="wa-fm-stat-val">${bounce}%</span></div>
         <div class="wa-fm-stat">Avg Time <span class="wa-fm-stat-val">${fmtDuration(dur)}</span></div>
-        <div class="wa-fm-stat">${isHighlightRev ? 'Revenue' : 'Conv Rate'} <span class="wa-fm-stat-val highlight">${isHighlightRev ? fmt_money(rev) : convRate + '%'}</span></div>
+        <div class="wa-fm-stat">${isHighlightRev ? 'Revenue' : convLabel} <span class="wa-fm-stat-val highlight">${isHighlightRev ? fmt_money(rev) : convRate + '%'}</span></div>
       </div>`;
     }
 
@@ -6551,7 +6582,11 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
       // If a product is selected, show its detail card below the nucleus
       let detailCard = '';
       if (selProduct) {
-        const convRate = selProduct.visitors > 0 ? ((selProduct.revenue > 0 ? (d['Purchased'].visitors / selProduct.visitors * 100) : 0)).toFixed(1) : '0.0';
+        // Conv rate = % of this product's visitors who proceeded to cart
+        const cartV = d['Cart'].visitors || 0;
+        const totalProdV = d['Product Pages'].visitors || 1;
+        const estCartFromProduct = selProduct.visitors > 0 ? (cartV * selProduct.visitors / totalProdV) : 0;
+        const convRate = selProduct.visitors > 0 ? Math.min(estCartFromProduct / selProduct.visitors * 100, 100).toFixed(1) : '0.0';
         detailCard = `<div class="wa-fm-product-detail" style="margin:0.5rem auto;max-width:400px;">
           <div class="wa-fm-card" style="border-color:var(--green);">
             <div class="wa-fm-card-title">${selProduct.shortName} <span class="entry-badge" data-clear-product style="cursor:pointer;font-size:0.6rem;">✕ Clear</span></div>
@@ -6622,14 +6657,14 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
       <div class="wa-fm-vline-label" style="font-size:0.7rem;font-weight:600;">${convText}</div>
     </div>`;
 
-    // Cart card
-    const cartCard = `<div class="wa-fm-center">${waFmCard('Cart', fd['Cart'], { center: true })}</div>`;
+    // Cart card — pass filtered data so conv rate uses filtered next-step
+    const cartCard = `<div class="wa-fm-center">${waFmCard('Cart', fd['Cart'], { center: true, _filteredData: fd })}</div>`;
 
     // Cart → Checkout connector
     const conn2 = waFmConnector(fd['Cart'], fd['Checkout']);
 
     // Checkout card
-    const checkoutCard = `<div class="wa-fm-center">${waFmCard('Checkout', fd['Checkout'], { center: true })}</div>`;
+    const checkoutCard = `<div class="wa-fm-center">${waFmCard('Checkout', fd['Checkout'], { center: true, _filteredData: fd })}</div>`;
 
     // Checkout → Purchased connector
     const conn3 = waFmConnector(fd['Checkout'], fd['Purchased']);
