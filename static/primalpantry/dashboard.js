@@ -643,11 +643,16 @@ async function loadAdSpend() {
   try {
     const [from, to] = getDateRange();
     const tok = encodeURIComponent(currentStaff.token);
-    const [fbRes, gRes, fbRangeRes] = await Promise.all([
+    const [fbRes, gRes, fbRangeRes, refundsRes] = await Promise.all([
       fetch(`/.netlify/functions/facebook-adspend?token=${tok}`).then(r => r.json()).catch(() => ({ spend: 0 })),
       fetch(`/.netlify/functions/google-ads?token=${tok}&from=${from}&to=${to}`).then(r => r.json()).catch(() => ({ campaigns: [] })),
       fetch(`/.netlify/functions/facebook-campaigns?token=${tok}&from=${from}&to=${to}`).then(r => r.json()).catch(() => ({ campaigns: [] })),
+      fetch(`/.netlify/functions/stripe-refunds-list?token=${tok}&from=${from}&to=${to}`).then(r => r.json()).catch(() => ({ refunds: [], total: 0, count: 0 })),
     ]);
+    // Store refund data globally for stats + timeseries
+    window._stripeRefunds = refundsRes.refunds || [];
+    window._stripeRefundTotal = refundsRes.total || 0;
+    window._stripeRefundCount = refundsRes.count || 0;
     // Today's ad spend for the banner (Facebook today + Google today)
     const todayStr = new Date().toISOString().slice(0, 10);
     const fbTodaySpend = Number(fbRes.spend || 0);
@@ -1047,9 +1052,10 @@ function renderStats(orders, lineItems) {
   const grossMargin = revenue > 0 ? ((revenue - periodCOGS) / revenue * 100).toFixed(1) : '0.0';
   const sparkCOGS = buildHourlySpark(h => orders.filter(o => orderHourNZ(o) === h).reduce((s, o) => s + getOrderCOGS(o.id), 0));
 
-  // Profit = Revenue - COGS - Adspend
-  const profit = revenue - periodCOGS - currentAdSpend;
-  const priorProfit = priorRevenue - priorCOGS; // no prior adspend available
+  // Profit = Revenue - COGS - Adspend - Refunds
+  const currentRefundTotal = window._stripeRefundTotal || 0;
+  const profit = revenue - periodCOGS - currentAdSpend - currentRefundTotal;
+  const priorProfit = priorRevenue - priorCOGS; // no prior adspend/refunds available
   const avgProfit = orderCount > 0 ? profit / orderCount : 0;
   const avgCOGS = orderCount > 0 ? periodCOGS / orderCount : 0;
   const blendedCPA = orderCount > 0 ? currentAdSpend / orderCount : 0;
@@ -1061,15 +1067,16 @@ function renderStats(orders, lineItems) {
   const longestWait = waitDays.length > 0 ? Math.max(...waitDays) : 0;
   const waitOver2 = waitDays.filter(d => d > 2).length;
 
-  // Total refund $ value
-  const refundTotal = refundedOrders.reduce((s, o) => s + Number(o.total_value || 0), 0);
+  // Refund $ value — prefer Stripe data, fallback to order status
+  const refundTotal = (window._stripeRefundTotal > 0) ? window._stripeRefundTotal : refundedOrders.reduce((s, o) => s + Number(o.total_value || 0), 0);
+  const refundCount = (window._stripeRefundCount > 0) ? window._stripeRefundCount : refundedOrders.length;
 
   // Overview stats — toggled by statsMode
   const isAvg = statsMode === 'avg';
   const stats = [
     isAvg
       ? { label: 'Avg Profit', value: fmt_money(avgProfit), sub: 'per order after cogs + ads', color: profit >= 0 ? 'var(--green)' : 'var(--red)' }
-      : { label: 'Profit', value: fmt_money(profit), sub: `revenue − cogs − adspend`, prior: fmtDelta(profit, priorProfit, true), color: profit >= 0 ? 'var(--green)' : 'var(--red)' },
+      : { label: 'Profit', value: fmt_money(profit), sub: `rev − cogs − ads − refunds`, prior: fmtDelta(profit, priorProfit, true), color: profit >= 0 ? 'var(--green)' : 'var(--red)' },
     isAvg
       ? { label: 'AOV', value: fmt_money(aov), sub: 'avg order value', prior: fmtDelta(aov, priorAov, true), spark: renderSparkBars(sparkAov, 'var(--sage)'), color: 'var(--sage)' }
       : { label: 'Revenue', value: fmt_money(revenue), sub: `${growthSign}${growthPct}% vs prior period`, prior: fmtDelta(revenue, priorRevenue, true), spark: renderSparkBars(sparkRevenue, 'var(--sage)'), color: 'var(--green)' },
@@ -1086,7 +1093,7 @@ function renderStats(orders, lineItems) {
     { label: 'ROAS', value: currentAdSpend > 0 ? (currentPaidRev / currentAdSpend).toFixed(1) + 'x' : '-', sub: currentPaidConv > 0 ? currentPaidConv + ' paid conversions' : 'return on ad spend', color: 'var(--sage)' },
     { label: 'Live Visitors', value: '<span id="wa-live-count">-</span>', sub: 'on site now', color: 'var(--cyan)' },
     { label: 'Website Visitors', value: '<span id="wa-visitors-count">-</span>', sub: 'unique visitors', color: 'var(--cyan)' },
-    { label: 'Refunds', value: `${fmt_money(refundTotal)} (${refundedOrders.length})`, sub: `${refundedOrders.length} order${refundedOrders.length !== 1 ? 's' : ''} refunded`, color: 'var(--red)' },
+    { label: 'Refunds', value: `${fmt_money(refundTotal)} (${refundCount})`, sub: `${refundCount} refund${refundCount !== 1 ? 's' : ''} from Stripe`, color: 'var(--red)' },
   ];
 
   function renderStatCard(s) {
@@ -1372,8 +1379,16 @@ function renderDailyPace() {
     }
   }
 
+  // Build hourly refunds from Stripe data
+  const todayRefundHourly = Array(24).fill(0);
+  if (window._stripeRefunds) {
+    window._stripeRefunds.forEach(r => {
+      if (r.date === todayStr) todayRefundHourly[r.hour] += r.amount;
+    });
+  }
+
   const labels = [], cumToday = [], cumLastWeek = [], cumTotalCosts = [];
-  let runToday = 0, runLW = 0, runCogs = 0;
+  let runToday = 0, runLW = 0, runCogs = 0, runRefunds = 0;
   for (let h = 0; h < 24; h++) {
     const ampm = h === 0 ? '12am' : h < 12 ? h + 'am' : h === 12 ? '12pm' : (h - 12) + 'pm';
     labels.push(ampm);
@@ -1382,7 +1397,8 @@ function renderDailyPace() {
     if (h <= currentHour) {
       runToday += todayHourly[h]; cumToday.push(runToday);
       runCogs += todayCogsHourly[h];
-      cumTotalCosts.push(runCogs + (cumAdspendByHour[h] || 0));
+      runRefunds += todayRefundHourly[h];
+      cumTotalCosts.push(runCogs + (cumAdspendByHour[h] || 0) + runRefunds);
     } else {
       cumToday.push(null); cumTotalCosts.push(null);
     }
@@ -1400,7 +1416,7 @@ function renderDailyPace() {
       datasets: [
         { label: lwLabel, data: cumLastWeek, borderColor: 'rgba(156,146,135,0.35)', backgroundColor: 'rgba(156,146,135,0.05)', fill: true, borderWidth: 1.5, borderDash: [4, 3], tension: 0.3, pointRadius: 0, order: 3 },
         { label: todayLabel + ' Revenue', data: cumToday, borderColor: '#6B8F5B', backgroundColor: 'rgba(107,143,91,0.2)', fill: true, borderWidth: 2.5, tension: 0.3, pointRadius: 0, pointHitRadius: 8, order: 2 },
-        { label: 'Total Costs (COGS + Adspend)', data: cumTotalCosts, borderColor: '#E67E22', backgroundColor: 'rgba(230,126,34,0.35)', fill: true, borderWidth: 2, tension: 0.3, pointRadius: 0, order: 1 },
+        { label: 'Total Costs (COGS + Ads + Refunds)', data: cumTotalCosts, borderColor: '#E67E22', backgroundColor: 'rgba(230,126,34,0.35)', fill: true, borderWidth: 2, tension: 0.3, pointRadius: 0, order: 1 },
       ],
     },
     options: {
@@ -1441,6 +1457,17 @@ function renderMonthlyPace() {
     if (d.getFullYear() === prevYear && d.getMonth() === prevMonth) prevDaily[d.getDate() - 1] += Number(o.total_value || 0);
   });
 
+  // Build daily refunds from Stripe data for this month
+  const refundDaily = Array(daysInMonth).fill(0);
+  if (window._stripeRefunds) {
+    window._stripeRefunds.forEach(r => {
+      const d = new Date(r.date + 'T00:00:00');
+      if (d.getFullYear() === year && d.getMonth() === month) {
+        refundDaily[d.getDate() - 1] += r.amount;
+      }
+    });
+  }
+
   // Distribute adspend proportionally to daily revenue
   let totalRevenueToNow = 0;
   for (let i = 0; i < today; i++) totalRevenueToNow += currentDaily[i];
@@ -1452,7 +1479,7 @@ function renderMonthlyPace() {
     if (i < today) {
       runCurrent += currentDaily[i]; cumCurrent.push(runCurrent);
       const dailyAdspend = totalRevenueToNow > 0 ? currentAdSpend * (currentDaily[i] / totalRevenueToNow) : currentAdSpend / today;
-      runCosts += cogsDaily[i] + dailyAdspend; cumTotalCosts.push(runCosts);
+      runCosts += cogsDaily[i] + dailyAdspend + refundDaily[i]; cumTotalCosts.push(runCosts);
     } else {
       cumCurrent.push(null); cumTotalCosts.push(null);
     }
@@ -1472,7 +1499,7 @@ function renderMonthlyPace() {
       datasets: [
         { label: prevLabel + ' (pace)', data: cumPrev, borderColor: 'rgba(156,146,135,0.35)', backgroundColor: 'rgba(156,146,135,0.05)', fill: true, borderWidth: 1.5, borderDash: [4, 3], tension: 0.3, pointRadius: 0, order: 3 },
         { label: currLabel + ' Revenue', data: cumCurrent, borderColor: '#6B8F5B', backgroundColor: 'rgba(107,143,91,0.2)', fill: true, borderWidth: 2.5, tension: 0.3, pointRadius: 0, pointHitRadius: 8, order: 2 },
-        { label: 'Total Costs (COGS + Adspend)', data: cumTotalCosts, borderColor: '#E67E22', backgroundColor: 'rgba(230,126,34,0.35)', fill: true, borderWidth: 2, tension: 0.3, pointRadius: 0, order: 1 },
+        { label: 'Total Costs (COGS + Ads + Refunds)', data: cumTotalCosts, borderColor: '#E67E22', backgroundColor: 'rgba(230,126,34,0.35)', fill: true, borderWidth: 2, tension: 0.3, pointRadius: 0, order: 1 },
       ],
     },
     options: {
