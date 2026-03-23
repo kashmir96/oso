@@ -10435,6 +10435,7 @@ async function loadSettingsTab() {
         document.getElementById('settings-' + settingsActiveTab).style.display = 'block';
         if (settingsActiveTab === 'suppliers') loadSuppliers();
         else if (settingsActiveTab === 'macros') loadMacros();
+        else if (settingsActiveTab === 'marketing') loadUtmMappings();
       });
     });
     // Add macro

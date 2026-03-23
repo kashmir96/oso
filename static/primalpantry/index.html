@@ -974,42 +974,6 @@
         </div>
       </div>
 
-      <div class="wa-panel" style="margin-bottom:1.5rem;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
-          <h3 style="margin:0;">UTM Mappings</h3>
-          <div style="display:flex;gap:0.5rem;">
-            <button id="utm-map-import-btn" style="background:var(--card);color:var(--text);border:1px solid var(--border);padding:0.3rem 0.6rem;border-radius:6px;font-size:0.7rem;cursor:pointer;">Import CSV</button>
-            <button id="utm-map-add-btn" style="background:var(--sage);color:#141210;border:none;padding:0.3rem 0.6rem;border-radius:6px;font-size:0.7rem;font-weight:600;cursor:pointer;">+ Add Mapping</button>
-          </div>
-        </div>
-        <p style="font-size:0.7rem;color:var(--dim);margin-bottom:0.75rem;">Map cryptic ad platform IDs to friendly names. These translate everywhere UTMs appear.</p>
-        <div id="utm-map-form" style="display:none;margin-bottom:0.75rem;padding:0.75rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;">
-          <div style="display:grid;grid-template-columns:1fr 2fr 2fr auto;gap:0.5rem;align-items:end;">
-            <div>
-              <label style="font-size:0.65rem;color:var(--dim);display:block;margin-bottom:0.2rem;">Field</label>
-              <select id="utm-map-field" style="width:100%;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:0.35rem;font-size:0.8rem;">
-                <option value="utm_campaign">Campaign</option>
-                <option value="utm_source">Source</option>
-                <option value="utm_medium">Medium</option>
-                <option value="utm_content">Content</option>
-                <option value="utm_term">Term</option>
-                <option value="utm_adgroup">Ad Group</option>
-              </select>
-            </div>
-            <div>
-              <label style="font-size:0.65rem;color:var(--dim);display:block;margin-bottom:0.2rem;">UTM Value (the ID)</label>
-              <input id="utm-map-value" type="text" placeholder="e.g. 120215930553850368" style="width:100%;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:0.35rem;font-size:0.8rem;box-sizing:border-box;">
-            </div>
-            <div>
-              <label style="font-size:0.65rem;color:var(--dim);display:block;margin-bottom:0.2rem;">Friendly Name</label>
-              <input id="utm-map-name" type="text" placeholder="e.g. Summer Sale - NZ Broad" style="width:100%;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:0.35rem;font-size:0.8rem;box-sizing:border-box;">
-            </div>
-            <button id="utm-map-save-btn" style="background:var(--sage);color:#141210;border:none;padding:0.35rem 0.75rem;border-radius:4px;font-size:0.8rem;font-weight:600;cursor:pointer;white-space:nowrap;">Save</button>
-          </div>
-        </div>
-        <input id="utm-map-csv-file" type="file" accept=".csv,.tsv,.txt" style="display:none;">
-        <div id="utm-map-list" style="font-size:0.8rem;"><span style="color:var(--dim);">Loading mappings...</span></div>
-      </div>
 
       <div class="wa-small-panels">
         <div class="wa-panel">
@@ -1736,6 +1700,7 @@
     <div class="settings-tabs">
       <button class="settings-tab-btn active" data-settings-tab="suppliers">Suppliers</button>
       <button class="settings-tab-btn" data-settings-tab="macros">Macros</button>
+      <button class="settings-tab-btn" data-settings-tab="marketing">Marketing</button>
     </div>
 
     <!-- Suppliers sub-tab -->
@@ -1790,6 +1755,46 @@
             <tbody id="macro-table"><tr><td colspan="3" class="loading">Loading...</td></tr></tbody>
           </table>
         </div>
+      </div>
+    </div>
+
+    <!-- Marketing sub-tab -->
+    <div id="settings-marketing" class="settings-panel" style="display:none;">
+      <div class="orders-card" style="margin-bottom:1.5rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+          <h3 style="margin:0;">UTM Mappings</h3>
+          <div style="display:flex;gap:0.5rem;">
+            <button id="utm-map-import-btn" style="background:var(--card);color:var(--text);border:1px solid var(--border);padding:0.3rem 0.6rem;border-radius:6px;font-size:0.7rem;cursor:pointer;">Import CSV</button>
+            <button id="utm-map-add-btn" style="background:var(--sage);color:#141210;border:none;padding:0.3rem 0.6rem;border-radius:6px;font-size:0.7rem;font-weight:600;cursor:pointer;">+ Add Mapping</button>
+          </div>
+        </div>
+        <p style="font-size:0.7rem;color:var(--dim);margin-bottom:0.75rem;">Map cryptic ad platform IDs to friendly names. These translate everywhere UTMs appear.</p>
+        <div id="utm-map-form" style="display:none;margin-bottom:0.75rem;padding:0.75rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;">
+          <div style="display:grid;grid-template-columns:1fr 2fr 2fr auto;gap:0.5rem;align-items:end;">
+            <div>
+              <label style="font-size:0.65rem;color:var(--dim);display:block;margin-bottom:0.2rem;">Field</label>
+              <select id="utm-map-field" style="width:100%;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:0.35rem;font-size:0.8rem;">
+                <option value="utm_campaign">Campaign</option>
+                <option value="utm_source">Source</option>
+                <option value="utm_medium">Medium</option>
+                <option value="utm_content">Content</option>
+                <option value="utm_term">Term</option>
+                <option value="utm_adgroup">Ad Group</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:0.65rem;color:var(--dim);display:block;margin-bottom:0.2rem;">UTM Value (the ID)</label>
+              <input id="utm-map-value" type="text" placeholder="e.g. 120215930553850368" style="width:100%;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:0.35rem;font-size:0.8rem;box-sizing:border-box;">
+            </div>
+            <div>
+              <label style="font-size:0.65rem;color:var(--dim);display:block;margin-bottom:0.2rem;">Friendly Name</label>
+              <input id="utm-map-name" type="text" placeholder="e.g. Summer Sale - NZ Broad" style="width:100%;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:0.35rem;font-size:0.8rem;box-sizing:border-box;">
+            </div>
+            <button id="utm-map-save-btn" style="background:var(--sage);color:#141210;border:none;padding:0.35rem 0.75rem;border-radius:4px;font-size:0.8rem;font-weight:600;cursor:pointer;white-space:nowrap;">Save</button>
+          </div>
+        </div>
+        <input id="utm-map-csv-file" type="file" accept=".csv,.tsv,.txt" style="display:none;">
+        <div id="utm-map-list" style="font-size:0.8rem;"><span style="color:var(--dim);">Loading mappings...</span></div>
       </div>
     </div>
   </div><!-- /tab-settings -->
