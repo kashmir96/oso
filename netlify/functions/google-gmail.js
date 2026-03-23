@@ -306,11 +306,12 @@ exports.handler = async (event) => {
     const limit = body.limit || 50;
     const search = body.search || '';
     const filter = body.filter || 'all';
-
+    const folder = body.folder || 'inbox';
     const channelFilter = body.channel || 'all';
 
-    // Single lightweight query
-    let msgPath = '/rest/v1/email_messages?select=thread_id,customer_email,from_address,to_address,subject,snippet,date,direction,is_read,account_id,order_flagged,channel&archived=eq.false&order=date.desc&limit=200';
+    // Single lightweight query — include archived for archived folder
+    const archivedFilter = folder === 'archived' ? '&archived=eq.true' : '&archived=eq.false';
+    let msgPath = '/rest/v1/email_messages?select=thread_id,customer_email,from_address,to_address,subject,snippet,date,direction,is_read,account_id,order_flagged,channel' + archivedFilter + '&order=date.desc&limit=500';
     if (channelFilter !== 'all') msgPath += '&channel=eq.' + channelFilter;
     const res = await sbFetch(msgPath);
     const msgs = await res.json();
@@ -329,6 +330,7 @@ exports.handler = async (event) => {
           last_subject: m.subject,
           last_snippet: m.snippet,
           last_date: m.date,
+          last_direction: m.direction,
           unread_count: 0,
           message_count: 0,
           account_id: m.account_id,
@@ -364,7 +366,12 @@ exports.handler = async (event) => {
       }
     } catch { /* contacts lookup failed, continue without */ }
 
-    // Filter
+    // Folder filter
+    if (folder === 'inbox') threads = threads.filter(t => t.last_direction === 'inbound');
+    else if (folder === 'sent') threads = threads.filter(t => t.last_direction === 'outbound');
+    // 'archived' folder is already filtered by the DB query
+
+    // Contact type filter
     if (filter === 'suppliers') threads = threads.filter(t => t.contact_type === 'supplier');
     else if (filter === 'wholesalers') threads = threads.filter(t => t.contact_type === 'wholesaler');
     else if (filter === 'customers') threads = threads.filter(t => t.contact_type === 'customer');

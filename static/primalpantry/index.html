@@ -417,6 +417,11 @@
           <input type="text" id="comms-search" placeholder="Search conversations...">
           <button class="comms-compose-btn" id="comms-compose-btn">+ Compose</button>
         </div>
+        <div class="comms-filter-bar" id="comms-folder-bar">
+          <button class="comms-filter-btn active" data-folder="inbox">Inbox <span id="comms-inbox-count" style="font-size:0.65rem;opacity:0.7;"></span></button>
+          <button class="comms-filter-btn" data-folder="sent">Sent</button>
+          <button class="comms-filter-btn" data-folder="archived">Archived</button>
+        </div>
         <div class="comms-accounts" id="comms-accounts-bar">
           <span style="color:var(--dim);">No Gmail accounts connected</span>
           <button class="comms-connect-btn" id="comms-connect-btn" style="margin-left:0.5rem;">Connect Gmail</button>

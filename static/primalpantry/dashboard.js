@@ -8464,6 +8464,7 @@ function renderCommsAccounts() {
 let commsFilter = 'all';
 let commsInboxFilter = 'all';
 let commsChannelFilter = 'all';
+let commsFolder = 'inbox';
 let commsMacros = [];
 let commsStaffList = [];
 let commsPrompts = [];
@@ -8497,8 +8498,15 @@ function renderCommsThreadList(searchFilter) {
     );
   }
   if (threads.length === 0) {
-    list.innerHTML = '<div class="comms-empty">' + (commsAccounts.length === 0 ? 'Connect a Gmail account to start' : 'No conversations found') + '</div>';
+    const emptyMsg = commsAccounts.length === 0 ? 'Connect a Gmail account to start' : commsFolder === 'sent' ? 'No sent emails' : commsFolder === 'archived' ? 'No archived conversations' : 'Inbox empty';
+    list.innerHTML = '<div class="comms-empty">' + emptyMsg + '</div>';
     return;
+  }
+  // Update inbox count badge
+  if (commsFolder === 'inbox') {
+    const unread = threads.reduce((s, t) => s + (t.unread_count || 0), 0);
+    const countEl = document.getElementById('comms-inbox-count');
+    if (countEl) countEl.textContent = unread > 0 ? '(' + unread + ')' : '';
   }
   // Group by date
   let lastGroup = '';
@@ -8517,7 +8525,7 @@ function renderCommsThreadList(searchFilter) {
     html += '<div class="comms-thread-item channel-' + ch + (isActive ? ' active' : '') + (t.unread_count > 0 ? ' unread' : '') + '" onclick="openCommsThread(\'' + (t.thread_id || '').replace(/'/g, "\\'") + '\')">'
       + '<div class="comms-thread-name">'
       + (showDot ? '<span class="comms-unread-dot ' + dotClass + '"></span>' : '')
-      + '<span>' + esc(t.customer_name || t.customer_email || 'Unknown')
+      + '<span>' + (commsFolder === 'sent' ? 'To: ' : '') + esc(t.customer_name || t.customer_email || 'Unknown')
       + '<span class="comms-channel-badge ch-' + ch + '">' + chLabels[ch] + '</span>'
       + '</span>'
       + '<span class="comms-thread-time">' + commsTimeAgo(t.last_date)
@@ -8862,10 +8870,19 @@ async function loadCommsTab() {
         body: commsActiveThread._quoteBlock || '',
       });
     });
-    // Filter buttons
-    document.querySelectorAll('.comms-filter-btn').forEach(btn => {
+    // Folder buttons
+    document.querySelectorAll('#comms-folder-bar .comms-filter-btn').forEach(btn => {
       btn.addEventListener('click', function() {
-        document.querySelectorAll('.comms-filter-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('#comms-folder-bar .comms-filter-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        commsFolder = this.dataset.folder;
+        loadCommsThreads();
+      });
+    });
+    // Contact type filter buttons
+    document.querySelectorAll('#comms-filter-bar .comms-filter-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('#comms-filter-bar .comms-filter-btn').forEach(b => b.classList.remove('active'));
         this.classList.add('active');
         commsFilter = this.dataset.filter;
         loadCommsThreads();
@@ -8908,7 +8925,7 @@ async function loadCommsTab() {
 
 async function loadCommsThreads() {
   try {
-    const data = await commsApi('threads', { limit: 50, filter: commsFilter, channel: commsChannelFilter });
+    const data = await commsApi('threads', { limit: 50, filter: commsFilter, channel: commsChannelFilter, folder: commsFolder });
     commsThreads = data.threads || [];
     renderCommsThreadList();
   } catch (e) {
