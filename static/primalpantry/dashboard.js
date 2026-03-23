@@ -714,6 +714,7 @@ async function initDashboard() {
   } catch (e) { console.warn('initDashboard partial error:', e.message); }
   applyFilter();
   loadAdSpend();
+  loadExpenses();
 
   // Start auto-refresh of stats every 15 seconds
   startStatsRefresh();
@@ -1052,10 +1053,14 @@ function renderStats(orders, lineItems) {
   const grossMargin = revenue > 0 ? ((revenue - periodCOGS) / revenue * 100).toFixed(1) : '0.0';
   const sparkCOGS = buildHourlySpark(h => orders.filter(o => orderHourNZ(o) === h).reduce((s, o) => s + getOrderCOGS(o.id), 0));
 
-  // Profit = Revenue - COGS - Adspend - Refunds
+  // Profit = Revenue - COGS - Adspend - Refunds - Expenses
   const currentRefundTotal = window._stripeRefundTotal || 0;
-  const profit = revenue - periodCOGS - currentAdSpend - currentRefundTotal;
-  const priorProfit = priorRevenue - priorCOGS; // no prior adspend/refunds available
+  const [periodFrom, periodTo] = getDateRange();
+  const periodDays = Math.max(1, Math.round((new Date(periodTo) - new Date(periodFrom)) / 86400000) + 1);
+  const dailyExpenses = expensesData.reduce((s, e) => s + expenseDailyEquiv(Number(e.amount), e.frequency), 0);
+  const periodExpenses = dailyExpenses * periodDays;
+  const profit = revenue - periodCOGS - currentAdSpend - currentRefundTotal - periodExpenses;
+  const priorProfit = priorRevenue - priorCOGS; // no prior adspend/refunds/expenses available
   const avgProfit = orderCount > 0 ? profit / orderCount : 0;
   const avgCOGS = orderCount > 0 ? periodCOGS / orderCount : 0;
   const blendedCPA = orderCount > 0 ? currentAdSpend / orderCount : 0;
@@ -1075,8 +1080,8 @@ function renderStats(orders, lineItems) {
   const isAvg = statsMode === 'avg';
   const stats = [
     isAvg
-      ? { label: 'Avg Profit', value: fmt_money(avgProfit), sub: 'per order after cogs + ads', color: profit >= 0 ? 'var(--green)' : 'var(--red)' }
-      : { label: 'Profit', value: fmt_money(profit), sub: `rev − cogs − ads − refunds`, prior: fmtDelta(profit, priorProfit, true), color: profit >= 0 ? 'var(--green)' : 'var(--red)' },
+      ? { label: 'Avg Profit', value: fmt_money(avgProfit), sub: 'per order after all costs', color: profit >= 0 ? 'var(--green)' : 'var(--red)' }
+      : { label: 'Profit', value: fmt_money(profit), sub: periodExpenses > 0 ? `incl $${periodExpenses.toFixed(0)} opex` : 'rev − cogs − ads − refunds', prior: fmtDelta(profit, priorProfit, true), color: profit >= 0 ? 'var(--green)' : 'var(--red)' },
     isAvg
       ? { label: 'AOV', value: fmt_money(aov), sub: 'avg order value', prior: fmtDelta(aov, priorAov, true), spark: renderSparkBars(sparkAov, 'var(--sage)'), color: 'var(--sage)' }
       : { label: 'Revenue', value: fmt_money(revenue), sub: `${growthSign}${growthPct}% vs prior period`, prior: fmtDelta(revenue, priorRevenue, true), spark: renderSparkBars(sparkRevenue, 'var(--sage)'), color: 'var(--green)' },
@@ -1387,8 +1392,12 @@ function renderDailyPace() {
     });
   }
 
+  // Daily expenses spread hourly
+  const dailyExp = expensesData.reduce((s, e) => s + expenseDailyEquiv(Number(e.amount), e.frequency), 0);
+  const hourlyExpense = dailyExp / 24;
+
   const labels = [], cumToday = [], cumLastWeek = [], cumTotalCosts = [];
-  let runToday = 0, runLW = 0, runCogs = 0, runRefunds = 0;
+  let runToday = 0, runLW = 0, runCogs = 0, runRefunds = 0, runExpenses = 0;
   for (let h = 0; h < 24; h++) {
     const ampm = h === 0 ? '12am' : h < 12 ? h + 'am' : h === 12 ? '12pm' : (h - 12) + 'pm';
     labels.push(ampm);
@@ -1398,7 +1407,8 @@ function renderDailyPace() {
       runToday += todayHourly[h]; cumToday.push(runToday);
       runCogs += todayCogsHourly[h];
       runRefunds += todayRefundHourly[h];
-      cumTotalCosts.push(runCogs + (cumAdspendByHour[h] || 0) + runRefunds);
+      runExpenses += hourlyExpense;
+      cumTotalCosts.push(runCogs + (cumAdspendByHour[h] || 0) + runRefunds + runExpenses);
     } else {
       cumToday.push(null); cumTotalCosts.push(null);
     }
@@ -1416,7 +1426,7 @@ function renderDailyPace() {
       datasets: [
         { label: lwLabel, data: cumLastWeek, borderColor: 'rgba(156,146,135,0.35)', backgroundColor: 'rgba(156,146,135,0.05)', fill: true, borderWidth: 1.5, borderDash: [4, 3], tension: 0.3, pointRadius: 0, order: 3 },
         { label: todayLabel + ' Revenue', data: cumToday, borderColor: '#6B8F5B', backgroundColor: 'rgba(107,143,91,0.2)', fill: true, borderWidth: 2.5, tension: 0.3, pointRadius: 0, pointHitRadius: 8, order: 2 },
-        { label: 'Total Costs (COGS + Ads + Refunds)', data: cumTotalCosts, borderColor: '#E67E22', backgroundColor: 'rgba(230,126,34,0.35)', fill: true, borderWidth: 2, tension: 0.3, pointRadius: 0, order: 1 },
+        { label: 'Total Costs (COGS + Ads + Refunds + Opex)', data: cumTotalCosts, borderColor: '#E67E22', backgroundColor: 'rgba(230,126,34,0.35)', fill: true, borderWidth: 2, tension: 0.3, pointRadius: 0, order: 1 },
       ],
     },
     options: {
@@ -1499,7 +1509,7 @@ function renderMonthlyPace() {
       datasets: [
         { label: prevLabel + ' (pace)', data: cumPrev, borderColor: 'rgba(156,146,135,0.35)', backgroundColor: 'rgba(156,146,135,0.05)', fill: true, borderWidth: 1.5, borderDash: [4, 3], tension: 0.3, pointRadius: 0, order: 3 },
         { label: currLabel + ' Revenue', data: cumCurrent, borderColor: '#6B8F5B', backgroundColor: 'rgba(107,143,91,0.2)', fill: true, borderWidth: 2.5, tension: 0.3, pointRadius: 0, pointHitRadius: 8, order: 2 },
-        { label: 'Total Costs (COGS + Ads + Refunds)', data: cumTotalCosts, borderColor: '#E67E22', backgroundColor: 'rgba(230,126,34,0.35)', fill: true, borderWidth: 2, tension: 0.3, pointRadius: 0, order: 1 },
+        { label: 'Total Costs (COGS + Ads + Refunds + Opex)', data: cumTotalCosts, borderColor: '#E67E22', backgroundColor: 'rgba(230,126,34,0.35)', fill: true, borderWidth: 2, tension: 0.3, pointRadius: 0, order: 1 },
       ],
     },
     options: {
@@ -10737,7 +10747,7 @@ async function loadFinanceTab() {
   document.getElementById('xero-connect-banner').style.display = xeroConnected ? 'none' : '';
   document.getElementById('xero-status-bar').style.display = xeroConnected ? 'flex' : 'none';
 
-  await renderFinanceStats();
+  await Promise.all([renderFinanceStats(), loadExpenses()]);
   const activePanel = document.querySelector('#fin-sub-tabs .wa-panel-tab.active');
   const panel = activePanel ? activePanel.dataset.finPanel : 'pnl';
   if (panel === 'pnl') await renderFinancePnl();
@@ -10761,6 +10771,106 @@ document.querySelectorAll('#fin-sub-tabs .wa-panel-tab').forEach(tab => {
     applyStatsVisibility();
   });
 });
+
+// ── Operational Expenses ──
+let expensesData = [];
+let currentMonthlyExpenses = 0;
+
+function expenseMonthlyEquiv(amount, freq) {
+  switch (freq) {
+    case 'weekly': return amount * 52 / 12;
+    case 'fortnightly': return amount * 26 / 12;
+    case 'monthly': return amount;
+    case 'quarterly': return amount / 3;
+    case 'yearly': return amount / 12;
+    case 'one-off': return 0;
+    default: return amount;
+  }
+}
+
+function expenseDailyEquiv(amount, freq) {
+  switch (freq) {
+    case 'weekly': return amount / 7;
+    case 'fortnightly': return amount / 14;
+    case 'monthly': return amount / 30;
+    case 'quarterly': return amount / 90;
+    case 'yearly': return amount / 365;
+    case 'one-off': return 0;
+    default: return amount / 30;
+  }
+}
+
+async function loadExpenses() {
+  try {
+    const res = await fetch(`${db.supabaseUrl}/rest/v1/expenses?order=category.asc,name.asc&select=*`, {
+      headers: { 'apikey': db.supabaseKey, 'Authorization': `Bearer ${db.supabaseKey}` },
+    });
+    expensesData = await res.json();
+    if (!Array.isArray(expensesData)) expensesData = [];
+  } catch { expensesData = []; }
+  currentMonthlyExpenses = expensesData.reduce((s, e) => s + expenseMonthlyEquiv(Number(e.amount), e.frequency), 0);
+  renderExpensesTable();
+}
+
+function renderExpensesTable() {
+  const tbody = document.getElementById('expenses-table');
+  const totalEl = document.getElementById('expenses-total');
+  if (expensesData.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="loading">No expenses added yet</td></tr>';
+    totalEl.textContent = '';
+    return;
+  }
+  totalEl.textContent = '$' + currentMonthlyExpenses.toFixed(2) + '/mo';
+  tbody.innerHTML = expensesData.map(e => {
+    const monthly = expenseMonthlyEquiv(Number(e.amount), e.frequency);
+    return `<tr>
+      <td>${esc(e.name)}</td>
+      <td><span class="source-pill" style="background:rgba(156,146,135,0.15);color:var(--muted);">${esc(e.category)}</span></td>
+      <td style="text-align:right;">$${Number(e.amount).toFixed(2)}</td>
+      <td>${e.frequency}</td>
+      <td style="text-align:right;color:var(--honey);">$${monthly.toFixed(2)}</td>
+      <td><button onclick="deleteExpense(${e.id})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:0.75rem;">Delete</button></td>
+    </tr>`;
+  }).join('');
+}
+
+document.getElementById('expense-add-btn').addEventListener('click', () => {
+  document.getElementById('expense-add-form').style.display = '';
+  document.getElementById('expense-name').value = '';
+  document.getElementById('expense-amount').value = '';
+});
+
+document.getElementById('expense-cancel-btn').addEventListener('click', () => {
+  document.getElementById('expense-add-form').style.display = 'none';
+});
+
+document.getElementById('expense-save-btn').addEventListener('click', async () => {
+  const name = document.getElementById('expense-name').value.trim();
+  const category = document.getElementById('expense-category').value;
+  const amount = parseFloat(document.getElementById('expense-amount').value);
+  const frequency = document.getElementById('expense-frequency').value;
+  if (!name || isNaN(amount) || amount <= 0) return;
+  try {
+    await fetch(`${db.supabaseUrl}/rest/v1/expenses`, {
+      method: 'POST',
+      headers: { 'apikey': db.supabaseKey, 'Authorization': `Bearer ${db.supabaseKey}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ name, category, amount, frequency }),
+    });
+    document.getElementById('expense-add-form').style.display = 'none';
+    await loadExpenses();
+  } catch (e) { console.error('Save expense error:', e); }
+});
+
+window.deleteExpense = async function(id) {
+  if (!confirm('Delete this expense?')) return;
+  try {
+    await fetch(`${db.supabaseUrl}/rest/v1/expenses?id=eq.${id}`, {
+      method: 'DELETE',
+      headers: { 'apikey': db.supabaseKey, 'Authorization': `Bearer ${db.supabaseKey}` },
+    });
+    await loadExpenses();
+  } catch (e) { console.error('Delete expense error:', e); }
+};
 
 // ── Action Center Tab ──
 let actionsInited = false;
