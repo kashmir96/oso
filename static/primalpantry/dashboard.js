@@ -6059,7 +6059,9 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
   function renderAbandonedTable() {
     const tbody = document.getElementById('ac-table');
     if (!abandonedCheckouts.length) {
-      tbody.innerHTML = '<tr><td colspan="7" class="loading">No abandoned checkouts found.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="loading">No abandoned checkouts found.</td></tr>';
+      document.getElementById('ac-select-all').checked = false;
+      document.getElementById('ac-send-all-btn').style.display = 'none';
       return;
     }
 
@@ -6073,6 +6075,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
       const canSend = ac.status === 'new' && !ac.later_purchased;
 
       return `<tr>
+        <td>${canSend ? `<input type="checkbox" class="ac-row-check" data-idx="${idx}" style="cursor:pointer;">` : ''}</td>
         <td style="white-space:nowrap;">${date}</td>
         <td>${ac.email}</td>
         <td>${ac.name || '-'}</td>
@@ -6082,7 +6085,103 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
         <td>${canSend ? `<button onclick="previewRecoveryEmail(${idx})" style="background:var(--sage);color:#141210;border:none;padding:0.3rem 0.6rem;border-radius:4px;font-size:0.75rem;font-weight:600;cursor:pointer;white-space:nowrap;">Send Email</button>` : ''}</td>
       </tr>`;
     }).join('');
+    updateAcBulkBtn();
   }
+
+  function updateAcBulkBtn() {
+    const checked = document.querySelectorAll('.ac-row-check:checked').length;
+    const btn = document.getElementById('ac-send-all-btn');
+    btn.style.display = checked > 0 ? '' : 'none';
+    btn.textContent = `Send All Selected (${checked})`;
+  }
+
+  // Select all checkbox
+  document.getElementById('ac-select-all').addEventListener('change', function() {
+    document.querySelectorAll('.ac-row-check').forEach(cb => { cb.checked = this.checked; });
+    updateAcBulkBtn();
+  });
+
+  // Individual checkbox changes
+  document.getElementById('ac-table').addEventListener('change', function(e) {
+    if (e.target.classList.contains('ac-row-check')) updateAcBulkBtn();
+  });
+
+  // Bulk send handler
+  document.getElementById('ac-send-all-btn').addEventListener('click', async function() {
+    const checkboxes = document.querySelectorAll('.ac-row-check:checked');
+    if (checkboxes.length === 0) return;
+
+    const indices = Array.from(checkboxes).map(cb => parseInt(cb.dataset.idx));
+    const btn = this;
+    const statusEl = document.getElementById('ac-bulk-status');
+    btn.disabled = true;
+
+    // Get gmail account
+    let accountId = null;
+    if (commsAccounts.length === 0) {
+      try {
+        const d = await fetch('/.netlify/functions/gmail-auth?action=status&token=' + currentStaff.token).then(r => r.json());
+        commsAccounts = d.accounts || [];
+      } catch {}
+    }
+    const helloAcct = commsAccounts.find(a => a.email_address === 'hello@primalpantry.co.nz');
+    accountId = helloAcct ? helloAcct.id : (commsAccounts[0] ? commsAccounts[0].id : null);
+    if (!accountId) {
+      statusEl.innerHTML = '<span style="color:var(--red);">No Gmail account connected</span>';
+      btn.disabled = false;
+      return;
+    }
+
+    let sent = 0, failed = 0;
+    for (const idx of indices) {
+      const ac = abandonedCheckouts[idx];
+      if (!ac || ac.status !== 'new' || ac.later_purchased) { failed++; continue; }
+
+      statusEl.textContent = `Sending ${sent + failed + 1} of ${indices.length}...`;
+      const firstName = (ac.name || '').split(' ')[0] || 'there';
+      const currencySymbol = '$';
+      const total = ac.amount_total ? currencySymbol + (ac.amount_total / 100).toFixed(2) : '';
+      const itemsHtml = (ac.line_items || []).map(li =>
+        `<tr><td style="padding:8px 12px;border-bottom:1px solid #f0ebe5;font-size:14px;color:#2d2a26;">${li.description || 'Product'}</td><td style="padding:8px 12px;border-bottom:1px solid #f0ebe5;font-size:14px;color:#6e6259;text-align:center;">${li.quantity || 1}</td><td style="padding:8px 12px;border-bottom:1px solid #f0ebe5;font-size:14px;color:#2d2a26;text-align:right;">${currencySymbol}${((li.amount || 0) / 100).toFixed(2)}</td></tr>`
+      ).join('');
+      const subject = `${firstName}, your cart is still waiting for you`;
+      const body = `<div style="max-width:560px;margin:0 auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <div style="text-align:center;margin-bottom:24px;">
+    <h1 style="font-size:22px;color:#2d2a26;margin:0;">Primal Pantry</h1>
+    <p style="font-size:12px;color:#9c9287;margin:4px 0 0;">Natural Tallow Skincare — Made in New Zealand</p>
+  </div>
+  <div style="background:#fff;border-radius:12px;padding:32px;border:1px solid #e8e2da;">
+    <h2 style="font-size:18px;color:#2d2a26;margin:0 0 16px;">Hey ${firstName},</h2>
+    <p style="font-size:14px;color:#6e6259;line-height:1.6;margin:0 0 20px;">We noticed you were checking out some of our products but didn't quite finish your order — no stress at all!<br><br>Your items are still saved and ready to go. We handcraft everything in small batches here in Christchurch, so stock can move quickly — just wanted to make sure you don't miss out.</p>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+      <thead><tr style="background:#f8f5f0;"><th style="padding:8px 12px;text-align:left;font-size:12px;color:#9c9287;text-transform:uppercase;">Item</th><th style="padding:8px 12px;text-align:center;font-size:12px;color:#9c9287;text-transform:uppercase;">Qty</th><th style="padding:8px 12px;text-align:right;font-size:12px;color:#9c9287;text-transform:uppercase;">Price</th></tr></thead>
+      <tbody>${itemsHtml}</tbody>
+      ${total ? `<tfoot><tr><td colspan="2" style="padding:10px 12px;font-size:14px;font-weight:600;color:#2d2a26;">Total</td><td style="padding:10px 12px;font-size:14px;font-weight:600;color:#2d2a26;text-align:right;">${total}</td></tr></tfoot>` : ''}
+    </table>
+    <div style="text-align:center;margin:24px 0;">
+      <a href="https://www.primalpantry.co.nz/cart/?utm_source=email&utm_medium=recovery&utm_campaign=abandoned_cart&utm_content=${ac.session_id}" style="display:inline-block;background:#8CB47A;color:#141210;padding:14px 36px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">Complete Your Order</a>
+    </div>
+    <p style="font-size:13px;color:#9c9287;line-height:1.5;margin:16px 0 0;text-align:center;">Questions? Just hit reply — we'd love to help.</p>
+  </div>
+  <div style="text-align:center;margin-top:16px;"><p style="font-size:11px;color:#bbb;">Primal Pantry · Christchurch, New Zealand</p></div>
+</div>`;
+
+      try {
+        const res = await commsApi('send', { account_id: accountId, to: ac.email, subject, body, send_type: 'bulk' });
+        if (res.success) {
+          sent++;
+          try { await fetch(AC_BASE + '?token=' + currentStaff.token + '&action=update_status&session_id=' + encodeURIComponent(ac.session_id) + '&status=contacted'); } catch {}
+          ac.status = 'contacted';
+          ac.contacted_at = new Date().toISOString();
+        } else { failed++; }
+      } catch { failed++; }
+    }
+
+    statusEl.innerHTML = `<span style="color:var(--sage);">${sent} sent</span>` + (failed > 0 ? ` · <span style="color:var(--red);">${failed} failed</span>` : '');
+    btn.disabled = false;
+    document.getElementById('ac-select-all').checked = false;
+    renderAbandonedTable();
+  });
 
   // ── Recovery Email Preview Modal ──
   let recoveryItemsHtml = '';

@@ -1001,10 +1001,16 @@
         <div class="wa-stat"><div class="wa-val" id="ac-contacted">-</div><div class="wa-lbl">Contacted</div></div>
         <div class="wa-stat"><div class="wa-val" id="ac-recovered">-</div><div class="wa-lbl">Recovered</div></div>
       </div>
+      <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.5rem;">
+        <label style="font-size:0.8rem;color:var(--muted);display:flex;align-items:center;gap:0.3rem;cursor:pointer;"><input type="checkbox" id="ac-select-all" style="cursor:pointer;"> Select all</label>
+        <button id="ac-send-all-btn" style="display:none;background:var(--sage);color:#141210;border:none;padding:0.35rem 0.75rem;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;">Send All Selected</button>
+        <span id="ac-bulk-status" style="font-size:0.75rem;color:var(--dim);"></span>
+      </div>
       <div style="overflow-x:auto;">
         <table>
           <thead>
             <tr>
+              <th style="width:30px;"></th>
               <th>Date</th>
               <th>Email</th>
               <th>Name</th>
@@ -1015,7 +1021,7 @@
             </tr>
           </thead>
           <tbody id="ac-table">
-            <tr><td colspan="7" class="loading">Click "Load" to fetch abandoned checkouts</td></tr>
+            <tr><td colspan="8" class="loading">Click "Load" to fetch abandoned checkouts</td></tr>
           </tbody>
         </table>
       </div>
