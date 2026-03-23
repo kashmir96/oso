@@ -3056,24 +3056,17 @@ function renderMap(orders) {
       attribution: '',
       maxZoom: 18,
     }).addTo(mapInstance);
-
-    // Wire up filter toggles
-    const layerSel = document.getElementById('map-layer');
-    const srcSel = document.getElementById('map-ad-source');
-    if (layerSel) layerSel.addEventListener('change', () => refreshMapLayers());
-    if (srcSel) srcSel.addEventListener('change', () => refreshMapLayers());
-
-    // Load adspend region data
-    loadAdspendRegions();
   }
 
+  // Always load adspend data (uses currentStaff token)
+  loadAdspendRegions();
   refreshMapLayers();
   setTimeout(() => mapInstance.invalidateSize(), 200);
 }
 
 function loadAdspendRegions() {
-  const tok = localStorage.getItem('pp_token');
-  if (!tok) return;
+  const tok = currentStaff && currentStaff.token;
+  if (!tok) { console.warn('[Map] No staff token, skipping adspend regions'); return; }
   const now = new Date();
   const nz = new Date(now.toLocaleString('en-US', { timeZone: 'Pacific/Auckland' }));
   const y = nz.getFullYear(), m = String(nz.getMonth() + 1).padStart(2, '0'), d = String(nz.getDate()).padStart(2, '0');
