@@ -659,6 +659,8 @@ async function loadAdSpend() {
     // Banner
     const el = document.getElementById('adspend-value');
     if (el) el.textContent = currentAdSpend > 0 ? '$' + currentAdSpend.toFixed(2) : '—';
+    // Re-render stats and pace chart with updated adspend
+    applyFilter();
   } catch (e) {
     currentAdSpend = 0; currentPaidRev = 0; currentPaidConv = 0; currentPaidClicks = 0; currentPaidImpr = 0;
     const el = document.getElementById('adspend-value');
@@ -6039,6 +6041,231 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     document.getElementById('wa-checkout-abandon').innerHTML = `${checkoutAbandons} <span style="font-size:0.65rem;color:var(--dim);">${checkout > 0 ? '(' + (checkoutAbandons / checkout * 100).toFixed(0) + '%)' : ''}</span>`;
     document.getElementById('wa-overall-abandon-rate').textContent = overallDropoff + '%';
     el.style.display = '';
+  }
+
+  // ── Full Funnel Visualisation Modal ──
+  let waFmMode = 'conversions';
+  let waFmData = null;
+  let waFmProductsExpanded = false;
+
+  window.waOpenFunnelModal = async function() {
+    const overlay = document.getElementById('wa-fm-overlay');
+    const body = document.getElementById('wa-fm-body');
+    overlay.classList.add('open');
+    body.innerHTML = '<div class="wa-loading">Loading funnel data...</div>';
+    waFmProductsExpanded = false;
+
+    try {
+      const { from, to } = waGetDates();
+
+      // Define page groups
+      const groups = [
+        { label: 'Homepage', patterns: ['/'] },
+        { label: 'Shop Page', patterns: ['/shop/', '/shop'] },
+        { label: 'Cart', patterns: ['/cart/', '/cart'] },
+        { label: 'Checkout', patterns: ['/checkout/', '/checkout'] },
+      ];
+
+      // Build product page patterns from existing traffic data
+      const productPatterns = [];
+      if (waTrafficData && waTrafficData.pages) {
+        const excludePatterns = ['/', '/shop/', '/shop', '/cart/', '/cart', '/checkout/', '/checkout', '/pages/'];
+        waTrafficData.pages.forEach(p => {
+          if (p.name && !excludePatterns.includes(p.name) && !p.name.startsWith('/pages/') && p.visitors >= 2) {
+            productPatterns.push(p.name);
+          }
+        });
+      }
+      if (productPatterns.length === 0) productPatterns.push('/shop/%');
+      groups.push({ label: 'Product Pages', patterns: productPatterns });
+
+      const data = await waFetch('analytics-dashboard', {
+        site: waSite, from, to, metric: 'page_funnel',
+        groups: JSON.stringify(groups)
+      });
+
+      // Build lookup by label
+      const byLabel = {};
+      (data || []).forEach(d => { byLabel[d.label] = d; });
+
+      // Get funnel stages for purchased count
+      const funnelData = await waFetch('analytics-dashboard', { site: waSite, from, to, metric: 'funnel_stages' });
+      const purchased = funnelData ? (funnelData.purchased || 0) : 0;
+
+      // Calculate total revenue from order data
+      const siteOrders = (typeof filteredOrders !== 'undefined' ? filteredOrders : allOrders || []);
+      const totalRev = siteOrders.reduce((s, o) => s + Number(o.total_value || 0), 0);
+
+      // Revenue per page group from waRevMaps
+      const revMap = waRevMaps ? waRevMaps.pathname || {} : {};
+      function groupRev(patterns) {
+        let rev = 0;
+        patterns.forEach(p => {
+          Object.keys(revMap).forEach(k => {
+            if (k === p || (p.endsWith('%') && k.startsWith(p.slice(0, -1)))) rev += revMap[k] || 0;
+          });
+        });
+        return rev;
+      }
+
+      // Assemble full data
+      const labels = ['Homepage', 'Shop Page', 'Product Pages', 'Cart', 'Checkout'];
+      waFmData = {};
+      labels.forEach(lbl => {
+        const d = byLabel[lbl] || { visitors: 0, views: 0, avg_duration: 0, bounce_rate: 0, entry_visitors: 0 };
+        const g = groups.find(g => g.label === lbl);
+        const rev = g ? groupRev(g.patterns) : 0;
+        waFmData[lbl] = { ...d, revenue: rev };
+      });
+      waFmData['Purchased'] = { visitors: purchased, views: purchased, avg_duration: 0, bounce_rate: 0, entry_visitors: 0, revenue: totalRev };
+
+      waFmRender();
+    } catch (err) {
+      console.error('Funnel modal error:', err);
+      body.innerHTML = '<div class="wa-loading" style="color:var(--red);">Failed to load funnel data</div>';
+    }
+  };
+
+  window.waCloseFunnelModal = function() {
+    document.getElementById('wa-fm-overlay').classList.remove('open');
+  };
+
+  window.waFunnelToggle = function(mode) {
+    waFmMode = mode;
+    document.getElementById('wa-fm-tog-conv').classList.toggle('active', mode === 'conversions');
+    document.getElementById('wa-fm-tog-rev').classList.toggle('active', mode === 'revenue');
+    waFmRender();
+  };
+
+  window.waToggleProductBreakdown = function() {
+    waFmProductsExpanded = !waFmProductsExpanded;
+    waFmRender();
+  };
+
+  function waFmCard(label, data, opts = {}) {
+    const visitors = data.visitors || 0;
+    const bounce = data.bounce_rate || 0;
+    const dur = data.avg_duration || 0;
+    const entryPct = visitors > 0 && data.entry_visitors > 0 ? Math.round(data.entry_visitors / visitors * 100) : 0;
+    const rev = data.revenue || 0;
+    const totalVisitors = waFmData['Homepage'] ? Math.max(waFmData['Homepage'].visitors, 1) : 1;
+    const convRate = totalVisitors > 0 ? ((waFmData['Purchased'].visitors || 0) / visitors * 100).toFixed(1) : '0.0';
+    const convCount = waFmData['Purchased'].visitors || 0;
+    const isHighlightRev = waFmMode === 'revenue';
+    const clickable = opts.clickable ? ' clickable' : '';
+    const centerClass = opts.center ? ' center-card' : '';
+    const onClick = opts.onClick || '';
+
+    let entryBadge = entryPct > 0 ? `<span class="entry-badge">${entryPct}% enter here</span>` : '';
+    if (label === 'Purchased') entryBadge = '';
+
+    let stats = '';
+    if (label === 'Purchased') {
+      stats = `<div class="wa-fm-stats">
+        <div class="wa-fm-stat">Orders <span class="wa-fm-stat-val${isHighlightRev ? '' : ' highlight'}">${fmtNum(visitors)}</span></div>
+        <div class="wa-fm-stat">Revenue <span class="wa-fm-stat-val${isHighlightRev ? ' highlight' : ''}">${fmt_money(rev)}</span></div>
+      </div>`;
+    } else {
+      stats = `<div class="wa-fm-stats">
+        <div class="wa-fm-stat">Users <span class="wa-fm-stat-val">${fmtNum(visitors)}</span></div>
+        <div class="wa-fm-stat">Bounce <span class="wa-fm-stat-val">${bounce}%</span></div>
+        <div class="wa-fm-stat">Avg Time <span class="wa-fm-stat-val">${fmtDuration(dur)}</span></div>
+        <div class="wa-fm-stat">${isHighlightRev ? 'Revenue' : 'Conv Rate'} <span class="wa-fm-stat-val highlight">${isHighlightRev ? fmt_money(rev) : convRate + '%'}</span></div>
+      </div>`;
+    }
+
+    return `<div class="wa-fm-card${centerClass}${clickable}" ${onClick ? `onclick="${onClick}"` : ''}>
+      <div class="wa-fm-card-title">${label} ${entryBadge}</div>
+      ${stats}
+    </div>`;
+  }
+
+  function waFmConnector(fromData, toData, label) {
+    const users = toData.visitors || 0;
+    const dropPct = fromData.visitors > 0 ? ((1 - users / fromData.visitors) * 100).toFixed(0) : 0;
+    return `<div class="wa-fm-center-connector">
+      <div class="wa-fm-vline"></div>
+      <div class="wa-fm-vline-label">${fmtNum(users)} users · ${dropPct}% drop</div>
+      <div class="wa-fm-vline"></div>
+    </div>`;
+  }
+
+  function waFmRender() {
+    if (!waFmData) return;
+    const body = document.getElementById('wa-fm-body');
+    const d = waFmData;
+
+    // Top row: Homepage, Shop, Product Pages
+    let productsCard;
+    if (waFmProductsExpanded) {
+      // Expanded: show grid of individual product pages
+      let miniCards = '';
+      const excludePatterns = ['/', '/shop/', '/shop', '/cart/', '/cart', '/checkout/', '/checkout'];
+      const productPages = (waTrafficData && waTrafficData.pages || [])
+        .filter(p => p.name && !excludePatterns.includes(p.name) && !p.name.startsWith('/pages/') && p.visitors >= 2)
+        .slice(0, 10);
+
+      const revMap = waRevMaps ? waRevMaps.pathname || {} : {};
+      productPages.forEach(p => {
+        const rev = revMap[p.name] || 0;
+        const isRev = waFmMode === 'revenue';
+        const shortName = p.name.replace(/^\/(shop\/)?/, '').replace(/\/$/, '') || p.name;
+        miniCards += `<div class="wa-fm-mini-card">
+          <div class="wa-fm-mini-card-title" title="${p.name}">${shortName}</div>
+          <div class="wa-fm-mini-stat">Users: <strong>${fmtNum(p.visitors)}</strong> · Views: ${fmtNum(p.views)}</div>
+          <div class="wa-fm-mini-stat">${isRev ? 'Rev: <strong>' + fmt_money(rev) + '</strong>' : ''}</div>
+        </div>`;
+      });
+
+      productsCard = `<div style="flex:1;max-width:280px;">
+        ${waFmCard('Product Pages', d['Product Pages'], { clickable: true, onClick: 'waToggleProductBreakdown()' })}
+        <div class="wa-fm-product-expanded">
+          <div class="wa-fm-product-grid">${miniCards}</div>
+          <button class="wa-fm-collapse-btn" onclick="event.stopPropagation();waToggleProductBreakdown()">Collapse</button>
+        </div>
+      </div>`;
+    } else {
+      productsCard = `<div style="flex:1;max-width:280px;">${waFmCard('Product Pages', d['Product Pages'], { clickable: true, onClick: 'waToggleProductBreakdown()' })}</div>`;
+    }
+
+    // Build connector lines from top row to cart
+    // Simple approach: 3 dotted lines converging
+    const topCards = `<div class="wa-fm-top-row">
+      <div style="flex:1;max-width:280px;">${waFmCard('Homepage', d['Homepage'])}</div>
+      <div style="flex:1;max-width:280px;">${waFmCard('Shop Page', d['Shop Page'])}</div>
+      ${productsCard}
+    </div>`;
+
+    // Connector: show cart visitors as the convergence
+    const cartVisitors = d['Cart'].visitors || 0;
+    const topMax = Math.max(d['Homepage'].visitors || 0, d['Shop Page'].visitors || 0, d['Product Pages'].visitors || 0, 1);
+    const convText = `${fmtNum(cartVisitors)} users reach cart`;
+
+    const connector1 = `<div class="wa-fm-center-connector">
+      <div style="display:flex;justify-content:center;gap:4rem;width:100%;">
+        <div class="wa-fm-vline" style="height:28px;"></div>
+        <div class="wa-fm-vline" style="height:28px;"></div>
+        <div class="wa-fm-vline" style="height:28px;"></div>
+      </div>
+      <div class="wa-fm-vline-label" style="font-size:0.7rem;font-weight:600;">${convText}</div>
+    </div>`;
+
+    // Cart card
+    const cartCard = `<div class="wa-fm-center">${waFmCard('Cart', d['Cart'], { center: true })}</div>`;
+
+    // Cart → Checkout connector
+    const conn2 = waFmConnector(d['Cart'], d['Checkout']);
+
+    // Checkout card
+    const checkoutCard = `<div class="wa-fm-center">${waFmCard('Checkout', d['Checkout'], { center: true })}</div>`;
+
+    // Checkout → Purchased connector
+    const conn3 = waFmConnector(d['Checkout'], d['Purchased']);
+
+    // Purchased card
+    const purchasedCard = `<div class="wa-fm-center">${waFmCard('Purchased', d['Purchased'], { center: true })}</div>`;
+
+    body.innerHTML = topCards + connector1 + cartCard + conn2 + checkoutCard + conn3 + purchasedCard;
   }
 
   // ── Abandoned Checkouts (Layer 2 — Stripe) ──
