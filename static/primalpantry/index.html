@@ -1108,60 +1108,6 @@
       <div id="wa-checkout-errors"><div class="wa-loading">Loading...</div></div>
     </div>
 
-    <div class="wa-panel" style="margin-bottom:1.5rem;">
-      <h3>Abandoned Checkouts <span style="font-size:0.65rem;color:var(--dim);font-weight:400;">(from Stripe)</span></h3>
-      <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.75rem;">
-        <select id="ac-days" style="background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.6rem;font-size:0.8rem;">
-          <option value="7" selected>Last 7 days</option>
-          <option value="14">Last 14 days</option>
-          <option value="30">Last 30 days</option>
-        </select>
-        <button id="ac-load-btn" style="background:var(--sage);color:#141210;border:none;padding:0.4rem 0.75rem;border-radius:6px;font-size:0.8rem;font-weight:600;cursor:pointer;">Load</button>
-      </div>
-      <div class="wa-stats" id="ac-stats" style="display:none;margin-bottom:0.75rem;">
-        <div class="wa-stat"><div class="wa-val" id="ac-total">-</div><div class="wa-lbl">Abandoned</div></div>
-        <div class="wa-stat"><div class="wa-val" id="ac-lost-rev">-</div><div class="wa-lbl">Est. Lost Revenue</div></div>
-        <div class="wa-stat"><div class="wa-val" id="ac-contacted">-</div><div class="wa-lbl">Contacted</div></div>
-        <div class="wa-stat"><div class="wa-val" id="ac-recovered">-</div><div class="wa-lbl">Recovered</div></div>
-      </div>
-      <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.5rem;">
-        <label style="font-size:0.8rem;color:var(--muted);display:flex;align-items:center;gap:0.3rem;cursor:pointer;"><input type="checkbox" id="ac-select-all" style="cursor:pointer;"> Select all</label>
-        <button id="ac-send-all-btn" style="display:none;background:var(--sage);color:#141210;border:none;padding:0.35rem 0.75rem;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;">Send All Selected</button>
-        <span id="ac-bulk-status" style="font-size:0.75rem;color:var(--dim);"></span>
-      </div>
-      <div style="overflow-x:auto;">
-        <table>
-          <thead>
-            <tr>
-              <th style="width:30px;"></th>
-              <th>Date</th>
-              <th>Email</th>
-              <th>Name</th>
-              <th>Cart Contents</th>
-              <th style="text-align:right;">Value</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="ac-table">
-            <tr><td colspan="8" class="loading">Click "Load" to fetch abandoned checkouts</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Recovery Email Preview Modal -->
-    <div class="modal-overlay" id="recovery-modal">
-      <div class="modal" style="max-width:620px;">
-        <button class="modal-close" onclick="document.getElementById('recovery-modal').classList.remove('open')">&times;</button>
-        <h2>Recovery Email Preview</h2>
-        <div id="recovery-preview" style="background:#f8f5f0;border-radius:8px;padding:1rem;margin-bottom:1rem;max-height:400px;overflow-y:auto;"></div>
-        <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
-          <button onclick="document.getElementById('recovery-modal').classList.remove('open')" style="background:var(--card);border:1px solid var(--border);color:var(--muted);padding:0.5rem 1rem;border-radius:6px;cursor:pointer;font-size:0.85rem;">Cancel</button>
-          <button id="recovery-send-btn" style="background:var(--sage);color:#141210;border:none;padding:0.5rem 1rem;border-radius:6px;cursor:pointer;font-size:0.85rem;font-weight:600;">Send Email</button>
-        </div>
-      </div>
-    </div>
   </div><!-- /tab-website -->
 
   <!-- Macros modal -->
@@ -1448,6 +1394,61 @@
             <tr><td colspan="4" class="loading">No changes detected yet</td></tr>
           </tbody>
         </table>
+      </div>
+    </div>
+    <!-- Abandoned Checkouts -->
+    <div class="chart-card" style="margin-bottom:1.5rem;">
+      <h3>Abandoned Checkouts <span style="font-size:0.65rem;color:var(--dim);font-weight:400;">(from Stripe)</span></h3>
+      <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.75rem;">
+        <select id="ac-days" style="background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.6rem;font-size:0.8rem;">
+          <option value="7" selected>Last 7 days</option>
+          <option value="14">Last 14 days</option>
+          <option value="30">Last 30 days</option>
+        </select>
+        <button id="ac-load-btn" style="background:var(--sage);color:#141210;border:none;padding:0.4rem 0.75rem;border-radius:6px;font-size:0.8rem;font-weight:600;cursor:pointer;">Load</button>
+      </div>
+      <div class="wa-stats" id="ac-stats" style="display:none;margin-bottom:0.75rem;">
+        <div class="wa-stat"><div class="wa-val" id="ac-total">-</div><div class="wa-lbl">Abandoned</div></div>
+        <div class="wa-stat"><div class="wa-val" id="ac-lost-rev">-</div><div class="wa-lbl">Est. Lost Revenue</div></div>
+        <div class="wa-stat"><div class="wa-val" id="ac-contacted">-</div><div class="wa-lbl">Contacted</div></div>
+        <div class="wa-stat"><div class="wa-val" id="ac-recovered">-</div><div class="wa-lbl">Recovered</div></div>
+      </div>
+      <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.5rem;">
+        <label style="font-size:0.8rem;color:var(--muted);display:flex;align-items:center;gap:0.3rem;cursor:pointer;"><input type="checkbox" id="ac-select-all" style="cursor:pointer;"> Select all</label>
+        <button id="ac-send-all-btn" style="display:none;background:var(--sage);color:#141210;border:none;padding:0.35rem 0.75rem;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;">Send All Selected</button>
+        <span id="ac-bulk-status" style="font-size:0.75rem;color:var(--dim);"></span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:30px;"></th>
+              <th>Date</th>
+              <th>Email</th>
+              <th>Name</th>
+              <th>Cart Contents</th>
+              <th style="text-align:right;">Value</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="ac-table">
+            <tr><td colspan="8" class="loading">Click "Load" to fetch abandoned checkouts</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Recovery Email Preview Modal -->
+    <div class="modal-overlay" id="recovery-modal">
+      <div class="modal" style="max-width:620px;">
+        <button class="modal-close" onclick="document.getElementById('recovery-modal').classList.remove('open')">&times;</button>
+        <h2>Recovery Email Preview</h2>
+        <div id="recovery-preview" style="background:#f8f5f0;border-radius:8px;padding:1rem;margin-bottom:1rem;max-height:400px;overflow-y:auto;"></div>
+        <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+          <button onclick="document.getElementById('recovery-modal').classList.remove('open')" style="background:var(--card);border:1px solid var(--border);color:var(--muted);padding:0.5rem 1rem;border-radius:6px;cursor:pointer;font-size:0.85rem;">Cancel</button>
+          <button id="recovery-send-btn" style="background:var(--sage);color:#141210;border:none;padding:0.5rem 1rem;border-radius:6px;cursor:pointer;font-size:0.85rem;font-weight:600;">Send Email</button>
+        </div>
       </div>
     </div>
   </div><!-- /tab-marketing -->

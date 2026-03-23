@@ -6919,6 +6919,11 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
       const value = ac.amount_total ? '$' + (ac.amount_total / 100).toFixed(2) : '-';
       const color = statusColors[ac.status] || 'var(--muted)';
       const canSend = ac.status === 'new' && !ac.later_purchased;
+      const displayStatus = ac.later_purchased ? 'recovered' : ac.status;
+      const sentInfo = ac.status === 'contacted' && ac.contacted_at ? `<br><small style="color:var(--dim);">Sent ${new Date(ac.contacted_at).toLocaleDateString('en-NZ')}${ac.contacted_by ? ' by ' + ac.contacted_by : ''}</small>` : '';
+      const actionCol = canSend
+        ? `<button onclick="previewRecoveryEmail(${idx})" style="background:var(--sage);color:#141210;border:none;padding:0.3rem 0.6rem;border-radius:4px;font-size:0.75rem;font-weight:600;cursor:pointer;white-space:nowrap;">Send Email</button>`
+        : (ac.status === 'contacted' ? '<span style="font-size:0.7rem;color:var(--dim);">✓ Sent</span>' : '');
 
       return `<tr>
         <td>${canSend ? `<input type="checkbox" class="ac-row-check" data-idx="${idx}" style="cursor:pointer;">` : ''}</td>
@@ -6927,8 +6932,8 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
         <td>${ac.name || '-'}</td>
         <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${items}">${items}</td>
         <td style="text-align:right;">${value}</td>
-        <td><span class="ship-status-badge" style="background:${color}22;color:${color};">${ac.later_purchased && ac.status === 'new' ? 'recovered' : ac.status}</span></td>
-        <td>${canSend ? `<button onclick="previewRecoveryEmail(${idx})" style="background:var(--sage);color:#141210;border:none;padding:0.3rem 0.6rem;border-radius:4px;font-size:0.75rem;font-weight:600;cursor:pointer;white-space:nowrap;">Send Email</button>` : ''}</td>
+        <td><span class="ship-status-badge" style="background:${color}22;color:${color};">${displayStatus}</span>${sentInfo}</td>
+        <td>${actionCol}</td>
       </tr>`;
     }).join('');
     updateAcBulkBtn();
@@ -9485,6 +9490,8 @@ async function loadMarketingTab() {
   loadCompetitorsSection();
   // Load changelog
   loadMktChangelog();
+  // Auto-load abandoned checkouts
+  if (typeof loadAbandonedCheckouts === 'function') loadAbandonedCheckouts();
 }
 
 // ── Communications Tab ──
