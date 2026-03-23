@@ -1945,9 +1945,9 @@ function renderHeatmap(orders) {
   container.innerHTML = html + summaryHtml;
 }
 
-// Heatmap mode + range toggles
-document.getElementById('heatmap-mode')?.addEventListener('change', () => renderHeatmap(filteredOrders));
-document.getElementById('heatmap-range')?.addEventListener('change', () => renderHeatmap(filteredOrders));
+// Heatmap mode + range toggles — always use allOrders so heatmap does its own date filtering
+document.getElementById('heatmap-mode')?.addEventListener('change', () => renderHeatmap(allOrders));
+document.getElementById('heatmap-range')?.addEventListener('change', () => renderHeatmap(allOrders));
 
 // ── Shipping status lookup for orders ──
 function getShipStatus(order) {
