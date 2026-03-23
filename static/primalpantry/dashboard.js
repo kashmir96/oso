@@ -1331,25 +1331,49 @@ function renderDailyPace() {
     }
   });
 
-  // Use real hourly adspend if available, otherwise distribute proportionally
-  const adspendByHour = Array(24).fill(0);
+  // Use stored cumulative adspend snapshots for the hourly chart
+  // Each row has the cumulative_spend at that hour — plot directly
+  const cumAdspendByHour = Array(24).fill(null);
   let hasHourlyAdspend = false;
   if (window._adspendHourlyData) {
     const todayData = window._adspendHourlyData.filter(r => r.date === todayStr);
-    todayData.forEach(r => { adspendByHour[r.hour] += Number(r.hourly_spend || 0); });
-    hasHourlyAdspend = todayData.length > 0;
+    if (todayData.length > 0) {
+      hasHourlyAdspend = true;
+      // Aggregate FB + Google cumulative spend per hour
+      const bySrc = {};
+      todayData.forEach(r => {
+        if (!bySrc[r.source]) bySrc[r.source] = {};
+        bySrc[r.source][r.hour] = Number(r.cumulative_spend || 0);
+      });
+      // For each hour up to current, sum all sources' cumulative values
+      for (let h = 0; h <= currentHour; h++) {
+        let total = 0;
+        for (const src of Object.keys(bySrc)) {
+          // Use this hour's value, or carry forward from the last recorded hour
+          let val = bySrc[src][h];
+          if (val === undefined) {
+            for (let ph = h - 1; ph >= 0; ph--) {
+              if (bySrc[src][ph] !== undefined) { val = bySrc[src][ph]; break; }
+            }
+          }
+          total += val || 0;
+        }
+        cumAdspendByHour[h] = total;
+      }
+    }
   }
   if (!hasHourlyAdspend) {
-    // Fallback: distribute proportionally to revenue
-    let totalRevenueToNow = 0;
-    for (let h = 0; h <= currentHour; h++) totalRevenueToNow += todayHourly[h];
+    // Fallback: spread evenly across completed hours
+    const adspendPerHour = currentHour > 0 ? currentAdSpend / (currentHour + 1) : currentAdSpend;
+    let runAds = 0;
     for (let h = 0; h <= currentHour; h++) {
-      adspendByHour[h] = totalRevenueToNow > 0 ? currentAdSpend * (todayHourly[h] / totalRevenueToNow) : currentAdSpend / (currentHour + 1);
+      runAds += adspendPerHour;
+      cumAdspendByHour[h] = runAds;
     }
   }
 
   const labels = [], cumToday = [], cumLastWeek = [], cumTotalCosts = [];
-  let runToday = 0, runLW = 0, runCosts = 0;
+  let runToday = 0, runLW = 0, runCogs = 0;
   for (let h = 0; h < 24; h++) {
     const ampm = h === 0 ? '12am' : h < 12 ? h + 'am' : h === 12 ? '12pm' : (h - 12) + 'pm';
     labels.push(ampm);
@@ -1357,7 +1381,8 @@ function renderDailyPace() {
     cumLastWeek.push(runLW);
     if (h <= currentHour) {
       runToday += todayHourly[h]; cumToday.push(runToday);
-      runCosts += todayCogsHourly[h] + adspendByHour[h]; cumTotalCosts.push(runCosts);
+      runCogs += todayCogsHourly[h];
+      cumTotalCosts.push(runCogs + (cumAdspendByHour[h] || 0));
     } else {
       cumToday.push(null); cumTotalCosts.push(null);
     }
