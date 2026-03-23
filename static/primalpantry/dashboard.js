@@ -1480,17 +1480,83 @@ function renderPaceChart() {
     );
   }
 
+  // Find breakeven point: where revenue crosses total costs
+  let beIdx = -1, beRevenue = 0, beLabel = '';
+  for (let h = 0; h < d.cumToday.length; h++) {
+    const rev = d.cumToday[h];
+    const cost = d.cumTotalCosts[h];
+    if (rev === null || cost === null) continue;
+    if (h > 0 && d.cumToday[h - 1] !== null && d.cumToday[h - 1] <= d.cumTotalCosts[h - 1] && rev >= cost) {
+      beIdx = h; beRevenue = rev; beLabel = d.labels[h]; break;
+    }
+  }
+  // Breakeven dot dataset
+  if (beIdx >= 0) {
+    const beData = Array(24).fill(null);
+    beData[beIdx] = beRevenue;
+    baseDatasets.push({
+      label: 'Breakeven (' + beLabel + ' · $' + beRevenue.toFixed(2) + ')',
+      data: beData,
+      borderColor: '#fff',
+      backgroundColor: '#6B8F5B',
+      pointRadius: 7,
+      pointHoverRadius: 10,
+      pointBorderWidth: 2,
+      pointStyle: 'circle',
+      showLine: false,
+      order: 20,
+    });
+  }
+
+  // Crosshair plugin for breakeven dot hover
+  const crosshairPlugin = {
+    id: 'breakevenCrosshair',
+    afterDraw(chart) {
+      const tooltip = chart.tooltip;
+      if (!tooltip || !tooltip.getActiveElements().length) return;
+      const active = tooltip.getActiveElements();
+      const beDs = chart.data.datasets.findIndex(ds => ds.label && ds.label.startsWith('Breakeven'));
+      if (beDs < 0) return;
+      const isHoveringBe = active.some(a => a.datasetIndex === beDs);
+      if (!isHoveringBe) return;
+      const pt = active.find(a => a.datasetIndex === beDs);
+      if (!pt) return;
+      const { x, y } = pt.element;
+      const ctx = chart.ctx;
+      const { top, bottom, left, right } = chart.chartArea;
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(107,143,91,0.6)';
+      // Vertical line
+      ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bottom); ctx.stroke();
+      // Horizontal line
+      ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(right, y); ctx.stroke();
+      ctx.restore();
+    }
+  };
+
   if (charts.cumRevenue) charts.cumRevenue.destroy();
   charts.cumRevenue = new Chart(document.getElementById('cumulative-revenue-chart'), {
     type: 'line',
     data: { labels: d.labels, datasets: baseDatasets },
+    plugins: [crosshairPlugin],
     options: {
       responsive: true, maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       onClick: () => { window._paceExpanded = !window._paceExpanded; renderPaceChart(); },
       plugins: {
         legend: { labels: { color: '#9c9287', font: { size: 11, family: 'DM Sans' } } },
-        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': $' + (ctx.parsed.y || 0).toFixed(2) } },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              if (ctx.dataset.label && ctx.dataset.label.startsWith('Breakeven')) {
+                return 'Breakeven at ' + d.labels[ctx.dataIndex] + ': $' + (ctx.parsed.y || 0).toFixed(2);
+              }
+              return ctx.dataset.label + ': $' + (ctx.parsed.y || 0).toFixed(2);
+            }
+          }
+        },
       },
       scales: {
         x: { ticks: { color: '#9c9287', maxTicksLimit: 12, font: { size: 10 } }, grid: { display: false } },
