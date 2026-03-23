@@ -678,7 +678,7 @@ async function loadAdSpend() {
     if (el) el.textContent = currentAdSpend > 0 ? '$' + currentAdSpend.toFixed(2) : '—';
     // Load hourly adspend data for pace chart (stored by scheduled function)
     db.from('adspend_hourly').select('date,hour,source,hourly_spend').gte('date', from).lte('date', to).order('date', { ascending: true }).order('hour', { ascending: true })
-      .then(res => { window._adspendHourlyData = res || []; })
+      .then(res => { window._adspendHourlyData = (res && res.data) ? res.data : Array.isArray(res) ? res : []; })
       .catch(() => { window._adspendHourlyData = []; });
 
     // Re-render stats and pace chart with updated adspend
@@ -1350,7 +1350,7 @@ function renderDailyPace() {
   // Each row has the cumulative_spend at that hour — plot directly
   const cumAdspendByHour = Array(24).fill(null);
   let hasHourlyAdspend = false;
-  if (window._adspendHourlyData) {
+  if (window._adspendHourlyData && Array.isArray(window._adspendHourlyData)) {
     const todayData = window._adspendHourlyData.filter(r => r.date === todayStr);
     if (todayData.length > 0) {
       hasHourlyAdspend = true;
