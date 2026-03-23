@@ -3237,7 +3237,7 @@ function refreshMapLayers() {
 
     orderMarkerData.forEach(m => {
       const ratio = m.revenue / globalMax;
-      const radius = 3 + ratio * 18;
+      const radius = Math.max(2, ratio * 20); // pure proportional, min 2px
       const marker = L.circleMarker(m.coords, {
         radius,
         color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.35, weight: 1,
@@ -3261,7 +3261,7 @@ function refreshMapLayers() {
     adMarkerData.forEach(m => {
       const offset = showOrders ? 0.15 : 0;
       const ratio = m.spend / globalMax;
-      const radius = 3 + ratio * 18; // same scale as orders
+      const radius = Math.max(2, ratio * 20); // pure proportional, min 2px
       const marker = L.circleMarker([m.coords[0] + offset, m.coords[1] + offset], {
         radius,
         color: '#E67E22', fillColor: '#E67E22', fillOpacity: 0.3, weight: 2, dashArray: '4 2',
