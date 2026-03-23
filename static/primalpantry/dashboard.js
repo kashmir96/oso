@@ -1319,11 +1319,12 @@ function renderDailyPace() {
     }
   });
 
-  const labels = [], cumToday = [], cumLastWeek = [], cumCogs = [], cumAdspend = [];
-  let runToday = 0, runLW = 0, runCogs = 0;
-  // Spread adspend evenly across completed hours
-  const adspendPerHour = currentHour > 0 ? currentAdSpend / (currentHour + 1) : currentAdSpend;
-  let runAds = 0;
+  // Distribute adspend proportionally to revenue per hour (ads drive sales)
+  let totalRevenueToNow = 0;
+  for (let h = 0; h <= currentHour; h++) totalRevenueToNow += todayHourly[h];
+
+  const labels = [], cumToday = [], cumLastWeek = [], cumTotalCosts = [];
+  let runToday = 0, runLW = 0, runCosts = 0;
   for (let h = 0; h < 24; h++) {
     const ampm = h === 0 ? '12am' : h < 12 ? h + 'am' : h === 12 ? '12pm' : (h - 12) + 'pm';
     labels.push(ampm);
@@ -1331,10 +1332,10 @@ function renderDailyPace() {
     cumLastWeek.push(runLW);
     if (h <= currentHour) {
       runToday += todayHourly[h]; cumToday.push(runToday);
-      runCogs += todayCogsHourly[h]; cumCogs.push(runCogs);
-      runAds += adspendPerHour; cumAdspend.push(runAds);
+      const hourlyAdspend = totalRevenueToNow > 0 ? currentAdSpend * (todayHourly[h] / totalRevenueToNow) : currentAdSpend / (currentHour + 1);
+      runCosts += todayCogsHourly[h] + hourlyAdspend; cumTotalCosts.push(runCosts);
     } else {
-      cumToday.push(null); cumCogs.push(null); cumAdspend.push(null);
+      cumToday.push(null); cumTotalCosts.push(null);
     }
   }
 
@@ -1348,10 +1349,9 @@ function renderDailyPace() {
     data: {
       labels,
       datasets: [
-        { label: lwLabel, data: cumLastWeek, borderColor: 'rgba(156,146,135,0.35)', backgroundColor: 'rgba(156,146,135,0.05)', fill: true, borderWidth: 1.5, borderDash: [4, 3], tension: 0.3, pointRadius: 0, order: 5 },
-        { label: todayLabel, data: cumToday, borderColor: '#8CB47A', backgroundColor: 'rgba(140,180,122,0.12)', fill: true, borderWidth: 2.5, tension: 0.3, pointRadius: 0, pointHitRadius: 8, order: 4 },
-        { label: 'Adspend', data: cumAdspend, borderColor: '#E67E22', backgroundColor: 'rgba(230,126,34,0.18)', fill: true, borderWidth: 2, tension: 0.3, pointRadius: 0, order: 3 },
-        { label: 'COGs', data: cumCogs, borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,0.15)', fill: true, borderWidth: 2, tension: 0.3, pointRadius: 0, order: 2 },
+        { label: lwLabel, data: cumLastWeek, borderColor: 'rgba(156,146,135,0.35)', backgroundColor: 'rgba(156,146,135,0.05)', fill: true, borderWidth: 1.5, borderDash: [4, 3], tension: 0.3, pointRadius: 0, order: 3 },
+        { label: todayLabel + ' Revenue', data: cumToday, borderColor: '#6B8F5B', backgroundColor: 'rgba(107,143,91,0.2)', fill: true, borderWidth: 2.5, tension: 0.3, pointRadius: 0, pointHitRadius: 8, order: 2 },
+        { label: 'Total Costs (COGS + Adspend)', data: cumTotalCosts, borderColor: '#E67E22', backgroundColor: 'rgba(230,126,34,0.35)', fill: true, borderWidth: 2, tension: 0.3, pointRadius: 0, order: 1 },
       ],
     },
     options: {
@@ -1392,15 +1392,20 @@ function renderMonthlyPace() {
     if (d.getFullYear() === prevYear && d.getMonth() === prevMonth) prevDaily[d.getDate() - 1] += Number(o.total_value || 0);
   });
 
-  const labels = [], cumCurrent = [], cumPrev = [], cumCogs = [];
-  let runCurrent = 0, runPrev = 0, runCogs = 0;
+  // Distribute adspend proportionally to daily revenue
+  let totalRevenueToNow = 0;
+  for (let i = 0; i < today; i++) totalRevenueToNow += currentDaily[i];
+
+  const labels = [], cumCurrent = [], cumPrev = [], cumTotalCosts = [];
+  let runCurrent = 0, runPrev = 0, runCosts = 0;
   for (let i = 0; i < daysInMonth; i++) {
     labels.push(i + 1);
     if (i < today) {
       runCurrent += currentDaily[i]; cumCurrent.push(runCurrent);
-      runCogs += cogsDaily[i]; cumCogs.push(runCogs);
+      const dailyAdspend = totalRevenueToNow > 0 ? currentAdSpend * (currentDaily[i] / totalRevenueToNow) : currentAdSpend / today;
+      runCosts += cogsDaily[i] + dailyAdspend; cumTotalCosts.push(runCosts);
     } else {
-      cumCurrent.push(null); cumCogs.push(null);
+      cumCurrent.push(null); cumTotalCosts.push(null);
     }
     if (i < daysInPrevMonth) runPrev += prevDaily[i];
     cumPrev.push(runPrev);
@@ -1416,9 +1421,9 @@ function renderMonthlyPace() {
     data: {
       labels,
       datasets: [
-        { label: prevLabel + ' (pace)', data: cumPrev, borderColor: 'rgba(156,146,135,0.35)', backgroundColor: 'rgba(156,146,135,0.05)', fill: true, borderWidth: 1.5, borderDash: [4, 3], tension: 0.3, pointRadius: 0, order: 4 },
-        { label: currLabel, data: cumCurrent, borderColor: '#8CB47A', backgroundColor: 'rgba(140,180,122,0.12)', fill: true, borderWidth: 2.5, tension: 0.3, pointRadius: 0, pointHitRadius: 8, order: 3 },
-        { label: 'COGs', data: cumCogs, borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,0.15)', fill: true, borderWidth: 2, tension: 0.3, pointRadius: 0, order: 2 },
+        { label: prevLabel + ' (pace)', data: cumPrev, borderColor: 'rgba(156,146,135,0.35)', backgroundColor: 'rgba(156,146,135,0.05)', fill: true, borderWidth: 1.5, borderDash: [4, 3], tension: 0.3, pointRadius: 0, order: 3 },
+        { label: currLabel + ' Revenue', data: cumCurrent, borderColor: '#6B8F5B', backgroundColor: 'rgba(107,143,91,0.2)', fill: true, borderWidth: 2.5, tension: 0.3, pointRadius: 0, pointHitRadius: 8, order: 2 },
+        { label: 'Total Costs (COGS + Adspend)', data: cumTotalCosts, borderColor: '#E67E22', backgroundColor: 'rgba(230,126,34,0.35)', fill: true, borderWidth: 2, tension: 0.3, pointRadius: 0, order: 1 },
       ],
     },
     options: {
@@ -3009,8 +3014,35 @@ const NZ_CITIES = {
 
 let mapInstance = null;
 let heatLayer = null;
+let adspendHeatLayer = null;
+let mapOrderMarkers = [];
+let mapAdMarkers = [];
+let cachedMapOrders = null;
+let cachedAdspendRegions = { facebook: [], google: [] };
+
+// NZ region centroids (Facebook returns region names like "Auckland", "Canterbury", etc.)
+const NZ_REGIONS = {
+  'auckland':[-36.85,174.76],'auckland region':[-36.85,174.76],
+  'canterbury':[-43.53,172.64],'canterbury region':[-43.53,172.64],
+  'wellington':[-41.29,174.78],'wellington region':[-41.29,174.78],
+  'waikato':[-37.79,175.28],'waikato region':[-37.79,175.28],
+  'bay of plenty':[-37.69,176.17],'bay of plenty region':[-37.69,176.17],
+  'otago':[-45.87,170.50],'otago region':[-45.87,170.50],
+  'manawatu-whanganui':[-40.35,175.61],'manawatū-whanganui':[-40.35,175.61],'manawatu-wanganui':[-40.35,175.61],
+  'hawke\'s bay':[-39.49,176.91],'hawkes bay':[-39.49,176.91],'hawke\'s bay region':[-39.49,176.91],
+  'taranaki':[-39.07,174.08],'taranaki region':[-39.07,174.08],
+  'northland':[-35.73,174.32],'northland region':[-35.73,174.32],
+  'southland':[-46.41,168.35],'southland region':[-46.41,168.35],
+  'nelson':[-41.27,173.28],'nelson region':[-41.27,173.28],
+  'marlborough':[-41.51,173.95],'marlborough region':[-41.51,173.95],
+  'gisborne':[-38.66,178.02],'gisborne region':[-38.66,178.02],'gisborne district':[-38.66,178.02],
+  'tasman':[-41.27,172.85],'tasman region':[-41.27,172.85],
+  'west coast':[-42.45,171.21],'west coast region':[-42.45,171.21],
+  'chatham islands':[-43.88,-176.52],
+};
 
 function renderMap(orders) {
+  cachedMapOrders = orders;
   const container = document.getElementById('order-map');
   if (typeof L === 'undefined') {
     container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--dim);font-size:0.85rem;">Loading map...</div>';
@@ -3018,81 +3050,177 @@ function renderMap(orders) {
     return;
   }
 
-  // Count orders per city and get coordinates
-  const cityOrders = {};
-  orders.forEach(o => {
-    const city = (o.city || '').toLowerCase().trim();
-    if (!city) return;
-    if (!cityOrders[city]) cityOrders[city] = { count: 0, revenue: 0, name: o.city };
-    cityOrders[city].count++;
-    cityOrders[city].revenue += Number(o.total_value || 0);
-  });
-
-  // Build heat data points
-  const heatData = [];
-  const markers = [];
-  Object.entries(cityOrders).forEach(([city, data]) => {
-    const coords = NZ_CITIES[city];
-    if (!coords) return;
-    // Add multiple points for intensity
-    for (let i = 0; i < data.count; i++) {
-      heatData.push([coords[0], coords[1], 1]);
-    }
-    markers.push({ coords, ...data });
-  });
-
   if (!mapInstance) {
     mapInstance = L.map('order-map', { scrollWheelZoom: false }).setView([-41.0, 174.0], 5);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       attribution: '',
       maxZoom: 18,
     }).addTo(mapInstance);
+
+    // Wire up filter toggles
+    const layerSel = document.getElementById('map-layer');
+    const srcSel = document.getElementById('map-ad-source');
+    if (layerSel) layerSel.addEventListener('change', () => refreshMapLayers());
+    if (srcSel) srcSel.addEventListener('change', () => refreshMapLayers());
+
+    // Load adspend region data
+    loadAdspendRegions();
   }
 
-  // Remove old heat layer
-  if (heatLayer) mapInstance.removeLayer(heatLayer);
-
-  if (heatData.length > 0) {
-    heatLayer = L.heatLayer(heatData, {
-      radius: 25,
-      blur: 20,
-      maxZoom: 10,
-      gradient: { 0.2: '#3b82f6', 0.4: '#8b5cf6', 0.6: '#ec4899', 0.8: '#f59e0b', 1.0: '#f43f5e' },
-    }).addTo(mapInstance);
-  }
-
-  // Add circle markers with tooltips
-  // Clear old markers
-  mapInstance.eachLayer(l => { if (l instanceof L.CircleMarker) mapInstance.removeLayer(l); });
-  markers.forEach(m => {
-    const marker = L.circleMarker(m.coords, {
-      radius: Math.min(4 + m.count * 2, 20),
-      color: 'var(--blue)',
-      fillColor: '#3b82f6',
-      fillOpacity: 0.6,
-      weight: 1,
-    }).bindTooltip(`<b>${m.name}</b><br>${m.count} orders<br>$${m.revenue.toFixed(2)}<br><i>Click to filter</i>`, { className: '' })
-      .addTo(mapInstance);
-    marker.on('click', () => {
-      const citySelect = document.getElementById('filter-city');
-      // Find matching option (case-insensitive)
-      const match = [...citySelect.options].find(opt => opt.value.toLowerCase() === m.name.toLowerCase());
-      if (match) {
-        citySelect.value = match.value;
-      } else {
-        // Add it if not in dropdown
-        const opt = document.createElement('option');
-        opt.value = m.name;
-        opt.textContent = m.name;
-        citySelect.appendChild(opt);
-        citySelect.value = m.name;
-      }
-      applyFilter();
-    });
-  });
-
-  // Invalidate size in case container was hidden
+  refreshMapLayers();
   setTimeout(() => mapInstance.invalidateSize(), 200);
+}
+
+function loadAdspendRegions() {
+  const tok = localStorage.getItem('pp_token');
+  if (!tok) return;
+  const now = new Date();
+  const nz = new Date(now.toLocaleString('en-US', { timeZone: 'Pacific/Auckland' }));
+  const y = nz.getFullYear(), m = String(nz.getMonth() + 1).padStart(2, '0'), d = String(nz.getDate()).padStart(2, '0');
+  const from = `${y}-${m}-01`;
+  const to = `${y}-${m}-${d}`;
+
+  // Facebook regions
+  fetch(`/.netlify/functions/facebook-campaigns?token=${tok}&from=${from}&to=${to}&geo=region`)
+    .then(r => r.json())
+    .then(data => {
+      cachedAdspendRegions.facebook = data.regions || [];
+      refreshMapLayers();
+    }).catch(() => {});
+
+  // Google regions
+  fetch(`/.netlify/functions/google-ads?token=${tok}&from=${from}&to=${to}&geo=region`)
+    .then(r => r.json())
+    .then(data => {
+      cachedAdspendRegions.google = data.regions || [];
+      refreshMapLayers();
+    }).catch(() => {});
+}
+
+function refreshMapLayers() {
+  if (!mapInstance) return;
+  const layer = (document.getElementById('map-layer') || {}).value || 'both';
+  const adSource = (document.getElementById('map-ad-source') || {}).value || 'all';
+  const showOrders = layer === 'orders' || layer === 'both';
+  const showAds = layer === 'adspend' || layer === 'both';
+
+  // Hide/show ad source dropdown
+  const srcSel = document.getElementById('map-ad-source');
+  if (srcSel) srcSel.style.display = (layer === 'orders') ? 'none' : '';
+
+  // Clear existing layers
+  if (heatLayer) { mapInstance.removeLayer(heatLayer); heatLayer = null; }
+  if (adspendHeatLayer) { mapInstance.removeLayer(adspendHeatLayer); adspendHeatLayer = null; }
+  mapOrderMarkers.forEach(m => mapInstance.removeLayer(m));
+  mapOrderMarkers = [];
+  mapAdMarkers.forEach(m => mapInstance.removeLayer(m));
+  mapAdMarkers = [];
+
+  // ── Orders layer ──
+  if (showOrders && cachedMapOrders) {
+    const cityOrders = {};
+    cachedMapOrders.forEach(o => {
+      const city = (o.city || '').toLowerCase().trim();
+      if (!city) return;
+      if (!cityOrders[city]) cityOrders[city] = { count: 0, revenue: 0, name: o.city };
+      cityOrders[city].count++;
+      cityOrders[city].revenue += Number(o.total_value || 0);
+    });
+
+    const heatData = [];
+    const markers = [];
+    Object.entries(cityOrders).forEach(([city, data]) => {
+      const coords = NZ_CITIES[city];
+      if (!coords) return;
+      for (let i = 0; i < data.count; i++) heatData.push([coords[0], coords[1], 1]);
+      markers.push({ coords, ...data });
+    });
+
+    if (heatData.length > 0) {
+      heatLayer = L.heatLayer(heatData, {
+        radius: 25, blur: 20, maxZoom: 10,
+        gradient: { 0.2: '#3b82f6', 0.4: '#8b5cf6', 0.6: '#ec4899', 0.8: '#f59e0b', 1.0: '#f43f5e' },
+      }).addTo(mapInstance);
+    }
+
+    markers.forEach(m => {
+      const marker = L.circleMarker(m.coords, {
+        radius: Math.min(4 + m.count * 2, 20),
+        color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.6, weight: 1,
+      }).bindTooltip(`<b>${m.name}</b><br>${m.count} orders<br>$${m.revenue.toFixed(2)}<br><i>Click to filter</i>`, { className: '' })
+        .addTo(mapInstance);
+      marker.on('click', () => {
+        const citySelect = document.getElementById('filter-city');
+        const match = [...citySelect.options].find(opt => opt.value.toLowerCase() === m.name.toLowerCase());
+        if (match) { citySelect.value = match.value; } else {
+          const opt = document.createElement('option'); opt.value = m.name; opt.textContent = m.name;
+          citySelect.appendChild(opt); citySelect.value = m.name;
+        }
+        applyFilter();
+      });
+      mapOrderMarkers.push(marker);
+    });
+  }
+
+  // ── Adspend layer ──
+  if (showAds) {
+    // Merge FB + Google by region
+    const regionSpend = {};
+    const addRegions = (regions, source) => {
+      (regions || []).forEach(r => {
+        const key = r.region.toLowerCase().replace(/ region$/i, '').trim();
+        if (!regionSpend[key]) regionSpend[key] = { name: r.region, spend: 0, impressions: 0, clicks: 0, conversions: 0, conversions_value: 0 };
+        regionSpend[key].spend += r.spend;
+        regionSpend[key].impressions += r.impressions;
+        regionSpend[key].clicks += r.clicks;
+        regionSpend[key].conversions += r.conversions;
+        regionSpend[key].conversions_value += r.conversions_value;
+      });
+    };
+
+    if (adSource === 'all' || adSource === 'facebook') addRegions(cachedAdspendRegions.facebook, 'facebook');
+    if (adSource === 'all' || adSource === 'google') addRegions(cachedAdspendRegions.google, 'google');
+
+    const adMarkers = [];
+    Object.entries(regionSpend).forEach(([key, data]) => {
+      // Try matching region coordinates
+      const coords = NZ_REGIONS[key] || NZ_REGIONS[key + ' region'];
+      if (!coords) return;
+      adMarkers.push({ coords, ...data });
+    });
+
+    // Adspend heat layer (orange)
+    const adHeatData = [];
+    adMarkers.forEach(m => {
+      const intensity = Math.max(1, Math.round(m.spend / 5));
+      for (let i = 0; i < intensity; i++) adHeatData.push([m.coords[0], m.coords[1], 1]);
+    });
+
+    if (adHeatData.length > 0) {
+      adspendHeatLayer = L.heatLayer(adHeatData, {
+        radius: 35, blur: 25, maxZoom: 10,
+        gradient: { 0.2: 'rgba(230,126,34,0.3)', 0.4: 'rgba(230,126,34,0.5)', 0.6: '#E67E22', 0.8: '#D35400', 1.0: '#e74c3c' },
+      }).addTo(mapInstance);
+    }
+
+    // Adspend circle markers (orange, offset slightly from order markers)
+    adMarkers.forEach(m => {
+      const offset = showOrders ? 0.15 : 0;
+      const marker = L.circleMarker([m.coords[0] + offset, m.coords[1] + offset], {
+        radius: Math.min(6 + m.spend * 0.8, 28),
+        color: '#E67E22', fillColor: '#E67E22', fillOpacity: 0.5, weight: 2, dashArray: '4 2',
+      }).bindTooltip(
+        `<b>${m.name}</b> <span style="color:#E67E22">● Ad Spend</span><br>` +
+        `Spend: $${m.spend.toFixed(2)}<br>` +
+        `Impressions: ${m.impressions.toLocaleString()}<br>` +
+        `Clicks: ${m.clicks.toLocaleString()}<br>` +
+        `Conversions: ${m.conversions}<br>` +
+        `Conv. Value: $${m.conversions_value.toFixed(2)}`,
+        { className: '' }
+      ).addTo(mapInstance);
+      mapAdMarkers.push(marker);
+    });
+  }
 }
 
 function sum(arr, key) { return arr.reduce((s, o) => s + Number(o[key] || 0), 0); }

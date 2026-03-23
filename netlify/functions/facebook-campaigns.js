@@ -66,7 +66,7 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'GET') return reply(405, { error: 'GET only' });
 
   const qs = event.queryStringParameters || {};
-  const { token, from, to, daily } = qs;
+  const { token, from, to, daily, geo } = qs;
 
   const staff = await getStaffByToken(token);
   if (!staff) return reply(401, { error: 'Unauthorized' });
@@ -84,7 +84,10 @@ exports.handler = async (event) => {
     const timeRange = JSON.stringify({ since: from, until: to });
 
     let url;
-    if (daily) {
+    if (geo === 'region') {
+      // Region-level breakdown (spend, impressions, clicks, conversions by region)
+      url = `https://graph.facebook.com/v21.0/act_${accountId}/insights?time_range=${encodeURIComponent(timeRange)}&breakdowns=region&fields=region,spend,impressions,clicks,actions,action_values&access_token=${accessToken}&limit=500`;
+    } else if (daily) {
       // Daily totals (account level, broken down by day)
       url = `https://graph.facebook.com/v21.0/act_${accountId}/insights?time_range=${encodeURIComponent(timeRange)}&time_increment=1&fields=spend,actions,action_values&access_token=${accessToken}&limit=100`;
     } else {
@@ -107,6 +110,33 @@ exports.handler = async (event) => {
 
       if (json.data) allData = allData.concat(json.data);
       nextUrl = json.paging?.next || null;
+    }
+
+    if (geo === 'region') {
+      const regions = allData.map(d => {
+        const { conversions, conversions_value } = parseActions(d.actions, d.action_values);
+        return {
+          region: d.region || '',
+          spend: Number(d.spend || 0),
+          impressions: Number(d.impressions || 0),
+          clicks: Number(d.clicks || 0),
+          conversions,
+          conversions_value,
+        };
+      });
+      // Aggregate by region (in case of duplicates)
+      const regionMap = {};
+      regions.forEach(r => {
+        if (!r.region) return;
+        if (!regionMap[r.region]) regionMap[r.region] = { region: r.region, spend: 0, impressions: 0, clicks: 0, conversions: 0, conversions_value: 0 };
+        regionMap[r.region].spend += r.spend;
+        regionMap[r.region].impressions += r.impressions;
+        regionMap[r.region].clicks += r.clicks;
+        regionMap[r.region].conversions += r.conversions;
+        regionMap[r.region].conversions_value += r.conversions_value;
+      });
+      const sorted = Object.values(regionMap).sort((a, b) => b.spend - a.spend);
+      return reply(200, { regions: sorted });
     }
 
     if (daily) {

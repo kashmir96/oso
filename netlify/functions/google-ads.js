@@ -96,7 +96,7 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'GET') return reply(405, { error: 'GET only' });
 
   const qs = event.queryStringParameters || {};
-  const { token, from, to, daily } = qs;
+  const { token, from, to, daily, geo } = qs;
 
   const staff = await getStaffByToken(token);
   if (!staff) return reply(401, { error: 'Unauthorized' });
@@ -112,7 +112,9 @@ exports.handler = async (event) => {
 
   try {
     let query;
-    if (daily) {
+    if (geo === 'region') {
+      query = `SELECT geographic_view.country_criterion_id, geographic_view.location_type, segments.geo_target_region, metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions, metrics.conversions_value FROM geographic_view WHERE segments.date BETWEEN '${from}' AND '${to}' AND geographic_view.location_type = 'LOCATION_OF_PRESENCE' ORDER BY metrics.cost_micros DESC`;
+    } else if (daily) {
       query = `SELECT segments.date, metrics.cost_micros, metrics.conversions_value FROM campaign WHERE segments.date BETWEEN '${from}' AND '${to}' AND campaign.status = 'ENABLED' ORDER BY segments.date ASC`;
     } else {
       query = `SELECT campaign.name, campaign.id, campaign.primary_status, campaign.primary_status_reasons, metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions, metrics.conversions_value FROM campaign WHERE segments.date BETWEEN '${from}' AND '${to}' AND campaign.status = 'ENABLED' ORDER BY metrics.cost_micros DESC`;
@@ -141,6 +143,25 @@ exports.handler = async (event) => {
 
     // searchStream returns array of result batches
     const results = Array.isArray(apiData) ? apiData : [apiData];
+
+    if (geo === 'region') {
+      const regionMap = {};
+      for (const batch of results) {
+        for (const row of (batch.results || [])) {
+          const regionName = row.segments?.geoTargetRegion || '';
+          // Extract region name from resource path (e.g. "geoTargetConstants/123" → use raw)
+          const key = regionName || 'Unknown';
+          if (!regionMap[key]) regionMap[key] = { region: key, spend: 0, impressions: 0, clicks: 0, conversions: 0, conversions_value: 0 };
+          regionMap[key].spend += (row.metrics?.costMicros || 0) / 1000000;
+          regionMap[key].impressions += Number(row.metrics?.impressions || 0);
+          regionMap[key].clicks += Number(row.metrics?.clicks || 0);
+          regionMap[key].conversions += Number(row.metrics?.conversions || 0);
+          regionMap[key].conversions_value += Number(row.metrics?.conversionsValue || 0);
+        }
+      }
+      const sorted = Object.values(regionMap).sort((a, b) => b.spend - a.spend);
+      return reply(200, { regions: sorted });
+    }
 
     if (daily) {
       const dailyMap = {};
