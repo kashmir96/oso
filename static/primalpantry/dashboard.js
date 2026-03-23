@@ -10805,11 +10805,8 @@ function expenseDailyEquiv(amount, freq) {
 
 async function loadExpenses() {
   try {
-    const res = await fetch(`${db.supabaseUrl}/rest/v1/expenses?order=category.asc,name.asc&select=*`, {
-      headers: { 'apikey': db.supabaseKey, 'Authorization': `Bearer ${db.supabaseKey}` },
-    });
-    expensesData = await res.json();
-    if (!Array.isArray(expensesData)) expensesData = [];
+    const res = await db.from('expenses').select('*').order('category', { ascending: true });
+    expensesData = Array.isArray(res) ? res : (res?.data || []);
   } catch { expensesData = []; }
   currentMonthlyExpenses = expensesData.reduce((s, e) => s + expenseMonthlyEquiv(Number(e.amount), e.frequency), 0);
   renderExpensesTable();
@@ -10854,11 +10851,7 @@ document.getElementById('expense-save-btn').addEventListener('click', async () =
   const frequency = document.getElementById('expense-frequency').value;
   if (!name || isNaN(amount) || amount <= 0) return;
   try {
-    await fetch(`${db.supabaseUrl}/rest/v1/expenses`, {
-      method: 'POST',
-      headers: { 'apikey': db.supabaseKey, 'Authorization': `Bearer ${db.supabaseKey}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-      body: JSON.stringify({ name, category, amount, frequency }),
-    });
+    await db.from('expenses').insert({ name, category, amount, frequency });
     document.getElementById('expense-add-form').style.display = 'none';
     await loadExpenses();
   } catch (e) { console.error('Save expense error:', e); }
@@ -10867,10 +10860,7 @@ document.getElementById('expense-save-btn').addEventListener('click', async () =
 window.deleteExpense = async function(id) {
   if (!confirm('Delete this expense?')) return;
   try {
-    await fetch(`${db.supabaseUrl}/rest/v1/expenses?id=eq.${id}`, {
-      method: 'DELETE',
-      headers: { 'apikey': db.supabaseKey, 'Authorization': `Bearer ${db.supabaseKey}` },
-    });
+    await db.from('expenses').delete().eq('id', id);
     await loadExpenses();
   } catch (e) { console.error('Delete expense error:', e); }
 };
