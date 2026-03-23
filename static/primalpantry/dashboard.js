@@ -6337,10 +6337,13 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     const visitors = data.visitors || 0;
     const bounce = data.bounce_rate || 0;
     const dur = data.avg_duration || 0;
-    const entryPct = visitors > 0 && data.entry_visitors > 0 ? Math.round(data.entry_visitors / visitors * 100) : 0;
     const rev = data.revenue || 0;
-    const totalVisitors = waFmData['Homepage'] ? Math.max(waFmData['Homepage'].visitors, 1) : 1;
-    const convRate = totalVisitors > 0 ? ((waFmData['Purchased'].visitors || 0) / visitors * 100).toFixed(1) : '0.0';
+    // Entry %: share of TOTAL site visitors who entered at this page
+    const totalEntries = ['Homepage', 'Shop Page', 'Product Pages', 'Cart', 'Checkout'].reduce((s, k) => s + ((waFmData[k] && waFmData[k].entry_visitors) || 0), 0) || 1;
+    const entryPct = data.entry_visitors > 0 ? Math.round(data.entry_visitors / totalEntries * 100) : 0;
+    // Conv rate: what % of THIS page's visitors went on to purchase
+    const purchasedCount = (waFmData['Purchased'] && waFmData['Purchased'].visitors) || 0;
+    const convRate = visitors > 0 ? Math.min((purchasedCount / visitors * 100), 100).toFixed(1) : '0.0';
     const convCount = waFmData['Purchased'].visitors || 0;
     const isHighlightRev = waFmMode === 'revenue';
     const clickable = opts.clickable ? ' clickable' : '';
