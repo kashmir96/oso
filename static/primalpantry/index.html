@@ -189,7 +189,7 @@
   <div id="pace-map-row" style="display:grid;grid-template-columns:2fr 1fr;gap:0.75rem;margin-bottom:1.5rem;">
     <div style="display:flex;flex-direction:column;gap:0.75rem;">
       <div class="chart-card" style="flex:1;">
-        <h3>Order Heatmap (Day x Hour) <select id="heatmap-mode" style="float:right;background:var(--bg);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:0.75rem;" onclick="event.stopPropagation()"><option value="orders">Orders</option><option value="revenue">Revenue ($)</option><option value="cpa">CPA ($)</option></select></h3>
+        <h3>Order Heatmap (Day x Hour) <select id="heatmap-range" style="float:right;margin-left:6px;background:var(--bg);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:0.75rem;" onclick="event.stopPropagation()"><option value="7">Last 7 days</option><option value="30">Last 30 days</option></select><select id="heatmap-mode" style="float:right;background:var(--bg);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:0.75rem;" onclick="event.stopPropagation()"><option value="orders">Orders</option><option value="revenue">Revenue ($)</option><option value="cpa">CPA ($)</option></select></h3>
         <div id="heatmap-container"></div>
       </div>
       <div class="chart-card sensitive-chart" id="pace-chart-card" style="flex:1;">

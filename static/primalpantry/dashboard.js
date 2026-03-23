@@ -1404,6 +1404,15 @@ function renderDailyPace() {
     }
   }
 
+  // Store per-hour (non-cumulative) adspend for heatmap CPA
+  const adspendPerHourArr = Array(24).fill(0);
+  for (let h = 0; h < 24; h++) {
+    if (cumAdspendByHour[h] != null) {
+      adspendPerHourArr[h] = h === 0 ? cumAdspendByHour[0] : (cumAdspendByHour[h] - (cumAdspendByHour[h - 1] || 0));
+    }
+  }
+  window._adspendPerHour = adspendPerHourArr;
+
   // Build hourly refunds from Stripe data
   const todayRefundHourly = Array(24).fill(0);
   if (window._stripeRefunds) {
@@ -1823,12 +1832,21 @@ function orderSourcePill(o) {
 // ── Heatmap (Day of week x Hour) ──
 function renderHeatmap(orders) {
   const mode = document.getElementById('heatmap-mode')?.value || 'orders';
+  const rangeDays = Number(document.getElementById('heatmap-range')?.value || 7);
+
+  // Filter orders to heatmap range
+  const now = new Date();
+  const cutoff = new Date(now);
+  cutoff.setDate(cutoff.getDate() - rangeDays);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  const rangeOrders = orders.filter(o => o.order_date >= cutoffStr);
+
   const orderGrid = Array(7).fill(null).map(() => Array(24).fill(0));
   const revGrid = Array(7).fill(null).map(() => Array(24).fill(0));
   const dayOrders = Array(7).fill(0);
   const dayRev = Array(7).fill(0);
 
-  orders.forEach(o => {
+  rangeOrders.forEach(o => {
     const dow = new Date(o.order_date + 'T00:00:00').getDay();
     const h = o.order_hour != null ? o.order_hour : new Date(o.created_at).getHours();
     const val = Number(o.total_value || 0);
@@ -1838,12 +1856,11 @@ function renderHeatmap(orders) {
     dayRev[dow] += val;
   });
 
-  // Blended CPA: total adspend / total orders, applied per-hour
+  // CPA: spread total adspend evenly across 24 hours, then CPA = hourly spend / orders in that hour
   const totalOrders = dayOrders.reduce((s, v) => s + v, 0) || 1;
-  const blendedCPA = totalOrders > 0 ? currentAdSpend / totalOrders : 0;
-  // CPA grid: each cell = blendedCPA if there are orders, else 0
-  const cpaGrid = orderGrid.map(row => row.map(cnt => cnt > 0 ? blendedCPA : 0));
-  const dayCPA = dayOrders.map(cnt => cnt > 0 ? blendedCPA : 0);
+  const hourlySpend = currentAdSpend / 24; // adspend distributed evenly across hours
+  const cpaGrid = orderGrid.map(row => row.map(cnt => cnt > 0 ? hourlySpend / cnt : 0));
+  const dayCPA = dayOrders.map(cnt => cnt > 0 ? currentAdSpend / cnt : 0);
 
   let grid, prefix, suffix, colorBase;
   if (mode === 'revenue') {
