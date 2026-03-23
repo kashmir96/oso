@@ -1856,11 +1856,15 @@ function renderHeatmap(orders) {
     dayRev[dow] += val;
   });
 
-  // CPA: spread total adspend evenly across 24 hours, then CPA = hourly spend / orders in that hour
+  // CPA: use actual per-hour adspend from timeseries data
   const totalOrders = dayOrders.reduce((s, v) => s + v, 0) || 1;
-  const hourlySpend = currentAdSpend / 24; // adspend distributed evenly across hours
-  const cpaGrid = orderGrid.map(row => row.map(cnt => cnt > 0 ? hourlySpend / cnt : 0));
-  const dayCPA = dayOrders.map(cnt => cnt > 0 ? currentAdSpend / cnt : 0);
+  const perHourSpend = window._adspendPerHour || Array(24).fill(currentAdSpend / 24);
+  const cpaGrid = orderGrid.map(row => row.map((cnt, h) => cnt > 0 ? perHourSpend[h] / cnt : 0));
+  const dayCPA = dayOrders.map((cnt, d) => {
+    if (cnt === 0) return 0;
+    const daySpend = orderGrid[d].reduce((s, c, h) => s + (c > 0 ? perHourSpend[h] : 0), 0);
+    return daySpend / cnt;
+  });
 
   let grid, prefix, suffix, colorBase;
   if (mode === 'revenue') {
@@ -1941,8 +1945,9 @@ function renderHeatmap(orders) {
   container.innerHTML = html + summaryHtml;
 }
 
-// Heatmap mode toggle
+// Heatmap mode + range toggles
 document.getElementById('heatmap-mode')?.addEventListener('change', () => renderHeatmap(filteredOrders));
+document.getElementById('heatmap-range')?.addEventListener('change', () => renderHeatmap(filteredOrders));
 
 // ── Shipping status lookup for orders ──
 function getShipStatus(order) {
