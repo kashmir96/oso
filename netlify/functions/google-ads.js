@@ -138,28 +138,63 @@ exports.handler = async (event) => {
     if (!apiRes.ok) {
       console.error('Google Ads API error:', JSON.stringify(apiData));
       const errMsg = apiData.error?.message || `Google Ads API error ${apiRes.status}`;
-      return reply(200, { campaigns: [], error: errMsg });
+      return reply(200, geo === 'region' ? { regions: [], error: errMsg } : { campaigns: [], error: errMsg });
     }
 
     // searchStream returns array of result batches
     const results = Array.isArray(apiData) ? apiData : [apiData];
 
     if (geo === 'region') {
-      const regionMap = {};
+      // Collect geo target resource names and metrics
+      const geoMap = {};
+      const geoIds = new Set();
       for (const batch of results) {
         for (const row of (batch.results || [])) {
-          const regionName = row.segments?.geoTargetRegion || '';
-          // Extract region name from resource path (e.g. "geoTargetConstants/123" → use raw)
-          const key = regionName || 'Unknown';
-          if (!regionMap[key]) regionMap[key] = { region: key, spend: 0, impressions: 0, clicks: 0, conversions: 0, conversions_value: 0 };
-          regionMap[key].spend += (row.metrics?.costMicros || 0) / 1000000;
-          regionMap[key].impressions += Number(row.metrics?.impressions || 0);
-          regionMap[key].clicks += Number(row.metrics?.clicks || 0);
-          regionMap[key].conversions += Number(row.metrics?.conversions || 0);
-          regionMap[key].conversions_value += Number(row.metrics?.conversionsValue || 0);
+          const geoResource = row.segments?.geoTargetRegion || '';
+          if (!geoResource) continue;
+          const geoId = geoResource.replace('geoTargetConstants/', '');
+          geoIds.add(geoId);
+          if (!geoMap[geoId]) geoMap[geoId] = { region: geoId, spend: 0, impressions: 0, clicks: 0, conversions: 0, conversions_value: 0 };
+          geoMap[geoId].spend += (row.metrics?.costMicros || 0) / 1000000;
+          geoMap[geoId].impressions += Number(row.metrics?.impressions || 0);
+          geoMap[geoId].clicks += Number(row.metrics?.clicks || 0);
+          geoMap[geoId].conversions += Number(row.metrics?.conversions || 0);
+          geoMap[geoId].conversions_value += Number(row.metrics?.conversionsValue || 0);
         }
       }
-      const sorted = Object.values(regionMap).sort((a, b) => b.spend - a.spend);
+
+      // Resolve geo IDs to human-readable names
+      if (geoIds.size > 0) {
+        const idList = [...geoIds].join(',');
+        const nameQuery = `SELECT geo_target_constant.resource_name, geo_target_constant.name, geo_target_constant.canonical_name FROM geo_target_constant WHERE geo_target_constant.id IN (${idList})`;
+        try {
+          const nameRes = await fetch(
+            `https://googleads.googleapis.com/v23/customers/${gTokens.ads_customer_id}/googleAds:searchStream`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${gTokens.access_token}`,
+                'developer-token': devToken,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ query: nameQuery }),
+            }
+          );
+          const nameData = await nameRes.json();
+          const nameBatches = Array.isArray(nameData) ? nameData : [nameData];
+          for (const batch of nameBatches) {
+            for (const row of (batch.results || [])) {
+              const id = (row.geoTargetConstant?.resourceName || '').replace('geoTargetConstants/', '');
+              const name = row.geoTargetConstant?.name || row.geoTargetConstant?.canonicalName || id;
+              if (geoMap[id]) geoMap[id].region = name;
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to resolve geo names:', e.message);
+        }
+      }
+
+      const sorted = Object.values(geoMap).sort((a, b) => b.spend - a.spend);
       return reply(200, { regions: sorted });
     }
 
