@@ -1814,12 +1814,38 @@ function orderSourcePill(o) {
 
 // ── Heatmap (Day of week x Hour) ──
 function renderHeatmap(orders) {
-  const grid = Array(7).fill(null).map(() => Array(24).fill(0));
+  const mode = document.getElementById('heatmap-mode')?.value || 'orders';
+  const orderGrid = Array(7).fill(null).map(() => Array(24).fill(0));
+  const revGrid = Array(7).fill(null).map(() => Array(24).fill(0));
+  const dayOrders = Array(7).fill(0);
+  const dayRev = Array(7).fill(0);
+
   orders.forEach(o => {
     const dow = new Date(o.order_date + 'T00:00:00').getDay();
     const h = o.order_hour != null ? o.order_hour : new Date(o.created_at).getHours();
-    grid[dow][h]++;
+    const val = Number(o.total_value || 0);
+    orderGrid[dow][h]++;
+    revGrid[dow][h] += val;
+    dayOrders[dow]++;
+    dayRev[dow] += val;
   });
+
+  // CPA grid: spread adspend evenly across days of week proportional to orders
+  const totalOrders = dayOrders.reduce((s, v) => s + v, 0) || 1;
+  const dayCPA = dayOrders.map(cnt => cnt > 0 ? (currentAdSpend * (cnt / totalOrders)) / cnt : 0);
+
+  let grid, prefix, suffix, colorBase;
+  if (mode === 'revenue') {
+    grid = revGrid;
+    prefix = '$'; suffix = ''; colorBase = '107,143,91';
+  } else if (mode === 'cpa') {
+    // CPA per cell doesn't make sense (need orders per cell), so show day-level CPA in row summary
+    grid = orderGrid; // still show orders in cells
+    prefix = ''; suffix = ''; colorBase = '107,143,91';
+  } else {
+    grid = orderGrid;
+    prefix = ''; suffix = ''; colorBase = '107,143,91';
+  }
 
   const max = Math.max(1, ...grid.flat());
   const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -1829,19 +1855,64 @@ function renderHeatmap(orders) {
   // Header row
   html += '<div></div>';
   for (let h = 0; h < 24; h++) html += `<div class="heatmap-header">${h}</div>`;
+  html += '<div class="heatmap-header" style="font-weight:600;">Total</div>';
 
   for (let d = 0; d < 7; d++) {
     html += `<div class="heatmap-label">${dayLabels[d]}</div>`;
     for (let h = 0; h < 24; h++) {
       const v = grid[d][h];
       const intensity = v / max;
-      const bg = v === 0 ? 'rgba(107,143,91,0.05)' : `rgba(107,143,91,${0.15 + intensity * 0.85})`;
-      html += `<div class="heatmap-cell" style="background:${bg}" title="${dayLabels[d]} ${h}:00 — ${v} orders">${v || ''}</div>`;
+      const bg = v === 0 ? 'rgba(107,143,91,0.05)' : `rgba(${colorBase},${(0.15 + intensity * 0.85).toFixed(2)})`;
+      let display, tooltip;
+      if (mode === 'revenue') {
+        display = v > 0 ? '$' + Math.round(v) : '';
+        tooltip = `${dayLabels[d]} ${h}:00 — $${v.toFixed(2)} revenue`;
+      } else {
+        display = v || '';
+        tooltip = `${dayLabels[d]} ${h}:00 — ${v} orders`;
+      }
+      html += `<div class="heatmap-cell" style="background:${bg}" title="${tooltip}">${display}</div>`;
     }
+    // Row summary
+    let rowSummary;
+    if (mode === 'revenue') {
+      rowSummary = `$${Math.round(dayRev[d])}`;
+    } else if (mode === 'cpa') {
+      rowSummary = dayCPA[d] > 0 ? `$${dayCPA[d].toFixed(2)}` : '—';
+    } else {
+      rowSummary = dayOrders[d] || '';
+    }
+    html += `<div class="heatmap-cell" style="background:rgba(107,143,91,0.15);font-weight:600;font-size:0.6rem;" title="${dayLabels[d]} total">${rowSummary}</div>`;
   }
   html += '</div>';
-  container.innerHTML = html;
+
+  // Day summary bar below
+  let summaryHtml = '<div style="display:flex;gap:0.25rem;margin-top:0.5rem;flex-wrap:wrap;">';
+  for (let d = 0; d < 7; d++) {
+    let val, label;
+    if (mode === 'revenue') {
+      val = `$${Math.round(dayRev[d])}`;
+      label = 'rev';
+    } else if (mode === 'cpa') {
+      val = dayCPA[d] > 0 ? `$${dayCPA[d].toFixed(2)}` : '—';
+      label = 'CPA';
+    } else {
+      val = dayOrders[d];
+      label = 'orders';
+    }
+    summaryHtml += `<div style="flex:1;text-align:center;padding:4px;background:var(--card);border-radius:4px;font-size:0.65rem;">
+      <div style="font-weight:600;color:var(--text);">${dayLabels[d]}</div>
+      <div style="color:var(--green);font-weight:700;">${val}</div>
+      <div style="color:var(--dim);font-size:0.55rem;">${label}</div>
+    </div>`;
+  }
+  summaryHtml += '</div>';
+
+  container.innerHTML = html + summaryHtml;
 }
+
+// Heatmap mode toggle
+document.getElementById('heatmap-mode')?.addEventListener('change', () => renderHeatmap(filteredOrders));
 
 // ── Shipping status lookup for orders ──
 function getShipStatus(order) {
