@@ -627,6 +627,13 @@ function applyFilter() {
     renderShipmentsTable();
   } else if (activeTab === 'manufacturing') {
     loadManufacturingTab();
+  } else if (activeTab === 'marketing') {
+    mktLastDateRange = null; // force reload
+    loadMarketingTab();
+  } else if (activeTab === 'website') {
+    if (typeof loadWebsiteAnalytics === 'function') loadWebsiteAnalytics();
+  } else if (activeTab === 'finance') {
+    if (typeof loadFinanceTab === 'function') loadFinanceTab();
   }
 }
 
