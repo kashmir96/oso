@@ -6238,6 +6238,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
   let waFmMode = 'conversions';
   let waFmData = null;
   let waFmProductsExpanded = false;
+  let waFmProductPages = [];
 
   window.waOpenFunnelModal = async function() {
     const overlay = document.getElementById('wa-fm-overlay');
@@ -6305,10 +6306,29 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
       labels.forEach(lbl => {
         const d = byLabel[lbl] || { visitors: 0, views: 0, avg_duration: 0, bounce_rate: 0, entry_visitors: 0 };
         const g = groups.find(g => g.label === lbl);
-        const rev = g ? groupRev(g.patterns) : 0;
+        let rev = g ? groupRev(g.patterns) : 0;
+        // Cart & Checkout revenue = total purchased revenue (everyone who bought went through these)
+        if (lbl === 'Cart' || lbl === 'Checkout') rev = totalRev;
         waFmData[lbl] = { ...d, revenue: rev };
       });
       waFmData['Purchased'] = { visitors: purchased, views: purchased, avg_duration: 0, bounce_rate: 0, entry_visitors: 0, revenue: totalRev };
+
+      // Store product-level page data for breakdown
+      waFmProductPages = (waTrafficData && waTrafficData.pages || [])
+        .filter(p => {
+          const excludePatterns = ['/', '/shop/', '/shop', '/cart/', '/cart', '/checkout/', '/checkout'];
+          return p.name && !excludePatterns.includes(p.name) && !p.name.startsWith('/pages/') && p.visitors >= 2;
+        })
+        .slice(0, 20)
+        .map(p => ({
+          name: p.name,
+          shortName: p.name.replace(/^\/(shop\/)?/, '').replace(/\/$/, '') || p.name,
+          visitors: p.visitors || 0,
+          views: p.views || 0,
+          bounce_rate: p.bounce_rate || 0,
+          avg_duration: p.avg_duration || 0,
+          revenue: (revMap[p.name] || 0),
+        }));
 
       waFmRender();
     } catch (err) {
@@ -6391,32 +6411,33 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
 
     // Top row: Homepage, Shop, Product Pages
     let productsCard;
-    if (waFmProductsExpanded) {
-      // Expanded: show grid of individual product pages
-      let miniCards = '';
-      const excludePatterns = ['/', '/shop/', '/shop', '/cart/', '/cart', '/checkout/', '/checkout'];
-      const productPages = (waTrafficData && waTrafficData.pages || [])
-        .filter(p => p.name && !excludePatterns.includes(p.name) && !p.name.startsWith('/pages/') && p.visitors >= 2)
-        .slice(0, 10);
+    if (waFmProductsExpanded && waFmProductPages) {
+      // Expanded: radial nucleus layout around the Product Pages card
+      const isRev = waFmMode === 'revenue';
+      const pages = waFmProductPages.slice(0, 12);
+      const maxVisitors = Math.max(...pages.map(p => p.visitors), 1);
 
-      const revMap = waRevMaps ? waRevMaps.pathname || {} : {};
-      productPages.forEach(p => {
-        const rev = revMap[p.name] || 0;
-        const isRev = waFmMode === 'revenue';
-        const shortName = p.name.replace(/^\/(shop\/)?/, '').replace(/\/$/, '') || p.name;
-        miniCards += `<div class="wa-fm-mini-card">
-          <div class="wa-fm-mini-card-title" title="${p.name}">${shortName}</div>
-          <div class="wa-fm-mini-stat">Users: <strong>${fmtNum(p.visitors)}</strong> · Views: ${fmtNum(p.views)}</div>
-          <div class="wa-fm-mini-stat">${isRev ? 'Rev: <strong>' + fmt_money(rev) + '</strong>' : ''}</div>
+      let orbits = '';
+      pages.forEach((p, i) => {
+        const angle = (i / pages.length) * 2 * Math.PI - Math.PI / 2;
+        const radiusX = 180, radiusY = 140;
+        const x = Math.cos(angle) * radiusX;
+        const y = Math.sin(angle) * radiusY;
+        const dotSize = 8 + (p.visitors / maxVisitors) * 20;
+        const stat = isRev ? fmt_money(p.revenue) : fmtNum(p.visitors) + ' users';
+        orbits += `<div class="wa-fm-orbit-dot" style="left:calc(50% + ${x.toFixed(0)}px);top:calc(50% + ${y.toFixed(0)}px);width:${dotSize.toFixed(0)}px;height:${dotSize.toFixed(0)}px;" title="${p.name}\n${p.visitors} users · ${p.bounce_rate}% bounce · ${fmtDuration(p.avg_duration)} avg\nRevenue: ${fmt_money(p.revenue)}">
+          <span class="wa-fm-orbit-label">${p.shortName.length > 18 ? p.shortName.slice(0, 16) + '…' : p.shortName}<br><small>${stat}</small></span>
         </div>`;
       });
 
-      productsCard = `<div style="flex:1;max-width:280px;">
-        ${waFmCard('Product Pages', d['Product Pages'], { clickable: true, onClick: 'waToggleProductBreakdown()' })}
-        <div class="wa-fm-product-expanded">
-          <div class="wa-fm-product-grid">${miniCards}</div>
-          <button class="wa-fm-collapse-btn" onclick="event.stopPropagation();waToggleProductBreakdown()">Collapse</button>
+      productsCard = `<div style="flex:1;min-width:500px;max-width:700px;">
+        <div class="wa-fm-nucleus" style="position:relative;height:380px;">
+          <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:200px;">
+            ${waFmCard('Product Pages', d['Product Pages'], { clickable: true, onClick: 'waToggleProductBreakdown()' })}
+          </div>
+          ${orbits}
         </div>
+        <div style="text-align:center;"><button class="wa-fm-collapse-btn" onclick="event.stopPropagation();waToggleProductBreakdown()" style="margin-top:0.25rem;">Collapse</button></div>
       </div>`;
     } else {
       productsCard = `<div style="flex:1;max-width:280px;">${waFmCard('Product Pages', d['Product Pages'], { clickable: true, onClick: 'waToggleProductBreakdown()' })}</div>`;
