@@ -148,6 +148,7 @@ let ordersPage = 1;
 let customersPage = 1;
 let landingRevPage = 1;
 const PAGE_SIZE = 10;
+const ESHIP_COST_PER_ORDER = 4.00; // avg eShip carrier cost per shipment
 let currentStaff = null;
 let activeTab = 'sales';
 let attributionModel = localStorage.getItem('oso_attr_model') || 'first';
@@ -1065,8 +1066,12 @@ function renderStats(orders, lineItems) {
   const currentRefundTotal = window._stripeRefundTotal || 0;
   const dailyExpenses = expensesData.reduce((s, e) => s + expenseDailyEquiv(Number(e.amount), e.frequency), 0);
   const periodExpenses = dailyExpenses * periodDays;
-  const periodShipping = orders.reduce((s, o) => s + Number(o.shipping_cost || 0), 0);
-  const priorShipping = priorOrders.reduce((s, o) => s + Number(o.shipping_cost || 0), 0);
+  // eShip cost per order (global constant at top of file)
+  const shippedOrders = orders.filter(o => o.fulfillment_status === 'fulfilled' || o.shipping_status === 'shipped' || o.status === 'shipped');
+  const shippedCount = shippedOrders.length || orderCount; // fallback to all orders if status not tracked
+  const periodShipping = shippedCount * ESHIP_COST_PER_ORDER;
+  const priorShippedCount = priorOrders.filter(o => o.fulfillment_status === 'fulfilled' || o.shipping_status === 'shipped' || o.status === 'shipped').length || priorOrderCount;
+  const priorShipping = priorShippedCount * ESHIP_COST_PER_ORDER;
   const avgShipping = orderCount > 0 ? periodShipping / orderCount : 0;
   const profit = revenue - periodCOGS - currentAdSpend - currentRefundTotal - periodExpenses - periodShipping;
   const priorProfit = priorRevenue - priorCOGS - priorShipping;
@@ -1108,8 +1113,8 @@ function renderStats(orders, lineItems) {
     { label: 'Live Visitors', value: '<span id="wa-live-count">-</span>', sub: 'on site now', color: 'var(--cyan)' },
     { label: 'Website Visitors', value: '<span id="wa-visitors-count">-</span>', sub: 'unique visitors', color: 'var(--cyan)' },
     isAvg
-      ? { label: 'Avg Shipping', value: fmt_money(avgShipping), sub: 'shipping cost per order', color: 'var(--purple)' }
-      : { label: 'Shipping', value: fmt_money(periodShipping), sub: orderCount + ' orders shipped', prior: fmtDelta(periodShipping, priorShipping, true), color: 'var(--purple)' },
+      ? { label: 'Avg Shipping', value: fmt_money(ESHIP_COST_PER_ORDER), sub: 'eShip cost per order', color: 'var(--purple)' }
+      : { label: 'eShip Bill', value: fmt_money(periodShipping), sub: shippedCount + ' orders @ $' + ESHIP_COST_PER_ORDER.toFixed(2) + '/ea', prior: fmtDelta(periodShipping, priorShipping, true), color: 'var(--purple)' },
     { label: 'Opex', value: fmt_money(periodExpenses), sub: periodDays === 1 ? '$' + dailyExpenses.toFixed(2) + '/day · $' + currentMonthlyExpenses.toFixed(0) + '/mo' : periodDays + 'd @ $' + dailyExpenses.toFixed(2) + '/day', color: '#E08050' },
     { label: 'Refunds', value: `${fmt_money(refundTotal)} (${refundCount})`, sub: `${refundCount} refund${refundCount !== 1 ? 's' : ''} from Stripe`, color: 'var(--red)' },
   ];
@@ -1351,7 +1356,7 @@ function renderDailyPace() {
       const h = o.created_at ? new Date(o.created_at).getHours() : 0;
       todayHourly[h] += val;
       todayCogsHourly[h] += getOrderCOGS(o.id);
-      todayShippingHourly[h] += Number(o.shipping_cost || 0);
+      todayShippingHourly[h] += ESHIP_COST_PER_ORDER;
     } else if (o.order_date === lastWeekStr) {
       const h = o.created_at ? new Date(o.created_at).getHours() : 0;
       lastWeekHourly[h] += val;
