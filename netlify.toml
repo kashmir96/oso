@@ -36,6 +36,9 @@
 [functions."action-engine"]
   schedule = "0 18 * * *"
 
+[functions."abandoned-cart-auto"]
+  schedule = "0 5 * * *"
+
 # ── Cache headers for dashboard static assets ──
 [[headers]]
   for = "/primalpantry/dashboard.css"
