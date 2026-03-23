@@ -39,6 +39,9 @@
 [functions."abandoned-cart-auto"]
   schedule = "0 5 * * *"
 
+[functions."adspend-hourly-sync"]
+  schedule = "23 * * * *"
+
 # ── Cache headers for dashboard static assets ──
 [[headers]]
   for = "/primalpantry/dashboard.css"

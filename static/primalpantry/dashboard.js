@@ -666,6 +666,11 @@ async function loadAdSpend() {
     // Banner
     const el = document.getElementById('adspend-value');
     if (el) el.textContent = currentAdSpend > 0 ? '$' + currentAdSpend.toFixed(2) : '—';
+    // Load hourly adspend data for pace chart (stored by scheduled function)
+    db.from('adspend_hourly').select('date,hour,source,hourly_spend').gte('date', from).lte('date', to).order('date', { ascending: true }).order('hour', { ascending: true })
+      .then(res => { window._adspendHourlyData = res || []; })
+      .catch(() => { window._adspendHourlyData = []; });
+
     // Re-render stats and pace chart with updated adspend
     applyFilter();
   } catch (e) {
@@ -1326,9 +1331,22 @@ function renderDailyPace() {
     }
   });
 
-  // Distribute adspend proportionally to revenue per hour (ads drive sales)
-  let totalRevenueToNow = 0;
-  for (let h = 0; h <= currentHour; h++) totalRevenueToNow += todayHourly[h];
+  // Use real hourly adspend if available, otherwise distribute proportionally
+  const adspendByHour = Array(24).fill(0);
+  let hasHourlyAdspend = false;
+  if (window._adspendHourlyData) {
+    const todayData = window._adspendHourlyData.filter(r => r.date === todayStr);
+    todayData.forEach(r => { adspendByHour[r.hour] += Number(r.hourly_spend || 0); });
+    hasHourlyAdspend = todayData.length > 0;
+  }
+  if (!hasHourlyAdspend) {
+    // Fallback: distribute proportionally to revenue
+    let totalRevenueToNow = 0;
+    for (let h = 0; h <= currentHour; h++) totalRevenueToNow += todayHourly[h];
+    for (let h = 0; h <= currentHour; h++) {
+      adspendByHour[h] = totalRevenueToNow > 0 ? currentAdSpend * (todayHourly[h] / totalRevenueToNow) : currentAdSpend / (currentHour + 1);
+    }
+  }
 
   const labels = [], cumToday = [], cumLastWeek = [], cumTotalCosts = [];
   let runToday = 0, runLW = 0, runCosts = 0;
@@ -1339,8 +1357,7 @@ function renderDailyPace() {
     cumLastWeek.push(runLW);
     if (h <= currentHour) {
       runToday += todayHourly[h]; cumToday.push(runToday);
-      const hourlyAdspend = totalRevenueToNow > 0 ? currentAdSpend * (todayHourly[h] / totalRevenueToNow) : currentAdSpend / (currentHour + 1);
-      runCosts += todayCogsHourly[h] + hourlyAdspend; cumTotalCosts.push(runCosts);
+      runCosts += todayCogsHourly[h] + adspendByHour[h]; cumTotalCosts.push(runCosts);
     } else {
       cumToday.push(null); cumTotalCosts.push(null);
     }
