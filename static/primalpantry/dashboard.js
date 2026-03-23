@@ -6335,6 +6335,22 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     waFmRender();
   };
 
+  // Event delegation for orbit dot clicks (inline onclick may not work in all browsers)
+  document.getElementById('wa-fm-body').addEventListener('click', function(e) {
+    const dot = e.target.closest('.wa-fm-orbit-dot[data-idx]');
+    if (dot) {
+      e.stopPropagation();
+      waSelectProduct(Number(dot.dataset.idx));
+      return;
+    }
+    const clearBtn = e.target.closest('[data-clear-product]');
+    if (clearBtn) {
+      e.stopPropagation();
+      waFmSelectedProduct = null;
+      waFmRender();
+    }
+  });
+
   window.waOpenFunnelModal = async function() {
     const overlay = document.getElementById('wa-fm-overlay');
     const body = document.getElementById('wa-fm-body');
@@ -6527,7 +6543,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
         const stat = isRev ? fmt_money(p.revenue) : fmtNum(p.visitors) + ' users';
         const selected = waFmSelectedProduct === i;
         const dimmed = waFmSelectedProduct !== null && !selected;
-        orbits += `<div class="wa-fm-orbit-dot${selected ? ' selected' : ''}${dimmed ? ' dimmed' : ''}" onclick="event.stopPropagation();waSelectProduct(${i})" style="left:calc(50% + ${x.toFixed(0)}px);top:calc(50% + ${y.toFixed(0)}px);width:${dotSize.toFixed(0)}px;height:${dotSize.toFixed(0)}px;cursor:pointer;">
+        orbits += `<div class="wa-fm-orbit-dot${selected ? ' selected' : ''}${dimmed ? ' dimmed' : ''}" data-idx="${i}" style="left:calc(50% + ${x.toFixed(0)}px);top:calc(50% + ${y.toFixed(0)}px);width:${dotSize.toFixed(0)}px;height:${dotSize.toFixed(0)}px;cursor:pointer;">
           <span class="wa-fm-orbit-label">${p.shortName.length > 18 ? p.shortName.slice(0, 16) + '…' : p.shortName}<br><small>${stat}</small></span>
         </div>`;
       });
@@ -6538,7 +6554,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
         const convRate = selProduct.visitors > 0 ? ((selProduct.revenue > 0 ? (d['Purchased'].visitors / selProduct.visitors * 100) : 0)).toFixed(1) : '0.0';
         detailCard = `<div class="wa-fm-product-detail" style="margin:0.5rem auto;max-width:400px;">
           <div class="wa-fm-card" style="border-color:var(--green);">
-            <div class="wa-fm-card-title">${selProduct.shortName} <span class="entry-badge" onclick="event.stopPropagation();waSelectProduct(${waFmSelectedProduct})" style="cursor:pointer;font-size:0.6rem;">✕ Clear</span></div>
+            <div class="wa-fm-card-title">${selProduct.shortName} <span class="entry-badge" data-clear-product style="cursor:pointer;font-size:0.6rem;">✕ Clear</span></div>
             <div class="wa-fm-stats" style="grid-template-columns:1fr 1fr 1fr;">
               <div class="wa-fm-stat">Users <span class="wa-fm-stat-val">${fmtNum(selProduct.visitors)}</span></div>
               <div class="wa-fm-stat">Bounce <span class="wa-fm-stat-val">${selProduct.bounce_rate}%</span></div>
@@ -6590,7 +6606,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
 
     // Filter banner
     const filterBanner = selProd
-      ? `<div style="text-align:center;margin:0.5rem 0;"><span class="entry-badge" style="font-size:0.7rem;padding:4px 12px;">Filtering by: ${selProd.shortName} <span onclick="event.stopPropagation();waSelectProduct(${waFmSelectedProduct})" style="cursor:pointer;margin-left:4px;">✕</span></span></div>`
+      ? `<div style="text-align:center;margin:0.5rem 0;"><span class="entry-badge" style="font-size:0.7rem;padding:4px 12px;">Filtering by: ${selProd.shortName} <span data-clear-product style="cursor:pointer;margin-left:4px;">✕</span></span></div>`
       : '';
 
     // Connector: show cart visitors as the convergence
