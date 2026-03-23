@@ -3133,25 +3133,57 @@ function refreshMapLayers() {
   mapAdMarkers.forEach(m => mapInstance.removeLayer(m));
   mapAdMarkers = [];
 
+  // ── Build city→region lookup ──
+  const cityToRegionMap = {};
+  Object.keys(NZ_CITIES).forEach(city => {
+    const cc = NZ_CITIES[city];
+    let bestRegion = '', bestDist = Infinity;
+    Object.entries(NZ_REGIONS).forEach(([rName, rc]) => {
+      if (rName.includes(' region')) return;
+      const d = Math.abs(cc[0] - rc[0]) + Math.abs(cc[1] - rc[1]);
+      if (d < bestDist) { bestDist = d; bestRegion = rName; }
+    });
+    cityToRegionMap[city] = bestRegion;
+  });
+
   // ── Collect all data first to find global max $ for shared scaling ──
   let orderMarkerData = [];
   let adMarkerData = [];
 
   // Orders data
   if (showOrders && cachedMapOrders) {
-    const cityOrders = {};
-    cachedMapOrders.forEach(o => {
-      const city = (o.city || '').toLowerCase().trim();
-      if (!city) return;
-      if (!cityOrders[city]) cityOrders[city] = { count: 0, revenue: 0, name: o.city };
-      cityOrders[city].count++;
-      cityOrders[city].revenue += Number(o.total_value || 0);
-    });
-    Object.entries(cityOrders).forEach(([city, data]) => {
-      const coords = NZ_CITIES[city];
-      if (!coords) return;
-      orderMarkerData.push({ coords, ...data });
-    });
+    if (showAds) {
+      // Aggregate orders to REGION level when comparing with adspend
+      const regionOrders = {};
+      cachedMapOrders.forEach(o => {
+        const city = (o.city || '').toLowerCase().trim();
+        if (!city) return;
+        const region = cityToRegionMap[city] || city;
+        if (!regionOrders[region]) regionOrders[region] = { count: 0, revenue: 0, name: region.charAt(0).toUpperCase() + region.slice(1) };
+        regionOrders[region].count++;
+        regionOrders[region].revenue += Number(o.total_value || 0);
+      });
+      Object.entries(regionOrders).forEach(([region, data]) => {
+        const coords = NZ_REGIONS[region] || NZ_REGIONS[region + ' region'];
+        if (!coords) return;
+        orderMarkerData.push({ coords, ...data });
+      });
+    } else {
+      // City-level detail when orders only
+      const cityOrders = {};
+      cachedMapOrders.forEach(o => {
+        const city = (o.city || '').toLowerCase().trim();
+        if (!city) return;
+        if (!cityOrders[city]) cityOrders[city] = { count: 0, revenue: 0, name: o.city };
+        cityOrders[city].count++;
+        cityOrders[city].revenue += Number(o.total_value || 0);
+      });
+      Object.entries(cityOrders).forEach(([city, data]) => {
+        const coords = NZ_CITIES[city];
+        if (!coords) return;
+        orderMarkerData.push({ coords, ...data });
+      });
+    }
   }
 
   // Adspend data
