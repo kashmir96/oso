@@ -1060,8 +1060,6 @@ function renderStats(orders, lineItems) {
 
   // Profit = Revenue - COGS - Adspend - Refunds - Expenses
   const currentRefundTotal = window._stripeRefundTotal || 0;
-  const [periodFrom, periodTo] = getDateRange();
-  const periodDays = Math.max(1, Math.round((new Date(periodTo) - new Date(periodFrom)) / 86400000) + 1);
   const dailyExpenses = expensesData.reduce((s, e) => s + expenseDailyEquiv(Number(e.amount), e.frequency), 0);
   const periodExpenses = dailyExpenses * periodDays;
   const profit = revenue - periodCOGS - currentAdSpend - currentRefundTotal - periodExpenses;
