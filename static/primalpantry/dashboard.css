@@ -342,7 +342,9 @@
     .comms-dot-wholesaler { background: #9b6fcb !important; }
     .comms-date-group { padding: 0.4rem 0.75rem; font-size: 0.65rem; color: var(--dim); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; background: rgba(0,0,0,0.15); }
     .comms-order-flag { display: inline-block; width: 14px; height: 14px; vertical-align: middle; margin-left: 0.25rem; opacity: 0.7; }
-    .comms-prompt-bubble { background: rgba(220,120,160,0.12); border: 1px solid rgba(220,120,160,0.3); border-radius: 8px; padding: 0.6rem 0.75rem; margin: 0.25rem 0.75rem; cursor: pointer; transition: background 0.15s; }
+    .comms-prompt-bubble { background: rgba(220,120,160,0.12); border: 1px solid rgba(220,120,160,0.3); border-radius: 8px; padding: 0.6rem 0.75rem; margin: 0.25rem 0.75rem; cursor: pointer; transition: background 0.15s; position: relative; }
+    .comms-prompt-dismiss { position: absolute; top: 4px; right: 6px; background: none; border: none; color: #dc78a0; font-size: 1.1rem; cursor: pointer; padding: 0 4px; line-height: 1; opacity: 0.5; transition: opacity 0.15s; }
+    .comms-prompt-dismiss:hover { opacity: 1; }
     .comms-prompt-bubble:hover { background: rgba(220,120,160,0.2); }
     .comms-prompt-from { color: #dc78a0; font-weight: 600; font-size: 0.75rem; }
     .comms-prompt-subject { font-size: 0.8rem; color: var(--text); margin-top: 0.15rem; }

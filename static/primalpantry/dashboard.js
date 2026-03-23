@@ -9934,6 +9934,7 @@ async function renderCommsPrompts() {
   area.innerHTML = commsPrompts.map(p => {
     const fromName = (p.email_from || '').split('<')[0].trim() || 'Unknown';
     return '<div class="comms-prompt-bubble" onclick="openPromptThread(\'' + (p.thread_id || '').replace(/'/g, "\\'") + '\',' + p.id + ')">'
+      + '<button class="comms-prompt-dismiss" onclick="event.stopPropagation();dismissPrompt(' + p.id + ')" title="Dismiss">&times;</button>'
       + '<div class="comms-prompt-from">Prompted by ' + esc(p.from_staff) + '</div>'
       + '<div class="comms-prompt-subject">' + esc(fromName) + ' — ' + esc(p.email_subject || '(no subject)') + '</div>'
       + '<div class="comms-prompt-snippet">' + esc(p.email_snippet || '') + '</div>'
@@ -10184,13 +10185,15 @@ async function checkCommsPrompts() {
         const fromName = (p.email_from || '').split('<')[0].trim() || 'Unknown';
         const div = document.createElement('div');
         div.className = 'claude-msg prompt';
-        div.innerHTML = '<div class="claude-bubble" onclick="handlePromptClick(\'' + (p.thread_id || '').replace(/'/g, "\\'") + '\',' + p.id + ')">'
+        div.innerHTML = '<div class="claude-bubble" style="position:relative;">'
+          + '<button onclick="event.stopPropagation();dismissPromptBubble(' + p.id + ',this)" style="position:absolute;top:4px;right:6px;background:none;border:none;color:#dc78a0;font-size:1.1rem;cursor:pointer;padding:0 4px;line-height:1;" title="Dismiss">&times;</button>'
+          + '<div onclick="handlePromptClick(\'' + (p.thread_id || '').replace(/'/g, "\\'") + '\',' + p.id + ')" style="cursor:pointer;">'
           + '<div class="prompt-label">Email from ' + esc(p.from_staff) + '</div>'
           + '<div class="prompt-subject">' + esc(fromName) + ' — ' + esc(p.email_subject || '(no subject)') + '</div>'
           + '<div style="font-size:0.75rem;color:var(--dim);margin-top:0.15rem;">' + esc((p.email_snippet || '').slice(0, 100)) + '</div>'
           + (p.note ? '<div style="font-size:0.7rem;color:#dc78a0;margin-top:0.2rem;">Note: ' + esc(p.note) + '</div>' : '')
           + '<div style="font-size:0.65rem;color:var(--dim);margin-top:0.25rem;">Click to view</div>'
-          + '</div>';
+          + '</div></div>';
         chatMsgs.appendChild(div);
       }
       chatMsgs.scrollTop = chatMsgs.scrollHeight;
@@ -10205,6 +10208,32 @@ async function checkCommsPrompts() {
     }
   } catch {}
 }
+
+// Dismiss a prompt from the comms tab without opening it
+window.dismissPrompt = function(promptId) {
+  commsApi('dismiss_prompt', { prompt_id: promptId }).catch(() => {});
+  commsPrompts = commsPrompts.filter(p => p.id !== promptId);
+  renderCommsPrompts();
+  // Also remove from chat bubble
+  document.querySelectorAll('.claude-msg.prompt').forEach(el => el.remove());
+  checkPrompts();
+};
+
+// Dismiss a prompt from the chat bubble without opening it
+window.dismissPromptBubble = function(promptId, btn) {
+  commsApi('dismiss_prompt', { prompt_id: promptId }).catch(() => {});
+  // Remove just this bubble
+  const msgEl = btn.closest('.claude-msg');
+  if (msgEl) msgEl.remove();
+  // Update comms prompts too
+  commsPrompts = commsPrompts.filter(p => p.id !== promptId);
+  // Check if any prompts left
+  const remaining = document.querySelectorAll('.claude-msg.prompt');
+  if (remaining.length === 0) {
+    const fab = document.getElementById('claude-fab');
+    if (fab) fab.classList.remove('has-prompts');
+  }
+};
 
 function handlePromptClick(threadId, promptId) {
   // Dismiss prompt
