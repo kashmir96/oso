@@ -1104,6 +1104,9 @@ function renderStats(orders, lineItems) {
   const shopRev = revenue - stripeRev;
 
   // Hourly cost accumulation sparkline for Total Costs
+  const now = new Date();
+  const todayStr = localDateStr(now);
+  const currentHour = now.getHours();
   const costSparkData = [];
   let runCostSpark = 0;
   for (let h = 0; h < 24; h++) {
