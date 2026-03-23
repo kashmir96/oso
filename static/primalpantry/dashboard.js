@@ -3084,17 +3084,19 @@ function loadAdspendRegions() {
   fetch(`/.netlify/functions/facebook-campaigns?token=${tok}&from=${from}&to=${to}&geo=region`)
     .then(r => r.json())
     .then(data => {
+      console.log('[Map] FB region data:', data);
       cachedAdspendRegions.facebook = data.regions || [];
       refreshMapLayers();
-    }).catch(() => {});
+    }).catch(e => console.warn('[Map] FB region fetch failed:', e));
 
   // Google regions
   fetch(`/.netlify/functions/google-ads?token=${tok}&from=${from}&to=${to}&geo=region`)
     .then(r => r.json())
     .then(data => {
+      console.log('[Map] Google region data:', data);
       cachedAdspendRegions.google = data.regions || [];
       refreshMapLayers();
-    }).catch(() => {});
+    }).catch(e => console.warn('[Map] Google region fetch failed:', e));
 }
 
 function refreshMapLayers() {
@@ -3181,11 +3183,18 @@ function refreshMapLayers() {
     if (adSource === 'all' || adSource === 'facebook') addRegions(cachedAdspendRegions.facebook, 'facebook');
     if (adSource === 'all' || adSource === 'google') addRegions(cachedAdspendRegions.google, 'google');
 
+    console.log('[Map] Adspend regions merged:', regionSpend);
+
     const adMarkers = [];
+    // Build a flexible lookup: strip "region", "district", accents
+    const normalise = s => s.toLowerCase().replace(/\s*region$/,'').replace(/\s*district$/,'').replace(/ā/g,'a').replace(/ū/g,'u').replace(/ī/g,'i').replace(/ō/g,'o').replace(/ē/g,'e').trim();
+    const regionLookup = {};
+    Object.keys(NZ_REGIONS).forEach(k => { regionLookup[normalise(k)] = NZ_REGIONS[k]; });
+
     Object.entries(regionSpend).forEach(([key, data]) => {
-      // Try matching region coordinates
-      const coords = NZ_REGIONS[key] || NZ_REGIONS[key + ' region'];
-      if (!coords) return;
+      const norm = normalise(key);
+      const coords = regionLookup[norm];
+      if (!coords) { console.warn('[Map] No coords for region:', key, '(normalised:', norm + ')'); return; }
       adMarkers.push({ coords, ...data });
     });
 

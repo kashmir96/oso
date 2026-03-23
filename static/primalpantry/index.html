@@ -198,20 +198,19 @@
       </div>
     </div>
     <div class="chart-card" style="min-height:0;">
-      <h3>Order Locations
-        <span style="float:right;display:flex;gap:6px;align-items:center;">
-          <select id="map-layer" style="background:var(--bg);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:0.72rem;" onclick="event.stopPropagation()">
-            <option value="orders">Orders Only</option>
-            <option value="both" selected>Orders + Adspend</option>
-            <option value="adspend">Adspend Only</option>
-          </select>
-          <select id="map-ad-source" style="background:var(--bg);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:0.72rem;" onclick="event.stopPropagation()">
-            <option value="all">FB + Google</option>
-            <option value="facebook">Facebook Only</option>
-            <option value="google">Google Only</option>
-          </select>
-        </span>
-      </h3>
+      <h3>Order Locations</h3>
+      <div style="display:flex;gap:6px;margin:-0.5rem 0 0.5rem;justify-content:flex-end;">
+        <select id="map-layer" style="background:var(--bg);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:0.72rem;cursor:pointer;" onclick="event.stopPropagation()">
+          <option value="orders">Orders Only</option>
+          <option value="both" selected>Orders + Adspend</option>
+          <option value="adspend">Adspend Only</option>
+        </select>
+        <select id="map-ad-source" style="background:var(--bg);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:0.72rem;cursor:pointer;" onclick="event.stopPropagation()">
+          <option value="all">FB + Google</option>
+          <option value="facebook">Facebook Only</option>
+          <option value="google">Google Only</option>
+        </select>
+      </div>
       <div id="order-map" style="height:100%;min-height:400px;"></div>
     </div>
   </div>
