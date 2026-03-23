@@ -6363,7 +6363,11 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     const entryPct = data.entry_visitors > 0 ? Math.round(data.entry_visitors / totalEntries * 100) : 0;
     // Conv rate: what % of THIS page's visitors went on to purchase
     const purchasedCount = (waFmData['Purchased'] && waFmData['Purchased'].visitors) || 0;
-    const convRate = visitors > 0 ? Math.min((purchasedCount / visitors * 100), 100).toFixed(1) : '0.0';
+    let convRate = '0.0';
+    if (visitors > 0 && purchasedCount > 0) {
+      const raw = purchasedCount / visitors * 100;
+      convRate = (isFinite(raw) ? Math.min(raw, 100) : 100).toFixed(1);
+    }
     const convCount = waFmData['Purchased'].visitors || 0;
     const isHighlightRev = waFmMode === 'revenue';
     const clickable = opts.clickable ? ' clickable' : '';
