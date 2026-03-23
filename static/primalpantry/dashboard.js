@@ -6187,8 +6187,51 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     } catch {}
   }
 
+  // ── Website Insight AI ──
+  let waInsightLoaded = false;
+  function renderWebsiteInsight(insight) {
+    const body = document.getElementById('wa-insight-body');
+    const time = document.getElementById('wa-insight-time');
+    if (!insight) {
+      body.innerHTML = '<div style="color:var(--dim);font-style:italic;">No website insight yet. Click Refresh to generate one.</div>';
+      time.textContent = '';
+      return;
+    }
+    body.innerHTML = insight.insight_text
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\n/g, '<br>');
+    time.textContent = 'Generated ' + new Date(insight.generated_at).toLocaleDateString('en-NZ', {
+      day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Pacific/Auckland',
+    });
+  }
+  async function refreshWebsiteInsight() {
+    const btn = document.getElementById('wa-refresh-insight');
+    btn.disabled = true; btn.textContent = 'Generating...';
+    document.getElementById('wa-insight-body').innerHTML = '<div class="loading">Generating website insights… this may take 30-60 seconds.</div>';
+    try {
+      const res = await fetch('/.netlify/functions/website-insights?token=' + encodeURIComponent(currentStaff.token) + '&refresh=1');
+      const data = await res.json();
+      if (data.insight) {
+        renderWebsiteInsight({ insight_text: data.insight, generated_at: new Date().toISOString() });
+      } else {
+        document.getElementById('wa-insight-body').innerHTML = '<div style="color:var(--dim);">Insight generated. Reload to view.</div>';
+      }
+    } catch (e) {
+      document.getElementById('wa-insight-body').innerHTML = '<div style="color:var(--red);">Failed: ' + e.message + '</div>';
+    }
+    btn.disabled = false; btn.textContent = 'Refresh';
+  }
+  document.getElementById('wa-refresh-insight')?.addEventListener('click', refreshWebsiteInsight);
+
   async function waLoadDashboard() {
     if (!waSite || !waToken()) return;
+    // Load website insight (once per session)
+    if (!waInsightLoaded) {
+      waInsightLoaded = true;
+      db.from('website_insights').select('*').order('insight_date', { ascending: false }).limit(1)
+        .then(res => { renderWebsiteInsight(res?.data?.[0] || null); })
+        .catch(() => { renderWebsiteInsight(null); });
+    }
     waFunnelData = {}; // Clear cached funnel data on reload
     waFunnelInlineLoaded = false; // Re-fetch inline funnel on next engagement tab view
     Object.keys(waTablePages).forEach(k => { waTablePages[k] = 1; }); // Reset pagination

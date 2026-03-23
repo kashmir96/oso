@@ -42,6 +42,9 @@
 [functions."adspend-hourly-sync"]
   schedule = "23 * * * *"
 
+[functions."website-insights"]
+  schedule = "30 18 * * *"
+
 # ── Cache headers for dashboard static assets ──
 [[headers]]
   for = "/primalpantry/dashboard.css"

@@ -902,6 +902,17 @@
   </div><!-- /tab-manufacturing -->
 
   <div id="tab-website" class="tab-content">
+    <!-- Website AI Insight -->
+    <div class="orders-card" id="wa-insight-card" style="margin-bottom:1rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+        <h3 style="margin:0;">🌐 Website Insights</h3>
+        <div style="display:flex;gap:0.5rem;align-items:center;">
+          <span id="wa-insight-time" style="font-size:0.65rem;color:var(--dim);"></span>
+          <button class="manual-order-btn" id="wa-refresh-insight" style="font-size:0.7rem;padding:3px 10px;">Refresh</button>
+        </div>
+      </div>
+      <div id="wa-insight-body" style="font-size:0.82rem;line-height:1.65;color:var(--muted);"></div>
+    </div>
     <div class="wa-controls">
       <select id="wa-site"><option value="">Loading sites...</option></select>
       <select id="wa-range">
