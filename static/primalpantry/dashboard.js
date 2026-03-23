@@ -649,15 +649,16 @@ async function loadAdSpend() {
     // Period totals from all campaigns
     const gTotalSpend = gCampaigns.reduce((s, c) => s + (c.spend || 0), 0);
     const fbTotalSpend = fbCampaigns.reduce((s, c) => s + (c.spend || 0), 0);
-    currentAdSpend = fbTotalSpend + gTotalSpend;
     currentPaidRev = [...fbCampaigns, ...gCampaigns].reduce((s, c) => s + (c.conversions_value || 0), 0);
     currentPaidConv = [...fbCampaigns, ...gCampaigns].reduce((s, c) => s + (c.conversions || 0), 0);
     currentPaidClicks = [...fbCampaigns, ...gCampaigns].reduce((s, c) => s + (c.clicks || 0), 0);
     currentPaidImpr = [...fbCampaigns, ...gCampaigns].reduce((s, c) => s + (c.impressions || 0), 0);
-    // Banner shows today's spend only
-    const todaySpend = fbTodaySpend + (from === todayStr ? gTotalSpend : 0);
+    // Blended ad spend: FB insights (today) + Google campaigns + FB campaigns (whichever is higher)
+    const todaySpend = fbTodaySpend + gTotalSpend;
+    currentAdSpend = Math.max(todaySpend, fbTotalSpend + gTotalSpend);
+    // Banner
     const el = document.getElementById('adspend-value');
-    if (el) el.textContent = todaySpend > 0 ? '$' + todaySpend.toFixed(2) : '—';
+    if (el) el.textContent = currentAdSpend > 0 ? '$' + currentAdSpend.toFixed(2) : '—';
   } catch (e) {
     currentAdSpend = 0; currentPaidRev = 0; currentPaidConv = 0; currentPaidClicks = 0; currentPaidImpr = 0;
     const el = document.getElementById('adspend-value');
