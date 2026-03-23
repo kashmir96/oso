@@ -678,8 +678,10 @@ async function loadAdSpend() {
     // Banner
     const el = document.getElementById('adspend-value');
     if (el) el.textContent = currentAdSpend > 0 ? '$' + currentAdSpend.toFixed(2) : '—';
-    // Load hourly adspend data for pace chart (stored by scheduled function)
-    db.from('adspend_hourly').select('date,hour,source,hourly_spend').gte('date', from).lte('date', to).order('date', { ascending: true }).order('hour', { ascending: true })
+    // Load hourly adspend data for pace chart + heatmap CPA (load 30 days for heatmap range)
+    const adspendFrom = new Date(); adspendFrom.setDate(adspendFrom.getDate() - 30);
+    const adspendFromStr = adspendFrom.toISOString().slice(0, 10);
+    db.from('adspend_hourly').select('date,hour,source,hourly_spend').gte('date', adspendFromStr).order('date', { ascending: true }).order('hour', { ascending: true })
       .then(res => { window._adspendHourlyData = (res && res.data) ? res.data : Array.isArray(res) ? res : []; })
       .catch(() => { window._adspendHourlyData = []; });
 
@@ -1856,15 +1858,21 @@ function renderHeatmap(orders) {
     dayRev[dow] += val;
   });
 
-  // CPA: use actual per-hour adspend from timeseries data
+  // CPA: aggregate actual hourly adspend (FB + Google) by DOW x hour from adspend_hourly table
   const totalOrders = dayOrders.reduce((s, v) => s + v, 0) || 1;
-  const perHourSpend = window._adspendPerHour || Array(24).fill(currentAdSpend / 24);
-  const cpaGrid = orderGrid.map(row => row.map((cnt, h) => cnt > 0 ? perHourSpend[h] / cnt : 0));
-  const dayCPA = dayOrders.map((cnt, d) => {
-    if (cnt === 0) return 0;
-    const daySpend = orderGrid[d].reduce((s, c, h) => s + (c > 0 ? perHourSpend[h] : 0), 0);
-    return daySpend / cnt;
-  });
+  const spendGrid = Array(7).fill(null).map(() => Array(24).fill(0));
+  const daySpendTotals = Array(7).fill(0);
+  if (window._adspendHourlyData && window._adspendHourlyData.length > 0) {
+    window._adspendHourlyData.forEach(r => {
+      if (r.date < cutoffStr) return; // only within heatmap range
+      const dow = new Date(r.date + 'T00:00:00').getDay();
+      const spend = Number(r.hourly_spend || 0);
+      spendGrid[dow][r.hour] += spend;
+      daySpendTotals[dow] += spend;
+    });
+  }
+  const cpaGrid = orderGrid.map((row, d) => row.map((cnt, h) => cnt > 0 ? spendGrid[d][h] / cnt : 0));
+  const dayCPA = dayOrders.map((cnt, d) => cnt > 0 ? daySpendTotals[d] / cnt : 0);
 
   let grid, prefix, suffix, colorBase;
   if (mode === 'revenue') {
