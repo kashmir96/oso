@@ -56,14 +56,14 @@
       if (el && el.value) lines.push(`Filter ${f.label}: ${el.value}`);
     });
 
-    // Stat cards
-    const statCards = document.querySelectorAll('.stat-card');
+    // All visible stat cards (overview, orders, shipping, marketing, customers, finance)
+    const statCards = document.querySelectorAll('.stat-card, .fin-stat, .wa-stat');
     if (statCards.length) {
-      lines.push('\nSummary stats:');
+      lines.push('\nDashboard stats:');
       statCards.forEach(card => {
-        const label = card.querySelector('.label');
-        const value = card.querySelector('.value');
-        const sub = card.querySelector('.sub');
+        const label = card.querySelector('.label, .fin-lbl, .wa-lbl');
+        const value = card.querySelector('.value, .fin-val, .wa-val');
+        const sub = card.querySelector('.sub, .fin-sub');
         if (label && value) {
           let text = `- ${label.textContent.trim()}: ${value.textContent.trim()}`;
           if (sub) text += ` (${sub.textContent.trim()})`;
@@ -78,16 +78,121 @@
       lines.push(`\nAd Spend Today: ${adSpend.textContent.trim()}`);
     }
 
-    // Website analytics stats (if on that tab)
-    const waStats = document.querySelectorAll('.wa-stat');
-    if (waStats.length) {
-      lines.push('\nWebsite analytics:');
-      waStats.forEach(stat => {
-        const val = stat.querySelector('.wa-val');
-        const lbl = stat.querySelector('.wa-lbl');
-        if (val && lbl) lines.push(`- ${lbl.textContent.trim()}: ${val.textContent.trim()}`);
-      });
-    }
+    // ── Chart data from Chart.js instances ──
+    try {
+      if (typeof charts !== 'undefined') {
+        for (const [name, chart] of Object.entries(charts)) {
+          if (!chart || !chart.data) continue;
+          const labels = chart.data.labels || [];
+          const datasets = chart.data.datasets || [];
+          if (labels.length === 0 && datasets.length === 0) continue;
+          lines.push(`\nChart "${name}":`);
+          datasets.forEach(ds => {
+            const dataStr = (ds.data || []).slice(0, 30).map((v, i) => `${labels[i] || i}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join(', ');
+            lines.push(`  ${ds.label || 'data'}: ${dataStr}`);
+          });
+        }
+      }
+    } catch {}
+
+    // ── Order breakdown data ──
+    try {
+      if (typeof filteredOrders !== 'undefined' && filteredOrders.length > 0) {
+        const orders = filteredOrders;
+        const totalRev = orders.reduce((s, o) => s + Number(o.total_value || 0), 0);
+        const avgAOV = totalRev / orders.length;
+
+        // Revenue by source
+        const bySrc = {};
+        orders.forEach(o => {
+          const src = o.utm_source || 'Direct';
+          bySrc[src] = (bySrc[src] || 0) + Number(o.total_value || 0);
+        });
+        lines.push(`\nRevenue by source: ${Object.entries(bySrc).sort((a,b) => b[1]-a[1]).slice(0,10).map(([k,v]) => `${k}: $${v.toFixed(2)}`).join(', ')}`);
+
+        // Revenue by city
+        const byCity = {};
+        orders.forEach(o => {
+          const city = o.city || 'Unknown';
+          byCity[city] = (byCity[city] || 0) + Number(o.total_value || 0);
+        });
+        lines.push(`Revenue by city: ${Object.entries(byCity).sort((a,b) => b[1]-a[1]).slice(0,10).map(([k,v]) => `${k}: $${v.toFixed(2)}`).join(', ')}`);
+
+        // Orders by hour (today)
+        const byHour = Array(24).fill(0);
+        const today = new Date().toISOString().slice(0, 10);
+        orders.forEach(o => {
+          if (o.created_at && o.order_date === today) {
+            byHour[new Date(o.created_at).getHours()]++;
+          }
+        });
+        const hourStr = byHour.map((c, h) => c > 0 ? `${h}:00=${c}` : '').filter(Boolean).join(', ');
+        if (hourStr) lines.push(`Orders by hour today: ${hourStr}`);
+
+        // Product breakdown
+        if (typeof allLineItems !== 'undefined') {
+          const orderIds = new Set(orders.map(o => o.id));
+          const items = allLineItems.filter(li => orderIds.has(li.order_id));
+          const byProduct = {};
+          items.forEach(li => {
+            const name = li.description || li.sku || 'Unknown';
+            byProduct[name] = (byProduct[name] || 0) + (li.quantity || 1);
+          });
+          lines.push(`Top products: ${Object.entries(byProduct).sort((a,b) => b[1]-a[1]).slice(0,10).map(([k,v]) => `${k}: ${v} sold`).join(', ')}`);
+        }
+
+        // New vs returning
+        const emailCounts = {};
+        if (typeof allOrders !== 'undefined') {
+          allOrders.forEach(o => { emailCounts[o.email] = (emailCounts[o.email] || 0) + 1; });
+        }
+        const newCust = orders.filter(o => emailCounts[o.email] === 1).length;
+        const retCust = orders.length - newCust;
+        lines.push(`New customers: ${newCust}, Returning: ${retCust}`);
+      }
+    } catch {}
+
+    // ── Shipping stats ──
+    try {
+      if (typeof allShipments !== 'undefined' && allShipments.length > 0) {
+        const statusCounts = {};
+        allShipments.forEach(s => { statusCounts[s._shipping_status] = (statusCounts[s._shipping_status] || 0) + 1; });
+        lines.push(`\nShipping: ${Object.entries(statusCounts).map(([k,v]) => `${k}: ${v}`).join(', ')}`);
+      }
+    } catch {}
+
+    // ── Marketing campaigns ──
+    try {
+      if (typeof mktAllCampaigns !== 'undefined' && mktAllCampaigns.length > 0) {
+        lines.push(`\nMarketing campaigns: ${mktAllCampaigns.length} total`);
+        mktAllCampaigns.slice(0, 10).forEach(c => {
+          lines.push(`  ${c.name}: spend $${(c.spend || 0).toFixed(2)}, clicks ${c.clicks || 0}, conv ${c.conversions || 0}, ROAS ${c.roas || '-'}`);
+        });
+      }
+    } catch {}
+
+    // ── All visible tables (scrape any table on the active tab) ──
+    try {
+      const activeTab = document.querySelector('.tab-content.active');
+      if (activeTab) {
+        activeTab.querySelectorAll('table').forEach((table, idx) => {
+          const caption = table.querySelector('h3, caption');
+          const thead = table.querySelector('thead');
+          const tbody = table.querySelector('tbody');
+          if (!tbody || !tbody.querySelectorAll('tr').length) return;
+          const headers = thead ? Array.from(thead.querySelectorAll('th')).map(th => th.textContent.trim()) : [];
+          const rows = Array.from(tbody.querySelectorAll('tr')).slice(0, 15);
+          if (rows.length === 0) return;
+          const title = caption ? caption.textContent.trim() : `Table ${idx + 1}`;
+          lines.push(`\n${title}:`);
+          if (headers.length) lines.push(`  ${headers.join(' | ')}`);
+          rows.forEach(tr => {
+            const cells = Array.from(tr.querySelectorAll('td')).map(td => td.textContent.trim());
+            if (cells.length) lines.push(`  ${cells.join(' | ')}`);
+          });
+        });
+      }
+    } catch {}
 
     return lines.join('\n');
   }
