@@ -846,6 +846,23 @@
     </div>
 
     <div id="wa-funnel-viz" class="wa-panel" style="margin-bottom:1rem;padding:1rem;"></div>
+    <div style="text-align:center;margin:-0.5rem 0 1rem;"><button class="wa-view-btn" onclick="waOpenFunnelModal()" style="font-size:0.7rem;padding:0.3rem 1rem;">Full Visualisation</button></div>
+
+    <!-- Funnel visualisation modal -->
+    <div class="wa-fm-overlay" id="wa-fm-overlay" onclick="if(event.target===this)waCloseFunnelModal()">
+      <div class="wa-fm-modal">
+        <div class="wa-fm-header">
+          <h2>Traffic Flow Visualisation</h2>
+          <div class="wa-fm-toggle">
+            <button class="wa-fm-toggle-btn active" id="wa-fm-tog-conv" onclick="waFunnelToggle('conversions')">Users / Conversions</button>
+            <button class="wa-fm-toggle-btn" id="wa-fm-tog-rev" onclick="waFunnelToggle('revenue')">Users / Revenue</button>
+          </div>
+          <button class="modal-close" onclick="waCloseFunnelModal()">&times;</button>
+        </div>
+        <div id="wa-fm-body" class="wa-fm-body"><div class="wa-loading">Loading funnel data...</div></div>
+      </div>
+    </div>
+
     <div id="wa-abandonment-stats" class="wa-stats" style="margin-bottom:1rem;display:none;">
       <div class="wa-stat"><div class="wa-val" id="wa-browse-abandon">-</div><div class="wa-lbl">Browse Abandons</div></div>
       <div class="wa-stat"><div class="wa-val" id="wa-cart-abandon">-</div><div class="wa-lbl">Cart Abandons</div></div>

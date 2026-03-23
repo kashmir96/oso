@@ -648,6 +648,56 @@
       .line-item-row { flex-wrap: wrap; }
     }
 
+    /* Funnel modal */
+    .wa-fm-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 200; align-items: flex-start; justify-content: center; overflow-y: auto; padding: 2rem 1rem; }
+    .wa-fm-overlay.open { display: flex; }
+    .wa-fm-modal { background: var(--card); border-radius: 12px; max-width: 1000px; width: 100%; max-height: none; box-shadow: 0 24px 48px rgba(0,0,0,0.3); border: 1px solid var(--border); }
+    .wa-fm-header { display: flex; align-items: center; gap: 1rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+    .wa-fm-header h2 { font-size: 1rem; margin: 0; color: var(--text); flex: 1; }
+    .wa-fm-toggle { display: flex; gap: 0; }
+    .wa-fm-toggle-btn { background: var(--bg); border: 1px solid var(--border); padding: 0.3rem 0.75rem; font-size: 0.7rem; font-weight: 600; color: var(--muted); cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.2s; }
+    .wa-fm-toggle-btn:first-child { border-radius: 6px 0 0 6px; }
+    .wa-fm-toggle-btn:last-child { border-radius: 0 6px 6px 0; border-left: none; }
+    .wa-fm-toggle-btn.active { background: var(--sage); color: #fff; border-color: var(--sage); }
+    .wa-fm-body { padding: 1.5rem 1.25rem; }
+
+    /* Hub and spoke layout */
+    .wa-fm-top-row { display: flex; gap: 0.75rem; justify-content: center; margin-bottom: 0; }
+    .wa-fm-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem; min-width: 180px; flex: 1; max-width: 280px; transition: all 0.2s; }
+    .wa-fm-card:hover { border-color: var(--sage); }
+    .wa-fm-card.clickable { cursor: pointer; }
+    .wa-fm-card-title { font-size: 0.8rem; font-weight: 700; color: var(--text); margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem; }
+    .wa-fm-card-title .entry-badge { font-size: 0.6rem; font-weight: 600; background: rgba(140,180,122,0.15); color: var(--sage); padding: 0.1rem 0.4rem; border-radius: 4px; }
+    .wa-fm-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem 0.75rem; }
+    .wa-fm-stat { font-size: 0.7rem; color: var(--dim); }
+    .wa-fm-stat-val { font-weight: 700; color: var(--text); }
+    .wa-fm-stat-val.highlight { color: var(--sage); font-size: 0.85rem; }
+
+    /* Connectors */
+    .wa-fm-connectors { display: flex; justify-content: center; position: relative; height: 50px; margin: 0; }
+    .wa-fm-conn-line { position: absolute; border-left: 2px dotted var(--border); height: 100%; }
+    .wa-fm-conn-label { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); font-size: 0.65rem; color: var(--dim); background: var(--card); padding: 0 0.4rem; white-space: nowrap; }
+    .wa-fm-center-connector { display: flex; flex-direction: column; align-items: center; padding: 0.25rem 0; }
+    .wa-fm-vline { border-left: 2px dotted var(--border); height: 36px; }
+    .wa-fm-vline-label { font-size: 0.65rem; color: var(--dim); margin: 0.15rem 0; white-space: nowrap; }
+    .wa-fm-center { display: flex; justify-content: center; }
+    .wa-fm-card.center-card { max-width: 320px; border-color: var(--sage); border-width: 2px; }
+
+    /* Product drill-down */
+    .wa-fm-product-expanded { margin-top: 0.5rem; }
+    .wa-fm-product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0.5rem; margin-top: 0.5rem; }
+    .wa-fm-mini-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem; font-size: 0.7rem; }
+    .wa-fm-mini-card-title { font-weight: 600; color: var(--text); font-size: 0.7rem; margin-bottom: 0.3rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .wa-fm-mini-stat { color: var(--dim); font-size: 0.65rem; }
+    .wa-fm-collapse-btn { background: none; border: 1px solid var(--border); border-radius: 6px; padding: 0.2rem 0.6rem; font-size: 0.65rem; color: var(--dim); cursor: pointer; margin-top: 0.5rem; }
+    .wa-fm-collapse-btn:hover { border-color: var(--sage); color: var(--sage); }
+
+    @media (max-width: 700px) {
+      .wa-fm-top-row { flex-direction: column; align-items: center; }
+      .wa-fm-card { max-width: 100%; }
+      .wa-fm-connectors { height: 30px; }
+    }
+
     /* Claude Chat Widget */
     .claude-fab { position: fixed; bottom: 1.5rem; right: 1.5rem; width: 52px; height: 52px; border-radius: 50%; background: var(--sage); border: none; cursor: pointer; z-index: 200; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(0,0,0,0.3); transition: transform 0.15s, box-shadow 0.15s; }
     .claude-fab:hover { transform: scale(1.08); box-shadow: 0 6px 24px rgba(0,0,0,0.4); }

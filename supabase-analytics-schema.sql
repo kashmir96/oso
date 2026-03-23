@@ -417,6 +417,60 @@ RETURNS json AS $$
   ) v;
 $$ LANGUAGE sql STABLE;
 
+-- Page funnel: per-page-group stats (visitors, views, avg duration, bounce rate, entry count)
+-- Accepts a JSON array of {label, patterns} where patterns is an array of pathname LIKE patterns
+-- e.g. [{"label":"Homepage","patterns":["/"]}]
+DROP FUNCTION IF EXISTS analytics_page_funnel(text, timestamptz, timestamptz, json, json);
+CREATE OR REPLACE FUNCTION analytics_page_funnel(p_site text, p_from timestamptz, p_to timestamptz, p_groups json, p_filters json DEFAULT NULL)
+RETURNS json AS $$
+DECLARE
+  result json;
+  fc text;
+BEGIN
+  fc := _analytics_filter_clause(p_filters, p_site, p_from, p_to);
+  EXECUTE format(
+    'WITH groups AS (
+      SELECT g->>''label'' AS label, g->''patterns'' AS patterns
+      FROM json_array_elements($4) g
+    ),
+    base AS (
+      SELECT pv.visitor_hash, pv.pathname, pv.duration, pv.entry_page,
+        (SELECT COUNT(*) FROM analytics_pageviews pv2
+         WHERE pv2.visitor_hash = pv.visitor_hash
+           AND pv2.site_id = $1 AND pv2.created_at >= $2 AND pv2.created_at < $3) AS session_pages
+      FROM analytics_pageviews pv
+      WHERE pv.site_id = $1 AND pv.created_at >= $2 AND pv.created_at < $3 %s
+    ),
+    matched AS (
+      SELECT g.label, b.*
+      FROM base b
+      JOIN groups g ON EXISTS (
+        SELECT 1 FROM json_array_elements_text(g.patterns) p
+        WHERE b.pathname LIKE p
+      )
+    )
+    SELECT COALESCE(json_agg(row_to_json(t)), ''[]''::json) FROM (
+      SELECT
+        label,
+        COUNT(DISTINCT visitor_hash) AS visitors,
+        COUNT(*) AS views,
+        COALESCE(ROUND(AVG(NULLIF(duration, 0))), 0) AS avg_duration,
+        CASE WHEN COUNT(DISTINCT visitor_hash) = 0 THEN 0
+          ELSE ROUND(
+            COUNT(DISTINCT CASE WHEN session_pages = 1 THEN visitor_hash END)::numeric
+            / COUNT(DISTINCT visitor_hash) * 100, 1
+          )
+        END AS bounce_rate,
+        COUNT(DISTINCT CASE WHEN entry_page THEN visitor_hash END) AS entry_visitors
+      FROM matched
+      GROUP BY label
+    ) t', fc)
+  USING p_site, p_from, p_to, p_groups
+  INTO result;
+  RETURN result;
+END;
+$$ LANGUAGE plpgsql STABLE;
+
 -- Conversion funnels: for visitors who triggered 'checkout completed' event,
 -- show entry page → last product page before conversion
 CREATE OR REPLACE FUNCTION analytics_conversions(p_site text, p_from timestamptz, p_to timestamptz, p_thank_you text DEFAULT '/pages/thank-you/')

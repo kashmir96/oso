@@ -196,6 +196,12 @@ exports.handler = async (event) => {
         return reply(200, data);
       }
 
+      case 'page_funnel': {
+        const groups = qs.groups ? JSON.parse(qs.groups) : [];
+        const data = await callRpc('analytics_page_funnel', { ...baseParams, p_groups: groups });
+        return reply(200, data);
+      }
+
       default:
         return reply(400, { error: 'Unknown metric' });
     }
