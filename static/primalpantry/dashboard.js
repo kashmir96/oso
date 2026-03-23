@@ -3072,36 +3072,49 @@ function renderMap(orders) {
 }
 
 function loadAdspendRegions() {
-  if (!currentStaff || !currentStaff.token) { console.warn('[Map] No staff token, skipping adspend regions'); return; }
+  if (!currentStaff || !currentStaff.token) return;
   const tok = encodeURIComponent(currentStaff.token);
-  const now = new Date();
-  const nz = new Date(now.toLocaleString('en-US', { timeZone: 'Pacific/Auckland' }));
-  const y = nz.getFullYear(), m = String(nz.getMonth() + 1).padStart(2, '0'), d = String(nz.getDate()).padStart(2, '0');
-  const from = `${y}-${m}-01`;
-  const to = `${y}-${m}-${d}`;
+  // Use same date range as dashboard filters
+  const [from, to] = getDateRange();
 
   // Facebook regions
   fetch(`/.netlify/functions/facebook-campaigns?token=${tok}&from=${from}&to=${to}&geo=region`)
     .then(r => r.json())
     .then(data => {
-      console.log('[Map] FB region data:', data);
       cachedAdspendRegions.facebook = data.regions || [];
       refreshMapLayers();
-    }).catch(e => console.warn('[Map] FB region fetch failed:', e));
+    }).catch(() => {});
 
   // Google regions
   fetch(`/.netlify/functions/google-ads?token=${tok}&from=${from}&to=${to}&geo=region`)
     .then(r => r.json())
     .then(data => {
-      console.log('[Map] Google region data:', data);
-      cachedAdspendRegions.google = data.regions || [];
+      // Google returns city/region names — aggregate into NZ regions
+      const regionAgg = {};
+      (data.regions || []).forEach(r => {
+        // Try to match to a known NZ region
+        const norm = r.region.toLowerCase().replace(/ region$/i,'').replace(/ district$/i,'').replace(/ā/g,'a').replace(/ū/g,'u').replace(/ī/g,'i').replace(/ō/g,'o').replace(/ē/g,'e').trim();
+        // Check if it's a known region
+        let matched = null;
+        for (const rk of Object.keys(NZ_REGIONS)) {
+          const rkNorm = rk.replace(/ region$/,'');
+          if (norm === rkNorm) { matched = rkNorm; break; }
+        }
+        if (!matched) return; // skip non-region entries (cities etc)
+        if (!regionAgg[matched]) regionAgg[matched] = { region: matched, spend: 0, impressions: 0, clicks: 0, conversions: 0, conversions_value: 0 };
+        regionAgg[matched].spend += r.spend;
+        regionAgg[matched].impressions += r.impressions;
+        regionAgg[matched].clicks += r.clicks;
+        regionAgg[matched].conversions += r.conversions;
+        regionAgg[matched].conversions_value += r.conversions_value;
+      });
+      cachedAdspendRegions.google = Object.values(regionAgg);
       refreshMapLayers();
-    }).catch(e => console.warn('[Map] Google region fetch failed:', e));
+    }).catch(() => {});
 }
 
 window.refreshMapLayers = refreshMapLayers;
 function refreshMapLayers() {
-  console.log('[Map] refreshMapLayers called, mapInstance:', !!mapInstance);
   if (!mapInstance) return;
   const layer = (document.getElementById('map-layer') || {}).value || 'both';
   const adSource = (document.getElementById('map-ad-source') || {}).value || 'all';
@@ -3185,10 +3198,7 @@ function refreshMapLayers() {
     if (adSource === 'all' || adSource === 'facebook') addRegions(cachedAdspendRegions.facebook, 'facebook');
     if (adSource === 'all' || adSource === 'google') addRegions(cachedAdspendRegions.google, 'google');
 
-    console.log('[Map] Adspend regions merged:', regionSpend);
-
     const adMarkers = [];
-    // Build a flexible lookup: strip "region", "district", accents
     const normalise = s => s.toLowerCase().replace(/\s*region$/,'').replace(/\s*district$/,'').replace(/ā/g,'a').replace(/ū/g,'u').replace(/ī/g,'i').replace(/ō/g,'o').replace(/ē/g,'e').trim();
     const regionLookup = {};
     Object.keys(NZ_REGIONS).forEach(k => { regionLookup[normalise(k)] = NZ_REGIONS[k]; });
@@ -3196,31 +3206,18 @@ function refreshMapLayers() {
     Object.entries(regionSpend).forEach(([key, data]) => {
       const norm = normalise(key);
       const coords = regionLookup[norm];
-      if (!coords) { console.warn('[Map] No coords for region:', key, '(normalised:', norm + ')'); return; }
+      if (!coords) return;
       adMarkers.push({ coords, ...data });
     });
 
-    // Adspend heat layer (orange, intensity relative to spend)
-    const adHeatData = [];
-    const maxAdSpend = Math.max(...adMarkers.map(m => m.spend), 1);
-    adMarkers.forEach(m => {
-      const intensity = Math.max(1, Math.round((m.spend / maxAdSpend) * 10));
-      for (let i = 0; i < intensity; i++) adHeatData.push([m.coords[0], m.coords[1], 1]);
-    });
-
-    if (adHeatData.length > 0) {
-      adspendHeatLayer = L.heatLayer(adHeatData, {
-        radius: 35, blur: 25, maxZoom: 10,
-        gradient: { 0.2: 'rgba(230,126,34,0.3)', 0.4: 'rgba(230,126,34,0.5)', 0.6: '#E67E22', 0.8: '#D35400', 1.0: '#e74c3c' },
-      }).addTo(mapInstance);
-    }
+    // No heat layer for adspend — just circle markers (cleaner)
 
     // Adspend circle markers (orange, sized relative to spend)
     const maxSpend = Math.max(...adMarkers.map(m => m.spend), 1);
     adMarkers.forEach(m => {
       const offset = showOrders ? 0.15 : 0;
-      const ratio = m.spend / maxSpend; // 0-1 relative to highest spend region
-      const radius = 4 + ratio * 20; // 4px min, 24px max
+      const ratio = m.spend / maxSpend;
+      const radius = 3 + ratio * 14; // 3px min, 17px max — smaller than order circles
       const marker = L.circleMarker([m.coords[0] + offset, m.coords[1] + offset], {
         radius,
         color: '#E67E22', fillColor: '#E67E22', fillOpacity: 0.3, weight: 2, dashArray: '4 2',
