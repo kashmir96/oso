@@ -3092,6 +3092,7 @@ function loadAdspendRegions() {
     }).catch(e => console.warn('[Map] Google region fetch failed:', e));
 }
 
+window.refreshMapLayers = refreshMapLayers;
 function refreshMapLayers() {
   console.log('[Map] refreshMapLayers called, mapInstance:', !!mapInstance);
   if (!mapInstance) return;
