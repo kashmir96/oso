@@ -235,6 +235,10 @@ Key database tables:
 - competitors: id, name, url, active
 - competitor_snapshots: id, competitor_id, checked_at, product_count, price_range
 - staff: id, username, display_name, role (no passwords/tokens)
+- action_alerts: id, rule_key, category, priority, title, detail, context, status, created_at
+- action_daily_summary: id, summary_date, summary_type, summary_text, generated_at
+- expenses: id, name, category, amount, frequency, created_at
+- adspend_hourly: id, date, hour, source, cumulative_spend, hourly_spend
 
 Guidelines:
 - Be concise and direct. Lead with insights, not fluff.

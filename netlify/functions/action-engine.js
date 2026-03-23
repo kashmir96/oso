@@ -86,8 +86,38 @@ async function loadRecentAlerts() {
 
 async function loadOrders(days = 30) {
   const from = getNZDate(days);
-  const res = await sbFetch(`/rest/v1/orders?order_date=gte.${from}&select=id,order_date,total_value,email,utm_source,utm_campaign,utm_content,status,created_at&order=order_date.desc`);
+  const res = await sbFetch(`/rest/v1/orders?order_date=gte.${from}&select=id,order_date,total_value,email,utm_source,utm_campaign,utm_content,status,created_at,refund_amount,refund_reason,discount_applied&order=order_date.desc`);
   return (await res.json()) || [];
+}
+
+async function loadRefunds(from) {
+  try {
+    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+    if (!stripe) return [];
+    const created = { gte: Math.floor(new Date(from + 'T00:00:00+13:00').getTime() / 1000) };
+    const refunds = [];
+    let hasMore = true, startingAfter = null;
+    while (hasMore) {
+      const params = { limit: 100, created };
+      if (startingAfter) params.starting_after = startingAfter;
+      const result = await stripe.refunds.list(params);
+      for (const r of result.data) {
+        refunds.push({ id: r.id, amount: r.amount / 100, reason: r.reason, status: r.status, created: r.created });
+      }
+      hasMore = result.has_more;
+      if (hasMore && result.data.length) startingAfter = result.data[result.data.length - 1].id;
+      else hasMore = false;
+    }
+    return refunds;
+  } catch { return []; }
+}
+
+async function loadWebsiteAnalytics(from, to) {
+  try {
+    const res = await sbFetch(`/rest/v1/rpc/analytics_summary`, { method: 'POST', body: { site: 'PrimalPantry.co.nz', from_date: from, to_date: to } });
+    const data = await res.json();
+    return data || {};
+  } catch { return {}; }
 }
 
 async function loadLineItems() {
@@ -316,7 +346,7 @@ function evaluateInventory(inventoryData, orders, lineItems, config) {
 
 // ── AI Summary ──
 
-async function generateSummary(alerts, orders, campaigns, inventoryData, competitorChanges, customerEmails, lineItems) {
+async function generateSummary(alerts, orders, campaigns, inventoryData, competitorChanges, customerEmails, lineItems, refunds = []) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return null;
 
@@ -384,6 +414,44 @@ async function generateSummary(alerts, orders, campaigns, inventoryData, competi
     return { sku: rp.sku, stock, velocity: velocity.toFixed(1), daysSupply: velocity > 0 ? Math.round(stock / velocity) : 999, reorderPoint: rp.reorder_point };
   });
 
+  // Refund & damage analysis
+  const refundTotal = refunds.reduce((s, r) => s + r.amount, 0);
+  const refundedOrders = orders.filter(o => (o.status || '').toLowerCase() === 'refunded' || Number(o.refund_amount) > 0);
+  const damagedOrders = orders.filter(o => {
+    const reason = (o.refund_reason || '').toLowerCase();
+    return reason.includes('damage') || reason.includes('broken') || (o.status || '').toLowerCase() === 'incorrect order';
+  });
+  const refundReasons = {};
+  refundedOrders.forEach(o => {
+    const reason = o.refund_reason || 'Not specified';
+    refundReasons[reason] = (refundReasons[reason] || 0) + 1;
+  });
+
+  // Email themes — group by topic keywords
+  const emailThemes = {};
+  customerEmails.forEach(e => {
+    const text = ((e.subject || '') + ' ' + (e.snippet || '')).toLowerCase();
+    const themes = [];
+    if (text.match(/refund|return|money back/)) themes.push('Refund/Return');
+    if (text.match(/damage|broken|leak|smash/)) themes.push('Damage');
+    if (text.match(/deliver|shipping|track|post/)) themes.push('Shipping');
+    if (text.match(/allerg|react|irritat|rash|burn/)) themes.push('Product Reaction');
+    if (text.match(/stock|out of|when.*available|restock/)) themes.push('Stock Inquiry');
+    if (text.match(/thank|love|amaz|great/)) themes.push('Positive Feedback');
+    if (text.match(/discount|code|coupon|deal/)) themes.push('Discount Request');
+    if (text.match(/wholesale|bulk|resell/)) themes.push('Wholesale');
+    if (!themes.length) themes.push('General');
+    themes.forEach(t => { emailThemes[t] = (emailThemes[t] || 0) + 1; });
+  });
+
+  // Campaign performance by platform
+  const fbCamps = campaigns.filter(c => c.platform === 'facebook');
+  const gCamps = campaigns.filter(c => c.platform === 'google');
+  const platformStats = {
+    facebook: { spend: fbCamps.reduce((s, c) => s + c.spend, 0).toFixed(2), conversions: fbCamps.reduce((s, c) => s + c.conversions, 0), roas: fbCamps.reduce((s, c) => s + c.spend, 0) > 0 ? (fbCamps.reduce((s, c) => s + c.conversions_value, 0) / fbCamps.reduce((s, c) => s + c.spend, 0)).toFixed(1) : '0' },
+    google: { spend: gCamps.reduce((s, c) => s + c.spend, 0).toFixed(2), conversions: gCamps.reduce((s, c) => s + c.conversions, 0), roas: gCamps.reduce((s, c) => s + c.spend, 0) > 0 ? (gCamps.reduce((s, c) => s + c.conversions_value, 0) / gCamps.reduce((s, c) => s + c.spend, 0)).toFixed(1) : '0' },
+  };
+
   // Seasonal context
   const month = new Date().getMonth();
   const seasonalNotes = [];
@@ -400,23 +468,25 @@ async function generateSummary(alerts, orders, campaigns, inventoryData, competi
       totalSpend: totalSpend.toFixed(2), totalConversions: totalConv,
       cpa: totalConv > 0 ? (totalSpend / totalConv).toFixed(2) : 'N/A',
       roas: totalSpend > 0 ? (totalRev / totalSpend).toFixed(1) : 'N/A',
+      byPlatform: platformStats,
       campaigns: campaigns.slice(0, 10).map(c => ({ name: c.name, platform: c.platform, spend: c.spend.toFixed(2), conversions: c.conversions, cpa: c.conversions > 0 ? (c.spend / c.conversions).toFixed(2) : 'N/A', roas: c.spend > 0 ? (c.conversions_value / c.spend).toFixed(1) : '0', ctr: c.impressions > 0 ? ((c.clicks / c.impressions) * 100).toFixed(2) : '0' })),
     },
     creativeRanking: creativeRanking.slice(0, 10),
+    refunds: { totalRefunded: refundTotal.toFixed(2), refundCount: refunds.length, damagedCount: damagedOrders.length, refundRate: orders.length > 0 ? ((refundedOrders.length / orders.length) * 100).toFixed(1) + '%' : '0%', reasons: refundReasons },
     discounts: { discountedOrderPct: discountRate + '%', discountRevenue: discountRevenue.toFixed(2), fullPriceRevenue: nonDiscountRevenue.toFixed(2) },
     inventory: invStatus.filter(i => i.stock > 0 || i.velocity > 0),
     activeAlerts: { total: alerts.length, p1: alerts.filter(a => a.priority === 'P1').length, p2: alerts.filter(a => a.priority === 'P2').length, p3: alerts.filter(a => a.priority === 'P3').length, list: alerts.slice(0, 15).map(a => ({ title: a.title, priority: a.priority, category: a.category })) },
     topProducts: topProducts.map(([name, d]) => ({ name, revenue: d.revenue.toFixed(2), units: d.units })),
     topMagnets: topMagnets.map(([name, count]) => ({ name, firstPurchases: count })),
     competitorChanges: competitorChanges.slice(0, 10).map(c => ({ summary: c.summary, type: c.change_type })),
-    customerEmails: customerEmails.slice(0, 10).map(e => ({ subject: e.subject, snippet: (e.snippet || '').slice(0, 100) })),
+    customerEmails: { themes: emailThemes, recentMessages: customerEmails.slice(0, 10).map(e => ({ subject: e.subject, snippet: (e.snippet || '').slice(0, 100) })) },
     seasonalNotes,
   };
 
   const dayOfWeek = new Date().getDay();
   const isMonday = dayOfWeek === 1;
 
-  const systemPrompt = `You are the AI business analyst for Primal Pantry, a NZ-based tallow skincare DTC brand. You make direct, specific recommendations. Use NZD. No fluff. Bold key numbers and actions.`;
+  const systemPrompt = `You are the AI business analyst for Primal Pantry, a NZ-based tallow skincare DTC brand. You make direct, specific, actionable recommendations. Use NZD. No fluff. Bold key numbers and actions. Every point must be something the owner can act on today.`;
 
   const userPrompt = `Generate a ${isMonday ? 'weekly' : 'daily'} briefing for ${yesterday}.
 
@@ -424,29 +494,53 @@ Data:
 ${JSON.stringify(context, null, 2)}
 
 Structure your response as:
-${isMonday ? `**Weekly Summary**: Key wins, losses, and week-over-week trends.
-**Focus This Week**: Top 3 priorities across ad ops, inventory, and product.
-**Ad Ops**: Which campaigns to kill (CPA too high), scale (CPA/ROAS strong), or create new creatives for. Rank creatives by performance — tell me which to focus budget on.
-**Product Intelligence**: Winners to focus ad spend on, best magnet products for acquisition, best upsells for cross-sell.
-**Inventory & Batches**: Stock status per SKU, recommended batch sizes based on velocity, when to run sales for overstock.
-**Discounts**: Is any active discount driving uplift? Should it be cancelled or extended?
-**Competitor & Trends**: Notable competitor moves, seasonal opportunities, customer request themes from emails.
-**Improvements**: One specific improvement for each area (ads, inventory, website, email).` :
-`**Yesterday**: Revenue, orders, AOV, standout events.
-**Ad Ops — Kill/Scale/Create**: Which campaigns to kill NOW (and why), which to increase budget on, which need new creatives. Rank top 3 creatives to focus spend on.
-**Product Focus**: Winners to push harder, best magnet products for new customer acquisition, best upsell pairings.
-**Inventory**: Any SKUs at risk? Recommended next batch sizes based on velocity. Flag if any SKU should go on sale.
-**Discounts**: % of orders discounted, revenue comparison (discounted vs full-price). Recommend if discount should continue or end.
-**Alerts**: Top actions from today's rule alerts.
-**Intel**: Competitor changes, customer email themes, seasonal considerations.`}
+${isMonday ? `**Weekly Summary**: Key wins, losses, trends. Revenue, orders, AOV vs last week.
 
-Keep each section to 1-3 sentences. Be specific — name campaigns, SKUs, and numbers.`;
+**🔴 Refunds & Damages**: Total refunded, damage count, top reasons. What to fix (packaging, product, shipping).
+
+**📈 Marketing — Kill / Scale / Create**:
+• By platform (FB vs Google): which platform is winning, where to shift budget
+• Which campaigns to kill NOW (CPA too high), scale (ROAS strong), create new creatives for
+• Rank top 3 creatives by ROAS — where to focus spend
+• Opportunities to reduce CPA or increase volume
+
+**🛒 Cross-sell & AOV**: Best upsell pairings from order data. Specific actions to increase AOV (bundles, thresholds, add-ons).
+
+**📦 Inventory**: Stock at risk, batch sizes needed, overstock to discount.
+
+**💰 Cost Reduction**: Opex/adspend cuts possible. Discount analysis — continue or kill?
+
+**🌐 Website**: Funnel drop-off insights. Pages to improve for conversion.
+
+**📧 Product & Customer Intel**: Email themes (complaints, requests, praise). Specific product improvement ideas or new product lines based on customer requests. Quote specific requests.
+
+**🏢 Competitive**: Notable competitor moves. Opportunities to differentiate.
+
+**✅ Top 3 Actions This Week**: The 3 most impactful things to do right now.` :
+
+`**Yesterday**: Revenue, orders, AOV, standout events.
+
+**🔴 Refunds & Damages**: Any refunds/damages yesterday? Root cause and fix.
+
+**📈 Ads — Kill / Scale / Create**: By platform. Which campaigns to kill, scale, or create new creatives for. Top 3 creatives to focus spend on. How to reduce CPA.
+
+**🛒 AOV & Cross-sell**: Current AOV trend. Best upsell opportunities from order data.
+
+**📦 Inventory**: Any SKUs at risk? Next batch sizes.
+
+**📧 Customer Intel**: Email themes today. Any product feedback, requests, or complaints to act on? Quote specific requests if relevant.
+
+**🏢 Environment**: Competitor changes, seasonal opportunities.
+
+**✅ Top 3 Actions Today**: Most impactful things to do right now.`}
+
+Keep each section to 1-3 sentences max. Be specific — name campaigns, SKUs, products, and numbers. Every recommendation must be actionable.`;
 
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1024, system: systemPrompt, messages: [{ role: 'user', content: userPrompt }] }),
+      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 2048, system: systemPrompt, messages: [{ role: 'user', content: userPrompt }] }),
     });
     const data = await res.json();
     const text = data.content?.[0]?.text || '';
@@ -498,7 +592,8 @@ exports.handler = async (event) => {
     // 2. Fetch data sources
     const from14 = getNZDate(14);
     const today = getNZDate(0);
-    const [fbCampaigns, gCampaigns, orders, lineItems, inventory, competitorChanges, customerEmails] = await Promise.all([
+    const from30 = getNZDate(30);
+    const [fbCampaigns, gCampaigns, orders, lineItems, inventory, competitorChanges, customerEmails, refunds] = await Promise.all([
       loadFBCampaigns(from14, today),
       loadGoogleCampaigns(from14, today),
       loadOrders(30),
@@ -506,6 +601,7 @@ exports.handler = async (event) => {
       loadInventory(),
       loadCompetitorChanges(),
       loadCustomerEmails(),
+      loadRefunds(from30),
     ]);
 
     const allCampaigns = [...fbCampaigns, ...gCampaigns];
@@ -569,7 +665,7 @@ exports.handler = async (event) => {
     if (!qs.token || qs.summary === '1') {
       // Combine existing + new alerts for context
       const allAlertsList = [...newAlerts.map(a => ({ ...a })), ...recentAlerts];
-      summary = await generateSummary(allAlertsList, orders, allCampaigns, inventory, competitorChanges, customerEmails, lineItems);
+      summary = await generateSummary(allAlertsList, orders, allCampaigns, inventory, competitorChanges, customerEmails, lineItems, refunds);
     }
 
     return {
