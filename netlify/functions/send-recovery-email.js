@@ -72,7 +72,7 @@ exports.handler = async (event) => {
         ${total ? `<tfoot><tr><td colspan="2" style="padding:10px 12px;font-size:14px;font-weight:600;color:#2d2a26;">Total</td><td style="padding:10px 12px;font-size:14px;font-weight:600;color:#2d2a26;text-align:right;">${total}</td></tr></tfoot>` : ''}
       </table>
       <div style="text-align:center;margin:24px 0;">
-        <a href="https://www.primalpantry.co.nz/cart/" style="display:inline-block;background:#8CB47A;color:#141210;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Complete Your Order</a>
+        <a href="https://www.primalpantry.co.nz/cart/?utm_source=email&utm_medium=recovery&utm_campaign=abandoned_cart&utm_content=${session_id}" style="display:inline-block;background:#8CB47A;color:#141210;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Complete Your Order</a>
       </div>
       <p style="font-size:13px;color:#9c9287;line-height:1.5;margin:16px 0 0;text-align:center;">
         Need help? Just reply to this email — we're happy to assist.
