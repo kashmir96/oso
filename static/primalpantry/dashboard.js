@@ -9681,6 +9681,42 @@ async function loadMarketingTab() {
   charts.mktSpendRev = new Chart(document.getElementById('mkt-spend-rev-chart'),{type:'line',data:{labels:lbls,datasets:[{label:'Ad Spend',data:spSpark,borderColor:'#E67E22',backgroundColor:'rgba(230,126,34,0.15)',fill:true,tension:0.4,pointRadius:2,borderWidth:2},{label:'Total Revenue',data:rvSpark,borderColor:'#6B8F5B',backgroundColor:'rgba(107,143,91,0.15)',fill:true,tension:0.4,pointRadius:2,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:'#9c9287',font:{size:11,family:'DM Sans'}}},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': $'+(ctx.parsed.y||0).toFixed(2)}}},scales:{y:{ticks:{color:'#9c9287',callback:v=>'$'+(v>=1000?(v/1000).toFixed(1)+'k':v.toFixed(0))},grid:{color:'#252220'}},x:{ticks:{color:'#9c9287',maxTicksLimit:15,font:{size:10}},grid:{display:false}}}}});
   if(charts.mktRoas)charts.mktRoas.destroy();
   charts.mktRoas = new Chart(document.getElementById('mkt-roas-chart'),{type:'line',data:{labels:lbls,datasets:[{label:'ROAS',data:roSpark,borderColor:'var(--sage)',backgroundColor:'rgba(140,180,122,0.15)',fill:true,tension:0.4,pointRadius:2,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>'ROAS: '+ctx.parsed.y.toFixed(1)+'x'}}},scales:{y:{ticks:{color:'#9c9287',callback:v=>v.toFixed(1)+'x'},grid:{color:'#252220'}},x:{ticks:{color:'#9c9287',maxTicksLimit:10,font:{size:10}},grid:{display:false}}}}});
+  // Hourly adspend stacked bar chart (FB + Google by hour of day)
+  try {
+    const hourlyData = window._adspendHourlyData || [];
+    const rangeData = hourlyData.filter(r => r.date >= from && r.date <= to);
+    const fbByHour = Array(24).fill(0), gByHour = Array(24).fill(0);
+    rangeData.forEach(r => {
+      const spend = Number(r.hourly_spend || 0);
+      const src = (r.source || '').toLowerCase();
+      if (src.includes('google')) gByHour[r.hour] += spend;
+      else fbByHour[r.hour] += spend;
+    });
+    const hourLabels = Array.from({length:24}, (_,i) => i + ':00');
+    if (charts.mktHourlyAdspend) charts.mktHourlyAdspend.destroy();
+    charts.mktHourlyAdspend = new Chart(document.getElementById('mkt-hourly-adspend-chart'), {
+      type: 'bar',
+      data: {
+        labels: hourLabels,
+        datasets: [
+          { label: 'Facebook', data: fbByHour, backgroundColor: 'rgba(66,103,178,0.75)', borderColor: '#4267B2', borderWidth: 1, stack: 'adspend' },
+          { label: 'Google Ads', data: gByHour, backgroundColor: 'rgba(66,133,244,0.75)', borderColor: '#4285F4', borderWidth: 1, stack: 'adspend' },
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { labels: { color: '#9c9287', font: { size: 11, family: 'DM Sans' } } },
+          tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': $' + (ctx.parsed.y || 0).toFixed(2), footer: items => 'Total: $' + items.reduce((s, i) => s + i.parsed.y, 0).toFixed(2) } }
+        },
+        scales: {
+          y: { stacked: true, ticks: { color: '#9c9287', callback: v => '$' + v.toFixed(0) }, grid: { color: '#252220' } },
+          x: { stacked: true, ticks: { color: '#9c9287', font: { size: 10 } }, grid: { display: false } }
+        }
+      }
+    });
+  } catch(e) { console.warn('Hourly adspend chart error:', e); }
   try{const fr=await mktApi('analytics-dashboard',{site:'PrimalPantry.co.nz',from,to,metric:'funnel_stages'});if(Array.isArray(fr)&&fr.length>0){const f=fr[0];document.getElementById('mkt-funnel-container').innerHTML=renderMktFunnel(f.visitors||0,f.add_to_cart||0,f.checkout||0,f.purchase||0);}else{document.getElementById('mkt-funnel-container').innerHTML='<div class="loading">No funnel data</div>';}}catch(e){document.getElementById('mkt-funnel-container').innerHTML='<div class="loading">Funnel unavailable</div>';}
   mktCampaignPage = 1; renderMktCT('');
   renderCampaignSplitCharts(fbD.daily || [], gD.daily || []);
@@ -9827,6 +9863,14 @@ function renderCommsThreadList(searchFilter) {
   if (commsInboxFilter && commsInboxFilter !== 'all') {
     const aid = parseInt(commsInboxFilter);
     threads = threads.filter(t => t.account_id === aid);
+  }
+  // Alibaba Orders filter
+  const alibabaFilter = document.getElementById('comms-alibaba-filter')?.checked;
+  if (alibabaFilter) {
+    threads = threads.filter(t =>
+      (t.customer_email || '').toLowerCase().includes('credit@notice.alibaba.com') &&
+      (t.last_subject || '').toLowerCase().includes('payment for your trade assurance')
+    );
   }
   if (searchFilter) {
     const q = searchFilter.toLowerCase();
@@ -10230,6 +10274,9 @@ async function loadCommsTab() {
     document.getElementById('comms-inbox-filter').addEventListener('change', function() {
       commsInboxFilter = this.value;
       loadCommsThreads();
+    });
+    document.getElementById('comms-alibaba-filter').addEventListener('change', function() {
+      renderCommsThreadList(document.getElementById('comms-search').value.trim());
     });
     // Channel filter buttons
     document.querySelectorAll('#comms-channel-bar .comms-filter-btn').forEach(btn => {

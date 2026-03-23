@@ -457,6 +457,9 @@
           <button class="comms-filter-btn filter-wholesaler" data-filter="wholesalers">Retailers</button>
           <button class="comms-filter-btn filter-flagged" data-filter="flagged">Flagged</button>
         </div>
+        <div class="comms-filter-bar" style="border-bottom:none;padding:0.3rem 0.75rem;">
+          <label style="font-size:0.75rem;color:var(--muted);display:flex;align-items:center;gap:0.3rem;cursor:pointer;"><input type="checkbox" id="comms-alibaba-filter" style="cursor:pointer;"> Alibaba Orders</label>
+        </div>
         <div id="comms-response-stats" style="display:flex;gap:0.5rem;padding:0.5rem 0.75rem;border-bottom:1px solid var(--border);flex-wrap:wrap;">
           <div style="flex:1;min-width:80px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.6rem;text-align:center;">
             <div style="font-size:0.6rem;color:var(--dim);text-transform:uppercase;">Avg Response</div>
@@ -1127,6 +1130,11 @@
 
   <div id="tab-marketing" class="tab-content">
     <div class="stats" id="marketing-stats-grid"></div>
+
+    <div class="chart-card" style="margin-bottom:1rem;">
+      <h3>Ad Spend by Hour of Day <span style="font-size:0.7rem;color:var(--dim);font-weight:400;">(Facebook + Google, stacked)</span></h3>
+      <div class="chart-wrap"><canvas id="mkt-hourly-adspend-chart"></canvas></div>
+    </div>
 
     <div class="charts-row">
       <div class="chart-card">
