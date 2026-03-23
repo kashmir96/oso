@@ -3060,19 +3060,20 @@ function renderMap(orders) {
     // Wire up dropdown listeners
     var mapLayerSel = document.getElementById('map-layer');
     var mapAdSrcSel = document.getElementById('map-ad-source');
-    if (mapLayerSel) mapLayerSel.addEventListener('change', function() { refreshMapLayers(); });
-    if (mapAdSrcSel) mapAdSrcSel.addEventListener('change', function() { refreshMapLayers(); });
+    if (mapLayerSel) mapLayerSel.addEventListener('change', function() { console.log('[Map] Layer changed to:', this.value); refreshMapLayers(); });
+    if (mapAdSrcSel) mapAdSrcSel.addEventListener('change', function() { console.log('[Map] Ad source changed to:', this.value); refreshMapLayers(); });
+
+    // Load adspend region data once
+    loadAdspendRegions();
   }
 
-  // Always load adspend data (uses currentStaff token)
-  loadAdspendRegions();
   refreshMapLayers();
   setTimeout(() => mapInstance.invalidateSize(), 200);
 }
 
 function loadAdspendRegions() {
-  const tok = currentStaff && currentStaff.token;
-  if (!tok) { console.warn('[Map] No staff token, skipping adspend regions'); return; }
+  if (!currentStaff || !currentStaff.token) { console.warn('[Map] No staff token, skipping adspend regions'); return; }
+  const tok = encodeURIComponent(currentStaff.token);
   const now = new Date();
   const nz = new Date(now.toLocaleString('en-US', { timeZone: 'Pacific/Auckland' }));
   const y = nz.getFullYear(), m = String(nz.getMonth() + 1).padStart(2, '0'), d = String(nz.getDate()).padStart(2, '0');
