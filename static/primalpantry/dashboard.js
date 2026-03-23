@@ -1110,6 +1110,7 @@ function renderStats(orders, lineItems) {
     isAvg
       ? { label: 'Avg Shipping', value: fmt_money(avgShipping), sub: 'shipping cost per order', color: 'var(--purple)' }
       : { label: 'Shipping', value: fmt_money(periodShipping), sub: orderCount + ' orders shipped', prior: fmtDelta(periodShipping, priorShipping, true), color: 'var(--purple)' },
+    { label: 'Opex', value: fmt_money(periodExpenses), sub: periodDays === 1 ? '$' + dailyExpenses.toFixed(2) + '/day · $' + currentMonthlyExpenses.toFixed(0) + '/mo' : periodDays + 'd @ $' + dailyExpenses.toFixed(2) + '/day', color: '#E08050' },
     { label: 'Refunds', value: `${fmt_money(refundTotal)} (${refundCount})`, sub: `${refundCount} refund${refundCount !== 1 ? 's' : ''} from Stripe`, color: 'var(--red)' },
   ];
 
