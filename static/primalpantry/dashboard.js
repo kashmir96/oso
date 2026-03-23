@@ -1348,10 +1348,10 @@ function renderDailyPace() {
     data: {
       labels,
       datasets: [
-        { label: lwLabel, data: cumLastWeek, borderColor: 'rgba(156,146,135,0.35)', backgroundColor: 'rgba(156,146,135,0.05)', fill: true, borderWidth: 1.5, borderDash: [4, 3], tension: 0.3, pointRadius: 0 },
-        { label: todayLabel, data: cumToday, borderColor: '#8CB47A', backgroundColor: 'rgba(140,180,122,0.1)', fill: true, borderWidth: 2.5, tension: 0.3, pointRadius: 0, pointHitRadius: 8 },
-        { label: 'COGs', data: cumCogs, borderColor: '#e74c3c', backgroundColor: 'transparent', fill: false, borderWidth: 1.5, tension: 0.3, pointRadius: 0, borderDash: [3, 2] },
-        { label: 'Adspend', data: cumAdspend, borderColor: 'var(--honey)', backgroundColor: 'transparent', fill: false, borderWidth: 1.5, tension: 0.3, pointRadius: 0, borderDash: [6, 3] },
+        { label: lwLabel, data: cumLastWeek, borderColor: 'rgba(156,146,135,0.35)', backgroundColor: 'rgba(156,146,135,0.05)', fill: true, borderWidth: 1.5, borderDash: [4, 3], tension: 0.3, pointRadius: 0, order: 5 },
+        { label: todayLabel, data: cumToday, borderColor: '#8CB47A', backgroundColor: 'rgba(140,180,122,0.12)', fill: true, borderWidth: 2.5, tension: 0.3, pointRadius: 0, pointHitRadius: 8, order: 4 },
+        { label: 'Adspend', data: cumAdspend, borderColor: '#E67E22', backgroundColor: 'rgba(230,126,34,0.18)', fill: true, borderWidth: 2, tension: 0.3, pointRadius: 0, order: 3 },
+        { label: 'COGs', data: cumCogs, borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,0.15)', fill: true, borderWidth: 2, tension: 0.3, pointRadius: 0, order: 2 },
       ],
     },
     options: {
@@ -1416,9 +1416,9 @@ function renderMonthlyPace() {
     data: {
       labels,
       datasets: [
-        { label: prevLabel + ' (pace)', data: cumPrev, borderColor: 'rgba(156,146,135,0.35)', backgroundColor: 'rgba(156,146,135,0.05)', fill: true, borderWidth: 1.5, borderDash: [4, 3], tension: 0.3, pointRadius: 0 },
-        { label: currLabel, data: cumCurrent, borderColor: '#8CB47A', backgroundColor: 'rgba(140,180,122,0.1)', fill: true, borderWidth: 2.5, tension: 0.3, pointRadius: 0, pointHitRadius: 8 },
-        { label: 'COGs', data: cumCogs, borderColor: '#e74c3c', backgroundColor: 'transparent', fill: false, borderWidth: 1.5, tension: 0.3, pointRadius: 0, borderDash: [3, 2] },
+        { label: prevLabel + ' (pace)', data: cumPrev, borderColor: 'rgba(156,146,135,0.35)', backgroundColor: 'rgba(156,146,135,0.05)', fill: true, borderWidth: 1.5, borderDash: [4, 3], tension: 0.3, pointRadius: 0, order: 4 },
+        { label: currLabel, data: cumCurrent, borderColor: '#8CB47A', backgroundColor: 'rgba(140,180,122,0.12)', fill: true, borderWidth: 2.5, tension: 0.3, pointRadius: 0, pointHitRadius: 8, order: 3 },
+        { label: 'COGs', data: cumCogs, borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,0.15)', fill: true, borderWidth: 2, tension: 0.3, pointRadius: 0, order: 2 },
       ],
     },
     options: {
