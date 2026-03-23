@@ -3133,7 +3133,11 @@ function refreshMapLayers() {
   mapAdMarkers.forEach(m => mapInstance.removeLayer(m));
   mapAdMarkers = [];
 
-  // ── Orders layer ──
+  // ── Collect all data first to find global max $ for shared scaling ──
+  let orderMarkerData = [];
+  let adMarkerData = [];
+
+  // Orders data
   if (showOrders && cachedMapOrders) {
     const cityOrders = {};
     cachedMapOrders.forEach(o => {
@@ -3143,16 +3147,55 @@ function refreshMapLayers() {
       cityOrders[city].count++;
       cityOrders[city].revenue += Number(o.total_value || 0);
     });
-
-    const heatData = [];
-    const markers = [];
     Object.entries(cityOrders).forEach(([city, data]) => {
       const coords = NZ_CITIES[city];
       if (!coords) return;
-      for (let i = 0; i < data.count; i++) heatData.push([coords[0], coords[1], 1]);
-      markers.push({ coords, ...data });
+      orderMarkerData.push({ coords, ...data });
     });
+  }
 
+  // Adspend data
+  if (showAds) {
+    const regionSpend = {};
+    const addRegions = (regions) => {
+      (regions || []).forEach(r => {
+        const key = r.region.toLowerCase().replace(/ region$/i, '').trim();
+        if (!regionSpend[key]) regionSpend[key] = { name: r.region, spend: 0, impressions: 0, clicks: 0, conversions: 0, conversions_value: 0 };
+        regionSpend[key].spend += r.spend;
+        regionSpend[key].impressions += r.impressions;
+        regionSpend[key].clicks += r.clicks;
+        regionSpend[key].conversions += r.conversions;
+        regionSpend[key].conversions_value += r.conversions_value;
+      });
+    };
+    if (adSource === 'all' || adSource === 'facebook') addRegions(cachedAdspendRegions.facebook);
+    if (adSource === 'all' || adSource === 'google') addRegions(cachedAdspendRegions.google);
+
+    const normalise = s => s.toLowerCase().replace(/\s*region$/,'').replace(/\s*district$/,'').replace(/ā/g,'a').replace(/ū/g,'u').replace(/ī/g,'i').replace(/ō/g,'o').replace(/ē/g,'e').trim();
+    const regionLookup = {};
+    Object.keys(NZ_REGIONS).forEach(k => { regionLookup[normalise(k)] = NZ_REGIONS[k]; });
+
+    Object.entries(regionSpend).forEach(([key, data]) => {
+      const norm = normalise(key);
+      const coords = regionLookup[norm];
+      if (!coords) return;
+      adMarkerData.push({ coords, ...data });
+    });
+  }
+
+  // ── Shared $ scale: find the single highest dollar value across both layers ──
+  const allDollarValues = [
+    ...orderMarkerData.map(m => m.revenue),
+    ...adMarkerData.map(m => m.spend),
+  ];
+  const globalMax = Math.max(...allDollarValues, 1);
+
+  // ── Render orders ──
+  if (showOrders) {
+    const heatData = [];
+    orderMarkerData.forEach(m => {
+      for (let i = 0; i < m.count; i++) heatData.push([m.coords[0], m.coords[1], 1]);
+    });
     if (heatData.length > 0) {
       heatLayer = L.heatLayer(heatData, {
         radius: 25, blur: 20, maxZoom: 10,
@@ -3160,9 +3203,11 @@ function refreshMapLayers() {
       }).addTo(mapInstance);
     }
 
-    markers.forEach(m => {
+    orderMarkerData.forEach(m => {
+      const ratio = m.revenue / globalMax;
+      const radius = 3 + ratio * 18;
       const marker = L.circleMarker(m.coords, {
-        radius: Math.min(4 + m.count * 2, 20),
+        radius,
         color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.35, weight: 1,
       }).bindTooltip(`<b>${m.name}</b><br>${m.count} orders<br>$${m.revenue.toFixed(2)}<br><i>Click to filter</i>`, { className: '' })
         .addTo(mapInstance);
@@ -3179,45 +3224,12 @@ function refreshMapLayers() {
     });
   }
 
-  // ── Adspend layer ──
+  // ── Render adspend ──
   if (showAds) {
-    // Merge FB + Google by region
-    const regionSpend = {};
-    const addRegions = (regions, source) => {
-      (regions || []).forEach(r => {
-        const key = r.region.toLowerCase().replace(/ region$/i, '').trim();
-        if (!regionSpend[key]) regionSpend[key] = { name: r.region, spend: 0, impressions: 0, clicks: 0, conversions: 0, conversions_value: 0 };
-        regionSpend[key].spend += r.spend;
-        regionSpend[key].impressions += r.impressions;
-        regionSpend[key].clicks += r.clicks;
-        regionSpend[key].conversions += r.conversions;
-        regionSpend[key].conversions_value += r.conversions_value;
-      });
-    };
-
-    if (adSource === 'all' || adSource === 'facebook') addRegions(cachedAdspendRegions.facebook, 'facebook');
-    if (adSource === 'all' || adSource === 'google') addRegions(cachedAdspendRegions.google, 'google');
-
-    const adMarkers = [];
-    const normalise = s => s.toLowerCase().replace(/\s*region$/,'').replace(/\s*district$/,'').replace(/ā/g,'a').replace(/ū/g,'u').replace(/ī/g,'i').replace(/ō/g,'o').replace(/ē/g,'e').trim();
-    const regionLookup = {};
-    Object.keys(NZ_REGIONS).forEach(k => { regionLookup[normalise(k)] = NZ_REGIONS[k]; });
-
-    Object.entries(regionSpend).forEach(([key, data]) => {
-      const norm = normalise(key);
-      const coords = regionLookup[norm];
-      if (!coords) return;
-      adMarkers.push({ coords, ...data });
-    });
-
-    // No heat layer for adspend — just circle markers (cleaner)
-
-    // Adspend circle markers (orange, sized relative to spend)
-    const maxSpend = Math.max(...adMarkers.map(m => m.spend), 1);
-    adMarkers.forEach(m => {
+    adMarkerData.forEach(m => {
       const offset = showOrders ? 0.15 : 0;
-      const ratio = m.spend / maxSpend;
-      const radius = 3 + ratio * 14; // 3px min, 17px max — smaller than order circles
+      const ratio = m.spend / globalMax;
+      const radius = 3 + ratio * 18; // same scale as orders
       const marker = L.circleMarker([m.coords[0] + offset, m.coords[1] + offset], {
         radius,
         color: '#E67E22', fillColor: '#E67E22', fillOpacity: 0.3, weight: 2, dashArray: '4 2',
