@@ -148,6 +148,10 @@ let activeTab = 'sales';
 let attributionModel = localStorage.getItem('oso_attr_model') || 'first';
 let statsMode = localStorage.getItem('oso_stats_mode') || 'total';
 let currentAdSpend = 0;
+let currentPaidRev = 0;
+let currentPaidConv = 0;
+let currentPaidClicks = 0;
+let currentPaidImpr = 0;
 let statsRefreshTimer = null;
 const STATS_REFRESH_MS = 60000;
 let lastKnownRevenue = null;
@@ -312,9 +316,9 @@ async function doTOTPVerify() {
 
 const savedStaff = localStorage.getItem('pp_staff');
 const staffTs = Number(localStorage.getItem('pp_staff_ts') || 0);
-const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
-if (savedStaff && (Date.now() - staffTs) < SEVEN_DAYS) {
-  try { currentStaff = JSON.parse(savedStaff); showDashboard(); } catch { localStorage.removeItem('pp_staff'); localStorage.removeItem('pp_staff_ts'); }
+const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+if (savedStaff && (Date.now() - staffTs) < THIRTY_DAYS) {
+  try { currentStaff = JSON.parse(savedStaff); localStorage.setItem('pp_staff_ts', String(Date.now())); showDashboard(); } catch { localStorage.removeItem('pp_staff'); localStorage.removeItem('pp_staff_ts'); }
 } else if (savedStaff) {
   localStorage.removeItem('pp_staff'); localStorage.removeItem('pp_staff_ts');
 }
@@ -630,18 +634,32 @@ function applyFilter() {
 async function loadAdSpend() {
   if (!currentStaff || !currentStaff.token) return;
   try {
-    const today = new Date().toISOString().slice(0, 10);
-    const [fbRes, gRes] = await Promise.all([
-      fetch(`/.netlify/functions/facebook-adspend?token=${encodeURIComponent(currentStaff.token)}`).then(r => r.json()).catch(() => ({ spend: 0 })),
-      fetch(`/.netlify/functions/google-ads?token=${encodeURIComponent(currentStaff.token)}&from=${today}&to=${today}`).then(r => r.json()).catch(() => ({ campaigns: [] })),
+    const [from, to] = getDateRange();
+    const tok = encodeURIComponent(currentStaff.token);
+    const [fbRes, gRes, fbRangeRes] = await Promise.all([
+      fetch(`/.netlify/functions/facebook-adspend?token=${tok}`).then(r => r.json()).catch(() => ({ spend: 0 })),
+      fetch(`/.netlify/functions/google-ads?token=${tok}&from=${from}&to=${to}`).then(r => r.json()).catch(() => ({ campaigns: [] })),
+      fetch(`/.netlify/functions/facebook-campaigns?token=${tok}&from=${from}&to=${to}`).then(r => r.json()).catch(() => ({ campaigns: [] })),
     ]);
-    const fbSpend = Number(fbRes.spend || 0);
-    const gAdsSpend = (gRes.campaigns || []).reduce((s, c) => s + (c.spend || 0), 0);
-    currentAdSpend = fbSpend + gAdsSpend;
+    // Today's ad spend for the banner (Facebook today + Google today)
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const fbTodaySpend = Number(fbRes.spend || 0);
+    const gCampaigns = gRes.campaigns || [];
+    const fbCampaigns = fbRangeRes.campaigns || [];
+    // Period totals from all campaigns
+    const gTotalSpend = gCampaigns.reduce((s, c) => s + (c.spend || 0), 0);
+    const fbTotalSpend = fbCampaigns.reduce((s, c) => s + (c.spend || 0), 0);
+    currentAdSpend = fbTotalSpend + gTotalSpend;
+    currentPaidRev = [...fbCampaigns, ...gCampaigns].reduce((s, c) => s + (c.conversions_value || 0), 0);
+    currentPaidConv = [...fbCampaigns, ...gCampaigns].reduce((s, c) => s + (c.conversions || 0), 0);
+    currentPaidClicks = [...fbCampaigns, ...gCampaigns].reduce((s, c) => s + (c.clicks || 0), 0);
+    currentPaidImpr = [...fbCampaigns, ...gCampaigns].reduce((s, c) => s + (c.impressions || 0), 0);
+    // Banner shows today's spend only
+    const todaySpend = fbTodaySpend + (from === todayStr ? gTotalSpend : 0);
     const el = document.getElementById('adspend-value');
-    if (el) el.textContent = currentAdSpend > 0 ? '$' + currentAdSpend.toFixed(2) : '—';
+    if (el) el.textContent = todaySpend > 0 ? '$' + todaySpend.toFixed(2) : '—';
   } catch (e) {
-    currentAdSpend = 0;
+    currentAdSpend = 0; currentPaidRev = 0; currentPaidConv = 0; currentPaidClicks = 0; currentPaidImpr = 0;
     const el = document.getElementById('adspend-value');
     if (el) el.textContent = '—';
   }
@@ -1045,11 +1063,12 @@ function renderStats(orders, lineItems) {
       : { label: 'COGs', value: fmt_money(periodCOGS), sub: `${grossMargin}% gross margin`, prior: fmtDelta(periodCOGS, priorCOGS, true), spark: renderSparkBars(sparkCOGS, 'var(--honey)'), color: 'var(--honey)' },
     isAvg
       ? { label: 'Blended CPA', value: fmt_money(blendedCPA), sub: 'adspend per order', color: 'var(--amber)' }
-      : { label: 'Adspend', value: fmt_money(currentAdSpend), sub: 'today\'s ad spend', color: 'var(--amber)' },
+      : { label: 'Adspend', value: fmt_money(currentAdSpend), sub: currentPaidImpr > 0 ? currentPaidImpr.toLocaleString() + ' impressions' : 'period ad spend', color: 'var(--amber)' },
     isAvg
       ? { label: 'Avg Items/Order', value: avgJars.toFixed(1), sub: 'line items per order', prior: fmtDelta(avgJars, priorAvgJars), color: 'var(--pink)' }
       : { label: 'Total Items', value: totalQty, sub: 'items purchased', prior: fmtDelta(totalQty, priorTotalQty), color: 'var(--pink)' },
     { label: 'Orders', value: orderCount, sub: `${periodEmails.size} customers`, prior: fmtDelta(orderCount, priorOrderCount), spark: renderSparkBars(sparkOrders, 'var(--blue)'), color: 'var(--blue)' },
+    { label: 'ROAS', value: currentAdSpend > 0 ? (currentPaidRev / currentAdSpend).toFixed(1) + 'x' : '-', sub: currentPaidConv > 0 ? currentPaidConv + ' paid conversions' : 'return on ad spend', color: 'var(--sage)' },
     { label: 'Live Visitors', value: '<span id="wa-live-count">-</span>', sub: 'on site now', color: 'var(--cyan)' },
     { label: 'Website Visitors', value: '<span id="wa-visitors-count">-</span>', sub: 'unique visitors', color: 'var(--cyan)' },
     { label: 'Refunds', value: `${fmt_money(refundTotal)} (${refundedOrders.length})`, sub: `${refundedOrders.length} order${refundedOrders.length !== 1 ? 's' : ''} refunded`, color: 'var(--red)' },
