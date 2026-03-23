@@ -6324,6 +6324,16 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
   let waFmData = null;
   let waFmProductsExpanded = false;
   let waFmProductPages = [];
+  let waFmSelectedProduct = null; // selected product slug for filtering funnel
+
+  window.waSelectProduct = function(idx) {
+    if (waFmSelectedProduct === idx) {
+      waFmSelectedProduct = null; // deselect
+    } else {
+      waFmSelectedProduct = idx;
+    }
+    waFmRender();
+  };
 
   window.waOpenFunnelModal = async function() {
     const overlay = document.getElementById('wa-fm-overlay');
@@ -6507,6 +6517,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
       const maxVisitors = Math.max(...pages.map(p => p.visitors), 1);
 
       let orbits = '';
+      const selProduct = waFmSelectedProduct !== null ? pages[waFmSelectedProduct] : null;
       pages.forEach((p, i) => {
         const angle = (i / pages.length) * 2 * Math.PI - Math.PI / 2;
         const radiusX = 180, radiusY = 140;
@@ -6514,10 +6525,31 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
         const y = Math.sin(angle) * radiusY;
         const dotSize = 8 + (p.visitors / maxVisitors) * 20;
         const stat = isRev ? fmt_money(p.revenue) : fmtNum(p.visitors) + ' users';
-        orbits += `<div class="wa-fm-orbit-dot" style="left:calc(50% + ${x.toFixed(0)}px);top:calc(50% + ${y.toFixed(0)}px);width:${dotSize.toFixed(0)}px;height:${dotSize.toFixed(0)}px;" title="${p.name}\n${p.visitors} users · ${p.bounce_rate}% bounce · ${fmtDuration(p.avg_duration)} avg\nRevenue: ${fmt_money(p.revenue)}">
+        const selected = waFmSelectedProduct === i;
+        const dimmed = waFmSelectedProduct !== null && !selected;
+        orbits += `<div class="wa-fm-orbit-dot${selected ? ' selected' : ''}${dimmed ? ' dimmed' : ''}" onclick="event.stopPropagation();waSelectProduct(${i})" style="left:calc(50% + ${x.toFixed(0)}px);top:calc(50% + ${y.toFixed(0)}px);width:${dotSize.toFixed(0)}px;height:${dotSize.toFixed(0)}px;cursor:pointer;">
           <span class="wa-fm-orbit-label">${p.shortName.length > 18 ? p.shortName.slice(0, 16) + '…' : p.shortName}<br><small>${stat}</small></span>
         </div>`;
       });
+
+      // If a product is selected, show its detail card below the nucleus
+      let detailCard = '';
+      if (selProduct) {
+        const convRate = selProduct.visitors > 0 ? ((selProduct.revenue > 0 ? (d['Purchased'].visitors / selProduct.visitors * 100) : 0)).toFixed(1) : '0.0';
+        detailCard = `<div class="wa-fm-product-detail" style="margin:0.5rem auto;max-width:400px;">
+          <div class="wa-fm-card" style="border-color:var(--green);">
+            <div class="wa-fm-card-title">${selProduct.shortName} <span class="entry-badge" onclick="event.stopPropagation();waSelectProduct(${waFmSelectedProduct})" style="cursor:pointer;font-size:0.6rem;">✕ Clear</span></div>
+            <div class="wa-fm-stats" style="grid-template-columns:1fr 1fr 1fr;">
+              <div class="wa-fm-stat">Users <span class="wa-fm-stat-val">${fmtNum(selProduct.visitors)}</span></div>
+              <div class="wa-fm-stat">Bounce <span class="wa-fm-stat-val">${selProduct.bounce_rate}%</span></div>
+              <div class="wa-fm-stat">Avg Time <span class="wa-fm-stat-val">${fmtDuration(selProduct.avg_duration)}</span></div>
+              <div class="wa-fm-stat">Revenue <span class="wa-fm-stat-val highlight">${fmt_money(selProduct.revenue)}</span></div>
+              <div class="wa-fm-stat">Conv Rate <span class="wa-fm-stat-val">${convRate}%</span></div>
+              <div class="wa-fm-stat">Page Views <span class="wa-fm-stat-val">${fmtNum(selProduct.views)}</span></div>
+            </div>
+          </div>
+        </div>`;
+      }
 
       productsCard = `<div style="flex:1;min-width:500px;max-width:700px;">
         <div class="wa-fm-nucleus" style="position:relative;height:380px;">
@@ -6526,6 +6558,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
           </div>
           ${orbits}
         </div>
+        ${detailCard}
         <div style="text-align:center;"><button class="wa-fm-collapse-btn" onclick="event.stopPropagation();waToggleProductBreakdown()" style="margin-top:0.25rem;">Collapse</button></div>
       </div>`;
     } else {
@@ -6540,9 +6573,28 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
       ${productsCard}
     </div>`;
 
+    // If a product is selected, estimate filtered funnel stats proportionally
+    // based on that product's share of total product page visitors
+    const selProd = waFmSelectedProduct !== null ? waFmProductPages[waFmSelectedProduct] : null;
+    const prodShare = selProd && d['Product Pages'].visitors > 0 ? selProd.visitors / d['Product Pages'].visitors : 1;
+    const fd = {}; // filtered data for display
+    ['Cart', 'Checkout', 'Purchased'].forEach(k => {
+      if (selProd) {
+        const estVisitors = Math.round((d[k].visitors || 0) * prodShare);
+        const estRev = selProd.revenue || 0;
+        fd[k] = { ...d[k], visitors: estVisitors, revenue: k === 'Purchased' ? estRev : estRev };
+      } else {
+        fd[k] = d[k];
+      }
+    });
+
+    // Filter banner
+    const filterBanner = selProd
+      ? `<div style="text-align:center;margin:0.5rem 0;"><span class="entry-badge" style="font-size:0.7rem;padding:4px 12px;">Filtering by: ${selProd.shortName} <span onclick="event.stopPropagation();waSelectProduct(${waFmSelectedProduct})" style="cursor:pointer;margin-left:4px;">✕</span></span></div>`
+      : '';
+
     // Connector: show cart visitors as the convergence
-    const cartVisitors = d['Cart'].visitors || 0;
-    const topMax = Math.max(d['Homepage'].visitors || 0, d['Shop Page'].visitors || 0, d['Product Pages'].visitors || 0, 1);
+    const cartVisitors = fd['Cart'].visitors || 0;
     const convText = `${fmtNum(cartVisitors)} users reach cart`;
 
     const connector1 = `<div class="wa-fm-center-connector">
@@ -6555,21 +6607,21 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     </div>`;
 
     // Cart card
-    const cartCard = `<div class="wa-fm-center">${waFmCard('Cart', d['Cart'], { center: true })}</div>`;
+    const cartCard = `<div class="wa-fm-center">${waFmCard('Cart', fd['Cart'], { center: true })}</div>`;
 
     // Cart → Checkout connector
-    const conn2 = waFmConnector(d['Cart'], d['Checkout']);
+    const conn2 = waFmConnector(fd['Cart'], fd['Checkout']);
 
     // Checkout card
-    const checkoutCard = `<div class="wa-fm-center">${waFmCard('Checkout', d['Checkout'], { center: true })}</div>`;
+    const checkoutCard = `<div class="wa-fm-center">${waFmCard('Checkout', fd['Checkout'], { center: true })}</div>`;
 
     // Checkout → Purchased connector
-    const conn3 = waFmConnector(d['Checkout'], d['Purchased']);
+    const conn3 = waFmConnector(fd['Checkout'], fd['Purchased']);
 
     // Purchased card
-    const purchasedCard = `<div class="wa-fm-center">${waFmCard('Purchased', d['Purchased'], { center: true })}</div>`;
+    const purchasedCard = `<div class="wa-fm-center">${waFmCard('Purchased', fd['Purchased'], { center: true })}</div>`;
 
-    body.innerHTML = topCards + connector1 + cartCard + conn2 + checkoutCard + conn3 + purchasedCard;
+    body.innerHTML = topCards + (filterBanner || '') + connector1 + cartCard + conn2 + checkoutCard + conn3 + purchasedCard;
   }
 
   // ── Abandoned Checkouts (Layer 2 — Stripe) ──
@@ -7158,6 +7210,7 @@ async function loadManufacturingTab() {
   renderMfgTable();
   renderQueuedBatches();
   prefillMfgForm();
+  loadIngredients();
 }
 
 function prefillMfgForm() {
@@ -8466,6 +8519,156 @@ document.getElementById('so-add-btn').addEventListener('click', async function()
 });
 
 document.getElementById('so-status-filter').addEventListener('change', () => { renderSupplierOrders(); });
+
+// ── Ingredient Stocktake ──
+let ingredientsData = [];
+let productIngredientsData = [];
+let ingPage = 1;
+let ingFilter = '';
+
+async function loadIngredients() {
+  try {
+    const [ingRes, piRes] = await Promise.all([
+      fetch(`${db.supabaseUrl}/rest/v1/ingredients?order=name.asc&select=*`, { headers: { 'apikey': db.supabaseKey, 'Authorization': `Bearer ${db.supabaseKey}` } }),
+      fetch(`${db.supabaseUrl}/rest/v1/product_ingredients?select=*`, { headers: { 'apikey': db.supabaseKey, 'Authorization': `Bearer ${db.supabaseKey}` } }),
+    ]);
+    ingredientsData = await ingRes.json();
+    productIngredientsData = await piRes.json();
+    if (!Array.isArray(ingredientsData)) ingredientsData = [];
+    if (!Array.isArray(productIngredientsData)) productIngredientsData = [];
+  } catch { ingredientsData = []; productIngredientsData = []; }
+  renderIngredientsTable();
+  populateFormulationDropdown();
+}
+
+function renderIngredientsTable() {
+  const tbody = document.getElementById('ing-table');
+  let filtered = ingredientsData;
+  if (ingFilter) filtered = filtered.filter(i => (i.name + i.category + i.supplier).toLowerCase().includes(ingFilter));
+  const start = (ingPage - 1) * PAGE_SIZE;
+  const page = filtered.slice(start, start + PAGE_SIZE);
+  if (page.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="loading">No ingredients found</td></tr>';
+    renderPagination('ing-pagination', 1, 0, () => {});
+    return;
+  }
+  tbody.innerHTML = page.map(i => {
+    const usedIn = productIngredientsData.filter(pi => pi.ingredient_id === i.id).map(pi => pi.product_name);
+    const unique = [...new Set(usedIn)];
+    const usedStr = unique.length > 0 ? unique.slice(0, 3).join(', ') + (unique.length > 3 ? '...' : '') : '-';
+    return `<tr class="clickable" onclick="editIngredient(${i.id})" style="cursor:pointer;">
+      <td><strong>${esc(i.name)}</strong></td>
+      <td><span class="source-pill" style="background:rgba(156,146,135,0.15);color:var(--muted);">${esc(i.category)}</span></td>
+      <td style="text-align:right;">${i.price_per_kg > 0 ? '$' + Number(i.price_per_kg).toFixed(2) : '<span style="color:var(--dim);">$0</span>'}</td>
+      <td style="text-align:right;">${Number(i.stock_kg || 0).toFixed(1)}</td>
+      <td>${esc(i.supplier || '-')}</td>
+      <td style="font-size:0.75rem;">${usedStr}</td>
+      <td><button onclick="event.stopPropagation();deleteIngredient(${i.id})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:0.75rem;">Delete</button></td>
+    </tr>`;
+  }).join('');
+  renderPagination('ing-pagination', ingPage, filtered.length, p => { ingPage = p; renderIngredientsTable(); });
+}
+
+document.getElementById('ing-search').addEventListener('input', function() { ingFilter = this.value.toLowerCase().trim(); ingPage = 1; renderIngredientsTable(); });
+
+document.getElementById('ing-add-btn').addEventListener('click', () => {
+  document.getElementById('ing-add-form').style.display = '';
+  document.getElementById('ing-name').value = '';
+  document.getElementById('ing-price').value = '';
+  document.getElementById('ing-stock').value = '';
+  document.getElementById('ing-supplier').value = '';
+  document.getElementById('ing-add-form').dataset.editId = '';
+});
+
+document.getElementById('ing-cancel-btn').addEventListener('click', () => {
+  document.getElementById('ing-add-form').style.display = 'none';
+});
+
+document.getElementById('ing-save-btn').addEventListener('click', async () => {
+  const name = document.getElementById('ing-name').value.trim();
+  const price_per_kg = parseFloat(document.getElementById('ing-price').value) || 0;
+  const stock_kg = parseFloat(document.getElementById('ing-stock').value) || 0;
+  const category = document.getElementById('ing-category').value;
+  const supplier = document.getElementById('ing-supplier').value.trim();
+  if (!name) return;
+  const editId = document.getElementById('ing-add-form').dataset.editId;
+  try {
+    if (editId) {
+      await fetch(`${db.supabaseUrl}/rest/v1/ingredients?id=eq.${editId}`, {
+        method: 'PATCH',
+        headers: { 'apikey': db.supabaseKey, 'Authorization': `Bearer ${db.supabaseKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, price_per_kg, stock_kg, category, supplier, updated_at: new Date().toISOString() }),
+      });
+    } else {
+      await fetch(`${db.supabaseUrl}/rest/v1/ingredients`, {
+        method: 'POST',
+        headers: { 'apikey': db.supabaseKey, 'Authorization': `Bearer ${db.supabaseKey}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify({ name, price_per_kg, stock_kg, category, supplier }),
+      });
+    }
+    document.getElementById('ing-add-form').style.display = 'none';
+    await loadIngredients();
+  } catch (e) { console.error('Save ingredient error:', e); }
+});
+
+window.editIngredient = function(id) {
+  const i = ingredientsData.find(x => x.id === id);
+  if (!i) return;
+  document.getElementById('ing-add-form').style.display = '';
+  document.getElementById('ing-add-form').dataset.editId = id;
+  document.getElementById('ing-name').value = i.name;
+  document.getElementById('ing-price').value = i.price_per_kg || '';
+  document.getElementById('ing-stock').value = i.stock_kg || '';
+  document.getElementById('ing-category').value = i.category || 'Raw Material';
+  document.getElementById('ing-supplier').value = i.supplier || '';
+};
+
+window.deleteIngredient = async function(id) {
+  if (!confirm('Delete this ingredient?')) return;
+  try {
+    await fetch(`${db.supabaseUrl}/rest/v1/ingredients?id=eq.${id}`, {
+      method: 'DELETE',
+      headers: { 'apikey': db.supabaseKey, 'Authorization': `Bearer ${db.supabaseKey}` },
+    });
+    await loadIngredients();
+  } catch (e) { console.error('Delete ingredient error:', e); }
+};
+
+// ── Product Formulations ──
+function populateFormulationDropdown() {
+  const sel = document.getElementById('formulation-product');
+  const products = [...new Set(productIngredientsData.map(pi => pi.product_sku))];
+  const nameMap = {};
+  productIngredientsData.forEach(pi => { nameMap[pi.product_sku] = pi.product_name; });
+  sel.innerHTML = '<option value="">Select product...</option>' + products.map(sku =>
+    '<option value="' + sku + '">' + esc(nameMap[sku] || sku) + '</option>'
+  ).join('');
+}
+
+document.getElementById('formulation-product').addEventListener('change', function() {
+  renderFormulationTable(this.value);
+});
+
+function renderFormulationTable(sku) {
+  const tbody = document.getElementById('formulation-table');
+  const totalEl = document.getElementById('formulation-total');
+  if (!sku) { tbody.innerHTML = '<tr><td colspan="4" class="loading">Select a product above</td></tr>'; totalEl.textContent = ''; return; }
+  const items = productIngredientsData.filter(pi => pi.product_sku === sku);
+  if (items.length === 0) { tbody.innerHTML = '<tr><td colspan="4" class="loading">No ingredients for this product</td></tr>'; totalEl.textContent = ''; return; }
+  let totalCostPerKg = 0;
+  tbody.innerHTML = items.map(pi => {
+    const ing = ingredientsData.find(i => i.id === pi.ingredient_id);
+    const priceKg = ing ? Number(ing.price_per_kg || 0) : 0;
+    const pct = Number(pi.percentage || 0);
+    const costContrib = priceKg * pct / 100;
+    totalCostPerKg += costContrib;
+    return '<tr><td>' + esc(ing ? ing.name : '?') + '</td>'
+      + '<td style="text-align:right;">' + pct.toFixed(2) + '%</td>'
+      + '<td style="text-align:right;">' + (priceKg > 0 ? '$' + priceKg.toFixed(2) : '-') + '</td>'
+      + '<td style="text-align:right;">' + (costContrib > 0 ? '$' + costContrib.toFixed(2) : '-') + '</td></tr>';
+  }).join('');
+  totalEl.textContent = 'Ingredient cost per kg: $' + totalCostPerKg.toFixed(2);
+}
 
 // ── Marketing Tab ──
 let mktInited = false;
