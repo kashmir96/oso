@@ -8439,6 +8439,91 @@ function renderMktGads() {
   renderPagination('mkt-gads-pagination', mktGadsPage, mktGadsCampaigns.length, p => { mktGadsPage = p; renderMktGads(); });
 }
 
+// ── Marketing: regional performance table ──
+async function renderMktRegionTable(orders, fbC, gC, gSt) {
+  const tbody = document.getElementById('mkt-region-table');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading regional data\u2026</td></tr>';
+
+  const tok = encodeURIComponent(currentStaff.token);
+  const [from, to] = getDateRange();
+
+  // Fetch FB and Google region breakdowns in parallel
+  const [fbGeo, gGeo] = await Promise.all([
+    fetch(`/.netlify/functions/facebook-campaigns?token=${tok}&from=${from}&to=${to}&geo=region`).then(r => r.json()).catch(() => ({ regions: [] })),
+    (gSt.connected && gSt.adsCustomerId)
+      ? fetch(`/.netlify/functions/google-ads?token=${tok}&from=${from}&to=${to}&geo=region`).then(r => r.json()).catch(() => ({ regions: [] }))
+      : { regions: [] },
+  ]);
+
+  // Build order revenue by region (from city → region mapping)
+  const cityToRegion = {};
+  Object.keys(NZ_CITIES).forEach(city => {
+    // Map cities to their region based on proximity to region centroids
+    let bestRegion = '', bestDist = Infinity;
+    const cc = NZ_CITIES[city];
+    Object.entries(NZ_REGIONS).forEach(([rName, rc]) => {
+      if (rName.includes(' region')) return; // skip duplicates
+      const d = Math.abs(cc[0] - rc[0]) + Math.abs(cc[1] - rc[1]);
+      if (d < bestDist) { bestDist = d; bestRegion = rName; }
+    });
+    cityToRegion[city] = bestRegion;
+  });
+
+  const regionData = {};
+  const ensureRegion = (name) => {
+    const key = name.toLowerCase().replace(/ region$/i, '').trim();
+    if (!regionData[key]) regionData[key] = { name: name, orders: 0, revenue: 0, fbSpend: 0, gSpend: 0 };
+    return regionData[key];
+  };
+
+  // Orders by region
+  orders.forEach(o => {
+    const city = (o.city || '').toLowerCase().trim();
+    const region = cityToRegion[city];
+    if (!region) return;
+    const r = ensureRegion(region);
+    r.orders++;
+    r.revenue += Number(o.total_value || 0);
+  });
+
+  // FB spend by region
+  (fbGeo.regions || []).forEach(r => {
+    const d = ensureRegion(r.region);
+    d.fbSpend += r.spend;
+  });
+
+  // Google spend by region
+  (gGeo.regions || []).forEach(r => {
+    const d = ensureRegion(r.region);
+    d.gSpend += r.spend;
+  });
+
+  const rows = Object.values(regionData)
+    .filter(r => r.orders > 0 || r.fbSpend > 0 || r.gSpend > 0)
+    .sort((a, b) => b.revenue - a.revenue);
+
+  if (rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="loading">No regional data</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r => {
+    const totalSpend = r.fbSpend + r.gSpend;
+    const roas = totalSpend > 0 ? (r.revenue / totalSpend).toFixed(1) + 'x' : '-';
+    const name = r.name.charAt(0).toUpperCase() + r.name.slice(1);
+    return '<tr>'
+      + '<td>' + esc(name) + '</td>'
+      + '<td>' + r.orders + '</td>'
+      + '<td>$' + r.revenue.toFixed(2) + '</td>'
+      + '<td>' + (r.fbSpend > 0 ? '$' + r.fbSpend.toFixed(2) : '-') + '</td>'
+      + '<td>' + (r.gSpend > 0 ? '$' + r.gSpend.toFixed(2) : '-') + '</td>'
+      + '<td>' + (totalSpend > 0 ? '$' + totalSpend.toFixed(2) : '-') + '</td>'
+      + '<td>' + roas + '</td>'
+      + '</tr>';
+  }).join('');
+}
+
 // ── Marketing: sales by source over time chart ──
 function renderMktSourceTimeChart(orders) {
   const dateSourceMap = {};
@@ -8780,6 +8865,8 @@ async function loadMarketingTab() {
   renderMktSourceTimeChart(mktOrders);
   renderMktCreativeTimeChart(mktOrders);
   mktGadsPage = 1; renderMktGads();
+  // Regional performance table
+  renderMktRegionTable(mktOrders, fbC, gC, gSt);
   try{const lr=await mktApi('analytics-dashboard',{site:'PrimalPantry.co.nz',from,to,metric:'entry_pages'});if(Array.isArray(lr)&&lr.length>0){document.getElementById('mkt-landing-table').innerHTML=lr.slice(0,10).map(l=>{const pg=l.value||l.pathname||'-';return '<tr style="cursor:pointer;" onclick="openPageModal(\''+pg.replace(/'/g,"\\'")+'\')""><td>'+pg+'</td><td>'+(l.visitors||l.count||0)+'</td><td>-</td><td>-</td><td>-</td><td>'+(l.bounce_rate?l.bounce_rate.toFixed(1)+'%':'-')+'</td></tr>';}).join('');}}catch(e){}
   const gmcP=gmcD.products||[];const gmcTbl=document.getElementById('mkt-gmc-table'),gmcWrap=document.getElementById('mkt-gmc-table-wrap'),gmcLoad=document.getElementById('mkt-gmc-loading');
   if(gmcP.length>0){mktGmcPage=1;gmcWrap.style.display='table';gmcLoad.style.display='none';renderMktGmc(gmcP);}
