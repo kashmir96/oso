@@ -2011,12 +2011,21 @@ function responseTimePill(inboundDate, outboundDate) {
   return `<span class="response-pill ${cls}" title="Response time">${label} reply</span>`;
 }
 
-function orderStatusIcon(status) {
-  if (!status) return '';
-  const s = status.toLowerCase();
-  if (s === 'refunded') return '<span class="status-icon refunded" title="Refunded">R</span>';
-  if (s === 'incorrect order') return '<span class="status-icon incorrect-order" title="Incorrect Order">IO</span>';
-  return '';
+function orderStatusIcon(order) {
+  if (!order) return '';
+  const s = (order.status || '').toLowerCase();
+  let pills = '';
+  if (s === 'refunded' || Number(order.refund_amount) > 0) {
+    const partial = Number(order.refund_amount) > 0 && Number(order.refund_amount) < Number(order.total_value);
+    pills += `<span class="status-icon refunded" title="Refunded${partial ? ' (partial: $' + Number(order.refund_amount).toFixed(2) + ')' : ''}" style="background:rgba(231,76,60,0.15);color:#e74c3c;padding:1px 4px;border-radius:3px;font-size:0.6rem;font-weight:700;margin-left:4px;">RF</span>`;
+  }
+  if (s === 'incorrect order' || (order.refund_reason || '').toLowerCase().includes('damage') || (order.refund_reason || '').toLowerCase().includes('broken')) {
+    pills += `<span class="status-icon damaged" title="Damaged/Replaced" style="background:rgba(230,126,34,0.15);color:#E67E22;padding:1px 4px;border-radius:3px;font-size:0.6rem;font-weight:700;margin-left:4px;">DM</span>`;
+  }
+  if (s === 'cancelled') {
+    pills += `<span class="status-icon cancelled" title="Cancelled" style="background:rgba(156,146,135,0.15);color:var(--muted);padding:1px 4px;border-radius:3px;font-size:0.6rem;font-weight:700;margin-left:4px;">CN</span>`;
+  }
+  return pills;
 }
 // ── Orders table ──
 let orderSortCol = 'date';
@@ -2095,7 +2104,7 @@ function renderOrdersTable() {
     <tr class="clickable" data-id="${o.id}">
       <td>${daysWaitingBadge(o)}</td>
       <td>${o.order_date}${o.created_at ? ' ' + new Date(o.created_at).toLocaleTimeString('en-NZ', {hour:'2-digit',minute:'2-digit'}) : ''}</td>
-      <td>${o.customer_name || '-'}${orderStatusIcon(o.status)}</td>
+      <td>${o.customer_name || '-'}${orderStatusIcon(o)}</td>
       <td>${o.email || '-'}</td>
       <td>${[o.city, o.country_code].filter(Boolean).join(', ') || '-'}</td>
       <td>$${Number(o.total_value || 0).toFixed(2)}</td>
