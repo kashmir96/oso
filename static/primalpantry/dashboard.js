@@ -1411,9 +1411,10 @@ function renderDailyPace() {
   const dailyExp = expensesData.reduce((s, e) => s + expenseDailyEquiv(Number(e.amount), e.frequency), 0);
   const hourlyExpense = dailyExp / 24;
 
+  // Opex is a flat daily baseline — other costs accumulate on top
   const labels = [], cumToday = [], cumLastWeek = [], cumTotalCosts = [];
-  const cumCogsArr = [], cumAdsArr = [], cumRefundsArr = [], cumOpexArr = [], cumShippingArr = [];
-  let runToday = 0, runLW = 0, runCogs = 0, runRefunds = 0, runExpenses = 0, runShipping = 0;
+  const cumCogsArr = [], cumAdsArr = [], cumRefundsArr = [], cumShippingArr = [];
+  let runToday = 0, runLW = 0, runCogs = 0, runRefunds = 0, runShipping = 0;
   for (let h = 0; h < 24; h++) {
     const ampm = h === 0 ? '12am' : h < 12 ? h + 'am' : h === 12 ? '12pm' : (h - 12) + 'pm';
     labels.push(ampm);
@@ -1423,17 +1424,16 @@ function renderDailyPace() {
       runToday += todayHourly[h]; cumToday.push(runToday);
       runCogs += todayCogsHourly[h];
       runRefunds += todayRefundHourly[h];
-      runExpenses += hourlyExpense;
       runShipping += todayShippingHourly[h];
-      cumCogsArr.push(runCogs);
-      cumAdsArr.push(cumAdspendByHour[h] || 0);
-      cumRefundsArr.push(runRefunds);
-      cumOpexArr.push(runExpenses);
-      cumShippingArr.push(runShipping);
-      cumTotalCosts.push(runCogs + (cumAdspendByHour[h] || 0) + runRefunds + runExpenses + runShipping);
+      const variableCosts = runCogs + (cumAdspendByHour[h] || 0) + runRefunds + runShipping;
+      cumCogsArr.push(dailyExp + runCogs);
+      cumAdsArr.push(dailyExp + (cumAdspendByHour[h] || 0));
+      cumRefundsArr.push(dailyExp + runRefunds);
+      cumShippingArr.push(dailyExp + runShipping);
+      cumTotalCosts.push(dailyExp + variableCosts);
     } else {
       cumToday.push(null); cumTotalCosts.push(null);
-      cumCogsArr.push(null); cumAdsArr.push(null); cumRefundsArr.push(null); cumOpexArr.push(null); cumShippingArr.push(null);
+      cumCogsArr.push(null); cumAdsArr.push(null); cumRefundsArr.push(null); cumShippingArr.push(null);
     }
   }
 
@@ -1441,8 +1441,11 @@ function renderDailyPace() {
   const todayLabel = 'Today (' + dayNames[now.getDay()] + ')';
   const lwLabel = 'Last ' + dayNames[lastWeek.getDay()] + ' (' + lastWeekStr.slice(5) + ')';
 
+  // Flat opex baseline = daily opex amount at every hour
+  const opexFlatLine = labels.map((_, h) => h <= currentHour ? dailyExp : null);
+
   // Store for expand toggle
-  window._paceChartData = { labels, cumToday, cumLastWeek, cumTotalCosts, cumCogsArr, cumAdsArr, cumRefundsArr, cumOpexArr, cumShippingArr, todayLabel, lwLabel };
+  window._paceChartData = { labels, cumToday, cumLastWeek, cumTotalCosts, cumCogsArr, cumAdsArr, cumRefundsArr, cumShippingArr, opexFlatLine, dailyExp, todayLabel, lwLabel };
   window._paceExpanded = window._paceExpanded || false;
   renderPaceChart();
 }
@@ -1457,13 +1460,19 @@ function renderPaceChart() {
     { label: d.todayLabel + ' Revenue', data: d.cumToday, borderColor: '#6B8F5B', backgroundColor: 'rgba(107,143,91,0.2)', fill: true, borderWidth: 2.5, tension: 0.3, pointRadius: 0, pointHitRadius: 8, order: 9 },
   ];
 
+  // Opex flat line always shown
+  if (d.dailyExp > 0) {
+    baseDatasets.push(
+      { label: 'Daily Opex ($' + d.dailyExp.toFixed(2) + ')', data: d.opexFlatLine, borderColor: '#E08050', backgroundColor: 'transparent', fill: false, borderWidth: 1.5, borderDash: [6, 4], tension: 0, pointRadius: 0, order: 0 },
+    );
+  }
+
   if (expanded) {
     baseDatasets.push(
       { label: 'COGS', data: d.cumCogsArr, borderColor: '#E67E22', backgroundColor: 'rgba(230,126,34,0.15)', fill: true, borderWidth: 2, tension: 0.3, pointRadius: 0, order: 5 },
       { label: 'Ads', data: d.cumAdsArr, borderColor: '#D4A84B', backgroundColor: 'rgba(212,168,75,0.15)', fill: true, borderWidth: 2, tension: 0.3, pointRadius: 0, order: 4 },
       { label: 'Shipping', data: d.cumShippingArr, borderColor: '#C0392B', backgroundColor: 'rgba(192,57,43,0.15)', fill: true, borderWidth: 2, tension: 0.3, pointRadius: 0, order: 3 },
       { label: 'Refunds', data: d.cumRefundsArr, borderColor: '#E74C3C', backgroundColor: 'rgba(231,76,60,0.15)', fill: true, borderWidth: 1.5, tension: 0.3, pointRadius: 0, order: 2 },
-      { label: 'Opex', data: d.cumOpexArr, borderColor: '#E08050', backgroundColor: 'rgba(224,128,80,0.15)', fill: true, borderWidth: 1.5, tension: 0.3, pointRadius: 0, order: 1 },
     );
   } else {
     baseDatasets.push(
