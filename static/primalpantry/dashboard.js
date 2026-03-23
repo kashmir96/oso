@@ -638,7 +638,8 @@ function applyFilter() {
   } else if (activeTab === 'website') {
     if (typeof loadWebsiteAnalytics === 'function') loadWebsiteAnalytics();
   } else if (activeTab === 'finance') {
-    if (typeof loadFinanceTab === 'function') loadFinanceTab();
+    // Only reload finance on manual filter change, not auto-refresh (would clear expense form inputs)
+    if (!window._isAutoRefresh && typeof loadFinanceTab === 'function') loadFinanceTab();
   }
 }
 
@@ -799,7 +800,9 @@ async function autoRefresh() {
     lastAutoRefresh = allOrders.length > 0 ? allOrders[0].created_at : '';
     populateFilterDropdowns();
     populateSegmentDropdowns();
+    window._isAutoRefresh = true;
     applyFilter();
+    window._isAutoRefresh = false;
     updateRefreshTime();
   } catch (e) {
     // Silent fail on auto-refresh
