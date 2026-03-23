@@ -1558,7 +1558,15 @@ function renderPaceChart() {
               if (ctx.dataset.label && ctx.dataset.label.startsWith('Breakeven')) {
                 return 'Breakeven at ' + d.labels[ctx.dataIndex] + ': $' + (ctx.parsed.y || 0).toFixed(2);
               }
-              return ctx.dataset.label + ': $' + (ctx.parsed.y || 0).toFixed(2);
+              const rawVal = ctx.dataset.data[ctx.dataIndex];
+              if (rawVal === null || rawVal === undefined) return '';
+              // For cost breakdown lines, show just that component's cumulative total (without opex base)
+              const lbl = ctx.dataset.label || '';
+              if (lbl === 'COGS') return lbl + ': $' + Math.max(0, rawVal - d.dailyExp).toFixed(2);
+              if (lbl === 'Ads') return lbl + ': $' + Math.max(0, rawVal - d.dailyExp).toFixed(2);
+              if (lbl === 'Refunds') return lbl + ': $' + Math.max(0, rawVal - d.dailyExp).toFixed(2);
+              if (lbl === 'Shipping') return lbl + ': $' + Math.max(0, rawVal - d.dailyExp).toFixed(2);
+              return lbl + ': $' + rawVal.toFixed(2);
             }
           }
         },
@@ -1830,18 +1838,20 @@ function renderHeatmap(orders) {
     dayRev[dow] += val;
   });
 
-  // CPA grid: spread adspend evenly across days of week proportional to orders
+  // Blended CPA: total adspend / total orders, applied per-hour
   const totalOrders = dayOrders.reduce((s, v) => s + v, 0) || 1;
-  const dayCPA = dayOrders.map(cnt => cnt > 0 ? (currentAdSpend * (cnt / totalOrders)) / cnt : 0);
+  const blendedCPA = totalOrders > 0 ? currentAdSpend / totalOrders : 0;
+  // CPA grid: each cell = blendedCPA if there are orders, else 0
+  const cpaGrid = orderGrid.map(row => row.map(cnt => cnt > 0 ? blendedCPA : 0));
+  const dayCPA = dayOrders.map(cnt => cnt > 0 ? blendedCPA : 0);
 
   let grid, prefix, suffix, colorBase;
   if (mode === 'revenue') {
     grid = revGrid;
     prefix = '$'; suffix = ''; colorBase = '107,143,91';
   } else if (mode === 'cpa') {
-    // CPA per cell doesn't make sense (need orders per cell), so show day-level CPA in row summary
-    grid = orderGrid; // still show orders in cells
-    prefix = ''; suffix = ''; colorBase = '107,143,91';
+    grid = cpaGrid;
+    prefix = '$'; suffix = ''; colorBase = '199,146,89';
   } else {
     grid = orderGrid;
     prefix = ''; suffix = ''; colorBase = '107,143,91';
@@ -1867,6 +1877,9 @@ function renderHeatmap(orders) {
       if (mode === 'revenue') {
         display = v > 0 ? '$' + Math.round(v) : '';
         tooltip = `${dayLabels[d]} ${h}:00 — $${v.toFixed(2)} revenue`;
+      } else if (mode === 'cpa') {
+        display = v > 0 ? '$' + v.toFixed(2) : '';
+        tooltip = `${dayLabels[d]} ${h}:00 — ${orderGrid[d][h]} orders, CPA $${v.toFixed(2)}`;
       } else {
         display = v || '';
         tooltip = `${dayLabels[d]} ${h}:00 — ${v} orders`;
