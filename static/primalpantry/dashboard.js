@@ -3150,7 +3150,7 @@ function refreshMapLayers() {
     markers.forEach(m => {
       const marker = L.circleMarker(m.coords, {
         radius: Math.min(4 + m.count * 2, 20),
-        color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.6, weight: 1,
+        color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.35, weight: 1,
       }).bindTooltip(`<b>${m.name}</b><br>${m.count} orders<br>$${m.revenue.toFixed(2)}<br><i>Click to filter</i>`, { className: '' })
         .addTo(mapInstance);
       marker.on('click', () => {
@@ -3223,7 +3223,7 @@ function refreshMapLayers() {
       const radius = 4 + ratio * 20; // 4px min, 24px max
       const marker = L.circleMarker([m.coords[0] + offset, m.coords[1] + offset], {
         radius,
-        color: '#E67E22', fillColor: '#E67E22', fillOpacity: 0.5, weight: 2, dashArray: '4 2',
+        color: '#E67E22', fillColor: '#E67E22', fillOpacity: 0.3, weight: 2, dashArray: '4 2',
       }).bindTooltip(
         `<b>${m.name}</b> <span style="color:#E67E22">● Ad Spend</span><br>` +
         `Spend: $${m.spend.toFixed(2)}<br>` +
