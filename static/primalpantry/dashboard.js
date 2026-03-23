@@ -1862,14 +1862,28 @@ function renderHeatmap(orders) {
   const totalOrders = dayOrders.reduce((s, v) => s + v, 0) || 1;
   const spendGrid = Array(7).fill(null).map(() => Array(24).fill(0));
   const daySpendTotals = Array(7).fill(0);
+  let hasSpendData = false;
   if (window._adspendHourlyData && window._adspendHourlyData.length > 0) {
     window._adspendHourlyData.forEach(r => {
-      if (r.date < cutoffStr) return; // only within heatmap range
+      if (r.date < cutoffStr) return;
       const dow = new Date(r.date + 'T00:00:00').getDay();
       const spend = Number(r.hourly_spend || 0);
       spendGrid[dow][r.hour] += spend;
       daySpendTotals[dow] += spend;
+      if (spend > 0) hasSpendData = true;
     });
+  }
+  // Fallback: if no hourly spend data, spread currentAdSpend evenly across hours with orders
+  if (!hasSpendData && currentAdSpend > 0) {
+    const hourlyFallback = currentAdSpend / 24;
+    for (let d = 0; d < 7; d++) {
+      for (let h = 0; h < 24; h++) {
+        if (orderGrid[d][h] > 0) {
+          spendGrid[d][h] = hourlyFallback;
+          daySpendTotals[d] += hourlyFallback;
+        }
+      }
+    }
   }
   const cpaGrid = orderGrid.map((row, d) => row.map((cnt, h) => cnt > 0 ? spendGrid[d][h] / cnt : 0));
   const dayCPA = dayOrders.map((cnt, d) => cnt > 0 ? daySpendTotals[d] / cnt : 0);
