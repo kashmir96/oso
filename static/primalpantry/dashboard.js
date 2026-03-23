@@ -1061,12 +1061,15 @@ function renderStats(orders, lineItems) {
   const grossMargin = revenue > 0 ? ((revenue - periodCOGS) / revenue * 100).toFixed(1) : '0.0';
   const sparkCOGS = buildHourlySpark(h => orders.filter(o => orderHourNZ(o) === h).reduce((s, o) => s + getOrderCOGS(o.id), 0));
 
-  // Profit = Revenue - COGS - Adspend - Refunds - Expenses
+  // Profit = Revenue - COGS - Adspend - Refunds - Expenses - Shipping
   const currentRefundTotal = window._stripeRefundTotal || 0;
   const dailyExpenses = expensesData.reduce((s, e) => s + expenseDailyEquiv(Number(e.amount), e.frequency), 0);
   const periodExpenses = dailyExpenses * periodDays;
-  const profit = revenue - periodCOGS - currentAdSpend - currentRefundTotal - periodExpenses;
-  const priorProfit = priorRevenue - priorCOGS; // no prior adspend/refunds/expenses available
+  const periodShipping = orders.reduce((s, o) => s + Number(o.shipping_cost || 0), 0);
+  const priorShipping = priorOrders.reduce((s, o) => s + Number(o.shipping_cost || 0), 0);
+  const avgShipping = orderCount > 0 ? periodShipping / orderCount : 0;
+  const profit = revenue - periodCOGS - currentAdSpend - currentRefundTotal - periodExpenses - periodShipping;
+  const priorProfit = priorRevenue - priorCOGS - priorShipping;
   const avgProfit = orderCount > 0 ? profit / orderCount : 0;
   const avgCOGS = orderCount > 0 ? periodCOGS / orderCount : 0;
   const blendedCPA = orderCount > 0 ? currentAdSpend / orderCount : 0;
@@ -1104,6 +1107,9 @@ function renderStats(orders, lineItems) {
     { label: 'ROAS', value: currentAdSpend > 0 ? (currentPaidRev / currentAdSpend).toFixed(1) + 'x' : '-', sub: currentPaidConv > 0 ? currentPaidConv + ' paid conversions' : 'return on ad spend', color: 'var(--sage)' },
     { label: 'Live Visitors', value: '<span id="wa-live-count">-</span>', sub: 'on site now', color: 'var(--cyan)' },
     { label: 'Website Visitors', value: '<span id="wa-visitors-count">-</span>', sub: 'unique visitors', color: 'var(--cyan)' },
+    isAvg
+      ? { label: 'Avg Shipping', value: fmt_money(avgShipping), sub: 'shipping cost per order', color: 'var(--purple)' }
+      : { label: 'Shipping', value: fmt_money(periodShipping), sub: orderCount + ' orders shipped', prior: fmtDelta(periodShipping, priorShipping, true), color: 'var(--purple)' },
     { label: 'Refunds', value: `${fmt_money(refundTotal)} (${refundCount})`, sub: `${refundCount} refund${refundCount !== 1 ? 's' : ''} from Stripe`, color: 'var(--red)' },
   ];
 
@@ -1336,6 +1342,7 @@ function renderDailyPace() {
   const todayHourly = Array(24).fill(0);
   const lastWeekHourly = Array(24).fill(0);
   const todayCogsHourly = Array(24).fill(0);
+  const todayShippingHourly = Array(24).fill(0);
 
   allOrders.forEach(o => {
     const val = Number(o.total_value || 0);
@@ -1343,6 +1350,7 @@ function renderDailyPace() {
       const h = o.created_at ? new Date(o.created_at).getHours() : 0;
       todayHourly[h] += val;
       todayCogsHourly[h] += getOrderCOGS(o.id);
+      todayShippingHourly[h] += Number(o.shipping_cost || 0);
     } else if (o.order_date === lastWeekStr) {
       const h = o.created_at ? new Date(o.created_at).getHours() : 0;
       lastWeekHourly[h] += val;
@@ -1403,7 +1411,8 @@ function renderDailyPace() {
   const hourlyExpense = dailyExp / 24;
 
   const labels = [], cumToday = [], cumLastWeek = [], cumTotalCosts = [];
-  let runToday = 0, runLW = 0, runCogs = 0, runRefunds = 0, runExpenses = 0;
+  const cumCogsArr = [], cumAdsArr = [], cumRefundsArr = [], cumOpexArr = [], cumShippingArr = [];
+  let runToday = 0, runLW = 0, runCogs = 0, runRefunds = 0, runExpenses = 0, runShipping = 0;
   for (let h = 0; h < 24; h++) {
     const ampm = h === 0 ? '12am' : h < 12 ? h + 'am' : h === 12 ? '12pm' : (h - 12) + 'pm';
     labels.push(ampm);
@@ -1414,9 +1423,16 @@ function renderDailyPace() {
       runCogs += todayCogsHourly[h];
       runRefunds += todayRefundHourly[h];
       runExpenses += hourlyExpense;
-      cumTotalCosts.push(runCogs + (cumAdspendByHour[h] || 0) + runRefunds + runExpenses);
+      runShipping += todayShippingHourly[h];
+      cumCogsArr.push(runCogs);
+      cumAdsArr.push(cumAdspendByHour[h] || 0);
+      cumRefundsArr.push(runRefunds);
+      cumOpexArr.push(runExpenses);
+      cumShippingArr.push(runShipping);
+      cumTotalCosts.push(runCogs + (cumAdspendByHour[h] || 0) + runRefunds + runExpenses + runShipping);
     } else {
       cumToday.push(null); cumTotalCosts.push(null);
+      cumCogsArr.push(null); cumAdsArr.push(null); cumRefundsArr.push(null); cumOpexArr.push(null); cumShippingArr.push(null);
     }
   }
 
@@ -1424,20 +1440,44 @@ function renderDailyPace() {
   const todayLabel = 'Today (' + dayNames[now.getDay()] + ')';
   const lwLabel = 'Last ' + dayNames[lastWeek.getDay()] + ' (' + lastWeekStr.slice(5) + ')';
 
+  // Store for expand toggle
+  window._paceChartData = { labels, cumToday, cumLastWeek, cumTotalCosts, cumCogsArr, cumAdsArr, cumRefundsArr, cumOpexArr, cumShippingArr, todayLabel, lwLabel };
+  window._paceExpanded = window._paceExpanded || false;
+  renderPaceChart();
+}
+
+function renderPaceChart() {
+  const d = window._paceChartData;
+  if (!d) return;
+  const expanded = window._paceExpanded;
+
+  const baseDatasets = [
+    { label: d.lwLabel, data: d.cumLastWeek, borderColor: 'rgba(156,146,135,0.35)', backgroundColor: 'rgba(156,146,135,0.05)', fill: true, borderWidth: 1.5, borderDash: [4, 3], tension: 0.3, pointRadius: 0, order: 10 },
+    { label: d.todayLabel + ' Revenue', data: d.cumToday, borderColor: '#6B8F5B', backgroundColor: 'rgba(107,143,91,0.2)', fill: true, borderWidth: 2.5, tension: 0.3, pointRadius: 0, pointHitRadius: 8, order: 9 },
+  ];
+
+  if (expanded) {
+    baseDatasets.push(
+      { label: 'COGS', data: d.cumCogsArr, borderColor: '#E67E22', backgroundColor: 'rgba(230,126,34,0.15)', fill: true, borderWidth: 2, tension: 0.3, pointRadius: 0, order: 5 },
+      { label: 'Ads', data: d.cumAdsArr, borderColor: '#D4A84B', backgroundColor: 'rgba(212,168,75,0.15)', fill: true, borderWidth: 2, tension: 0.3, pointRadius: 0, order: 4 },
+      { label: 'Shipping', data: d.cumShippingArr, borderColor: '#C0392B', backgroundColor: 'rgba(192,57,43,0.15)', fill: true, borderWidth: 2, tension: 0.3, pointRadius: 0, order: 3 },
+      { label: 'Refunds', data: d.cumRefundsArr, borderColor: '#E74C3C', backgroundColor: 'rgba(231,76,60,0.15)', fill: true, borderWidth: 1.5, tension: 0.3, pointRadius: 0, order: 2 },
+      { label: 'Opex', data: d.cumOpexArr, borderColor: '#E08050', backgroundColor: 'rgba(224,128,80,0.15)', fill: true, borderWidth: 1.5, tension: 0.3, pointRadius: 0, order: 1 },
+    );
+  } else {
+    baseDatasets.push(
+      { label: 'Total Costs (click to expand)', data: d.cumTotalCosts, borderColor: '#E67E22', backgroundColor: 'rgba(230,126,34,0.35)', fill: true, borderWidth: 2, tension: 0.3, pointRadius: 0, order: 1 },
+    );
+  }
+
   if (charts.cumRevenue) charts.cumRevenue.destroy();
   charts.cumRevenue = new Chart(document.getElementById('cumulative-revenue-chart'), {
     type: 'line',
-    data: {
-      labels,
-      datasets: [
-        { label: lwLabel, data: cumLastWeek, borderColor: 'rgba(156,146,135,0.35)', backgroundColor: 'rgba(156,146,135,0.05)', fill: true, borderWidth: 1.5, borderDash: [4, 3], tension: 0.3, pointRadius: 0, order: 3 },
-        { label: todayLabel + ' Revenue', data: cumToday, borderColor: '#6B8F5B', backgroundColor: 'rgba(107,143,91,0.2)', fill: true, borderWidth: 2.5, tension: 0.3, pointRadius: 0, pointHitRadius: 8, order: 2 },
-        { label: 'Total Costs (COGS + Ads + Refunds + Opex)', data: cumTotalCosts, borderColor: '#E67E22', backgroundColor: 'rgba(230,126,34,0.35)', fill: true, borderWidth: 2, tension: 0.3, pointRadius: 0, order: 1 },
-      ],
-    },
+    data: { labels: d.labels, datasets: baseDatasets },
     options: {
       responsive: true, maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
+      onClick: () => { window._paceExpanded = !window._paceExpanded; renderPaceChart(); },
       plugins: {
         legend: { labels: { color: '#9c9287', font: { size: 11, family: 'DM Sans' } } },
         tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': $' + (ctx.parsed.y || 0).toFixed(2) } },
@@ -1515,7 +1555,7 @@ function renderMonthlyPace() {
       datasets: [
         { label: prevLabel + ' (pace)', data: cumPrev, borderColor: 'rgba(156,146,135,0.35)', backgroundColor: 'rgba(156,146,135,0.05)', fill: true, borderWidth: 1.5, borderDash: [4, 3], tension: 0.3, pointRadius: 0, order: 3 },
         { label: currLabel + ' Revenue', data: cumCurrent, borderColor: '#6B8F5B', backgroundColor: 'rgba(107,143,91,0.2)', fill: true, borderWidth: 2.5, tension: 0.3, pointRadius: 0, pointHitRadius: 8, order: 2 },
-        { label: 'Total Costs (COGS + Ads + Refunds + Opex)', data: cumTotalCosts, borderColor: '#E67E22', backgroundColor: 'rgba(230,126,34,0.35)', fill: true, borderWidth: 2, tension: 0.3, pointRadius: 0, order: 1 },
+        { label: 'Total Costs (COGS + Ads + Refunds + Opex + Shipping)', data: cumTotalCosts, borderColor: '#E67E22', backgroundColor: 'rgba(230,126,34,0.35)', fill: true, borderWidth: 2, tension: 0.3, pointRadius: 0, order: 1 },
       ],
     },
     options: {
