@@ -3100,6 +3100,7 @@ function loadAdspendRegions() {
 }
 
 function refreshMapLayers() {
+  console.log('[Map] refreshMapLayers called, mapInstance:', !!mapInstance);
   if (!mapInstance) return;
   const layer = (document.getElementById('map-layer') || {}).value || 'both';
   const adSource = (document.getElementById('map-ad-source') || {}).value || 'all';
