@@ -3200,10 +3200,11 @@ function refreshMapLayers() {
       adMarkers.push({ coords, ...data });
     });
 
-    // Adspend heat layer (orange)
+    // Adspend heat layer (orange, intensity relative to spend)
     const adHeatData = [];
+    const maxAdSpend = Math.max(...adMarkers.map(m => m.spend), 1);
     adMarkers.forEach(m => {
-      const intensity = Math.max(1, Math.round(m.spend / 5));
+      const intensity = Math.max(1, Math.round((m.spend / maxAdSpend) * 10));
       for (let i = 0; i < intensity; i++) adHeatData.push([m.coords[0], m.coords[1], 1]);
     });
 
@@ -3214,11 +3215,14 @@ function refreshMapLayers() {
       }).addTo(mapInstance);
     }
 
-    // Adspend circle markers (orange, offset slightly from order markers)
+    // Adspend circle markers (orange, sized relative to spend)
+    const maxSpend = Math.max(...adMarkers.map(m => m.spend), 1);
     adMarkers.forEach(m => {
       const offset = showOrders ? 0.15 : 0;
+      const ratio = m.spend / maxSpend; // 0-1 relative to highest spend region
+      const radius = 4 + ratio * 20; // 4px min, 24px max
       const marker = L.circleMarker([m.coords[0] + offset, m.coords[1] + offset], {
-        radius: Math.min(6 + m.spend * 0.8, 28),
+        radius,
         color: '#E67E22', fillColor: '#E67E22', fillOpacity: 0.5, weight: 2, dashArray: '4 2',
       }).bindTooltip(
         `<b>${m.name}</b> <span style="color:#E67E22">● Ad Spend</span><br>` +
