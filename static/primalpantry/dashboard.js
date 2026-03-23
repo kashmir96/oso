@@ -148,7 +148,7 @@ let ordersPage = 1;
 let customersPage = 1;
 let landingRevPage = 1;
 const PAGE_SIZE = 10;
-const ESHIP_COST_PER_ORDER = 4.00; // avg eShip carrier cost per shipment
+let ESHIP_COST_PER_ORDER = Number(localStorage.getItem('oso_eship_cost') || 4.00);
 let currentStaff = null;
 let activeTab = 'sales';
 let attributionModel = localStorage.getItem('oso_attr_model') || 'first';
@@ -1113,8 +1113,8 @@ function renderStats(orders, lineItems) {
     { label: 'Live Visitors', value: '<span id="wa-live-count">-</span>', sub: 'on site now', color: 'var(--cyan)' },
     { label: 'Website Visitors', value: '<span id="wa-visitors-count">-</span>', sub: 'unique visitors', color: 'var(--cyan)' },
     isAvg
-      ? { label: 'Avg Shipping', value: fmt_money(ESHIP_COST_PER_ORDER), sub: 'eShip cost per order', color: 'var(--purple)' }
-      : { label: 'eShip Bill', value: fmt_money(periodShipping), sub: shippedCount + ' orders @ $' + ESHIP_COST_PER_ORDER.toFixed(2) + '/ea', prior: fmtDelta(periodShipping, priorShipping, true), color: 'var(--purple)' },
+      ? { label: 'Avg Shipping', value: fmt_money(ESHIP_COST_PER_ORDER), sub: '<a href="#" onclick="editEshipRate(event)" style="color:var(--purple);text-decoration:underline;font-size:0.7rem;">edit rate</a>', color: 'var(--purple)' }
+      : { label: 'eShip Bill', value: fmt_money(periodShipping), sub: shippedCount + ' orders @ $' + ESHIP_COST_PER_ORDER.toFixed(2) + '/ea · <a href="#" onclick="editEshipRate(event)" style="color:var(--purple);text-decoration:underline;font-size:0.65rem;">edit</a>', prior: fmtDelta(periodShipping, priorShipping, true), color: 'var(--purple)' },
     { label: 'Opex', value: fmt_money(periodExpenses), sub: periodDays === 1 ? '$' + dailyExpenses.toFixed(2) + '/day · $' + currentMonthlyExpenses.toFixed(0) + '/mo' : periodDays + 'd @ $' + dailyExpenses.toFixed(2) + '/day', color: '#E08050' },
     { label: 'Refunds', value: `${fmt_money(refundTotal)} (${refundCount})`, sub: `${refundCount} refund${refundCount !== 1 ? 's' : ''} from Stripe`, color: 'var(--red)' },
   ];
@@ -11241,6 +11241,19 @@ window.deleteExpense = async function(id) {
     await db.from('expenses').delete().eq('id', id);
     await loadExpenses();
   } catch (e) { console.error('Delete expense error:', e); }
+};
+
+// ── eShip Rate Editor ──
+window.editEshipRate = function(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const newRate = prompt('Enter average eShip cost per order ($):', ESHIP_COST_PER_ORDER.toFixed(2));
+  if (newRate === null) return;
+  const val = parseFloat(newRate);
+  if (isNaN(val) || val < 0) return;
+  ESHIP_COST_PER_ORDER = val;
+  localStorage.setItem('oso_eship_cost', val);
+  applyFilter(); // re-render stats with new rate
 };
 
 // ── Action Center Tab ──
