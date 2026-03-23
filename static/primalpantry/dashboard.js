@@ -147,7 +147,7 @@ let bundlesPage = 1;
 let ordersPage = 1;
 let customersPage = 1;
 let landingRevPage = 1;
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 15;
 let ESHIP_COST_PER_ORDER = Number(localStorage.getItem('oso_eship_cost') || 4.00);
 let currentStaff = null;
 let activeTab = 'sales';
@@ -5590,7 +5590,9 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
   let waFilters = []; // [{col:'referrer_domain', val:'google.com', label:'Referrer: google.com'}, ...]
   let waRevMaps = {}; // Revenue lookups by dimension, populated in waLoadDashboard
   let waView = 'traffic'; // 'traffic' or 'funnel'
+  let waSubTab = 'realtime'; // 'realtime', 'acquisition', 'engagement', 'monetisation'
   let waTrafficData = {}; // cached traffic-mode table data
+  let waFunnelInlineLoaded = false; // track if inline funnel has been loaded
   let waFunnelData = {}; // cached funnel-mode table data
 
   // Map table container IDs to filter column names
@@ -5636,6 +5638,28 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
   // Expose to onclick handlers
   window.waRemoveFilter = waRemoveFilter;
   window.waClearFilters = waClearFilters;
+
+  // Sub-tab switching
+  window.waSetSubTab = function(tab) {
+    waSubTab = tab;
+    ['realtime', 'acquisition', 'engagement', 'monetisation'].forEach(t => {
+      const el = document.getElementById('wa-sub-' + t);
+      if (el) el.style.display = t === tab ? '' : 'none';
+    });
+    document.querySelectorAll('.wa-sub-tab').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.waSub === tab);
+    });
+    // Auto-load inline funnel when engagement tab shown
+    if (tab === 'engagement' && !waFunnelInlineLoaded && waSite) {
+      waFunnelInlineLoaded = true;
+      waLoadInlineFunnel();
+    }
+    // Show realtime panel directly when on realtime tab
+    if (tab === 'realtime') {
+      const panel = document.getElementById('wa-realtime-panel');
+      if (panel) panel.style.display = '';
+    }
+  };
 
   // View toggle: traffic vs funnel
   window.waSetView = async function(view) {
@@ -5791,7 +5815,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     return String(n);
   }
 
-  const WA_PAGE_SIZE = 10;
+  const WA_PAGE_SIZE = 15;
   const waTablePages = {}; // { containerId: currentPage }
 
   function waRenderTable(containerId, rows, cols, opts = {}) {
@@ -6070,6 +6094,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
   async function waLoadDashboard() {
     if (!waSite || !waToken()) return;
     waFunnelData = {}; // Clear cached funnel data on reload
+    waFunnelInlineLoaded = false; // Re-fetch inline funnel on next engagement tab view
     Object.keys(waTablePages).forEach(k => { waTablePages[k] = 1; }); // Reset pagination
     const { from, to } = waGetDates();
 
@@ -6527,6 +6552,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
   let waFmProductPages = [];
   let waFmSelectedProduct = null; // selected product slug for filtering funnel
   let waFmConvMode = 'next'; // 'next' = proceed to next step, 'purchase' = eventual purchase
+  let waFmTotalAtc = 0, waFmTotalPurchased = 0; // site-wide totals from funnel_stages
 
   window.waSelectProduct = function(idx) {
     if (waFmSelectedProduct === idx) {
@@ -6596,6 +6622,8 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
       // Get funnel stages for purchased count
       const funnelData = await waFetch('analytics-dashboard', { site: waSite, from, to, metric: 'funnel_stages' });
       const purchased = funnelData ? (funnelData.purchased || 0) : 0;
+      waFmTotalAtc = funnelData ? (funnelData.atc || funnelData.add_to_cart || 0) : 0;
+      waFmTotalPurchased = purchased;
 
       // Calculate total revenue from order data
       const siteOrders = (typeof filteredOrders !== 'undefined' ? filteredOrders : allOrders || []);
@@ -6653,6 +6681,72 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
   window.waCloseFunnelModal = function() {
     document.getElementById('wa-fm-overlay').classList.remove('open');
   };
+
+  // Load funnel data inline (same logic as modal but renders to inline body)
+  async function waLoadInlineFunnel() {
+    const body = document.getElementById('wa-fm-body');
+    if (!body) return;
+    body.innerHTML = '<div class="wa-loading">Loading funnel data...</div>';
+    waFmProductsExpanded = false;
+    try {
+      const { from, to } = waGetDates();
+      const groups = [
+        { label: 'Homepage', patterns: ['/'] },
+        { label: 'Shop Page', patterns: ['/shop/', '/shop'] },
+        { label: 'Cart', patterns: ['/cart/', '/cart'] },
+        { label: 'Checkout', patterns: ['/checkout/', '/checkout'] },
+      ];
+      const productPatterns = [];
+      if (waTrafficData && waTrafficData.pages) {
+        const excludePatterns = ['/', '/shop/', '/shop', '/cart/', '/cart', '/checkout/', '/checkout', '/pages/'];
+        waTrafficData.pages.forEach(p => {
+          if (p.name && !excludePatterns.includes(p.name) && !p.name.startsWith('/pages/') && p.visitors >= 2) {
+            productPatterns.push(p.name);
+          }
+        });
+      }
+      if (productPatterns.length === 0) productPatterns.push('/shop/%');
+      groups.push({ label: 'Product Pages', patterns: productPatterns });
+      const data = await waFetch('analytics-dashboard', { site: waSite, from, to, metric: 'page_funnel', groups: JSON.stringify(groups) });
+      const byLabel = {};
+      (data || []).forEach(d => { byLabel[d.label] = d; });
+      const funnelData = await waFetch('analytics-dashboard', { site: waSite, from, to, metric: 'funnel_stages' });
+      const purchased = funnelData ? (funnelData.purchased || 0) : 0;
+      waFmTotalAtc = funnelData ? (funnelData.atc || funnelData.add_to_cart || 0) : 0;
+      waFmTotalPurchased = purchased;
+      const siteOrders = (typeof filteredOrders !== 'undefined' ? filteredOrders : allOrders || []);
+      const totalRev = siteOrders.reduce((s, o) => s + Number(o.total_value || 0), 0);
+      const revMap = waRevMaps ? waRevMaps.pathname || {} : {};
+      function groupRev(patterns) {
+        let rev = 0;
+        patterns.forEach(p => { Object.keys(revMap).forEach(k => { if (k === p || (p.endsWith('%') && k.startsWith(p.slice(0, -1)))) rev += revMap[k] || 0; }); });
+        return rev;
+      }
+      const labels = ['Homepage', 'Shop Page', 'Product Pages', 'Cart', 'Checkout'];
+      waFmData = {};
+      labels.forEach(lbl => {
+        const d = byLabel[lbl] || { visitors: 0, views: 0, avg_duration: 0, bounce_rate: 0, entry_visitors: 0 };
+        const g = groups.find(g => g.label === lbl);
+        let rev = g ? groupRev(g.patterns) : 0;
+        if (lbl === 'Cart' || lbl === 'Checkout') rev = totalRev;
+        waFmData[lbl] = { ...d, revenue: rev };
+      });
+      waFmData['Purchased'] = { visitors: purchased, views: purchased, avg_duration: 0, bounce_rate: 0, entry_visitors: 0, revenue: totalRev };
+      waFmProductPages = (waTrafficData && waTrafficData.pages || [])
+        .filter(p => {
+          const excludePatterns = ['/', '/shop/', '/shop', '/cart/', '/cart', '/checkout/', '/checkout'];
+          return p.name && !excludePatterns.includes(p.name) && !p.name.startsWith('/pages/') && p.visitors >= 2;
+        }).slice(0, 20).map(p => ({
+          name: p.name, shortName: p.name.replace(/^\/(shop\/)?/, '').replace(/\/$/, '') || p.name,
+          visitors: p.visitors || 0, views: p.views || 0, bounce_rate: p.bounce_rate || 0,
+          avg_duration: p.avg_duration || 0, revenue: (revMap[p.name] || 0),
+        }));
+      waFmRender();
+    } catch (err) {
+      console.error('Inline funnel error:', err);
+      body.innerHTML = '<div class="wa-loading" style="color:var(--red);">Failed to load funnel data</div>';
+    }
+  }
 
   window.waFunnelToggle = function(mode) {
     waFmMode = mode;
@@ -6720,6 +6814,12 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     let entryBadge = entryPct > 0 ? `<span class="entry-badge">${entryPct}% enter here</span>` : '';
     if (label === 'Purchased') entryBadge = '';
 
+    // ATC rate and Sales % for this page card
+    const totalAtc = waFmTotalAtc || 0;
+    const totalPayments = waFmTotalPurchased || 0;
+    const atcRate = visitors > 0 ? (totalAtc / visitors * 100).toFixed(1) : '0.0';
+    const salesPct = visitors > 0 ? (totalPayments / visitors * 100).toFixed(1) : '0.0';
+
     let stats = '';
     if (label === 'Purchased') {
       stats = `<div class="wa-fm-stats">
@@ -6727,11 +6827,12 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
         <div class="wa-fm-stat">Revenue <span class="wa-fm-stat-val${isHighlightRev ? ' highlight' : ''}">${fmt_money(rev)}</span></div>
       </div>`;
     } else {
-      stats = `<div class="wa-fm-stats">
+      stats = `<div class="wa-fm-stats" style="grid-template-columns:1fr 1fr 1fr;">
         <div class="wa-fm-stat">Users <span class="wa-fm-stat-val">${fmtNum(visitors)}</span></div>
-        <div class="wa-fm-stat">Bounce <span class="wa-fm-stat-val">${bounce}%</span></div>
-        <div class="wa-fm-stat">Avg Time <span class="wa-fm-stat-val">${fmtDuration(dur)}</span></div>
-        <div class="wa-fm-stat">${isHighlightRev ? 'Revenue' : convLabel} <span class="wa-fm-stat-val highlight">${isHighlightRev ? fmt_money(rev) : convRate + '%'}</span></div>
+        <div class="wa-fm-stat">Total ATC <span class="wa-fm-stat-val">${fmtNum(totalAtc)}</span></div>
+        <div class="wa-fm-stat">Total Payments <span class="wa-fm-stat-val">${fmtNum(totalPayments)}</span></div>
+        <div class="wa-fm-stat">ATC Rate <span class="wa-fm-stat-val highlight">${atcRate}%</span></div>
+        <div class="wa-fm-stat">Sales % <span class="wa-fm-stat-val highlight">${salesPct}%</span></div>
       </div>`;
     }
 
@@ -9488,7 +9589,37 @@ async function loadMarketingTab() {
   mktGadsPage = 1; renderMktGads();
   // Regional performance table
   renderMktRegionTable(mktOrders, fbC, gC, gSt);
-  try{const lr=await mktApi('analytics-dashboard',{site:'PrimalPantry.co.nz',from,to,metric:'entry_pages'});if(Array.isArray(lr)&&lr.length>0){document.getElementById('mkt-landing-table').innerHTML=lr.slice(0,10).map(l=>{const pg=l.value||l.pathname||'-';return '<tr style="cursor:pointer;" onclick="openPageModal(\''+pg.replace(/'/g,"\\'")+'\')""><td>'+pg+'</td><td>'+(l.visitors||l.count||0)+'</td><td>-</td><td>-</td><td>-</td><td>'+(l.bounce_rate?l.bounce_rate.toFixed(1)+'%':'-')+'</td></tr>';}).join('');}}catch(e){}
+  try{
+    const [lr, lf] = await Promise.all([
+      mktApi('analytics-dashboard',{site:'PrimalPantry.co.nz',from,to,metric:'entry_pages'}),
+      mktApi('analytics-dashboard',{site:'PrimalPantry.co.nz',from,to,metric:'funnel',col:'pathname'}).catch(()=>[])
+    ]);
+    // Build funnel lookup by page
+    const funnelByPage = {};
+    (lf||[]).forEach(r => { funnelByPage[r.name] = r; });
+    // Build revenue by landing page from orders
+    const lpRevMap = {};
+    mktOrders.forEach(o => { let lp = o.landing_page||''; if(lp){try{lp=new URL(lp,'https://x.com').pathname;}catch{}lpRevMap[lp]=(lpRevMap[lp]||0)+Number(o.total_value||0);} });
+    // Count conversions per landing page
+    const lpConvMap = {};
+    mktOrders.forEach(o => { let lp = o.landing_page||''; if(lp){try{lp=new URL(lp,'https://x.com').pathname;}catch{}lpConvMap[lp]=(lpConvMap[lp]||0)+1;} });
+    const totalLpVisitors = (lr||[]).reduce((s,l)=>s+(l.visitors||l.count||0),0)||1;
+    if(Array.isArray(lr)&&lr.length>0){
+      document.getElementById('mkt-landing-table').innerHTML=lr.slice(0,15).map(l=>{
+        const pg=l.value||l.pathname||'-';
+        const vis=l.visitors||l.count||0;
+        const f=funnelByPage[pg]||{};
+        const atcRate=vis>0&&f.atc?(f.atc/vis*100).toFixed(1)+'%':'-';
+        const cvr=vis>0&&f.sales?(f.sales/vis*100).toFixed(1)+'%':'-';
+        const rev=lpRevMap[pg]||0;
+        const conv=lpConvMap[pg]||0;
+        const lpShare=vis/totalLpVisitors;
+        const allocSpend=tSpend*lpShare;
+        const cpa=conv>0?'$'+(allocSpend/conv).toFixed(2):'-';
+        return '<tr style="cursor:pointer;" onclick="openPageModal(\''+pg.replace(/'/g,"\\'")+'\')""><td>'+pg+'</td><td>'+vis+'</td><td>'+atcRate+'</td><td>'+cvr+'</td><td>'+(rev>0?fmt_money(rev):'-')+'</td><td>'+cpa+'</td><td>'+(l.bounce_rate?l.bounce_rate.toFixed(1)+'%':'-')+'</td></tr>';
+      }).join('');
+    }
+  }catch(e){}
   const gmcP=gmcD.products||[];const gmcTbl=document.getElementById('mkt-gmc-table'),gmcWrap=document.getElementById('mkt-gmc-table-wrap'),gmcLoad=document.getElementById('mkt-gmc-loading');
   if(gmcP.length>0){mktGmcPage=1;gmcWrap.style.display='table';gmcLoad.style.display='none';renderMktGmc(gmcP);}
   else if(gSt.connected&&gSt.merchantId){gmcLoad.textContent=gmcD.error||'No products found';gmcLoad.style.display='block';gmcWrap.style.display='none';}

@@ -532,6 +532,9 @@
     .wa-panel-tab { padding: 0.4rem 0.75rem; border: none; background: none; color: var(--dim); font-size: 0.75rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; font-family: 'DM Sans', sans-serif; }
     .wa-panel-tab:hover { color: var(--text); }
     .wa-panel-tab.active { color: var(--sage); border-bottom-color: var(--sage); }
+    .wa-sub-tab { background: var(--card); border: 1px solid var(--border); color: var(--muted); padding: 0.4rem 0.9rem; border-radius: 8px; font-size: 0.8rem; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; font-weight: 500; }
+    .wa-sub-tab:hover { border-color: var(--sage); color: var(--text); }
+    .wa-sub-tab.active { background: var(--sage); color: #141210; border-color: var(--sage); font-weight: 600; }
     .wa-view-btn { background: var(--card); border: 1px solid var(--border); color: var(--muted); padding: 0.3rem 0.7rem; border-radius: 6px; font-size: 0.75rem; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
     .wa-view-btn:hover { border-color: var(--sage); color: var(--text); }
     .wa-view-btn.active { background: var(--sage); color: #141210; border-color: var(--sage); font-weight: 600; }
