@@ -156,6 +156,42 @@ exports.handler = async (event) => {
       query = query.single();
     }
 
+    // For large select queries without an explicit limit, paginate to get ALL rows
+    // (Supabase defaults to 1000 rows per request)
+    if (operation === 'select' && !params.limit && !params.single) {
+      let allData = [];
+      const PAGE = 1000;
+      let offset = 0;
+      while (true) {
+        let pageQuery = sb.from(table).select(params.select || '*');
+        // Re-apply filters
+        if (params.filters && Array.isArray(params.filters)) {
+          for (const f of params.filters) {
+            if (f.op === 'eq') pageQuery = pageQuery.eq(f.col, f.val);
+            else if (f.op === 'neq') pageQuery = pageQuery.neq(f.col, f.val);
+            else if (f.op === 'gt') pageQuery = pageQuery.gt(f.col, f.val);
+            else if (f.op === 'gte') pageQuery = pageQuery.gte(f.col, f.val);
+            else if (f.op === 'lt') pageQuery = pageQuery.lt(f.col, f.val);
+            else if (f.op === 'lte') pageQuery = pageQuery.lte(f.col, f.val);
+            else if (f.op === 'in') pageQuery = pageQuery.in(f.col, f.val);
+            else if (f.op === 'cs') pageQuery = pageQuery.contains(f.col, f.val);
+          }
+        }
+        if (params.order) {
+          pageQuery = pageQuery.order(params.order.col, { ascending: params.order.ascending ?? true });
+        }
+        pageQuery = pageQuery.range(offset, offset + PAGE - 1);
+        const { data: pageData, error: pageError } = await pageQuery;
+        if (pageError) {
+          return { statusCode: 400, headers, body: JSON.stringify({ data: null, error: { message: pageError.message } }) };
+        }
+        allData = allData.concat(pageData || []);
+        if (!pageData || pageData.length < PAGE) break;
+        offset += PAGE;
+      }
+      return { statusCode: 200, headers, body: JSON.stringify({ data: allData, error: null }) };
+    }
+
     const { data, error } = await query;
 
     if (error) {

@@ -213,6 +213,19 @@
         <div class="chart-wrap"><canvas id="cumulative-revenue-chart"></canvas></div>
       </div>
     </div>
+    <div class="chart-card">
+      <h3>SKU Revenue Over Time</h3>
+      <div style="display:flex;gap:0.75rem;align-items:center;margin-bottom:0.75rem;flex-wrap:wrap;">
+        <label style="font-size:0.8rem;color:var(--muted);">From</label>
+        <input type="date" id="sku-time-from" style="background:var(--card);border:1px solid var(--border);color:var(--text);padding:0.3rem 0.5rem;border-radius:4px;font-size:0.8rem;">
+        <label style="font-size:0.8rem;color:var(--muted);">To</label>
+        <input type="date" id="sku-time-to" style="background:var(--card);border:1px solid var(--border);color:var(--text);padding:0.3rem 0.5rem;border-radius:4px;font-size:0.8rem;">
+        <button id="sku-time-reset" style="background:var(--card);border:1px solid var(--border);color:var(--muted);padding:0.3rem 0.6rem;border-radius:4px;font-size:0.75rem;cursor:pointer;">Reset to 30d</button>
+      </div>
+      <div class="chart-wrap" style="height:340px;">
+        <canvas id="sku-time-chart"></canvas>
+      </div>
+    </div>
     <div class="chart-card" style="min-height:0;">
       <h3>Order Locations</h3>
       <div style="display:flex;gap:6px;margin:-0.5rem 0 0.5rem;justify-content:flex-end;">
@@ -647,19 +660,6 @@
       </div>
     </div>
     <div id="mfg-panel-sku-performance" style="display:none;">
-      <div class="orders-card">
-        <h3>SKU Revenue Over Time</h3>
-        <div style="display:flex;gap:0.75rem;align-items:center;margin-bottom:0.75rem;flex-wrap:wrap;">
-          <label style="font-size:0.8rem;color:var(--muted);">From</label>
-          <input type="date" id="sku-time-from" style="background:var(--card);border:1px solid var(--border);color:var(--text);padding:0.3rem 0.5rem;border-radius:4px;font-size:0.8rem;">
-          <label style="font-size:0.8rem;color:var(--muted);">To</label>
-          <input type="date" id="sku-time-to" style="background:var(--card);border:1px solid var(--border);color:var(--text);padding:0.3rem 0.5rem;border-radius:4px;font-size:0.8rem;">
-          <button id="sku-time-reset" style="background:var(--card);border:1px solid var(--border);color:var(--muted);padding:0.3rem 0.6rem;border-radius:4px;font-size:0.75rem;cursor:pointer;">Reset to 30d</button>
-        </div>
-        <div class="chart-wrap" style="height:340px;margin-bottom:1.5rem;">
-          <canvas id="sku-time-chart"></canvas>
-        </div>
-      </div>
       <div class="orders-card">
         <h3>SKU Performance</h3>
         <p style="font-size:0.8rem;color:var(--muted);margin-bottom:0.75rem;">Units sold, revenue, and refund rate per SKU across filtered orders.</p>
@@ -1232,16 +1232,23 @@
     </div>
 
     <div class="chart-card" style="margin-bottom:1.5rem;">
-      <h3>Creative Performance <span style="font-size:0.65rem;color:var(--dim);font-weight:400;">(Facebook Ads)</span></h3>
-      <div id="mkt-creatives-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:0.75rem;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
+        <h3 style="margin:0;">Creative Performance <span style="font-size:0.65rem;color:var(--dim);font-weight:400;">(Facebook Ads)</span></h3>
+        <select id="mkt-creative-range" class="filter-dropdown" onchange="window._creativeRangeChanged && window._creativeRangeChanged(this.value)">
+          <option value="today">Today</option>
+          <option value="7d">Last 7 days</option>
+          <option value="30d" selected>Last 30 days</option>
+        </select>
+      </div>
+      <div id="mkt-creatives-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.6rem;">
         <div class="loading">Loading creatives...</div>
       </div>
     </div>
 
     <!-- Creative Preview Modal -->
-    <div class="modal-overlay" id="creative-modal">
-      <div class="modal" style="max-width:500px;">
-        <button class="modal-close" onclick="document.getElementById('creative-modal').classList.remove('open')">&times;</button>
+    <div class="modal-overlay" id="creative-modal" onclick="if(event.target===this)this.classList.remove('open')">
+      <div class="modal" style="max-width:500px;position:relative;">
+        <button onclick="document.getElementById('creative-modal').classList.remove('open')" style="position:absolute;top:0.5rem;right:0.75rem;background:var(--card);border:1px solid var(--border);color:var(--text);font-size:1.2rem;cursor:pointer;border-radius:50%;width:2rem;height:2rem;display:flex;align-items:center;justify-content:center;z-index:10;">&times;</button>
         <div id="creative-modal-body"></div>
       </div>
     </div>

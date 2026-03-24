@@ -88,8 +88,8 @@ exports.handler = async (event) => {
       // Region-level breakdown (spend, impressions, clicks, conversions by region)
       url = `https://graph.facebook.com/v21.0/act_${accountId}/insights?time_range=${encodeURIComponent(timeRange)}&breakdowns=region&fields=region,spend,impressions,clicks,actions,action_values&access_token=${accessToken}&limit=500`;
     } else if (daily) {
-      // Daily totals (account level, broken down by day)
-      url = `https://graph.facebook.com/v21.0/act_${accountId}/insights?time_range=${encodeURIComponent(timeRange)}&time_increment=1&fields=spend,actions,action_values&access_token=${accessToken}&limit=100`;
+      // Daily totals per campaign (broken down by day)
+      url = `https://graph.facebook.com/v21.0/act_${accountId}/insights?level=campaign&time_range=${encodeURIComponent(timeRange)}&time_increment=1&fields=campaign_name,campaign_id,spend,actions,action_values&access_token=${accessToken}&limit=500`;
     } else {
       // Campaign level
       url = `https://graph.facebook.com/v21.0/act_${accountId}/insights?level=campaign&time_range=${encodeURIComponent(timeRange)}&fields=campaign_name,campaign_id,impressions,clicks,spend,actions,action_values&access_token=${accessToken}&limit=100`;
@@ -141,10 +141,13 @@ exports.handler = async (event) => {
 
     if (daily) {
       const dailyData = allData.map(d => {
-        const { conversions_value } = parseActions(d.actions, d.action_values);
+        const { conversions, conversions_value } = parseActions(d.actions, d.action_values);
         return {
           date: d.date_start,
+          campaign_name: d.campaign_name || '',
+          name: d.campaign_name || '',
           spend: Number(d.spend || 0),
+          conversions,
           conversions_value,
         };
       });
@@ -155,7 +158,7 @@ exports.handler = async (event) => {
     if (qs.ads === '1') {
       // Fetch active ads with their creative thumbnails and insights
       const trInline = `{"since":"${from}","until":"${to}"}`;
-      const adUrl = `https://graph.facebook.com/v21.0/act_${accountId}/ads?fields=name,status,creative{thumbnail_url},insights.time_range(${trInline}){impressions,clicks,spend,actions,action_values,ctr,cpc}&filtering=${encodeURIComponent('[{"field":"effective_status","operator":"IN","value":["ACTIVE"]}]')}&limit=100&access_token=${accessToken}`;
+      const adUrl = `https://graph.facebook.com/v21.0/act_${accountId}/ads?fields=name,status,creative{thumbnail_url,image_url,object_story_spec,title,body},insights.time_range(${trInline}){impressions,clicks,spend,actions,action_values,ctr,cpc}&filtering=${encodeURIComponent('[{"field":"effective_status","operator":"IN","value":["ACTIVE"]}]')}&limit=100&access_token=${accessToken}`;
       console.log('[FB Ads] Fetching:', adUrl.replace(accessToken, '***'));
       let adData = [];
       let nextAdUrl = adUrl;
@@ -176,10 +179,20 @@ exports.handler = async (event) => {
         const insights = ad.insights?.data?.[0] || {};
         const { conversions, conversions_value } = parseActions(insights.actions, insights.action_values);
         const spend = Number(insights.spend || 0);
+        // Extract ad copy from object_story_spec
+        const spec = ad.creative?.object_story_spec || {};
+        const linkData = spec.link_data || spec.video_data || {};
+        const adBody = ad.creative?.body || linkData.message || linkData.description || '';
+        const adTitle = ad.creative?.title || linkData.name || linkData.title || '';
+        const adLink = linkData.link || '';
         return {
           name: ad.name || '',
           status: ad.status || '',
           thumbnail_url: ad.creative?.thumbnail_url || '',
+          image_url: ad.creative?.image_url || '',
+          ad_body: adBody,
+          ad_title: adTitle,
+          ad_link: adLink,
           impressions: Number(insights.impressions || 0),
           clicks: Number(insights.clicks || 0),
           spend,

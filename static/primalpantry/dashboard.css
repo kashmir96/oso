@@ -94,16 +94,22 @@
     @keyframes fwBurst { 0% { opacity: 1; transform: translate(0,0) scale(1); } 20% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--fw-dx), var(--fw-dy)) scale(0); } }
     @keyframes beText { 0% { opacity: 0; transform: translate(-50%,-50%) scale(0); } 15% { opacity: 1; transform: translate(-50%,-50%) scale(1.2); } 30% { transform: translate(-50%,-50%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%,-50%) scale(1.5); } }
     /* Creative performance cards */
-    .creative-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; cursor: pointer; transition: border-color 0.2s; }
+    .creative-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; transition: border-color 0.2s; }
     .creative-card:hover { border-color: var(--sage); }
-    .creative-card-img { width: 100%; height: 140px; object-fit: cover; background: var(--bg); }
-    .creative-card-body { padding: 0.6rem; }
-    .creative-card-name { font-size: 0.72rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 0.3rem; }
-    .creative-card-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.2rem; }
-    .creative-card-stat { font-size: 0.62rem; color: var(--muted); }
-    .creative-card-stat strong { display: block; font-size: 0.8rem; color: var(--text); }
-    .creative-card-bar { height: 3px; border-radius: 2px; margin-top: 0.4rem; background: var(--border); overflow: hidden; }
+    .creative-card-img { width: 100%; height: 100px; object-fit: cover; background: var(--bg); cursor: pointer; transition: height 0.3s; }
+    .creative-card.expanded .creative-card-img { height: 260px; }
+    .creative-card-body { padding: 0.5rem; }
+    .creative-card-name { font-size: 0.68rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 0.25rem; }
+    .creative-card-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.15rem; }
+    .creative-card-stat { font-size: 0.58rem; color: var(--muted); }
+    .creative-card-stat strong { display: block; font-size: 0.75rem; color: var(--text); }
+    .creative-card-bar { height: 3px; border-radius: 2px; margin-top: 0.3rem; background: var(--border); overflow: hidden; }
     .creative-card-bar-fill { height: 100%; border-radius: 2px; }
+    .creative-card-more { font-size: 0.65rem; color: var(--sage); cursor: pointer; padding: 0.3rem 0 0; text-align: center; }
+    .creative-card-more:hover { text-decoration: underline; }
+    .creative-card-detail { display: none; padding: 0.5rem 0 0; border-top: 1px solid var(--border); margin-top: 0.4rem; font-size: 0.7rem; color: var(--muted); line-height: 1.5; }
+    .creative-card.expanded .creative-card-detail { display: block; }
+    .creative-card-adcopy { background: var(--bg); border-radius: 6px; padding: 0.5rem; margin-top: 0.3rem; font-size: 0.68rem; color: var(--text); white-space: pre-wrap; line-height: 1.4; max-height: 200px; overflow-y: auto; }
 
     .stat-card .label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.2rem; }
     .stat-card .value { font-size: 1.5rem; font-weight: 700; }

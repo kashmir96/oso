@@ -1111,6 +1111,7 @@ function renderAll(orders, lineItems) {
   renderProductsChart(lineItems);
   renderHeatmap(allOrders);
   try { renderMap(orders); } catch (e) { console.warn('Map render error (non-fatal):', e.message); }
+  renderSkuTimeSeries();
   renderMagnetProducts(orders);
   renderBoughtTogether(orders);
   renderTrending(orders);
@@ -9965,11 +9966,20 @@ function renderCampaignSplitCharts(fbDaily, gDaily) {
 }
 
 // ── Marketing: Creative Performance Grid ──
-async function renderCreativePerformance(mktOrders, trafficByContent) {
+window._creativeRangeChanged = function(range) {
+  const now = new Date(), to = now.toISOString().slice(0,10);
+  let from = to;
+  if (range === '7d') { const d = new Date(); d.setDate(d.getDate()-7); from = d.toISOString().slice(0,10); }
+  else if (range === '30d') { const d = new Date(); d.setDate(d.getDate()-30); from = d.toISOString().slice(0,10); }
+  renderCreativePerformance(allOrders.filter(o => o.order_date >= from && o.order_date <= to), null, from, to);
+};
+
+async function renderCreativePerformance(mktOrders, trafficByContent, overrideFrom, overrideTo) {
   const grid = document.getElementById('mkt-creatives-grid');
   if (!grid) return;
   try {
-    const [from, to] = getDateRange();
+    const from = overrideFrom || getDateRange()[0];
+    const to = overrideTo || getDateRange()[1];
     const tok = encodeURIComponent(currentStaff.token);
     const res = await fetch(`/.netlify/functions/facebook-campaigns?token=${tok}&from=${from}&to=${to}&ads=1`).then(r => r.json()).catch(() => ({ ads: [] }));
     const ads = res.ads || [];
@@ -9984,21 +9994,30 @@ async function renderCreativePerformance(mktOrders, trafficByContent) {
     });
     const maxSpend = Math.max(...ads.map(a => a.spend), 1);
 
-    grid.innerHTML = ads.slice(0, 12).map((ad, idx) => {
+    grid.innerHTML = ads.slice(0, 20).map((ad, idx) => {
       const adKey = (ad.name || '').toLowerCase();
       const traffic = trafficMap[adKey] || 0;
       const od = ordersByAd[adKey] || { sales: 0, revenue: 0 };
       const spendPct = (ad.spend / maxSpend * 100).toFixed(0);
       const rc = Number(ad.roas) >= 2 ? 'var(--green)' : Number(ad.roas) >= 1 ? 'var(--honey)' : 'var(--red)';
       const dot = ad.status === 'ACTIVE' ? '<span style="color:var(--green);font-size:0.5rem;">●</span> ' : '<span style="color:var(--dim);font-size:0.5rem;">●</span> ';
-      return `<div class="creative-card" onclick="openCreativeModal(${idx})">
-        ${ad.thumbnail_url ? `<img class="creative-card-img" src="${ad.thumbnail_url}" alt="${esc(ad.name)}" loading="lazy" onerror="this.style.display='none'">` : '<div class="creative-card-img" style="display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:0.7rem;">No preview</div>'}
+      const imgSrc = ad.image_url || ad.thumbnail_url || '';
+      const hasAdCopy = ad.ad_body || ad.ad_title;
+      return `<div class="creative-card" data-idx="${idx}">
+        ${imgSrc ? `<img class="creative-card-img" src="${imgSrc}" alt="${esc(ad.name)}" loading="lazy" onclick="this.closest('.creative-card').classList.toggle('expanded')" onerror="this.src='${ad.thumbnail_url || ''}';this.onerror=null;">` : '<div class="creative-card-img" style="display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:0.7rem;">No preview</div>'}
         <div class="creative-card-body">
           <div class="creative-card-name" title="${esc(ad.name)}">${dot}${esc(ad.name)}</div>
           <div class="creative-card-stats"><div class="creative-card-stat">Spend<strong>$${ad.spend.toFixed(2)}</strong></div><div class="creative-card-stat">ROAS<strong style="color:${rc}">${ad.roas}x</strong></div><div class="creative-card-stat">Conv<strong>${ad.conversions}</strong></div></div>
-          <div class="creative-card-stats" style="margin-top:0.2rem;"><div class="creative-card-stat">Clicks<strong>${ad.clicks.toLocaleString()}</strong></div><div class="creative-card-stat">CTR<strong>${ad.ctr.toFixed(2)}%</strong></div><div class="creative-card-stat">CPA<strong>${ad.cpa ? '$' + ad.cpa : '-'}</strong></div></div>
-          ${traffic > 0 || od.sales > 0 ? `<div class="creative-card-stats" style="margin-top:0.2rem;border-top:1px solid var(--border);padding-top:0.2rem;"><div class="creative-card-stat">Traffic<strong>${traffic.toLocaleString()}</strong></div><div class="creative-card-stat">Orders<strong>${od.sales}</strong></div><div class="creative-card-stat">Revenue<strong style="color:var(--green)">${od.revenue > 0 ? '$' + od.revenue.toFixed(0) : '-'}</strong></div></div>` : ''}
+          <div class="creative-card-stats" style="margin-top:0.15rem;"><div class="creative-card-stat">Clicks<strong>${ad.clicks.toLocaleString()}</strong></div><div class="creative-card-stat">CTR<strong>${ad.ctr.toFixed(2)}%</strong></div><div class="creative-card-stat">CPA<strong>${ad.cpa ? '$' + ad.cpa : '-'}</strong></div></div>
+          ${traffic > 0 || od.sales > 0 ? `<div class="creative-card-stats" style="margin-top:0.15rem;border-top:1px solid var(--border);padding-top:0.15rem;"><div class="creative-card-stat">Traffic<strong>${traffic.toLocaleString()}</strong></div><div class="creative-card-stat">Orders<strong>${od.sales}</strong></div><div class="creative-card-stat">Revenue<strong style="color:var(--green)">${od.revenue > 0 ? '$' + od.revenue.toFixed(0) : '-'}</strong></div></div>` : ''}
           <div class="creative-card-bar"><div class="creative-card-bar-fill" style="width:${spendPct}%;background:${rc};"></div></div>
+          <div class="creative-card-more" onclick="this.closest('.creative-card').classList.toggle('expanded')">See more ▾</div>
+          <div class="creative-card-detail">
+            <div class="creative-card-stats"><div class="creative-card-stat">Impressions<strong>${ad.impressions.toLocaleString()}</strong></div><div class="creative-card-stat">CPC<strong>${ad.cpc ? '$' + ad.cpc.toFixed(2) : '-'}</strong></div><div class="creative-card-stat">Conv Value <span style="font-size:0.5rem;color:var(--dim)">(FB)</span><strong>$${ad.conversions_value.toFixed(0)}</strong></div></div>
+            <div class="creative-card-stats" style="margin-top:0.15rem;"><div class="creative-card-stat">PP Orders<strong style="color:var(--green)">${od.sales || 0}</strong></div><div class="creative-card-stat">PP Revenue <span style="font-size:0.5rem;color:var(--dim)">(PP)</span><strong style="color:var(--green)">${od.revenue > 0 ? '$' + od.revenue.toFixed(0) : '-'}</strong></div><div class="creative-card-stat">Diff<strong style="color:${od.revenue > 0 && ad.conversions_value > 0 ? (od.revenue >= ad.conversions_value ? 'var(--green)' : 'var(--red)') : 'var(--dim)'}">${od.revenue > 0 && ad.conversions_value > 0 ? (od.revenue >= ad.conversions_value ? '+' : '') + ((od.revenue - ad.conversions_value) / ad.conversions_value * 100).toFixed(0) + '%' : '-'}</strong></div></div>
+            ${hasAdCopy ? `<div class="creative-card-adcopy">${ad.ad_title ? '<strong>' + esc(ad.ad_title) + '</strong><br>' : ''}${esc(ad.ad_body)}</div>` : ''}
+            ${ad.ad_link ? `<div style="margin-top:0.3rem;"><a href="${esc(ad.ad_link)}" target="_blank" style="color:var(--sage);font-size:0.65rem;">View landing page →</a></div>` : ''}
+          </div>
         </div>
       </div>`;
     }).join('');
@@ -10030,7 +10049,9 @@ window.openCreativeModal = function(idx) {
       <tr><td style="color:var(--muted);padding:0.3rem 0;">Conversions (FB)</td><td style="text-align:right;font-weight:600;">${ad.conversions}</td></tr>
       <tr><td style="color:var(--muted);padding:0.3rem 0;">Conv Value (FB)</td><td style="text-align:right;font-weight:600;">$${ad.conversions_value.toFixed(2)}</td></tr>
       ${traffic > 0 ? `<tr style="border-top:1px solid var(--border);"><td style="color:var(--cyan);padding:0.3rem 0;">Website Traffic</td><td style="text-align:right;font-weight:600;">${traffic.toLocaleString()}</td></tr>` : ''}
-      ${od.sales > 0 ? `<tr><td style="color:var(--green);padding:0.3rem 0;">Tracked Orders</td><td style="text-align:right;font-weight:600;">${od.sales}</td></tr><tr><td style="color:var(--green);padding:0.3rem 0;">Tracked Revenue</td><td style="text-align:right;font-weight:600;">$${od.revenue.toFixed(2)}</td></tr>` : ''}
+      <tr style="border-top:1px solid var(--border);"><td style="color:var(--green);padding:0.3rem 0;">PP Orders</td><td style="text-align:right;font-weight:600;">${od.sales || 0}</td></tr>
+      <tr><td style="color:var(--green);padding:0.3rem 0;">PP Revenue</td><td style="text-align:right;font-weight:600;">${od.revenue > 0 ? '$' + od.revenue.toFixed(2) : '-'}</td></tr>
+      ${od.revenue > 0 && ad.conversions_value > 0 ? `<tr><td style="color:var(--dim);padding:0.3rem 0;">PP vs FB Diff</td><td style="text-align:right;font-weight:600;color:${od.revenue >= ad.conversions_value ? 'var(--green)' : 'var(--red)'};">${(od.revenue >= ad.conversions_value ? '+' : '') + ((od.revenue - ad.conversions_value) / ad.conversions_value * 100).toFixed(0)}%</td></tr>` : ''}
     </table>`;
   document.getElementById('creative-modal').classList.add('open');
 };
@@ -10234,11 +10255,15 @@ async function renderMktRegionTable(orders, fbC, gC, gSt) {
   }).join('');
 }
 
-// ── Marketing: sales by source over time chart ──
+// ── Marketing: sales by source over time chart (always 30 days) ──
 function renderMktSourceTimeChart(orders) {
+  // Always use 30-day window regardless of date picker
+  const d30 = new Date(); d30.setDate(d30.getDate() - 30);
+  const from30 = d30.toISOString().slice(0,10), to30 = new Date().toISOString().slice(0,10);
+  const orders30 = allOrders.filter(o => o.order_date >= from30 && o.order_date <= to30);
   const dateSourceMap = {};
   const sourceTotals = {};
-  orders.forEach(o => {
+  orders30.forEach(o => {
     const d = o.order_date;
     const src = mktGetOrderSource(o);
     sourceTotals[src] = (sourceTotals[src] || 0) + 1;
@@ -10274,11 +10299,14 @@ function renderMktSourceTimeChart(orders) {
   });
 }
 
-// ── Marketing: sales by creative over time chart ──
+// ── Marketing: sales by creative over time chart (always 30 days) ──
 function renderMktCreativeTimeChart(orders) {
+  const d30 = new Date(); d30.setDate(d30.getDate() - 30);
+  const from30 = d30.toISOString().slice(0,10), to30 = new Date().toISOString().slice(0,10);
+  const orders30 = allOrders.filter(o => o.order_date >= from30 && o.order_date <= to30);
   const dateCreativeMap = {};
   const creativeTotals = {};
-  orders.forEach(o => {
+  orders30.forEach(o => {
     const d = o.order_date;
     const cr = mktGetOrderCreative(o) || '(none)';
     creativeTotals[cr] = (creativeTotals[cr] || 0) + 1;
@@ -10567,14 +10595,29 @@ async function loadMarketingTab() {
   allOrders.filter(o => o.order_date >= from30 && o.order_date <= to30).forEach(o => { const d = o.order_date; if (!byDate[d]) byDate[d] = {spend:0,paidRev:0,totalRev:0}; byDate[d].totalRev += Number(o.total_value || 0); });
   const sortedDates = Object.keys(byDate).sort().filter(d => d >= from30).slice(-30);
   const spSpark = sortedDates.map(d=>byDate[d].spend), rvSpark = sortedDates.map(d=>byDate[d].totalRev), roSpark = sortedDates.map(d=>byDate[d].spend>0?byDate[d].totalRev/byDate[d].spend:0);
+  // FB-specific stats
+  const fbCampaigns = (fbC.campaigns||[]);
+  const fbSpend = fbCampaigns.reduce((s,c)=>s+c.spend,0);
+  const fbConv = fbCampaigns.reduce((s,c)=>s+c.conversions,0);
+  const fbCPA = fbConv > 0 ? fbSpend / fbConv : 0;
+  // Build FB daily spark
+  const fbDailySpark = sortedDates.map(d => {
+    return (fbD.daily||[]).filter(r => r.date === d).reduce((s,r) => s + r.spend, 0);
+  });
+  // Build Google daily spark
+  const gDailySpark = sortedDates.map(d => {
+    return (gD.daily||[]).filter(r => r.date === d).reduce((s,r) => s + r.spend, 0);
+  });
+
   document.getElementById('marketing-stats-grid').innerHTML = [
     mktStatCard('Total Ad Spend','$'+tSpend.toFixed(2),tImpr.toLocaleString()+' impressions',spSpark.length>1?spSpark:[0],'var(--honey)'),
     mktStatCard('ROAS',tSpend>0?(tRev/tSpend).toFixed(1)+'x':'-','return on ad spend',roSpark.length>1?roSpark:[0],'var(--sage)'),
-    mktStatCard('CAC',tConv>0?'$'+(tSpend/tConv).toFixed(2):'-',tConv+' conversions',spSpark.length>1?spSpark:[0],'var(--blush)'),
+    mktStatCard('CAC',tConv>0?'$'+(tSpend/tConv).toFixed(2):'-',Math.round(tConv)+' conversions',spSpark.length>1?spSpark:[0],'var(--blush)'),
     mktStatCard('Paid Revenue','$'+tRev.toFixed(2),tClicks.toLocaleString()+' clicks',rvSpark.length>1?rvSpark:[0],'var(--green)'),
     mktStatCard('Blended CVR',tClicks>0?(tConv/tClicks*100).toFixed(1)+'%':'-','clicks to conversion',roSpark.length>1?roSpark:[0],'var(--cyan)'),
     mktStatCard('Avg CPC',tClicks>0?'$'+(tSpend/tClicks).toFixed(2):'-','cost per click',spSpark.length>1?spSpark:[0],'var(--purple)'),
-    mktStatCard('Google Ads Spend','$'+gSpend.toFixed(2),gConv+' conv · CPA '+(gCPA>0?'$'+gCPA.toFixed(2):'-'),spSpark.length>1?spSpark:[0],'#4285F4'),
+    mktStatCard('Facebook Ads','$'+fbSpend.toFixed(2),Math.round(fbConv)+' conv · CPA '+(fbCPA>0?'$'+fbCPA.toFixed(2):'-'),fbDailySpark.length>1?fbDailySpark:[0],'#4267B2'),
+    mktStatCard('Google Ads','$'+gSpend.toFixed(2),Math.round(gConv)+' conv · CPA '+(gCPA>0?'$'+gCPA.toFixed(2):'-'),gDailySpark.length>1?gDailySpark:[0],'#4285F4'),
     renderLearningPhaseWidget(gC.campaigns||[]),
   ].join('');
   const fbSp=(fbC.campaigns||[]).reduce((s,c)=>s+c.spend,0),gSp=(gC.campaigns||[]).reduce((s,c)=>s+c.spend,0);const chL=[],chD=[],chC=[];if(fbSp>0){chL.push('Facebook');chD.push(fbSp);chC.push('#4267B2');}if(gSp>0){chL.push('Google Ads');chD.push(gSp);chC.push('#4285F4');}if(!chL.length){chL.push('No data');chD.push(1);chC.push('#332d27');}
