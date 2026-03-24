@@ -365,6 +365,42 @@ function applyTabVisibility() {
   }
 }
 
+// ── Loading Screen Quotes ──
+const LOADING_QUOTES = [
+  { text: "Do what you can't.", author: "Casey Neistat" },
+  { text: "The only thing standing between you and your goal is the bullshit story you keep telling yourself.", author: "Wolf of Wall Street" },
+  { text: "Free is the most expensive word in business.", author: "Alex Hormozi" },
+  { text: "There is no spoon.", author: "The Matrix" },
+  { text: "Without risk there is no reward.", author: "Casey Neistat" },
+  { text: "I've been poor and I've been rich. Rich is better.", author: "Wolf of Wall Street" },
+  { text: "You don't need more time. You need more focus.", author: "Alex Hormozi" },
+  { text: "I know kung fu.", author: "The Matrix" },
+  { text: "Life's too short to live someone else's dream.", author: "Casey Neistat" },
+  { text: "The real question is not whether machines think but whether men do.", author: "The Matrix" },
+  { text: "Money is the megaphone for value.", author: "Alex Hormozi" },
+  { text: "I'm not leaving. I'm not fucking leaving!", author: "Wolf of Wall Street" },
+  { text: "What if I told you everything you know is wrong?", author: "The Matrix" },
+  { text: "If you want to be interesting, be interested.", author: "Casey Neistat" },
+  { text: "The secret to selling is to charge what it's worth.", author: "Alex Hormozi" },
+  { text: "Winners use words that say 'must' and 'will'.", author: "Wolf of Wall Street" },
+  { text: "You have to let it all go. Fear, doubt, disbelief.", author: "The Matrix" },
+  { text: "Persistence is very important. Don't give up.", author: "Casey Neistat" },
+  { text: "Volume negates luck.", author: "Alex Hormozi" },
+  { text: "Every action is a vote for the person you want to become.", author: "Alex Hormozi" },
+  { text: "If you're afraid, don't do it. If you're doing it, don't be afraid.", author: "Genghis Khan" },
+  { text: "An action committed in anger is an action doomed to failure.", author: "Genghis Khan" },
+  { text: "There is no good in anything until it is finished.", author: "Genghis Khan" },
+  { text: "The strength of a wall is neither greater nor less than the courage of the men who defend it.", author: "Genghis Khan" },
+];
+let quoteInterval;
+function rotateQuote() {
+  const q = LOADING_QUOTES[Math.floor(Math.random() * LOADING_QUOTES.length)];
+  const el = document.getElementById('loading-quote');
+  const au = document.getElementById('loading-quote-author');
+  if (el) { el.style.animation = 'none'; el.offsetHeight; el.style.animation = ''; el.textContent = '"' + q.text + '"'; }
+  if (au) au.textContent = '— ' + q.author;
+}
+
 // ── Loading Screen Progress ──
 const LOAD_STEPS = [
   { id: 'orders', label: 'Orders', msg: 'Loading orders...' },
@@ -401,9 +437,13 @@ function showLoadingScreen() {
   // Render step pills
   const stepsEl = document.getElementById('loading-steps');
   if (stepsEl) stepsEl.innerHTML = LOAD_STEPS.map(s => `<span class="loading-step" data-step="${s.id}">${s.label}</span>`).join('');
+  // Start quote rotation
+  rotateQuote();
+  quoteInterval = setInterval(rotateQuote, 3500);
 }
 
 function hideLoadingScreen() {
+  if (quoteInterval) { clearInterval(quoteInterval); quoteInterval = null; }
   const ls = document.getElementById('loading-screen');
   if (ls) ls.style.opacity = '0';
   setTimeout(() => { if (ls) ls.style.display = 'none'; }, 400);

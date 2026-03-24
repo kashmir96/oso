@@ -11,6 +11,9 @@
     .loading-bar-wrap { width: 100%; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; margin-bottom: 0.75rem; }
     .loading-bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--sage), var(--honey)); border-radius: 2px; transition: width 0.4s ease; }
     .loading-status { font-size: 0.8rem; color: var(--muted); margin-bottom: 1rem; min-height: 1.2em; }
+    .loading-quote { font-size: 0.85rem; color: var(--dim); font-style: italic; margin-bottom: 0.3rem; min-height: 2.5em; max-width: 340px; margin-left: auto; margin-right: auto; line-height: 1.4; animation: quoteCycle 3.5s ease infinite; }
+    .loading-quote-author { font-size: 0.65rem; color: var(--border); margin-bottom: 1.2rem; font-style: normal; letter-spacing: 0.05em; text-transform: uppercase; animation: quoteCycle 3.5s ease infinite; }
+    @keyframes quoteCycle { 0% { opacity: 0; transform: translateY(6px); } 10% { opacity: 1; transform: translateY(0); } 80% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-6px); } }
     .loading-steps { display: flex; flex-wrap: wrap; gap: 0.3rem; justify-content: center; }
     .loading-step { font-size: 0.65rem; padding: 0.15rem 0.5rem; border-radius: 10px; background: var(--card); color: var(--dim); border: 1px solid var(--border); transition: all 0.3s; }
     .loading-step.done { background: rgba(140,180,122,0.15); color: var(--sage); border-color: rgba(140,180,122,0.3); }
