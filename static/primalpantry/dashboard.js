@@ -676,9 +676,9 @@ async function loadAdSpend() {
     currentPaidConv = [...fbCampaigns, ...gCampaigns].reduce((s, c) => s + (c.conversions || 0), 0);
     currentPaidClicks = [...fbCampaigns, ...gCampaigns].reduce((s, c) => s + (c.clicks || 0), 0);
     currentPaidImpr = [...fbCampaigns, ...gCampaigns].reduce((s, c) => s + (c.impressions || 0), 0);
-    // Blended ad spend: FB insights (today) + Google campaigns + FB campaigns (whichever is higher)
-    const todaySpend = fbTodaySpend + gTotalSpend;
-    currentAdSpend = Math.max(todaySpend, fbTotalSpend + gTotalSpend);
+    // Blended ad spend: use campaign-level totals (most reliable across date ranges)
+    // fbTodaySpend from the insights endpoint can be inaccurate for non-today ranges
+    currentAdSpend = fbTotalSpend + gTotalSpend;
     // Banner
     const el = document.getElementById('adspend-value');
     if (el) el.textContent = currentAdSpend > 0 ? '$' + currentAdSpend.toFixed(2) : '—';
