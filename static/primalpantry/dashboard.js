@@ -412,6 +412,22 @@ const LOADING_QUOTES = [
   { text: "Everything that has a beginning has an end.", author: "The Matrix" },
   { text: "Conquering the world on horseback is easy; it is dismounting and governing that is hard.", author: "Genghis Khan" },
   { text: "I am the punishment of God. If you had not committed great sins, God would not have sent a punishment like me upon you.", author: "Genghis Khan" },
+  { text: "You do not rise to the level of your goals. You fall to the level of your systems.", author: "Atomic Habits" },
+  { text: "Every action you take is a vote for the type of person you wish to become.", author: "Atomic Habits" },
+  { text: "The task of breaking a bad habit is like uprooting a powerful oak within us.", author: "Atomic Habits" },
+  { text: "Habits are the compound interest of self-improvement.", author: "Atomic Habits" },
+  { text: "Be the designer of your world and not merely the consumer of it.", author: "Atomic Habits" },
+  { text: "Between your life as it is and the life you wish to live, there is a gap of regret.", author: "The Midnight Library" },
+  { text: "The only way to learn is to live.", author: "The Midnight Library" },
+  { text: "It is easy to mourn the lives we aren't living. It is hard to see what is in front of us.", author: "The Midnight Library" },
+  { text: "You don't have to understand life. You just have to live it.", author: "The Midnight Library" },
+  { text: "Never was anything great achieved without danger.", author: "The Midnight Library" },
+  { text: "Appear weak when you are strong, and strong when you are weak.", author: "The Art of War" },
+  { text: "In the midst of chaos, there is also opportunity.", author: "The Art of War" },
+  { text: "The supreme art of war is to subdue the enemy without fighting.", author: "The Art of War" },
+  { text: "Victorious warriors win first and then go to war, while defeated warriors go to war first and then seek to win.", author: "The Art of War" },
+  { text: "Know yourself and you will win all battles.", author: "The Art of War" },
+  { text: "Opportunities multiply as they are seized.", author: "The Art of War" },
 ];
 let _quoteShuffled = [];
 let _quoteIdx = 0;
