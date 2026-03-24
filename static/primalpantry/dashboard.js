@@ -3999,7 +3999,7 @@ function loadAdspendRegions() {
       // Also store for marketing tab region table
       window._fbRegionData = data.regions || [];
       refreshMapLayers();
-    }).catch(e => { console.warn('[Map] FB region fetch error:', e); });
+    }).catch(e => { console.error('[Map] FB region fetch error:', e); });
 
   // Google regions
   fetch(`/.netlify/functions/google-ads?token=${tok}&from=${from}&to=${to}&geo=region`)
@@ -4030,11 +4030,17 @@ function loadAdspendRegions() {
 }
 
 window.refreshMapLayers = refreshMapLayers;
+let _mapLayersPending = false;
 function refreshMapLayers() {
-  if (!mapInstance) return;
+  if (!mapInstance) { console.log('[Map] refreshMapLayers: no mapInstance yet'); return; }
   // Don't render if map container is hidden/zero-size (causes leaflet-heat IndexSizeError)
   const mapContainer = mapInstance.getContainer();
-  if (!mapContainer || mapContainer.offsetWidth === 0 || mapContainer.offsetHeight === 0) return;
+  if (!mapContainer || mapContainer.offsetWidth === 0 || mapContainer.offsetHeight === 0) {
+    console.log('[Map] refreshMapLayers: container hidden/zero-size, deferring');
+    _mapLayersPending = true;
+    return;
+  }
+  _mapLayersPending = false;
   try { mapInstance.invalidateSize(); } catch(e) {}
   const layer = (document.getElementById('map-layer') || {}).value || 'both';
   const adSource = (document.getElementById('map-ad-source') || {}).value || 'all';
@@ -4136,6 +4142,7 @@ function refreshMapLayers() {
     };
     if (adSource === 'all' || adSource === 'facebook') addRegions(cachedAdspendRegions.facebook);
     if (adSource === 'all' || adSource === 'google') addRegions(cachedAdspendRegions.google);
+    console.log('[Map] adspend regionSpend keys:', Object.keys(regionSpend), 'fb cached:', cachedAdspendRegions.facebook.length, 'google cached:', cachedAdspendRegions.google.length);
 
     const normalise = s => s.toLowerCase().replace(/\s*region$/,'').replace(/\s*district$/,'').replace(/ā/g,'a').replace(/ū/g,'u').replace(/ī/g,'i').replace(/ō/g,'o').replace(/ē/g,'e').replace(/-/g,' ').trim();
     const regionLookup = {};
@@ -4399,6 +4406,10 @@ eyeBtn.addEventListener('click', () => { statsVisible = !statsVisible; applyStat
 function loadActiveTab() {
   if (activeTab === 'sales') {
     renderAll(filteredOrders, allLineItems.filter(li => new Set(filteredOrders.map(o => o.id)).has(li.order_id)));
+    // If adspend regions arrived while map was hidden, re-render now
+    if (_mapLayersPending && mapInstance) {
+      setTimeout(() => { try { refreshMapLayers(); } catch(e) {} }, 300);
+    }
   } else if (activeTab === 'orders') {
     renderOrdersTable();
     // Load shipping data in background so order pills show eShip status
