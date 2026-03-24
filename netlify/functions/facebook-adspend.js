@@ -57,13 +57,30 @@ exports.handler = async (event) => {
   }
 
   try {
-    let url;
     if (from && to) {
+      // Date range query — straightforward
       const timeRange = JSON.stringify({ since: from, until: to });
-      url = `https://graph.facebook.com/v21.0/act_${accountId}/insights?fields=spend&time_range=${encodeURIComponent(timeRange)}&access_token=${accessToken}`;
-    } else {
-      url = `https://graph.facebook.com/v21.0/act_${accountId}/insights?fields=spend&date_preset=today&access_token=${accessToken}`;
+      const url = `https://graph.facebook.com/v21.0/act_${accountId}/insights?fields=spend&time_range=${encodeURIComponent(timeRange)}&access_token=${accessToken}`;
+      const res = await fetch(url);
+      const json = await res.json();
+      if (json.error) return reply(200, { spend: null, error: json.error.message });
+      const spend = json.data && json.data.length > 0 ? json.data[0].spend : '0.00';
+      return reply(200, { spend });
     }
+
+    // "Today" query — FB uses ad account timezone (likely US/UTC), not NZ.
+    // Fetch yesterday + today with daily breakdown, then calculate NZ "today" spend.
+    // NZ is UTC+12/+13. FB account may be in a different TZ.
+    // Strategy: fetch last 2 days of spend. Since we also get campaign-level totals
+    // from facebook-campaigns (which IS the source of truth for period spend),
+    // this endpoint just needs a reasonable "today" estimate.
+    // Fetch today + yesterday to cover the NZ day boundary.
+    const now = new Date();
+    const yesterday = new Date(now); yesterday.setDate(yesterday.getDate() - 1);
+    const ydStr = yesterday.toISOString().slice(0, 10);
+    const todayStr = now.toISOString().slice(0, 10);
+    const timeRange = JSON.stringify({ since: ydStr, until: todayStr });
+    const url = `https://graph.facebook.com/v21.0/act_${accountId}/insights?fields=spend&time_range=${encodeURIComponent(timeRange)}&time_increment=1&access_token=${accessToken}`;
     const res = await fetch(url);
     const json = await res.json();
 
@@ -72,8 +89,29 @@ exports.handler = async (event) => {
       return reply(200, { spend: null, error: json.error.message });
     }
 
-    const spend = json.data && json.data.length > 0 ? json.data[0].spend : '0.00';
-    return reply(200, { spend });
+    // Sum both days — this gives a "NZ today" approximation
+    // since NZ today spans parts of both UTC yesterday and UTC today.
+    // The campaign-level endpoint (facebook-campaigns) is used for precise period totals.
+    let totalSpend = 0;
+    if (json.data) {
+      for (const row of json.data) {
+        totalSpend += Number(row.spend || 0);
+      }
+    }
+    // Halve yesterday's contribution as rough estimate (NZ today covers ~half of UTC yesterday + all of UTC today)
+    // More precise: NZ is ~12-13h ahead, so NZ "today" started ~11-12h into UTC yesterday
+    let ydSpend = 0, tdSpend = 0;
+    if (json.data) {
+      for (const row of json.data) {
+        if (row.date_start === ydStr) ydSpend = Number(row.spend || 0);
+        else tdSpend = Number(row.spend || 0);
+      }
+    }
+    // NZ today ≈ last ~12h of UTC yesterday + all of UTC today so far
+    // Approximate: half of yesterday's spend + all of today's
+    const nzTodaySpend = (ydSpend * 0.5) + tdSpend;
+
+    return reply(200, { spend: nzTodaySpend.toFixed(2), raw_yesterday: ydSpend, raw_today: tdSpend });
   } catch (err) {
     console.error('Facebook adspend fetch error:', err.message);
     return reply(200, { spend: null, error: err.message });
