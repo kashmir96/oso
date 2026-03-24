@@ -11862,9 +11862,71 @@ function renderActionSummary(summary) {
     time.textContent = '';
     return;
   }
-  body.innerHTML = summary.summary_text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
-  time.textContent = 'Generated ' + new Date(summary.generated_at).toLocaleDateString('en-NZ', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+  let html = summary.summary_text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n---\n/g, '<hr style="border:none;border-top:1px solid var(--border);margin:1rem 0;">')
+    .replace(/\n/g, '<br>');
+  // Replace deep-dive links with clickable buttons
+  html = html.replace(/\[📊 Deep dive →\]\(#deepdive-([\w-]+)\)/g, (_, section) => {
+    return `<a href="#" onclick="actionDeepDive('${section}', event)" style="display:inline-block;margin:0.5rem 0;padding:4px 12px;background:var(--border);color:var(--green);border-radius:6px;font-size:0.75rem;text-decoration:none;font-weight:600;">📊 Deep dive into ${section} →</a>`;
+  });
+  body.innerHTML = html;
+  time.textContent = 'Generated ' + new Date(summary.generated_at).toLocaleDateString('en-NZ', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit', timeZone: 'Pacific/Auckland' });
 }
+
+// Deep-dive: sends a focused prompt to claude-chat for detailed analysis on a section
+window.actionDeepDive = async function(section, e) {
+  e.preventDefault();
+  const sectionNames = { marketing: 'Marketing Performance', website: 'Website & Conversion', profitability: 'Product Profitability & Margins', costs: 'Cost Reduction & Overhead Optimization', inventory: 'Inventory & Operations', customers: 'Customer & Competitive Intel' };
+  const sectionName = sectionNames[section] || section;
+
+  // Find or create a deep-dive container below the summary
+  let container = document.getElementById('action-deepdive');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'action-deepdive';
+    container.className = 'orders-card';
+    container.style.cssText = 'margin-bottom:1rem;';
+    document.getElementById('action-summary-body').closest('.orders-card').after(container);
+  }
+  container.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+    <h3 style="margin:0;">🔍 Deep Dive: ${sectionName}</h3>
+    <button onclick="document.getElementById('action-deepdive').remove()" style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:1.2rem;">✕</button>
+  </div>
+  <div id="action-deepdive-body" style="font-size:0.82rem;line-height:1.65;color:var(--muted);">
+    <div class="loading">Generating detailed ${sectionName.toLowerCase()} analysis… this may take 30-60 seconds.</div>
+  </div>`;
+  container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  const prompts = {
+    marketing: `Give me a comprehensive deep-dive on my marketing performance. I want: every campaign ranked by ROAS and CPA with kill/scale/hold verdict. Creative fatigue analysis — which ads have been running too long with declining performance. Platform comparison (FB vs Google) with budget reallocation recommendation. Channel attribution analysis. Regional performance — which countries convert best. Day-of-week and hour-of-day patterns — when should I increase/decrease bids. Ad copy vs landing page alignment check for every active campaign. Specific new creative angles to test based on what's working.`,
+    website: `Give me a comprehensive deep-dive on my website performance. I want: every page ranked by conversion opportunity (traffic × potential conversion lift). Detailed funnel analysis — where exactly are visitors dropping off. Mobile vs desktop comparison per page. Checkout error analysis and what's causing lost sales. Exit page analysis — why people leave. For my top 5 traffic pages, review the actual live content and give me specific copy, CTA, trust signal, and design recommendations. Any recent deploy changes that hurt or helped conversion. Page speed or UX issues to fix.`,
+    profitability: `Give me a comprehensive deep-dive on product profitability. I want: every product with full COGS breakdown (ingredients/labor/packaging), margin per unit, margin %, and total profit contribution. Rank by TOTAL profit (not just revenue). Identify which products I should push hardest in ads based on margin × volume potential. Products that need price increases. Products where COGS can be reduced. First-purchase magnet analysis — which products bring new customers, and what's the LTV play if they're low margin. Bundle recommendations with calculated margins. Specific AOV optimization tactics.`,
+    costs: `Give me a comprehensive deep-dive on cost reduction opportunities. I want: full COGS breakdown showing where money goes (ingredients, labor, packaging). Packaging cost analysis — what would I save with bulk purchasing or alternative suppliers? Most expensive ingredients — are there alternatives? Which essential oils could I source cheaper? Fixed overhead analysis — every expense category with reduce/eliminate recommendations. Ad spend efficiency — what CPA reduction would save annually. Refund cost analysis — root causes and prevention. Labor optimization — batch sizing for efficiency. Supplier negotiation opportunities. Give me a dollar figure for each saving opportunity.`,
+    inventory: `Give me a comprehensive deep-dive on inventory and operations. I want: every SKU with current stock, daily velocity, days of supply, and reorder recommendation. Which SKUs are at risk of stockout? Recommended batch sizes based on velocity. Overstock SKUs — should I bundle, discount, or hold? Supplier order status — anything delayed? Manufacturing batch schedule recommendations for the next 2 weeks. Ingredient stock levels — any raw materials running low?`,
+    customers: `Give me a comprehensive deep-dive on customer intelligence. I want: email theme analysis — what are customers saying? Specific complaints or product feedback to act on (quote actual messages). Product reaction reports. Shipping issues. Wholesale inquiries. Positive feedback patterns — what do customers love most? Competitor changes detected and how to respond. Customer retention patterns — repeat purchase rate. Top customer segments to focus on.`,
+  };
+
+  try {
+    const res = await fetch('/.netlify/functions/claude-chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token: currentStaff.token,
+        messages: [{ role: 'user', content: prompts[section] || 'Give me a detailed analysis of ' + sectionName }],
+        tools: [],
+      }),
+    });
+    const data = await res.json();
+    const text = data.reply || data.content?.[0]?.text || 'No response generated.';
+    document.getElementById('action-deepdive-body').innerHTML = text
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\n---\n/g, '<hr style="border:none;border-top:1px solid var(--border);margin:1rem 0;">')
+      .replace(/\n/g, '<br>');
+  } catch (err) {
+    document.getElementById('action-deepdive-body').innerHTML = '<div style="color:var(--red);">Failed: ' + err.message + '</div>';
+  }
+};
 
 async function refreshActionSummary() {
   const btn = document.getElementById('action-refresh-summary');

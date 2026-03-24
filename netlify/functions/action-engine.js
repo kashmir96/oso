@@ -164,6 +164,44 @@ async function loadProductCOGS() {
   return (await res.json()) || [];
 }
 
+async function loadExpenses() {
+  const res = await sbFetch('/rest/v1/expenses?select=name,category,amount,frequency');
+  return (await res.json()) || [];
+}
+
+async function loadIngredients() {
+  const res = await sbFetch('/rest/v1/ingredients?select=name,price_per_kg,stock_kg,category,supplier&price_per_kg=gt.0');
+  return (await res.json()) || [];
+}
+
+async function loadSupplierOrders() {
+  const res = await sbFetch('/rest/v1/supplier_orders?select=item_name,supplier_name,quantity,cost,status,expected_delivery&order=requested_at.desc&limit=20');
+  return (await res.json()) || [];
+}
+
+async function loadCheckoutErrors(from) {
+  const res = await sbFetch(`/rest/v1/checkout_errors?created_at=gte.${from}T00:00:00Z&select=error_type,error_message,browser,device,is_card_decline&order=created_at.desc&limit=50`);
+  return (await res.json()) || [];
+}
+
+async function loadAbandonedCarts() {
+  const res = await sbFetch('/rest/v1/abandoned_checkout_status?status=eq.new&select=stripe_session_id,status,updated_at&order=updated_at.desc&limit=20');
+  return (await res.json()) || [];
+}
+
+async function loadChangelogs() {
+  const res = await sbFetch('/rest/v1/site_changelogs?site_key=eq.primalpantry&select=commit_message,deployed_at,is_funnel_related,baseline_visitors,baseline_conv,baseline_rev,post_visitors,post_conv,post_rev,cooldown_complete&order=deployed_at.desc&limit=10');
+  return (await res.json()) || [];
+}
+
+async function loadAnalyticsByCountry(from, to) {
+  return callRpc('analytics_grouped', { p_site: SITE_ID, p_from: toUTC(from), p_to: toUTCEnd(to), p_column: 'country' });
+}
+
+async function loadAnalyticsBySource(from, to) {
+  return callRpc('analytics_grouped', { p_site: SITE_ID, p_from: toUTC(from), p_to: toUTCEnd(to), p_column: 'utm_source' });
+}
+
 async function loadFBAdCreatives() {
   try {
     const token = process.env.FB_ACCESS_TOKEN;
@@ -429,7 +467,9 @@ function evaluateInventory(inventoryData, orders, lineItems, config) {
 // ── AI Summary ──
 
 async function generateSummary(alerts, orders, campaigns, inventoryData, competitorChanges, customerEmails, lineItems, refunds = [],
-  { curAnalytics, priorAnalytics, curPages, priorPages, curDevices, curFunnelByPage, entryPages, exitPages, productCOGS, fbAdCreatives, livePages } = {}) {
+  { curAnalytics, priorAnalytics, monthAnalytics, curPages, priorPages, curDevices, curFunnelByPage, entryPages, exitPages,
+    productCOGS, fbAdCreatives, livePages, expenses, ingredients, supplierOrders, checkoutErrors, abandonedCarts,
+    changelogs, countryData, sourceData, allCampaigns30 } = {}) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return null;
 
@@ -544,31 +584,94 @@ async function generateSummary(alerts, orders, campaigns, inventoryData, competi
   if (month === 3 || month === 4) seasonalNotes.push('Autumn transition — winter skincare messaging opportunity');
   if (month === 5) seasonalNotes.push('Winter skincare season starting — moisturiser and balm demand rises');
 
+  // ── COMPREHENSIVE DATA AGGREGATION ──
+
   // Product margin analysis from COGS
   const cogsMap = {};
-  (productCOGS || []).forEach(c => { cogsMap[c.sku] = Number(c.ingredients || 0) + Number(c.labor || 0) + Number(c.packaging || 0); });
-  const productMargins = topProducts.map(([name, d]) => {
-    const matchingCogs = cogsMap[name] || 0;
-    const margin = d.units > 0 ? ((d.revenue / d.units) - matchingCogs).toFixed(2) : '?';
-    const marginPct = d.revenue > 0 && matchingCogs > 0 ? (((d.revenue / d.units - matchingCogs) / (d.revenue / d.units)) * 100).toFixed(0) + '%' : '?';
-    return { name, revenue: d.revenue.toFixed(2), units: d.units, cogs_per_unit: matchingCogs.toFixed(2), margin_per_unit: margin, margin_pct: marginPct };
+  const cogsBreakdown = {};
+  (productCOGS || []).forEach(c => {
+    const total = Number(c.ingredients || 0) + Number(c.labor || 0) + Number(c.packaging || 0);
+    cogsMap[c.sku] = total;
+    cogsBreakdown[c.sku] = { ingredients: Number(c.ingredients || 0), labor: Number(c.labor || 0), packaging: Number(c.packaging || 0), total };
   });
 
+  const productMargins = topProducts.map(([name, d]) => {
+    const cogs = cogsBreakdown[name] || { ingredients: 0, labor: 0, packaging: 0, total: 0 };
+    const avgPrice = d.units > 0 ? d.revenue / d.units : 0;
+    const margin = avgPrice - cogs.total;
+    const marginPct = avgPrice > 0 && cogs.total > 0 ? ((margin / avgPrice) * 100).toFixed(0) + '%' : '?';
+    return { sku: name, revenue: d.revenue.toFixed(2), units: d.units, avgPrice: avgPrice.toFixed(2), cogs_ingredients: cogs.ingredients.toFixed(2), cogs_labor: cogs.labor.toFixed(2), cogs_packaging: cogs.packaging.toFixed(2), cogs_total: cogs.total.toFixed(2), margin_per_unit: margin.toFixed(2), margin_pct: marginPct };
+  });
+
+  // Expenses: annualize and categorize
+  const freqMultiplier = { weekly: 52, fortnightly: 26, monthly: 12, quarterly: 4, yearly: 1, 'one-off': 0 };
+  const expensesByCategory = {};
+  let totalAnnualOpex = 0;
+  (expenses || []).forEach(e => {
+    const annual = Number(e.amount || 0) * (freqMultiplier[e.frequency] || 12);
+    const monthly = annual / 12;
+    totalAnnualOpex += annual;
+    if (!expensesByCategory[e.category]) expensesByCategory[e.category] = { items: [], monthlyTotal: 0 };
+    expensesByCategory[e.category].items.push({ name: e.name, amount: Number(e.amount || 0), frequency: e.frequency, monthly: monthly.toFixed(2) });
+    expensesByCategory[e.category].monthlyTotal += monthly;
+  });
+  Object.keys(expensesByCategory).forEach(k => { expensesByCategory[k].monthlyTotal = expensesByCategory[k].monthlyTotal.toFixed(2); });
+
+  // Packaging cost analysis (biggest cost component)
+  const totalPackagingCost30d = lineItems.reduce((s, li) => {
+    const c = cogsBreakdown[li.sku || li.description];
+    return s + (c ? c.packaging * (li.quantity || 1) : 0);
+  }, 0);
+  const totalLaborCost30d = lineItems.reduce((s, li) => {
+    const c = cogsBreakdown[li.sku || li.description];
+    return s + (c ? c.labor * (li.quantity || 1) : 0);
+  }, 0);
+  const totalIngredientCost30d = lineItems.reduce((s, li) => {
+    const c = cogsBreakdown[li.sku || li.description];
+    return s + (c ? c.ingredients * (li.quantity || 1) : 0);
+  }, 0);
+
+  // High-cost ingredients
+  const expensiveIngredients = (ingredients || []).sort((a, b) => Number(b.price_per_kg) - Number(a.price_per_kg)).slice(0, 10);
+
+  // Month-over-month order trends (30d vs prior 30d from 60d data)
+  const from30Date = getNZDate(30);
+  const recentOrders = orders.filter(o => o.order_date >= from30Date);
+  const olderOrders = orders.filter(o => o.order_date < from30Date);
+  const recentRev = recentOrders.reduce((s, o) => s + Number(o.total_value || 0), 0);
+  const olderRev = olderOrders.reduce((s, o) => s + Number(o.total_value || 0), 0);
+
+  // Order patterns: day of week + hour of day
+  const dayOfWeekOrders = [0, 0, 0, 0, 0, 0, 0]; // Sun-Sat
+  const hourOrders = Array(24).fill(0);
+  recentOrders.forEach(o => {
+    const d = new Date(o.created_at || o.order_date);
+    dayOfWeekOrders[d.getDay()]++;
+    hourOrders[d.getHours()]++;
+  });
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const bestDays = dayOfWeekOrders.map((c, i) => ({ day: dayNames[i], orders: c })).sort((a, b) => b.orders - a.orders);
+  const peakHours = hourOrders.map((c, i) => ({ hour: i, orders: c })).sort((a, b) => b.orders - a.orders).slice(0, 5);
+
   // Website analytics: page trends (7d vs prior 7d)
-  const pagesTrend = (curPages || []).sort((a, b) => b.visitors - a.visitors).slice(0, 10).map(p => {
+  const pagesTrend = (curPages || []).sort((a, b) => b.visitors - a.visitors).slice(0, 15).map(p => {
     const prior = (priorPages || []).find(pp => pp.value === p.value);
     const funnel = (curFunnelByPage || []).find(f => f.value === p.value);
     return {
-      pathname: p.value, visitors: p.visitors, bounce_rate: p.bounce_rate,
+      pathname: p.value, visitors: p.visitors, bounce_rate: p.bounce_rate, avg_duration: p.avg_duration,
       visitors_change: prior ? pctChange(p.visitors, prior.visitors) : 'new',
       bounce_change: prior ? ((p.bounce_rate || 0) - (prior.bounce_rate || 0)).toFixed(1) + 'pp' : null,
+      atc: funnel?.atc_uniques || 0,
       atc_rate: p.visitors > 0 ? ((funnel?.atc_uniques || 0) / p.visitors * 100).toFixed(1) + '%' : '0%',
       conv_rate: p.visitors > 0 ? ((funnel?.sale_uniques || 0) / p.visitors * 100).toFixed(1) + '%' : '0%',
     };
   });
 
-  // Creative fatigue: campaigns with CPA > 30 for 14+ days
-  const fatiguedCreatives = creativeRanking.filter(c => Number(c.cpa) > 30 && c.conversions > 0).map(c => c.name);
+  // Creative fatigue: 30d campaigns with CPA > 30
+  const fatigued30d = (allCampaigns30 || []).filter(c => c.conversions > 0 && c.spend / c.conversions > 30).map(c => ({ name: c.name, platform: c.platform, cpa: (c.spend / c.conversions).toFixed(2), spend: c.spend.toFixed(2), conversions: c.conversions }));
+
+  // Performing creatives (to scale)
+  const scaleable = creativeRanking.filter(c => Number(c.roas) > 2 && Number(c.cpa) !== 'N/A').slice(0, 5);
 
   // Ad ↔ page cross-reference
   const adPageMapping = (fbAdCreatives || []).map(ad => {
@@ -592,38 +695,84 @@ async function generateSummary(alerts, orders, campaigns, inventoryData, competi
       }
     }
   });
-  const topPairs = Object.entries(pairCounts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([pair, count]) => ({ pair, count }));
+  const topPairs = Object.entries(pairCounts).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([pair, count]) => ({ pair, count }));
+
+  // Checkout errors summary
+  const errorTypes = {};
+  (checkoutErrors || []).forEach(e => { const t = e.error_type || 'unknown'; errorTypes[t] = (errorTypes[t] || 0) + 1; });
+  const cardDeclines = (checkoutErrors || []).filter(e => e.is_card_decline).length;
+
+  // Abandoned cart count
+  const abandonedCount = (abandonedCarts || []).length;
+
+  // Recent deploy impact
+  const recentDeploys = (changelogs || []).filter(c => c.is_funnel_related && c.post_conv !== null).slice(0, 3).map(c => ({
+    change: c.commit_message, deployed: c.deployed_at,
+    before: { visitors: c.baseline_visitors, conv: c.baseline_conv, rev: c.baseline_rev },
+    after: { visitors: c.post_visitors, conv: c.post_conv, rev: c.post_rev },
+  }));
 
   const context = {
     date: yesterday,
+    // ── SALES OVERVIEW ──
     yesterday: { orders: yesterdayOrders.length, revenue: yRevenue.toFixed(2), aov: yesterdayOrders.length > 0 ? (yRevenue / yesterdayOrders.length).toFixed(2) : '0' },
+    monthOverMonth: { last30d: { orders: recentOrders.length, revenue: recentRev.toFixed(2), aov: recentOrders.length > 0 ? (recentRev / recentOrders.length).toFixed(2) : '0' }, prior30d: { orders: olderOrders.length, revenue: olderRev.toFixed(2) }, revenueChange: pctChange(recentRev, olderRev), ordersChange: pctChange(recentOrders.length, olderOrders.length) },
+    orderPatterns: { bestDays: bestDays.slice(0, 3), peakHours, totalOrders30d: recentOrders.length },
+    discounts: { discountedOrderPct: discountRate + '%', discountRevenue: discountRevenue.toFixed(2), fullPriceRevenue: nonDiscountRevenue.toFixed(2) },
+    refunds: { totalRefunded: refundTotal.toFixed(2), refundCount: refunds.length, damagedCount: damagedOrders.length, refundRate: orders.length > 0 ? ((refundedOrders.length / orders.length) * 100).toFixed(1) + '%' : '0%', reasons: refundReasons },
+    checkoutErrors: { total: (checkoutErrors || []).length, cardDeclines, byType: errorTypes },
+    abandonedCarts: abandonedCount,
+
+    // ── MARKETING ──
     ads: {
       totalSpend: totalSpend.toFixed(2), totalConversions: totalConv,
       cpa: totalConv > 0 ? (totalSpend / totalConv).toFixed(2) : 'N/A',
       roas: totalSpend > 0 ? (totalRev / totalSpend).toFixed(1) : 'N/A',
       byPlatform: platformStats,
-      campaigns: campaigns.slice(0, 15).map(c => ({ name: c.name, platform: c.platform, spend: c.spend.toFixed(2), conversions: c.conversions, cpa: c.conversions > 0 ? (c.spend / c.conversions).toFixed(2) : 'N/A', roas: c.spend > 0 ? (c.conversions_value / c.spend).toFixed(1) : '0', ctr: c.impressions > 0 ? ((c.clicks / c.impressions) * 100).toFixed(2) : '0' })),
+      campaigns: campaigns.sort((a, b) => b.spend - a.spend).slice(0, 20).map(c => ({ name: c.name, platform: c.platform, spend: c.spend.toFixed(2), conversions: c.conversions, cpa: c.conversions > 0 ? (c.spend / c.conversions).toFixed(2) : 'N/A', roas: c.spend > 0 ? (c.conversions_value / c.spend).toFixed(1) : '0', ctr: c.impressions > 0 ? ((c.clicks / c.impressions) * 100).toFixed(2) : '0', impressions: c.impressions, frequency: c.frequency || 0 })),
     },
-    creativeRanking: creativeRanking.slice(0, 10),
-    fatiguedCreatives,
-    refunds: { totalRefunded: refundTotal.toFixed(2), refundCount: refunds.length, damagedCount: damagedOrders.length, refundRate: orders.length > 0 ? ((refundedOrders.length / orders.length) * 100).toFixed(1) + '%' : '0%', reasons: refundReasons },
-    discounts: { discountedOrderPct: discountRate + '%', discountRevenue: discountRevenue.toFixed(2), fullPriceRevenue: nonDiscountRevenue.toFixed(2) },
-    inventory: invStatus.filter(i => i.stock > 0 || i.velocity > 0),
-    activeAlerts: { total: alerts.length, p1: alerts.filter(a => a.priority === 'P1').length, list: alerts.slice(0, 10).map(a => ({ title: a.title, priority: a.priority, category: a.category })) },
+    creativeRanking: creativeRanking.slice(0, 15),
+    fatiguedCreatives: fatigued30d,
+    scaleableCampaigns: scaleable,
+    adPageAlignment: adPageMapping.slice(0, 10),
+    trafficSources: (sourceData || []).slice(0, 10),
+    regionData: (countryData || []).slice(0, 10),
+
+    // ── PRODUCT & PROFITABILITY ──
     productMargins,
     topMagnets: topMagnets.map(([name, count]) => ({ name, firstPurchases: count })),
     topPairs,
-    // Website analytics
+
+    // ── COSTS & OVERHEADS ──
+    costAnalysis: {
+      totalCOGS30d: (totalIngredientCost30d + totalLaborCost30d + totalPackagingCost30d).toFixed(2),
+      ingredientCost30d: totalIngredientCost30d.toFixed(2),
+      laborCost30d: totalLaborCost30d.toFixed(2),
+      packagingCost30d: totalPackagingCost30d.toFixed(2),
+      totalAdSpend14d: totalSpend.toFixed(2),
+      totalRefunds30d: refundTotal.toFixed(2),
+    },
+    expenses: { totalMonthlyOpex: (totalAnnualOpex / 12).toFixed(2), byCategory: expensesByCategory },
+    expensiveIngredients: expensiveIngredients.map(i => ({ name: i.name, pricePerKg: Number(i.price_per_kg).toFixed(2), category: i.category, supplier: i.supplier || 'unknown' })),
+    supplierOrders: (supplierOrders || []).slice(0, 10),
+
+    // ── WEBSITE ANALYTICS ──
     websiteAnalytics: curAnalytics && priorAnalytics ? {
       current: { visitors: curAnalytics.unique_visitors, pageviews: curAnalytics.total_pageviews, bounce: curAnalytics.bounce_rate, avgDuration: curAnalytics.avg_duration },
+      prior: { visitors: priorAnalytics.unique_visitors, bounce: priorAnalytics.bounce_rate },
       changes: { visitors: pctChange(curAnalytics.unique_visitors, priorAnalytics.unique_visitors), pageviews: pctChange(curAnalytics.total_pageviews, priorAnalytics.total_pageviews), bounce: ((curAnalytics.bounce_rate || 0) - (priorAnalytics.bounce_rate || 0)).toFixed(1) + 'pp' },
+      month: monthAnalytics ? { visitors: monthAnalytics.unique_visitors, bounce: monthAnalytics.bounce_rate } : null,
     } : null,
     pagesTrend,
     devices: curDevices || [],
-    entryPages: (entryPages || []).slice(0, 5),
-    exitPages: (exitPages || []).slice(0, 5),
-    livePages: (livePages || []).map(p => ({ pathname: p.pathname, title: p.title, hero: p.hero, text: (p.text || '').slice(0, 1000) })),
-    adPageAlignment: adPageMapping.slice(0, 8),
+    entryPages: (entryPages || []).slice(0, 8),
+    exitPages: (exitPages || []).slice(0, 8),
+    livePages: (livePages || []).map(p => ({ pathname: p.pathname, title: p.title, hero: p.hero, text: (p.text || '').slice(0, 1500) })),
+    recentDeploys,
+
+    // ── INVENTORY & OPERATIONS ──
+    inventory: invStatus.filter(i => i.stock > 0 || i.velocity > 0),
+    activeAlerts: { total: alerts.length, p1: alerts.filter(a => a.priority === 'P1').length, list: alerts.slice(0, 10).map(a => ({ title: a.title, priority: a.priority, category: a.category })) },
     competitorChanges: competitorChanges.slice(0, 10).map(c => ({ summary: c.summary, type: c.change_type })),
     customerEmails: { themes: emailThemes, recentMessages: customerEmails.slice(0, 10).map(e => ({ subject: e.subject, snippet: (e.snippet || '').slice(0, 100) })) },
     seasonalNotes,
@@ -632,53 +781,101 @@ async function generateSummary(alerts, orders, campaigns, inventoryData, competi
   const dayOfWeek = new Date().getDay();
   const isMonday = dayOfWeek === 1;
 
-  const systemPrompt = `You are the AI business analyst for Primal Pantry, a NZ-based tallow skincare DTC brand. You combine sales, marketing, website analytics, product margin data, and customer intel into a single comprehensive briefing. Be direct, specific, data-driven. Use NZD. Bold (**text**) key numbers and actions. Every recommendation must be actionable.`;
+  const systemPrompt = `You are the AI business analyst for Primal Pantry, a NZ-based tallow skincare DTC brand selling online via Stripe. You have access to ALL business data: sales, marketing, website analytics, product margins, COGS breakdown, fixed expenses, ingredient costs, supplier data, inventory, checkout errors, abandoned carts, competitor intel, and customer comms. Your job is to produce a comprehensive, detailed, actionable briefing that covers EVERY area of the business. Be direct, specific, data-driven. Use NZD. Bold (**text**) key numbers and actions. Every recommendation must be something the owner can act on.
 
-  const userPrompt = `Generate a comprehensive ${isMonday ? 'weekly' : 'daily'} sales & marketing briefing for ${yesterday}.
+IMPORTANT: At the end of each section, include a clickable deep-dive link formatted exactly as: [📊 Deep dive →](#deepdive-SECTION_ID)
+Valid SECTION_IDs: marketing, website, profitability, costs, inventory, customers`;
+
+  const userPrompt = `Generate a comprehensive ${isMonday ? 'weekly' : 'daily'} business briefing for ${yesterday}.
 
 Data:
 ${JSON.stringify(context, null, 2)}
 
-Structure your response as:
+Structure your response with these sections. Be detailed — this is the owner's primary decision-making tool.
 
-**${isMonday ? 'Weekly' : 'Yesterday'}**: Revenue, orders, AOV${isMonday ? ' vs last week' : ''}. Key trend.
+---
 
-**🔴 Refunds & Damages**: Total refunded, damage count, top reasons. What to fix.
+**📊 ${isMonday ? 'WEEKLY' : 'DAILY'} SNAPSHOT**
+Revenue, orders, AOV. ${isMonday ? 'Week-over-week and month-over-month trends.' : 'Compare to recent averages.'} Refund rate. Discount usage rate. Abandoned cart count. Key verdict in one line.
 
-**📈 Marketing — Kill / Scale / Create**:
-• By platform (FB vs Google): which is winning, where to shift budget
-• Campaigns to kill NOW (CPA too high or fatigued — see fatiguedCreatives for CPA>$30 over 14d)
-• Campaigns to scale (strong ROAS)
-• Creative fatigue flags — which creatives to refresh
-• Regional / time-of-day / day-of-week opportunities from order patterns
+---
 
-**💰 Product Profitability & Margins**: From productMargins data — which products have the best margin? Which high-revenue products have poor margins? Recommend which products to push in ads based on profit per unit, not just revenue.
+**📈 MARKETING PERFORMANCE**
+• **Platform comparison**: FB vs Google — spend, ROAS, CPA, CTR. Which platform to invest more in and why.
+• **Campaign-level**: Top 5 campaigns by ROAS. Bottom 5 by CPA. Specific kill/scale/create recommendations for each.
+• **Creative fatigue**: From fatiguedCreatives data — any creative with CPA >$30 consistently. Name them. Recommend kill or refresh.
+• **Scaleable winners**: From scaleableCampaigns — which to increase budget on. By how much.
+• **Channel attribution**: From trafficSources — which traffic sources convert best. Where to invest more.
+• **Regional opportunities**: From regionData — which countries/regions have highest conversion. Any untapped regions worth targeting.
+• **Timing optimization**: From orderPatterns — best days and hours for orders. Should ad scheduling change?
+• **Ad ↔ landing page alignment**: Compare ad creative copy with actual live page content. Flag any mismatches. Suggest specific fixes.
+[📊 Deep dive →](#deepdive-marketing)
 
-**🛒 Bundles & Cross-sell**: From topPairs (frequently bought together) — specific bundle recommendations. Which product combinations to create or promote.
+---
 
-**🌐 Website Performance**:
-• Traffic changes this week vs last (visitors, bounce rate)
-• Pages gaining/losing traffic and why
-• Conversion opportunities — high traffic + low conversion pages, what to fix
-• Mobile vs desktop issues from device data
-• Ad ↔ landing page alignment — compare ad creative copy with actual page hero text. Flag mismatches.
-• For top pages: review actual live content (title, hero, text) and suggest specific improvements
+**🌐 WEBSITE & CONVERSION**
+• **Traffic overview**: Visitors, pageviews, bounce rate — this week vs last. Monthly trend.
+• **Page-level analysis**: Top 10 pages with traffic changes, bounce rate shifts, conversion rates. Which pages are gaining/losing and why.
+• **Conversion funnel**: Pages with high traffic but low ATC or conversion rate. Rank by opportunity size (visitors × potential conversion lift).
+• **Device issues**: Mobile vs desktop bounce and conversion. Flag specific pages where mobile underperforms.
+• **Checkout errors**: How many errors this week? Card declines? What's being lost.
+• **Exit pages**: Where are people leaving? What can be improved on those pages.
+• **Live page review**: For top 3 highest-traffic pages — review actual title, hero text, and content. Suggest specific headline, CTA, trust signal, or design improvements.
+• **Deploy impact**: Any recent site changes that affected funnel metrics? Before vs after.
+[📊 Deep dive →](#deepdive-website)
 
-**📦 Inventory**: Stock at risk, batch sizes needed, overstock to bundle/discount.
+---
 
-**📧 Customer Intel**: Email themes. Specific product improvement ideas from customer feedback.
+**💰 PRODUCT PROFITABILITY & MARGINS**
+• **Margin table**: For each top product — revenue, units sold, COGS breakdown (ingredients/labor/packaging), margin per unit, margin %.
+• **Profit drivers**: Which products generate the most TOTAL profit (margin × volume)? These should get ad spend priority.
+• **Poor margin products**: Which popular products have thin margins? Should prices increase, or COGS be reduced?
+• **First-purchase magnets**: Which products bring in new customers? Are these high or low margin? If low margin, what's the LTV play?
+• **Bundle opportunities**: From topPairs (frequently bought together) — specific bundles to create. Calculate the bundle margin.
+• **AOV optimization**: Current AOV vs target. Specific tactics: free shipping threshold, bundle discounts, upsell recommendations.
+[📊 Deep dive →](#deepdive-profitability)
 
-**🏢 Competitive**: Notable competitor moves.
+---
 
-**✅ Top 5 Actions ${isMonday ? 'This Week' : 'Today'}**: The 5 most impactful things to do right now, ranked by revenue impact. Blend marketing, website, product, and operational insights.
+**💸 COST REDUCTION & OVERHEAD OPTIMIZATION**
+• **COGS breakdown**: Total 30d ingredient cost, labor cost, packaging cost. Which is the biggest cost driver?
+• **Packaging**: Packaging costs $${totalPackagingCost30d.toFixed(0)} over 30 days. At current volume that's $${(totalPackagingCost30d * 12).toFixed(0)}/year. Recommend: negotiate bulk pricing, find alternative suppliers, or consolidate jar sizes.
+• **Expensive ingredients**: From expensiveIngredients — Blue Tansy at $4600/kg, Ylang Ylang at $985/kg. Are these worth the cost given product margins? Alternatives?
+• **Fixed overheads**: Monthly opex is $${(totalAnnualOpex / 12).toFixed(0)}. Break down by category. Which expenses can be reduced or eliminated?
+• **Ad spend efficiency**: Current CPA. If CPA dropped by $5, how much would that save annually at current volume?
+• **Refund cost**: Refunds cost $${refundTotal.toFixed(0)} over 30d. Root causes? Packaging damage rate? Worth investing in better packaging?
+• **Supplier optimization**: From supplierOrders — any pending orders? Are current suppliers competitive? Where to negotiate.
+• **Labor efficiency**: Labor is $${totalLaborCost30d.toFixed(0)} over 30d. At current production volume, is there room for batch size optimization?
+[📊 Deep dive →](#deepdive-costs)
 
-Keep each section to 2-4 sentences max. Name specific campaigns, pages, products, and numbers.`;
+---
+
+**📦 INVENTORY & OPERATIONS**
+• SKUs at risk of stockout. Days of supply remaining. Recommended batch sizes.
+• Overstock SKUs — bundle or discount recommendations.
+• Supplier orders status — anything delayed?
+[📊 Deep dive →](#deepdive-inventory)
+
+---
+
+**📧 CUSTOMER & COMPETITIVE INTEL**
+• Email themes this week. What are customers saying?
+• Any product feedback, complaints, or requests to act on? Quote specific messages.
+• Competitor changes detected. Opportunities to differentiate.
+[📊 Deep dive →](#deepdive-customers)
+
+---
+
+**✅ TOP 10 ACTIONS ${isMonday ? 'THIS WEEK' : 'TODAY'}**
+Ranked by expected revenue or profit impact. Each action must be specific, naming the exact campaign, product, page, or expense. Include estimated impact where possible (e.g., "Killing campaign X saves $Y/week" or "Improving page Z conversion from A% to B% adds $C/month").
+
+Be thorough. This is the owner's primary business intelligence tool.`;
 
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 4096, system: systemPrompt, messages: [{ role: 'user', content: userPrompt }] }),
+      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 8192, system: systemPrompt, messages: [{ role: 'user', content: userPrompt }] }),
     });
     const data = await res.json();
     const text = data.content?.[0]?.text || '';
@@ -732,33 +929,50 @@ exports.handler = async (event) => {
     const today = getNZDate(0);
     const from30 = getNZDate(30);
     const from7 = getNZDate(7);
+    const from60 = getNZDate(60);
     const [fbCampaigns, gCampaigns, orders, lineItems, inventory, competitorChanges, customerEmails, refunds,
-           curAnalytics, priorAnalytics, curPages, priorPages, curDevices, curFunnelByPage, entryPages, exitPages,
-           productCOGS, fbAdCreatives] = await Promise.all([
+           curAnalytics, priorAnalytics, monthAnalytics, curPages, priorPages, curDevices, curFunnelByPage, entryPages, exitPages,
+           productCOGS, fbAdCreatives, expenses, ingredients, supplierOrders, checkoutErrors, abandonedCarts, changelogs,
+           countryData, sourceData,
+           // 30d campaigns for fatigue detection
+           fbCampaigns30, gCampaigns30] = await Promise.all([
       loadFBCampaigns(from14, today),
       loadGoogleCampaigns(from14, today),
-      loadOrders(30),
+      loadOrders(60), // 60 days for month-over-month
       loadLineItems(),
       loadInventory(),
       loadCompetitorChanges(),
       loadCustomerEmails(),
       loadRefunds(from30),
-      // Website analytics
+      // Website analytics (7d vs prior 7d + 30d for trends)
       loadAnalyticsSummary(from7, today),
       loadAnalyticsSummary(from14, from7),
+      loadAnalyticsSummary(from30, today),
       loadAnalyticsPages(from7, today),
       loadAnalyticsPages(from14, from7),
       loadAnalyticsDevices(from7, today),
       loadFunnelByPage(from7, today),
       loadEntryPages(from7, today),
       loadExitPages(from7, today),
-      // Product costs
+      // Product costs & expenses
       loadProductCOGS(),
       loadFBAdCreatives(),
+      loadExpenses(),
+      loadIngredients(),
+      loadSupplierOrders(),
+      loadCheckoutErrors(from7),
+      loadAbandonedCarts(),
+      loadChangelogs(),
+      loadAnalyticsByCountry(from7, today),
+      loadAnalyticsBySource(from7, today),
+      // 30d campaigns for fatigue analysis
+      loadFBCampaigns(from30, today),
+      loadGoogleCampaigns(from30, today),
     ]);
 
     const allCampaigns = [...fbCampaigns, ...gCampaigns];
-    console.log(`Loaded: ${allCampaigns.length} campaigns, ${orders.length} orders, ${inventory.reorderPoints.length} SKUs`);
+    const allCampaigns30 = [...(fbCampaigns30 || []), ...(gCampaigns30 || [])];
+    console.log(`Loaded: ${allCampaigns.length} campaigns, ${orders.length} orders, ${inventory.reorderPoints.length} SKUs, ${(expenses||[]).length} expenses`);
 
     // Fetch live HTML of top 5 pages
     const topPagePaths = (curPages || []).sort((a, b) => b.visitors - a.visitors).slice(0, 5).map(p => p.value);
@@ -827,7 +1041,9 @@ exports.handler = async (event) => {
       // Combine existing + new alerts for context
       const allAlertsList = [...newAlerts.map(a => ({ ...a })), ...recentAlerts];
       summary = await generateSummary(allAlertsList, orders, allCampaigns, inventory, competitorChanges, customerEmails, lineItems, refunds,
-        { curAnalytics, priorAnalytics, curPages, priorPages, curDevices, curFunnelByPage, entryPages, exitPages, productCOGS, fbAdCreatives, livePages });
+        { curAnalytics, priorAnalytics, monthAnalytics, curPages, priorPages, curDevices, curFunnelByPage, entryPages, exitPages,
+          productCOGS, fbAdCreatives, livePages, expenses, ingredients, supplierOrders, checkoutErrors, abandonedCarts,
+          changelogs, countryData, sourceData, allCampaigns30 });
     }
 
     return {
