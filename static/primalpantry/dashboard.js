@@ -365,23 +365,62 @@ function applyTabVisibility() {
   }
 }
 
+// ── Loading Screen Progress ──
+const LOAD_STEPS = [
+  { id: 'orders', label: 'Orders', msg: 'Loading orders...' },
+  { id: 'costs', label: 'Costs', msg: 'Loading unit costs...' },
+  { id: 'adspend', label: 'Ad Spend', msg: 'Loading ad spend...' },
+  { id: 'analytics', label: 'Analytics', msg: 'Loading website analytics...' },
+  { id: 'marketing', label: 'Marketing', msg: 'Loading marketing data...' },
+  { id: 'finance', label: 'Finance', msg: 'Loading finance data...' },
+  { id: 'comms', label: 'Comms', msg: 'Loading communications...' },
+  { id: 'render', label: 'Rendering', msg: 'Building dashboard...' },
+];
+
+function updateLoadingProgress(stepId, status) {
+  const stepEl = document.querySelector(`[data-step="${stepId}"]`);
+  if (stepEl) {
+    stepEl.className = 'loading-step ' + status;
+  }
+  if (status === 'active') {
+    const step = LOAD_STEPS.find(s => s.id === stepId);
+    const statusEl = document.getElementById('loading-status');
+    if (statusEl && step) statusEl.textContent = step.msg;
+  }
+  // Update progress bar
+  const allSteps = document.querySelectorAll('.loading-step');
+  const done = document.querySelectorAll('.loading-step.done').length;
+  const bar = document.getElementById('loading-bar');
+  if (bar) bar.style.width = Math.round((done / LOAD_STEPS.length) * 100) + '%';
+}
+
+function showLoadingScreen() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('loading-screen').style.display = 'flex';
+  document.getElementById('dashboard').style.display = 'none';
+  // Render step pills
+  const stepsEl = document.getElementById('loading-steps');
+  if (stepsEl) stepsEl.innerHTML = LOAD_STEPS.map(s => `<span class="loading-step" data-step="${s.id}">${s.label}</span>`).join('');
+}
+
+function hideLoadingScreen() {
+  const ls = document.getElementById('loading-screen');
+  if (ls) ls.style.opacity = '0';
+  setTimeout(() => { if (ls) ls.style.display = 'none'; }, 400);
+  document.getElementById('dashboard').style.display = 'block';
+}
+
 function showDashboard() {
   document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('dashboard').style.display = 'block';
-  const claudeFab = document.getElementById('claude-fab');
-  if (claudeFab) claudeFab.style.display = 'flex';
+  showLoadingScreen();
   if (currentStaff) {
     document.getElementById('staff-greeting').textContent = currentStaff.display_name;
     if (currentStaff.can_manage_users) document.getElementById('team-btn').style.display = '';
     applyTabVisibility();
   }
-  initDashboard();
-  // For shipping role, load shipping data immediately (don't wait for full initDashboard)
-  if (currentStaff && currentStaff.role === 'shipping' && !shippingLoaded) {
-    loadShippingData();
-  }
+  loadAllDataUpfront();
   // Check for prompt notifications after login
-  setTimeout(() => { if (typeof checkCommsPrompts === 'function') checkCommsPrompts(); }, 2000);
+  setTimeout(() => { if (typeof checkCommsPrompts === 'function') checkCommsPrompts(); }, 5000);
   setTimeout(() => { if (typeof checkActionAlerts === 'function') checkActionAlerts(); }, 3000);
 }
 
@@ -641,16 +680,17 @@ function applyFilter() {
   } else if (activeTab === 'manufacturing') {
     loadManufacturingTab();
   } else if (activeTab === 'marketing') {
-    mktLastDateRange = null; // force reload
-    loadMarketingTab();
+    if (!window._mktPreloaded) { mktLastDateRange = null; loadMarketingTab(); }
+    else { window._mktPreloaded = false; } // allow re-fetch on next filter change
   } else if (activeTab === 'website') {
-    if (typeof loadWebsiteAnalytics === 'function') loadWebsiteAnalytics();
-    // Render moved widgets from Mission Control
+    if (!window._waPreloaded) {
+      if (typeof loadWebsiteAnalytics === 'function') loadWebsiteAnalytics();
+    } else { window._waPreloaded = false; }
     if (typeof renderUTM === 'function') renderUTM(filteredOrders);
     if (typeof renderLandingRevenue === 'function') renderLandingRevenue(filteredOrders);
   } else if (activeTab === 'finance') {
-    // Only reload finance on manual filter change, not auto-refresh (would clear expense form inputs)
-    if (!window._isAutoRefresh && typeof loadFinanceTab === 'function') loadFinanceTab();
+    if (!window._isAutoRefresh && !window._finPreloaded && typeof loadFinanceTab === 'function') loadFinanceTab();
+    else { window._finPreloaded = false; }
   }
 }
 
@@ -706,41 +746,104 @@ async function loadAdSpend() {
   }
 }
 
-async function initDashboard() {
-  if (!currentStaff?.token) return; // Prevent unauthenticated access
+async function loadAllDataUpfront() {
+  if (!currentStaff?.token) return;
+
+  const step = (id, status) => updateLoadingProgress(id, status);
+
   try {
+    // 1. Orders + line items (core data)
+    step('orders', 'active');
+    const [ordersRes, liRes] = await Promise.all([
+      db.from('orders').select('*').order('created_at', { ascending: false }),
+      db.from('order_line_items').select('*'),
+    ]);
+    allOrders = ordersRes.data || [];
+    allLineItems = liRes.data || [];
+    step('orders', 'done');
+
+    // 2. Unit costs + tags + filters
+    step('costs', 'active');
+    try {
+      await loadUnitCosts();
+      populateFilterDropdowns();
+      populateSegmentDropdowns();
+      renderSavedSegments();
+      await loadCustomerTags();
+    } catch (e) { console.warn('Costs/tags partial error:', e.message); }
+    step('costs', 'done');
+
+    // 3-6. Load everything else in parallel
+    step('adspend', 'active');
+    step('analytics', 'active');
+    step('marketing', 'active');
+    step('finance', 'active');
+
+    const results = await Promise.allSettled([
+      // Ad spend + refunds
+      loadAdSpend().then(() => step('adspend', 'done')).catch(() => step('adspend', 'error')),
+      // Website analytics (preload)
+      (async () => {
+        try {
+          if (typeof waInit === 'function') waInit();
+          if (typeof loadWebsiteAnalytics === 'function') await loadWebsiteAnalytics();
+          window._waPreloaded = true;
+        } catch (e) { console.warn('Analytics preload error:', e); }
+        step('analytics', 'done');
+      })(),
+      // Marketing (preload)
+      (async () => {
+        try {
+          if (typeof loadMarketingTab === 'function') await loadMarketingTab();
+          window._mktPreloaded = true;
+        } catch (e) { console.warn('Marketing preload error:', e); }
+        step('marketing', 'done');
+      })(),
+      // Finance (preload)
+      (async () => {
+        try {
+          await loadExpenses();
+          if (typeof loadFinanceTab === 'function') await loadFinanceTab();
+          window._finPreloaded = true;
+        } catch (e) { console.warn('Finance preload error:', e); }
+        step('finance', 'done');
+      })(),
+    ]);
+
+    // 7. Comms
+    step('comms', 'active');
+    try {
+      if (typeof loadCommsTab === 'function') await loadCommsTab();
+      window._commsPreloaded = true;
+    } catch (e) { console.warn('Comms preload error:', e); }
+    step('comms', 'done');
+
+    // 8. Final render
+    step('render', 'active');
+    applyFilter();
+    startStatsRefresh();
+    renderApiPills();
+
+    // Shipping for shipping role
+    if (currentStaff.role === 'shipping' && !shippingLoaded) loadShippingData();
+
+    const claudeFab = document.getElementById('claude-fab');
+    if (claudeFab) claudeFab.style.display = 'flex';
+    step('render', 'done');
+
+    // Reveal dashboard
+    hideLoadingScreen();
+
   } catch (err) {
-    document.getElementById('orders-table').innerHTML = `<tr><td colspan="8">Supabase error: ${err.message}</td></tr>`;
-    return;
+    console.error('loadAllDataUpfront fatal error:', err);
+    document.getElementById('loading-status').textContent = 'Error: ' + err.message;
+    // Still show dashboard after error
+    setTimeout(hideLoadingScreen, 2000);
   }
-
-  const [ordersRes, liRes] = await Promise.all([
-    db.from('orders').select('*').order('created_at', { ascending: false }),
-    db.from('order_line_items').select('*'),
-  ]);
-
-  if (ordersRes.error) {
-    document.getElementById('orders-table').innerHTML = `<tr><td colspan="8">DB error: ${ordersRes.error.message}</td></tr>`;
-    // Don't return — still load the active tab (shipping role needs this)
-  }
-
-  allOrders = ordersRes.data || [];
-  allLineItems = liRes.data || [];
-  try {
-    await loadUnitCosts();
-    populateFilterDropdowns();
-    populateSegmentDropdowns();
-    renderSavedSegments();
-    await loadCustomerTags();
-  } catch (e) { console.warn('initDashboard partial error:', e.message); }
-  applyFilter();
-  loadAdSpend();
-  loadExpenses();
-
-  // Start auto-refresh of stats every 15 seconds
-  startStatsRefresh();
-  renderApiPills(); // Show pills but don't fire checks yet — wait for tab switch
 }
+
+// Legacy alias
+async function initDashboard() { return loadAllDataUpfront(); }
 
 // ── API Health Pills ──
 const API_DEFS = {
@@ -4205,13 +4308,13 @@ function loadActiveTab() {
   } else if (activeTab === 'manufacturing') {
     loadManufacturingTab();
   } else if (activeTab === 'website') {
-    waInit();
+    if (!window._waPreloaded) waInit();
   } else if (activeTab === 'marketing') {
-    loadMarketingTab();
+    if (!window._mktPreloaded) loadMarketingTab();
   } else if (activeTab === 'comms') {
-    loadCommsTab();
+    if (!window._commsPreloaded) loadCommsTab();
   } else if (activeTab === 'finance') {
-    loadFinanceTab();
+    if (!window._finPreloaded) loadFinanceTab();
   } else if (activeTab === 'actions') {
     loadActionsTab();
   } else if (activeTab === 'settings') {
