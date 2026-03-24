@@ -3430,6 +3430,102 @@ const NZ_REGIONS = {
   'chatham islands':[-43.88,-176.52],
 };
 
+// ── Fuzzy city resolver: maps unknown city names to known NZ_CITIES entries ──
+const cityResolveCache = {};
+const CITY_ALIASES = {
+  'chch':'christchurch','chchurch':'christchurch','c/church':'christchurch',
+  'akl':'auckland','aucks':'auckland','tamaki':'auckland',
+  'wgtn':'wellington','welly':'wellington','wlg':'wellington',
+  'tga':'tauranga','palmy':'palmerston north','palmie':'palmerston north',
+  'p north':'palmerston north','palmerston':'palmerston north',
+  'dunners':'dunedin','dud':'dunedin',
+  'hams':'hamilton','the tron':'hamilton',
+  'invers':'invercargill','inver':'invercargill',
+  'mt maunganui':'mount maunganui','mt. maunganui':'mount maunganui',
+  'mt eden':'auckland','mt albert':'auckland','mt roskill':'auckland','mt wellington':'auckland',
+  'newmarket':'auckland','ponsonby':'auckland','grey lynn':'auckland','parnell':'auckland',
+  'remuera':'auckland','epsom':'auckland','devonport':'auckland','takapuna':'auckland',
+  'birkenhead':'auckland','glenfield':'auckland','browns bay':'auckland','albany':'auckland',
+  'botany':'auckland','howick':'auckland','pakuranga':'auckland','flat bush':'auckland',
+  'mangere':'auckland','otahuhu':'auckland','onehunga':'auckland','penrose':'auckland',
+  'ellerslie':'auckland','meadowbank':'auckland','glen innes':'auckland','st heliers':'auckland',
+  'mission bay':'auckland','kohimarama':'auckland','orakei':'auckland','grafton':'auckland',
+  'henderson':'auckland','te atatu':'auckland','new lynn':'auckland','avondale':'auckland',
+  'blockhouse bay':'auckland','lynfield':'auckland','mt roskill':'auckland','sandringham':'auckland',
+  'kingsland':'auckland','morningside':'auckland','pt chevalier':'auckland','westmere':'auckland',
+  'herne bay':'auckland','freemans bay':'auckland','cbd':'auckland','auckland cbd':'auckland',
+  'riccarton':'christchurch','ilam':'christchurch','fendalton':'christchurch','merivale':'christchurch',
+  'burnside':'christchurch','papanui':'christchurch','shirley':'christchurch','brighton':'christchurch',
+  'new brighton':'christchurch','sumner':'christchurch','lyttelton':'christchurch','cashmere':'christchurch',
+  'halswell':'christchurch','hornby':'christchurch','sockburn':'christchurch','addington':'christchurch',
+  'spreydon':'christchurch','sydenham':'christchurch','linwood':'christchurch','woolston':'christchurch',
+  'ferrymead':'christchurch','mt pleasant':'christchurch','heathcote':'christchurch',
+  'karori':'wellington','kelburn':'wellington','brooklyn':'wellington','newtown':'wellington',
+  'island bay':'wellington','miramar':'wellington','kilbirnie':'wellington','hataitai':'wellington',
+  'mt victoria':'wellington','te aro':'wellington','thorndon':'wellington','wadestown':'wellington',
+  'johnsonville':'wellington','tawa':'wellington','churton park':'wellington','khandallah':'wellington',
+  'ngaio':'wellington','crofton downs':'wellington',
+  'flagstaff':'hamilton','rototuna':'hamilton','hillcrest':'hamilton','dinsdale':'hamilton',
+  'frankton':'hamilton','claudelands':'hamilton','chartwell':'hamilton',
+  'bethlehem':'tauranga','otumoetai':'tauranga','welcome bay':'tauranga','greerton':'tauranga',
+  'pyes pa':'tauranga','the lakes':'tauranga',
+  'stokes valley':'lower hutt','wainuiomata':'lower hutt','eastbourne':'lower hutt',
+  'naenae':'lower hutt','avalon':'lower hutt','taita':'lower hutt',
+  'whitby':'porirua','plimmerton':'porirua','papakowhai':'porirua','titahi bay':'porirua',
+  'waikanae':'kapiti','raumati':'kapiti','paekakariki':'kapiti',
+  'richmond':'nelson','stoke':'nelson','atawhai':'nelson','tahunanui':'nelson',
+  'motueka':'nelson','brightwater':'nelson','mapua':'nelson',
+  'havelock north':'hastings','flaxmere':'hastings','clive':'hastings',
+  'taradale':'napier','greenmeadows':'napier','ahuriri':'napier','bay view':'napier',
+  'fitzroy':'new plymouth','merrilands':'new plymouth','bell block':'new plymouth','waitara':'new plymouth',
+  'arrowtown':'queenstown','frankton':'queenstown','jack point':'queenstown','kelvin heights':'queenstown',
+  'albert town':'wanaka','luggate':'wanaka',
+  'opoho':'dunedin','maori hill':'dunedin','st clair':'dunedin','south dunedin':'dunedin',
+  'caversham':'dunedin','green island':'dunedin','concord':'dunedin',
+};
+
+function normaliseCity(s) {
+  return s.toLowerCase().trim()
+    .replace(/ā/g,'a').replace(/ū/g,'u').replace(/ī/g,'i').replace(/ō/g,'o').replace(/ē/g,'e')
+    .replace(/\bmt\.?\s/g, 'mount ').replace(/\bst\.?\s/g, 'st ').replace(/\bpt\.?\s/g, 'pt ')
+    .replace(/\s+/g, ' ').trim();
+}
+
+// Returns the NZ_CITIES key for a given city string, or null if unresolvable
+function resolveCity(rawCity) {
+  if (!rawCity) return null;
+  const norm = normaliseCity(rawCity);
+  if (norm in cityResolveCache) return cityResolveCache[norm];
+
+  // 1. Exact match
+  if (NZ_CITIES[norm]) { cityResolveCache[norm] = norm; return norm; }
+
+  // 2. Alias match
+  if (CITY_ALIASES[norm]) { cityResolveCache[norm] = CITY_ALIASES[norm]; return CITY_ALIASES[norm]; }
+
+  // 3. Substring: known city contained in input (e.g. "christchurch central" → "christchurch")
+  const knownCities = Object.keys(NZ_CITIES);
+  for (const kc of knownCities) {
+    if (norm.includes(kc) || kc.includes(norm)) {
+      cityResolveCache[norm] = kc;
+      return kc;
+    }
+  }
+
+  // 4. Alias substring (e.g. "east tamaki" contains alias "tamaki" → auckland)
+  for (const [alias, target] of Object.entries(CITY_ALIASES)) {
+    if (norm.includes(alias)) {
+      cityResolveCache[norm] = target;
+      return target;
+    }
+  }
+
+  // Unresolvable
+  cityResolveCache[norm] = null;
+  console.warn('[Map] Unknown city:', rawCity);
+  return null;
+}
+
 function renderMap(orders) {
   cachedMapOrders = orders;
   const container = document.getElementById('order-map');
@@ -3545,9 +3641,9 @@ function refreshMapLayers() {
       // Aggregate orders to REGION level when comparing with adspend
       const regionOrders = {};
       cachedMapOrders.forEach(o => {
-        const city = (o.city || '').toLowerCase().trim();
-        if (!city) return;
-        const region = cityToRegionMap[city] || city;
+        const resolved = resolveCity(o.city);
+        if (!resolved) return;
+        const region = cityToRegionMap[resolved] || resolved;
         if (!regionOrders[region]) regionOrders[region] = { count: 0, revenue: 0, name: region.charAt(0).toUpperCase() + region.slice(1) };
         regionOrders[region].count++;
         regionOrders[region].revenue += Number(o.total_value || 0);
@@ -3561,11 +3657,11 @@ function refreshMapLayers() {
       // City-level detail when orders only
       const cityOrders = {};
       cachedMapOrders.forEach(o => {
-        const city = (o.city || '').toLowerCase().trim();
-        if (!city) return;
-        if (!cityOrders[city]) cityOrders[city] = { count: 0, revenue: 0, name: o.city };
-        cityOrders[city].count++;
-        cityOrders[city].revenue += Number(o.total_value || 0);
+        const resolved = resolveCity(o.city);
+        if (!resolved) return;
+        if (!cityOrders[resolved]) cityOrders[resolved] = { count: 0, revenue: 0, name: resolved.charAt(0).toUpperCase() + resolved.slice(1) };
+        cityOrders[resolved].count++;
+        cityOrders[resolved].revenue += Number(o.total_value || 0);
       });
       Object.entries(cityOrders).forEach(([city, data]) => {
         const coords = NZ_CITIES[city];
