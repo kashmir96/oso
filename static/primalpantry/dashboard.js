@@ -9842,10 +9842,21 @@ function expandChangelog(id) {
   if (!row) return;
   const detail = document.createElement('tr');
   detail.id = 'changelog-detail-' + id;
+  const sha = r.commit_sha || '';
+  const shaShort = sha.slice(0, 8);
+  const ghUrl = sha ? 'https://github.com/kashmir96/primalpantry/commit/' + sha : '';
+  const deployUrl = r.deploy_id ? 'https://app.netlify.com/sites/primalpantry/deploys/' + r.deploy_id : '';
+  const links = [];
+  if (ghUrl) links.push('<a href="' + ghUrl + '" target="_blank" rel="noopener" style="color:var(--sage);text-decoration:underline;font-size:0.8rem;">View commit on GitHub (' + shaShort + ')</a>');
+  if (deployUrl) links.push('<a href="' + deployUrl + '" target="_blank" rel="noopener" style="color:var(--sage);text-decoration:underline;font-size:0.8rem;">View deploy on Netlify</a>');
+  const funnelPages = (r.funnel_pages || []).map(p => '<li>' + esc(p) + '</li>').join('');
   detail.innerHTML = '<td colspan="9" style="background:var(--bg);padding:1rem;">'
     + '<div style="display:flex;gap:2rem;flex-wrap:wrap;">'
-    + '<div><strong>Commit:</strong> ' + esc(r.commit_message || '-') + '<br><strong>SHA:</strong> ' + (r.commit_sha ? r.commit_sha.slice(0, 8) : '-') + '</div>'
+    + '<div style="flex:1;min-width:200px;"><strong>Commit:</strong> ' + esc(r.commit_message || '-')
+    + (links.length ? '<br>' + links.join(' · ') : '')
+    + '</div>'
     + '<div><strong>Files changed:</strong><ul style="margin:0.25rem 0 0 1rem;font-size:0.8rem;">' + files + '</ul></div>'
+    + (funnelPages ? '<div><strong>Funnel pages affected:</strong><ul style="margin:0.25rem 0 0 1rem;font-size:0.8rem;">' + funnelPages + '</ul></div>' : '')
     + '</div></td>';
   row.after(detail);
 }

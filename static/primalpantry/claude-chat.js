@@ -522,7 +522,7 @@
   }
 
   async function pollDeploys() {
-    const staff = JSON.parse(sessionStorage.getItem('pp_staff') || 'null');
+    const staff = JSON.parse(localStorage.getItem('pp_staff') || 'null');
     if (!staff || !staff.token) return;
     try {
       const res = await fetch('/.netlify/functions/deploy-status?token=' + encodeURIComponent(staff.token));
