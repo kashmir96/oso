@@ -1203,6 +1203,21 @@
       <div id="mkt-creative-pagination"></div>
     </div>
 
+    <div class="chart-card" style="margin-bottom:1.5rem;">
+      <h3>Creative Performance <span style="font-size:0.65rem;color:var(--dim);font-weight:400;">(Facebook Ads)</span></h3>
+      <div id="mkt-creatives-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:0.75rem;">
+        <div class="loading">Loading creatives...</div>
+      </div>
+    </div>
+
+    <!-- Creative Preview Modal -->
+    <div class="modal-overlay" id="creative-modal">
+      <div class="modal" style="max-width:500px;">
+        <button class="modal-close" onclick="document.getElementById('creative-modal').classList.remove('open')">&times;</button>
+        <div id="creative-modal-body"></div>
+      </div>
+    </div>
+
     <div class="orders-card" style="margin-bottom:1.5rem;">
       <h3>Campaign Performance</h3>
       <input type="text" class="search-bar" id="mkt-campaign-search" placeholder="Search campaigns...">

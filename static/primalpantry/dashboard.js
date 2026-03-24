@@ -9531,6 +9531,77 @@ function renderCampaignSplitCharts(fbDaily, gDaily) {
   buildChart('mkt-camp-rev-chart', 'rev', 'Revenue', v => '$' + v.toFixed(0));
 }
 
+// ── Marketing: Creative Performance Grid ──
+async function renderCreativePerformance(mktOrders, trafficByContent) {
+  const grid = document.getElementById('mkt-creatives-grid');
+  if (!grid) return;
+  try {
+    const [from, to] = getDateRange();
+    const tok = encodeURIComponent(currentStaff.token);
+    const res = await fetch(`/.netlify/functions/facebook-campaigns?token=${tok}&from=${from}&to=${to}&ads=1`).then(r => r.json()).catch(() => ({ ads: [] }));
+    const ads = res.ads || [];
+    if (ads.length === 0) { grid.innerHTML = '<div class="loading" style="font-size:0.8rem;">No ad creative data available</div>'; return; }
+
+    const trafficMap = {};
+    (trafficByContent || []).forEach(r => { trafficMap[(r.name || '').toLowerCase()] = r.visitors || 0; });
+    const ordersByAd = {};
+    mktOrders.forEach(o => {
+      const content = (mktGetOrderCreative(o) || '').toLowerCase();
+      if (content) { if (!ordersByAd[content]) ordersByAd[content] = { sales: 0, revenue: 0 }; ordersByAd[content].sales++; ordersByAd[content].revenue += Number(o.total_value || 0); }
+    });
+    const maxSpend = Math.max(...ads.map(a => a.spend), 1);
+
+    grid.innerHTML = ads.slice(0, 12).map((ad, idx) => {
+      const adKey = (ad.name || '').toLowerCase();
+      const traffic = trafficMap[adKey] || 0;
+      const od = ordersByAd[adKey] || { sales: 0, revenue: 0 };
+      const spendPct = (ad.spend / maxSpend * 100).toFixed(0);
+      const rc = Number(ad.roas) >= 2 ? 'var(--green)' : Number(ad.roas) >= 1 ? 'var(--honey)' : 'var(--red)';
+      const dot = ad.status === 'ACTIVE' ? '<span style="color:var(--green);font-size:0.5rem;">●</span> ' : '<span style="color:var(--dim);font-size:0.5rem;">●</span> ';
+      return `<div class="creative-card" onclick="openCreativeModal(${idx})">
+        ${ad.thumbnail_url ? `<img class="creative-card-img" src="${ad.thumbnail_url}" alt="${esc(ad.name)}" loading="lazy" onerror="this.style.display='none'">` : '<div class="creative-card-img" style="display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:0.7rem;">No preview</div>'}
+        <div class="creative-card-body">
+          <div class="creative-card-name" title="${esc(ad.name)}">${dot}${esc(ad.name)}</div>
+          <div class="creative-card-stats"><div class="creative-card-stat">Spend<strong>$${ad.spend.toFixed(2)}</strong></div><div class="creative-card-stat">ROAS<strong style="color:${rc}">${ad.roas}x</strong></div><div class="creative-card-stat">Conv<strong>${ad.conversions}</strong></div></div>
+          <div class="creative-card-stats" style="margin-top:0.2rem;"><div class="creative-card-stat">Clicks<strong>${ad.clicks.toLocaleString()}</strong></div><div class="creative-card-stat">CTR<strong>${ad.ctr.toFixed(2)}%</strong></div><div class="creative-card-stat">CPA<strong>${ad.cpa ? '$' + ad.cpa : '-'}</strong></div></div>
+          ${traffic > 0 || od.sales > 0 ? `<div class="creative-card-stats" style="margin-top:0.2rem;border-top:1px solid var(--border);padding-top:0.2rem;"><div class="creative-card-stat">Traffic<strong>${traffic.toLocaleString()}</strong></div><div class="creative-card-stat">Orders<strong>${od.sales}</strong></div><div class="creative-card-stat">Revenue<strong style="color:var(--green)">${od.revenue > 0 ? '$' + od.revenue.toFixed(0) : '-'}</strong></div></div>` : ''}
+          <div class="creative-card-bar"><div class="creative-card-bar-fill" style="width:${spendPct}%;background:${rc};"></div></div>
+        </div>
+      </div>`;
+    }).join('');
+    window._fbAdsData = ads; window._fbAdsTrafficMap = trafficMap; window._fbAdsOrderMap = ordersByAd;
+  } catch (e) { console.error('Creative performance error:', e); grid.innerHTML = '<div class="loading" style="font-size:0.8rem;">Failed to load creatives</div>'; }
+}
+
+window.openCreativeModal = function(idx) {
+  const ads = window._fbAdsData;
+  if (!ads || !ads[idx]) return;
+  const ad = ads[idx];
+  const tm = window._fbAdsTrafficMap || {}, om = window._fbAdsOrderMap || {};
+  const ak = (ad.name || '').toLowerCase();
+  const traffic = tm[ak] || 0, od = om[ak] || { sales: 0, revenue: 0 };
+  const rc = Number(ad.roas) >= 2 ? 'var(--green)' : Number(ad.roas) >= 1 ? 'var(--honey)' : 'var(--red)';
+  const body = document.getElementById('creative-modal-body');
+  body.innerHTML = `
+    ${ad.thumbnail_url ? `<img src="${ad.thumbnail_url}" style="width:100%;border-radius:8px;margin-bottom:1rem;" alt="${esc(ad.name)}">` : ''}
+    <h3 style="font-size:1rem;margin-bottom:0.75rem;">${esc(ad.name)}</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem;margin-bottom:1rem;">
+      <div style="text-align:center;padding:0.5rem;background:var(--bg);border-radius:6px;"><div style="font-size:0.65rem;color:var(--dim);text-transform:uppercase;">Spend</div><div style="font-size:1.1rem;font-weight:700;color:var(--honey);">$${ad.spend.toFixed(2)}</div></div>
+      <div style="text-align:center;padding:0.5rem;background:var(--bg);border-radius:6px;"><div style="font-size:0.65rem;color:var(--dim);text-transform:uppercase;">ROAS</div><div style="font-size:1.1rem;font-weight:700;color:${rc};">${ad.roas}x</div></div>
+      <div style="text-align:center;padding:0.5rem;background:var(--bg);border-radius:6px;"><div style="font-size:0.65rem;color:var(--dim);text-transform:uppercase;">CPA</div><div style="font-size:1.1rem;font-weight:700;">${ad.cpa ? '$' + ad.cpa : '-'}</div></div>
+    </div>
+    <table style="width:100%;font-size:0.8rem;">
+      <tr><td style="color:var(--muted);padding:0.3rem 0;">Impressions</td><td style="text-align:right;font-weight:600;">${ad.impressions.toLocaleString()}</td></tr>
+      <tr><td style="color:var(--muted);padding:0.3rem 0;">Clicks</td><td style="text-align:right;font-weight:600;">${ad.clicks.toLocaleString()}</td></tr>
+      <tr><td style="color:var(--muted);padding:0.3rem 0;">CTR</td><td style="text-align:right;font-weight:600;">${ad.ctr.toFixed(2)}%</td></tr>
+      <tr><td style="color:var(--muted);padding:0.3rem 0;">Conversions (FB)</td><td style="text-align:right;font-weight:600;">${ad.conversions}</td></tr>
+      <tr><td style="color:var(--muted);padding:0.3rem 0;">Conv Value (FB)</td><td style="text-align:right;font-weight:600;">$${ad.conversions_value.toFixed(2)}</td></tr>
+      ${traffic > 0 ? `<tr style="border-top:1px solid var(--border);"><td style="color:var(--cyan);padding:0.3rem 0;">Website Traffic</td><td style="text-align:right;font-weight:600;">${traffic.toLocaleString()}</td></tr>` : ''}
+      ${od.sales > 0 ? `<tr><td style="color:var(--green);padding:0.3rem 0;">Tracked Orders</td><td style="text-align:right;font-weight:600;">${od.sales}</td></tr><tr><td style="color:var(--green);padding:0.3rem 0;">Tracked Revenue</td><td style="text-align:right;font-weight:600;">$${od.revenue.toFixed(2)}</td></tr>` : ''}
+    </table>`;
+  document.getElementById('creative-modal').classList.add('open');
+};
+
 // ── Marketing: resolve order source (with gclid/fbclid fallback) ──
 function mktGetOrderSource(o) {
   return resolveOrderSource(o).toLowerCase() || 'direct';
@@ -10115,6 +10186,8 @@ async function loadMarketingTab() {
   renderCampaignSplitCharts(fbD.daily || [], gD.daily || []);
   // Blended source + creative tables and charts
   const mktOrders = allOrders.filter(o => o.order_date >= from && o.order_date <= to);
+  // Creative performance grid (FB ads with thumbnails + blended data)
+  renderCreativePerformance(mktOrders, trafficByContent);
   mktSourceData = buildMktSourceData(mktOrders, trafficBySource, fbC.campaigns, gC.campaigns);
   mktSourcePage = 1; renderMktSourceTable();
   mktCreativeData = buildMktCreativeData(mktOrders, trafficByContent);

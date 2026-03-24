@@ -151,6 +151,46 @@ exports.handler = async (event) => {
       return reply(200, { daily: dailyData });
     }
 
+    // Ad-level creative performance (with thumbnails)
+    if (qs.ads === '1') {
+      // Fetch ad-level insights with creative thumbnail
+      const adUrl = `https://graph.facebook.com/v21.0/act_${accountId}/ads?time_range=${encodeURIComponent(timeRange)}&fields=name,status,creative{thumbnail_url,object_story_spec},insights.time_range(${encodeURIComponent(timeRange)}){impressions,clicks,spend,actions,action_values,ctr,cpc}&limit=100&access_token=${accessToken}`;
+      let adData = [];
+      let nextAdUrl = adUrl;
+      while (nextAdUrl) {
+        const adRes = await fetch(nextAdUrl);
+        const adJson = await adRes.json();
+        if (adJson.error) {
+          console.error('Facebook Ads API error:', adJson.error);
+          return reply(200, { ads: [], error: adJson.error.message });
+        }
+        if (adJson.data) adData = adData.concat(adJson.data);
+        nextAdUrl = adJson.paging?.next || null;
+      }
+
+      const ads = adData.map(ad => {
+        const insights = ad.insights?.data?.[0] || {};
+        const { conversions, conversions_value } = parseActions(insights.actions, insights.action_values);
+        const spend = Number(insights.spend || 0);
+        return {
+          name: ad.name || '',
+          status: ad.status || '',
+          thumbnail_url: ad.creative?.thumbnail_url || '',
+          impressions: Number(insights.impressions || 0),
+          clicks: Number(insights.clicks || 0),
+          spend,
+          ctr: Number(insights.ctr || 0),
+          cpc: Number(insights.cpc || 0),
+          conversions,
+          conversions_value,
+          roas: spend > 0 ? (conversions_value / spend).toFixed(1) : '0',
+          cpa: conversions > 0 ? (spend / conversions).toFixed(2) : null,
+        };
+      }).filter(a => a.spend > 0).sort((a, b) => b.spend - a.spend);
+
+      return reply(200, { ads });
+    }
+
     const campaigns = allData.map(d => {
       const { conversions, conversions_value } = parseActions(d.actions, d.action_values);
       return {
@@ -170,6 +210,6 @@ exports.handler = async (event) => {
     return reply(200, { campaigns });
   } catch (err) {
     console.error('Facebook campaigns fetch error:', err.message);
-    return reply(200, { campaigns: [], error: err.message });
+    return reply(200, { campaigns: [], ads: [], error: err.message });
   }
 };
