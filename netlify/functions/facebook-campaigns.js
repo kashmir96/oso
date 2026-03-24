@@ -155,8 +155,23 @@ exports.handler = async (event) => {
     if (qs.ads === '1') {
       // Fetch ad-level insights with creative thumbnail
       // For /ads endpoint, insights.time_range uses inline JSON without outer encoding
+      // Step 1: Get active campaign IDs
+      const campUrl = `https://graph.facebook.com/v21.0/act_${accountId}/campaigns?fields=id&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE"]}]&limit=500&access_token=${accessToken}`;
+      const campRes = await fetch(campUrl);
+      const campJson = await campRes.json();
+      const activeCampIds = (campJson.data || []).map(c => c.id);
+
+      if (activeCampIds.length === 0) {
+        return reply(200, { ads: [], error: 'No active campaigns' });
+      }
+
+      // Step 2: Fetch active ads within those campaigns
       const trInline = `{"since":"${from}","until":"${to}"}`;
-      const adUrl = `https://graph.facebook.com/v21.0/act_${accountId}/ads?fields=name,status,creative{thumbnail_url},insights.time_range(${trInline}){impressions,clicks,spend,actions,action_values,ctr,cpc}&filtering=[{"field":"ad.effective_status","operator":"IN","value":["ACTIVE","PAUSED"]}]&limit=100&access_token=${accessToken}`;
+      const campFilter = JSON.stringify([
+        {"field":"campaign.id","operator":"IN","value":activeCampIds},
+        {"field":"ad.effective_status","operator":"IN","value":["ACTIVE"]}
+      ]);
+      const adUrl = `https://graph.facebook.com/v21.0/act_${accountId}/ads?fields=name,status,creative{thumbnail_url},insights.time_range(${trInline}){impressions,clicks,spend,actions,action_values,ctr,cpc}&filtering=${encodeURIComponent(campFilter)}&limit=100&access_token=${accessToken}`;
       let adData = [];
       let nextAdUrl = adUrl;
       while (nextAdUrl) {

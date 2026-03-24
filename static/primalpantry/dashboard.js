@@ -680,9 +680,11 @@ async function loadAdSpend() {
     currentPaidConv = [...fbCampaigns, ...gCampaigns].reduce((s, c) => s + (c.conversions || 0), 0);
     currentPaidClicks = [...fbCampaigns, ...gCampaigns].reduce((s, c) => s + (c.clicks || 0), 0);
     currentPaidImpr = [...fbCampaigns, ...gCampaigns].reduce((s, c) => s + (c.impressions || 0), 0);
-    // Blended ad spend: prefer campaign-level totals, fallback to insights endpoint
-    // fbTodaySpend (from facebook-adspend) is reliable for 'today', fbTotalSpend (from facebook-campaigns) is reliable for date ranges
-    currentAdSpend = (fbTotalSpend > 0 ? fbTotalSpend : fbTodaySpend) + gTotalSpend;
+    // Blended ad spend: use campaign-level totals (confirmed working for both today + date ranges)
+    // fbTodaySpend from insights endpoint is a fallback only if campaigns return 0
+    currentFbSpend = fbTotalSpend > 0 ? fbTotalSpend : fbTodaySpend;
+    currentGSpend = gTotalSpend;
+    currentAdSpend = currentFbSpend + currentGSpend;
     // Banner
     const el = document.getElementById('adspend-value');
     if (el) el.textContent = currentAdSpend > 0 ? '$' + currentAdSpend.toFixed(2) : '—';
@@ -10349,11 +10351,14 @@ async function loadMarketingTab() {
   const gBanner = document.getElementById('mkt-google-banner'), gIds = document.getElementById('mkt-google-ids');
   if (gSt.connected) { gBanner.style.display = 'none'; gIds.style.display = 'block'; document.getElementById('mkt-google-status').innerHTML = '<span style="color:var(--sage);">\u25cf Connected</span>'; if (gSt.adsCustomerId) document.getElementById('mkt-ads-customer-id').value = gSt.adsCustomerId; if (gSt.merchantId) document.getElementById('mkt-merchant-id').value = gSt.merchantId; }
   else { gBanner.style.display = 'flex'; gIds.style.display = 'none'; document.getElementById('mkt-google-status').innerHTML = '<span style="color:var(--dim);">\u25cb Not connected</span>'; }
+  // Daily timeseries always fetches 30 days for rolling charts
+  const d30 = new Date(); d30.setDate(d30.getDate() - 30);
+  const from30 = d30.toISOString().slice(0,10), to30 = new Date().toISOString().slice(0,10);
   const [fbC, gC, fbD, gD, gmcD, trafficBySource, trafficByContent] = await Promise.all([
     mktApi('facebook-campaigns', { from, to }).catch(() => ({ campaigns: [] })),
     gSt.connected && gSt.adsCustomerId ? mktApi('google-ads', { from, to }).catch(() => ({ campaigns: [] })) : { campaigns: [] },
-    mktApi('facebook-campaigns', { from, to, daily: '1' }).catch(() => ({ daily: [] })),
-    gSt.connected && gSt.adsCustomerId ? mktApi('google-ads', { from, to, daily: '1' }).catch(() => ({ daily: [] })) : { daily: [] },
+    mktApi('facebook-campaigns', { from: from30, to: to30, daily: '1' }).catch(() => ({ daily: [] })),
+    gSt.connected && gSt.adsCustomerId ? mktApi('google-ads', { from: from30, to: to30, daily: '1' }).catch(() => ({ daily: [] })) : { daily: [] },
     gSt.connected && gSt.merchantId ? mktApi('google-merchant', {}).catch(() => ({ products: [] })) : { products: [] },
     mktApi('analytics-dashboard', { site: 'PrimalPantry.co.nz', from, to, metric: 'campaigns', col: 'utm_source' }).catch(() => []),
     mktApi('analytics-dashboard', { site: 'PrimalPantry.co.nz', from, to, metric: 'campaigns', col: 'utm_content' }).catch(() => []),
@@ -10364,11 +10369,11 @@ async function loadMarketingTab() {
   const tClicks = mktAllCampaigns.reduce((s,c)=>s+c.clicks,0), tConv = mktAllCampaigns.reduce((s,c)=>s+c.conversions,0);
   const tImpr = mktAllCampaigns.reduce((s,c)=>s+c.impressions,0);
   const gSpend = mktGadsCampaigns.reduce((s,c)=>s+c.spend,0), gConv = mktGadsCampaigns.reduce((s,c)=>s+c.conversions,0), gCPA = gConv>0?gSpend/gConv:0;
-  // Build daily data: ad spend from campaigns, total revenue from ALL orders (not just paid)
+  // Build 30-day rolling daily data for timeseries charts (always 30 days regardless of date picker)
   const byDate = {}; (fbD.daily||[]).concat(gD.daily||[]).forEach(d => { if (!byDate[d.date]) byDate[d.date] = {spend:0,paidRev:0,totalRev:0}; byDate[d.date].spend += d.spend; byDate[d.date].paidRev += d.conversions_value; });
-  // Add total order revenue by date
-  allOrders.filter(o => o.order_date >= from && o.order_date <= to).forEach(o => { const d = o.order_date; if (!byDate[d]) byDate[d] = {spend:0,paidRev:0,totalRev:0}; byDate[d].totalRev += Number(o.total_value || 0); });
-  const sortedDates = Object.keys(byDate).sort().slice(-30);
+  // Add total order revenue by date (30-day window)
+  allOrders.filter(o => o.order_date >= from30 && o.order_date <= to30).forEach(o => { const d = o.order_date; if (!byDate[d]) byDate[d] = {spend:0,paidRev:0,totalRev:0}; byDate[d].totalRev += Number(o.total_value || 0); });
+  const sortedDates = Object.keys(byDate).sort().filter(d => d >= from30).slice(-30);
   const spSpark = sortedDates.map(d=>byDate[d].spend), rvSpark = sortedDates.map(d=>byDate[d].totalRev), roSpark = sortedDates.map(d=>byDate[d].spend>0?byDate[d].totalRev/byDate[d].spend:0);
   document.getElementById('marketing-stats-grid').innerHTML = [
     mktStatCard('Total Ad Spend','$'+tSpend.toFixed(2),tImpr.toLocaleString()+' impressions',spSpark.length>1?spSpark:[0],'var(--honey)'),
