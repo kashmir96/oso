@@ -794,6 +794,20 @@
       .claude-fab { bottom: 1rem; right: 1rem; width: 48px; height: 48px; }
     }
 
+    /* Mystical Business Genie tab */
+    .genie-tab { background: linear-gradient(180deg, rgba(30,25,50,0.3) 0%, transparent 40%); }
+    .genie-card { background: linear-gradient(165deg, rgba(30,25,45,0.95) 0%, rgba(20,18,16,0.98) 100%); border: 1px solid rgba(139,92,246,0.2); border-radius: 14px; padding: 1rem 1.25rem; box-shadow: 0 0 20px rgba(139,92,246,0.06), 0 4px 16px rgba(0,0,0,0.2); }
+    .genie-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(139,92,246,0.12); }
+    .genie-orb { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #a78bfa, #7c3aed); box-shadow: 0 0 8px rgba(139,92,246,0.6), 0 0 20px rgba(139,92,246,0.2); animation: orbPulse 3s ease-in-out infinite; }
+    @keyframes orbPulse { 0%,100% { box-shadow: 0 0 8px rgba(139,92,246,0.6), 0 0 20px rgba(139,92,246,0.2); } 50% { box-shadow: 0 0 14px rgba(139,92,246,0.8), 0 0 30px rgba(139,92,246,0.3); } }
+    .genie-btn { background: linear-gradient(135deg, #7c3aed, #6d28d9); border: none; color: #f5f3ff; padding: 4px 14px; border-radius: 8px; font-size: 0.72rem; font-weight: 700; cursor: pointer; font-family: 'DM Sans', sans-serif; box-shadow: 0 2px 8px rgba(124,58,237,0.3); transition: all 0.2s; }
+    .genie-btn:hover { box-shadow: 0 4px 16px rgba(124,58,237,0.5); transform: translateY(-1px); }
+    .genie-tab .action-tab.active { background: rgba(139,92,246,0.15) !important; color: #c4b5fd !important; border-color: rgba(139,92,246,0.4) !important; }
+    .genie-tab #action-summary-body strong { color: #c4b5fd; }
+    .genie-tab #action-summary-body a { color: #a78bfa; }
+    .nav-genie { position: relative; }
+    .nav-genie::after { content: ''; position: absolute; bottom: -2px; left: 20%; right: 20%; height: 2px; background: linear-gradient(90deg, transparent, rgba(139,92,246,0.5), transparent); border-radius: 1px; }
+
     /* Finance tab */
     .fin-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
     .fin-stat { background: var(--card); border-radius: 10px; padding: 1rem; border: 1px solid var(--border); }
