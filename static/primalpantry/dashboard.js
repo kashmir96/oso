@@ -731,6 +731,67 @@ async function initDashboard() {
 
   // Start auto-refresh of stats every 15 seconds
   startStatsRefresh();
+  checkApiHealth();
+}
+
+// ── API Health Pills ──
+const API_DEFS = {
+  SB: { label: 'Supabase', tabs: ['sales','orders','shipping','customers','comms','production','marketing','finance','website','actions','settings'] },
+  ST: { label: 'Stripe', tabs: ['sales','orders','customers','finance'] },
+  FB: { label: 'Facebook Ads', tabs: ['sales','marketing','actions'] },
+  GA: { label: 'Google Ads', tabs: ['sales','marketing','actions'] },
+  GM: { label: 'Google Merchant', tabs: ['marketing'] },
+  ES: { label: 'eShip', tabs: ['shipping'] },
+  AI: { label: 'Claude AI', tabs: ['actions'] },
+  XR: { label: 'Xero', tabs: ['finance'] },
+  WA: { label: 'Analytics', tabs: ['website'] },
+};
+let apiHealthCache = {}; // { id: 'ok'|'err'|'wait' }
+
+function renderApiPills() {
+  const container = document.getElementById('api-pills');
+  if (!container) return;
+  const tab = activeTab;
+  const relevant = Object.entries(API_DEFS).filter(([, v]) => v.tabs.includes(tab));
+  if (relevant.length === 0) { container.innerHTML = ''; return; }
+  container.innerHTML = relevant.map(([id, def]) => {
+    const state = apiHealthCache[id] || 'wait';
+    const cls = state === 'ok' ? 'ap-ok' : state === 'err' ? 'ap-err' : 'ap-wait';
+    return '<span class="api-pill ' + cls + '" id="ap-' + id + '" title="' + def.label + ': ' + state + '"><span class="ap-dot"></span>' + id + '</span>';
+  }).join('');
+}
+
+function checkApiHealth() {
+  if (!currentStaff?.token) return;
+  const tok = encodeURIComponent(currentStaff.token);
+  const today = localDateStr(new Date());
+  const checks = {
+    SB: () => db.from('orders').select('id').limit(1).then(r => !r.error),
+    ST: () => fetch('/.netlify/functions/stripe-products?token=' + tok).then(r => r.ok),
+    FB: () => fetch('/.netlify/functions/facebook-campaigns?token=' + tok + '&from=' + today + '&to=' + today).then(r => r.ok),
+    GA: () => fetch('/.netlify/functions/google-ads?token=' + tok + '&from=' + today + '&to=' + today).then(r => r.ok),
+    GM: () => fetch('/.netlify/functions/google-merchant?token=' + tok).then(r => r.ok),
+    ES: () => fetch('/.netlify/functions/eship-orders?token=' + tok).then(r => r.ok),
+    AI: () => fetch('/.netlify/functions/claude-chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: currentStaff.token, message: 'ping', messages: [] }) }).then(r => r.ok),
+    XR: () => fetch('/.netlify/functions/xero-status?token=' + tok).then(r => r.ok),
+    WA: () => fetch('/.netlify/functions/analytics-dashboard?token=' + tok + '&site=PrimalPantry.co.nz&from=' + today + '&to=' + today + '&metric=summary').then(r => r.ok),
+  };
+  // Only check APIs relevant to current tab (and unchecked ones)
+  const tab = activeTab;
+  const relevant = Object.entries(API_DEFS).filter(([, v]) => v.tabs.includes(tab));
+  relevant.forEach(([id]) => {
+    if (apiHealthCache[id]) return; // Already checked
+    const check = checks[id];
+    if (!check) return;
+    check().then(ok => {
+      apiHealthCache[id] = ok ? 'ok' : 'err';
+      renderApiPills();
+    }).catch(() => {
+      apiHealthCache[id] = 'err';
+      renderApiPills();
+    });
+  });
+  renderApiPills();
 }
 
 // ── Refresh stats (lightweight: re-fetch data, update stat cards only) ──
@@ -4106,6 +4167,7 @@ document.querySelectorAll('.nav-item').forEach(btn => {
     document.getElementById('adspend-banner').style.display = (activeTab === 'marketing') ? '' : 'none';
     loadActiveTab();
     checkCommsPrompts(); // Check for pending prompts on every tab switch
+    checkApiHealth(); // Update API pills for this tab
   });
 });
 
