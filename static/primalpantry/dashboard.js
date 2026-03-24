@@ -12076,6 +12076,7 @@ function renderActionSummary(summary) {
   const genieQuotes = [
     'Stand still and you go backwards. Walk and you stay put. To get ahead, you have to hustle.',
     'Back yourself into a corner. Give yourself no choice but to succeed.',
+    "It's not enough for us to succeed, others need to fail.",
   ];
   const quote = genieQuotes[Math.floor(Math.random() * genieQuotes.length)];
   let html = '<div style="font-size:1.1rem;font-weight:700;color:#c4b5fd;margin-bottom:0.75rem;">Whats up Cuh? 🔮</div>';
