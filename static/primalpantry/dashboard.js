@@ -3514,6 +3514,16 @@ const NZ_CITIES = {
   'kaiapoi':[-43.38,172.66],'woodend':[-43.32,172.67],'pegasus':[-43.30,172.69],
   'lincoln':[-43.65,172.49],'darfield':[-43.49,172.11],'leeston':[-43.77,172.30],
   'haruru':[-35.27,174.07],'haruru falls':[-35.27,174.07],
+  // Small towns from unresolved logs
+  'havelock':[-41.28,173.77],'mount somers':[-43.63,171.38],'rakaia':[-43.76,172.02],
+  'otautau':[-46.15,167.84],'otorohanga':[-38.18,175.21],'roxburgh':[-45.55,169.32],
+  'pohuehue':[-36.52,174.63],'paeroa':[-37.37,175.67],'urenui':[-38.89,174.24],
+  'inglewood':[-39.12,174.18],'waipapa':[-35.21,174.04],'foxton':[-40.47,175.31],
+  'putaruru':[-38.05,175.78],'featherston':[-41.12,175.33],'diamond harbour':[-43.63,172.72],
+  'waipu':[-35.98,174.44],'turangi':[-38.99,175.81],'dannevirke':[-40.21,176.10],
+  'opua':[-35.31,174.12],'taumarunui':[-38.88,175.26],'waipawa':[-41.41,176.58],
+  'horowhenua':[-40.52,175.29],'rock and pillar':[-45.45,170.10],
+  'wangamui':[-39.93,175.05],'keao':[-37.80,176.32],
 };
 
 let mapInstance = null;
@@ -3548,8 +3558,18 @@ const NZ_REGIONS = {
 // ── Fuzzy city resolver: maps unknown city names to known NZ_CITIES entries ──
 const cityResolveCache = {};
 const CITY_ALIASES = {
-  'chch':'christchurch','chchurch':'christchurch','c/church':'christchurch',
-  'akl':'auckland','aucks':'auckland','tamaki':'auckland',
+  'chch':'christchurch','chchurch':'christchurch','c/church':'christchurch','chritchurch':'christchurch',
+  'akl':'auckland','aucks':'auckland','tamaki':'auckland','aucklsnd':'auckland',
+  'binheim':'blenheim',
+  'wangamui':'whanganui','wanganui':'whanganui',
+  'nth canterbury':'rangiora','north canterbury':'rangiora',
+  // Region names → largest city in that region
+  'waikato':'hamilton','northland':'whangarei','tasman':'nelson','horowhenua':'levin',
+  'canterbury':'christchurch','otago':'dunedin','southland':'invercargill',
+  'bay of plenty':'tauranga','manawatu':'palmerston north','hawkes bay':'napier',
+  'taranaki':'new plymouth','marlborough':'blenheim','west coast':'greymouth',
+  // Generic/country-level entries — map to null via special handling
+  'nz':'_skip_','new zealand':'_skip_',
   'wgtn':'wellington','welly':'wellington','wlg':'wellington',
   'tga':'tauranga','palmy':'palmerston north','palmie':'palmerston north',
   'p north':'palmerston north','palmerston':'palmerston north',
@@ -3606,22 +3626,43 @@ function normaliseCity(s) {
     .replace(/\s+/g, ' ').trim();
 }
 
+// Simple Levenshtein distance for typo matching
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  let prev = Array.from({ length: n + 1 }, (_, i) => i);
+  for (let i = 1; i <= m; i++) {
+    const curr = [i];
+    for (let j = 1; j <= n; j++) {
+      curr[j] = a[i-1] === b[j-1] ? prev[j-1] : 1 + Math.min(prev[j-1], prev[j], curr[j-1]);
+    }
+    prev = curr;
+  }
+  return prev[n];
+}
+
 // Returns the NZ_CITIES key for a given city string, or null if unresolvable
 function resolveCity(rawCity) {
   if (!rawCity) return null;
   const norm = normaliseCity(rawCity);
   if (norm in cityResolveCache) return cityResolveCache[norm];
 
+  // Strip trailing numbers (e.g. "otautau9689")
+  const normClean = norm.replace(/\d+$/, '').trim();
+
   // 1. Exact match
-  if (NZ_CITIES[norm]) { cityResolveCache[norm] = norm; return norm; }
+  if (NZ_CITIES[normClean]) { cityResolveCache[norm] = normClean; return normClean; }
 
   // 2. Alias match
-  if (CITY_ALIASES[norm]) { cityResolveCache[norm] = CITY_ALIASES[norm]; return CITY_ALIASES[norm]; }
+  const aliasResult = CITY_ALIASES[normClean];
+  if (aliasResult === '_skip_') { cityResolveCache[norm] = null; return null; }
+  if (aliasResult) { cityResolveCache[norm] = aliasResult; return aliasResult; }
 
   // 3. Substring: known city contained in input (e.g. "christchurch central" → "christchurch")
   const knownCities = Object.keys(NZ_CITIES);
   for (const kc of knownCities) {
-    if (norm.includes(kc) || kc.includes(norm)) {
+    if (kc.length >= 4 && (normClean.includes(kc) || kc.includes(normClean))) {
       cityResolveCache[norm] = kc;
       return kc;
     }
@@ -3629,9 +3670,24 @@ function resolveCity(rawCity) {
 
   // 4. Alias substring (e.g. "east tamaki" contains alias "tamaki" → auckland)
   for (const [alias, target] of Object.entries(CITY_ALIASES)) {
-    if (norm.includes(alias)) {
+    if (target === '_skip_') continue;
+    if (alias.length >= 4 && normClean.includes(alias)) {
       cityResolveCache[norm] = target;
       return target;
+    }
+  }
+
+  // 5. Levenshtein fuzzy match (max distance 2, only for names >= 5 chars)
+  if (normClean.length >= 5) {
+    let bestCity = null, bestDist = 3;
+    for (const kc of knownCities) {
+      if (Math.abs(kc.length - normClean.length) > 2) continue;
+      const d = levenshtein(normClean, kc);
+      if (d < bestDist) { bestDist = d; bestCity = kc; }
+    }
+    if (bestCity) {
+      cityResolveCache[norm] = bestCity;
+      return bestCity;
     }
   }
 
