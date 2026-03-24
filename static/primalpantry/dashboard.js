@@ -3973,7 +3973,10 @@ function renderMap(orders) {
     if (mapLayerSel) mapLayerSel.addEventListener('change', function() { console.log('[Map] Layer changed to:', this.value); refreshMapLayers(); });
     if (mapAdSrcSel) mapAdSrcSel.addEventListener('change', function() { console.log('[Map] Ad source changed to:', this.value); refreshMapLayers(); });
 
-    // Load adspend region data once
+    // Load adspend region data on first init
+    loadAdspendRegions();
+  } else {
+    // Re-fetch region data when date range changes
     loadAdspendRegions();
   }
 
@@ -3991,9 +3994,12 @@ function loadAdspendRegions() {
   fetch(`/.netlify/functions/facebook-campaigns?token=${tok}&from=${from}&to=${to}&geo=region`)
     .then(r => r.json())
     .then(data => {
+      console.log('[Map] FB region data:', JSON.stringify(data.regions?.map(r => r.region + ': $' + r.spend?.toFixed(2))));
       cachedAdspendRegions.facebook = data.regions || [];
+      // Also store for marketing tab region table
+      window._fbRegionData = data.regions || [];
       refreshMapLayers();
-    }).catch(() => {});
+    }).catch(e => { console.warn('[Map] FB region fetch error:', e); });
 
   // Google regions
   fetch(`/.netlify/functions/google-ads?token=${tok}&from=${from}&to=${to}&geo=region`)
@@ -4131,14 +4137,18 @@ function refreshMapLayers() {
     if (adSource === 'all' || adSource === 'facebook') addRegions(cachedAdspendRegions.facebook);
     if (adSource === 'all' || adSource === 'google') addRegions(cachedAdspendRegions.google);
 
-    const normalise = s => s.toLowerCase().replace(/\s*region$/,'').replace(/\s*district$/,'').replace(/ā/g,'a').replace(/ū/g,'u').replace(/ī/g,'i').replace(/ō/g,'o').replace(/ē/g,'e').trim();
+    const normalise = s => s.toLowerCase().replace(/\s*region$/,'').replace(/\s*district$/,'').replace(/ā/g,'a').replace(/ū/g,'u').replace(/ī/g,'i').replace(/ō/g,'o').replace(/ē/g,'e').replace(/-/g,' ').trim();
     const regionLookup = {};
     Object.keys(NZ_REGIONS).forEach(k => { regionLookup[normalise(k)] = NZ_REGIONS[k]; });
+    // Also add common FB name variants
+    regionLookup['hawkes bay'] = NZ_REGIONS['hawke\'s bay'];
+    regionLookup['manawatu whanganui'] = NZ_REGIONS['manawatu-whanganui'];
+    regionLookup['manawatu wanganui'] = NZ_REGIONS['manawatu-whanganui'];
 
     Object.entries(regionSpend).forEach(([key, data]) => {
       const norm = normalise(key);
       const coords = regionLookup[norm];
-      if (!coords) return;
+      if (!coords) { console.warn('[Map] Unmatched adspend region:', key, '(normalised:', norm + ')'); return; }
       adMarkerData.push({ coords, ...data });
     });
   }
@@ -10235,13 +10245,15 @@ async function renderMktRegionTable(orders, fbC, gC, gSt) {
     .sort((a, b) => b.revenue - a.revenue);
 
   if (rows.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="loading">No regional data</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="loading">No regional data</td></tr>';
     return;
   }
 
   tbody.innerHTML = rows.map(r => {
     const totalSpend = r.fbSpend + r.gSpend;
     const roas = totalSpend > 0 ? (r.revenue / totalSpend).toFixed(1) + 'x' : '-';
+    const roasColor = totalSpend > 0 ? (r.revenue / totalSpend >= 2 ? 'var(--green)' : r.revenue / totalSpend >= 1 ? 'var(--honey)' : 'var(--red)') : '';
+    const cpa = r.orders > 0 && totalSpend > 0 ? '$' + (totalSpend / r.orders).toFixed(2) : '-';
     const name = r.name.charAt(0).toUpperCase() + r.name.slice(1);
     return '<tr>'
       + '<td>' + esc(name) + '</td>'
@@ -10250,7 +10262,8 @@ async function renderMktRegionTable(orders, fbC, gC, gSt) {
       + '<td>' + (r.fbSpend > 0 ? '$' + r.fbSpend.toFixed(2) : '-') + '</td>'
       + '<td>' + (r.gSpend > 0 ? '$' + r.gSpend.toFixed(2) : '-') + '</td>'
       + '<td>' + (totalSpend > 0 ? '$' + totalSpend.toFixed(2) : '-') + '</td>'
-      + '<td>' + roas + '</td>'
+      + '<td>' + cpa + '</td>'
+      + '<td style="color:' + roasColor + ';font-weight:600;">' + roas + '</td>'
       + '</tr>';
   }).join('');
 }
