@@ -3750,6 +3750,20 @@ function refreshMapLayers() {
   let orderMarkerData = [];
   let adMarkerData = [];
 
+  // Diagnostic: log city resolution stats
+  if (cachedMapOrders) {
+    const total = cachedMapOrders.length;
+    const noCity = cachedMapOrders.filter(o => !o.city || !o.city.trim()).length;
+    const resolved = cachedMapOrders.filter(o => o.city && resolveCity(o.city)).length;
+    const unresolved = cachedMapOrders.filter(o => o.city && o.city.trim() && !resolveCity(o.city));
+    console.log(`[Map] ${total} orders: ${resolved} mapped, ${noCity} no city, ${unresolved.length} unresolved`);
+    if (unresolved.length > 0) {
+      const counts = {};
+      unresolved.forEach(o => { const c = o.city.trim(); counts[c] = (counts[c] || 0) + 1; });
+      console.table(Object.entries(counts).sort((a,b) => b[1] - a[1]).map(([city, n]) => ({ city, orders: n })));
+    }
+  }
+
   // Orders data
   if (showOrders && cachedMapOrders) {
     if (showAds) {
