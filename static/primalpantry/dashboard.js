@@ -905,6 +905,115 @@ function renderAll(orders, lineItems) {
   // New vs Returning moved to Customers tab
 }
 
+// ── Money rain animation (mystical purple/gold) ──
+function moneyRain() {
+  const symbols = ['💰', '💵', '✨', '🪙', '💎', '⚡'];
+  const count = 25;
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement('div');
+    el.textContent = symbols[Math.floor(Math.random() * symbols.length)];
+    el.style.cssText = `
+      position:fixed; top:-40px; left:${Math.random() * 100}vw; font-size:${18 + Math.random() * 20}px;
+      z-index:9999; pointer-events:none; opacity:0;
+      animation: moneyFall ${2 + Math.random() * 2}s ease-in forwards;
+      animation-delay: ${Math.random() * 0.8}s;
+      filter: drop-shadow(0 0 6px rgba(139,92,246,0.5));
+    `;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 4500);
+  }
+  // Purple flash overlay
+  const flash = document.createElement('div');
+  flash.style.cssText = `
+    position:fixed; inset:0; z-index:9998; pointer-events:none;
+    background: radial-gradient(ellipse at top, rgba(139,92,246,0.15), transparent 70%);
+    animation: flashFade 1.5s ease-out forwards;
+  `;
+  document.body.appendChild(flash);
+  setTimeout(() => flash.remove(), 2000);
+}
+
+// ── Breakeven fireworks ──
+let breakevenCelebrated = false;
+function fireBreakevenFireworks() {
+  if (breakevenCelebrated) return;
+  breakevenCelebrated = true;
+  const colors = ['#a78bfa', '#c084fc', '#e879f9', '#f59e0b', '#fbbf24', '#ffffff', '#8b5cf6', '#7c3aed'];
+  // Multiple bursts from different positions
+  const bursts = [
+    { x: window.innerWidth * 0.3, y: window.innerHeight * 0.3 },
+    { x: window.innerWidth * 0.7, y: window.innerHeight * 0.25 },
+    { x: window.innerWidth * 0.5, y: window.innerHeight * 0.35 },
+    { x: window.innerWidth * 0.2, y: window.innerHeight * 0.4 },
+    { x: window.innerWidth * 0.8, y: window.innerHeight * 0.3 },
+  ];
+  bursts.forEach((b, bi) => {
+    setTimeout(() => {
+      for (let i = 0; i < 50; i++) {
+        const p = document.createElement('div');
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        const size = 3 + Math.random() * 5;
+        const angle = (Math.PI * 2 * i) / 50 + (Math.random() - 0.5) * 0.5;
+        const dist = 80 + Math.random() * 180;
+        const dx = Math.cos(angle) * dist;
+        const dy = Math.sin(angle) * dist;
+        p.style.cssText = `
+          position:fixed; left:${b.x}px; top:${b.y}px; width:${size}px; height:${size}px;
+          background:${color}; border-radius:50%; z-index:9999; pointer-events:none;
+          box-shadow: 0 0 ${size * 2}px ${color}, 0 0 ${size * 4}px ${color}40;
+          animation: fwBurst ${1.5 + Math.random()}s ease-out forwards;
+          --fw-dx: ${dx}px; --fw-dy: ${dy}px;
+          animation-delay: ${Math.random() * 0.15}s;
+        `;
+        document.body.appendChild(p);
+        setTimeout(() => p.remove(), 3000);
+      }
+      // Sparkle ring
+      for (let s = 0; s < 20; s++) {
+        const sp = document.createElement('div');
+        sp.textContent = '✦';
+        const angle = (Math.PI * 2 * s) / 20;
+        const dist = 120 + Math.random() * 100;
+        sp.style.cssText = `
+          position:fixed; left:${b.x}px; top:${b.y}px; font-size:${10 + Math.random() * 8}px;
+          color: ${colors[Math.floor(Math.random() * colors.length)]}; z-index:9999; pointer-events:none;
+          animation: fwBurst ${2 + Math.random()}s ease-out forwards;
+          --fw-dx: ${Math.cos(angle) * dist}px; --fw-dy: ${Math.sin(angle) * dist}px;
+          filter: drop-shadow(0 0 4px currentColor);
+          animation-delay: ${0.1 + Math.random() * 0.2}s;
+        `;
+        document.body.appendChild(sp);
+        setTimeout(() => sp.remove(), 3500);
+      }
+    }, bi * 300);
+  });
+  // Big centre text
+  const txt = document.createElement('div');
+  txt.innerHTML = '⚡ BREAKEVEN ⚡';
+  txt.style.cssText = `
+    position:fixed; top:40%; left:50%; transform:translate(-50%,-50%) scale(0);
+    font-size:2.5rem; font-weight:900; color:#c084fc; z-index:10000; pointer-events:none;
+    text-shadow: 0 0 30px rgba(192,132,252,0.8), 0 0 60px rgba(139,92,246,0.4);
+    animation: beText 2.5s ease-out forwards;
+    font-family: 'DM Sans', sans-serif;
+  `;
+  document.body.appendChild(txt);
+  setTimeout(() => txt.remove(), 3500);
+  // Play a triumphant sound
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [[523.25,0],[659.25,0.1],[783.99,0.2],[1046.5,0.35]].forEach(([freq, delay]) => {
+      const osc = ctx.createOscillator(); const gain = ctx.createGain();
+      osc.type = 'sine'; osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.25, ctx.currentTime + delay);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.6);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + delay); osc.stop(ctx.currentTime + delay + 0.6);
+    });
+    setTimeout(() => ctx.close(), 2000);
+  } catch {}
+}
+
 // ── Sale sound (cha-ching) via Web Audio API ──
 function playSaleSound() {
   try {
@@ -1202,7 +1311,7 @@ function renderStats(orders, lineItems) {
   // Confetti on new sale
   if (lastKnownRevenue !== null && revenue > lastKnownRevenue) {
     const revenueCard = document.getElementById('revenue-stat-card');
-    if (revenueCard) { fireConfetti(revenueCard); playSaleSound(); }
+    if (revenueCard) { fireConfetti(revenueCard); playSaleSound(); moneyRain(); }
   }
   lastKnownRevenue = revenue;
 
@@ -1545,6 +1654,12 @@ function renderPaceChart() {
       beIdx = h; beRevenue = rev; beLabel = d.labels[h]; break;
     }
   }
+  // Fire breakeven fireworks when detected for today
+  if (beIdx >= 0 && getDateRange()[0] === localDateStr(new Date())) {
+    fireBreakevenFireworks();
+  }
+  // Reset breakeven celebration at midnight / date change
+  if (beIdx < 0) breakevenCelebrated = false;
   // Breakeven dot dataset
   if (beIdx >= 0) {
     const beData = Array(24).fill(null);
