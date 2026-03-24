@@ -391,14 +391,42 @@ const LOADING_QUOTES = [
   { text: "An action committed in anger is an action doomed to failure.", author: "Genghis Khan" },
   { text: "There is no good in anything until it is finished.", author: "Genghis Khan" },
   { text: "The strength of a wall is neither greater nor less than the courage of the men who defend it.", author: "Genghis Khan" },
+  { text: "Float like a butterfly, sting like a bee.", author: "Muhammad Ali" },
+  { text: "Don't count the days, make the days count.", author: "Muhammad Ali" },
+  { text: "He who is not courageous enough to take risks will accomplish nothing in life.", author: "Muhammad Ali" },
+  { text: "I hated every minute of training, but I said, don't quit. Suffer now and live the rest of your life as a champion.", author: "Muhammad Ali" },
+  { text: "Service to others is the rent you pay for your room here on Earth.", author: "Muhammad Ali" },
+  { text: "Impossible is just a big word thrown around by small men.", author: "Muhammad Ali" },
+  { text: "It isn't the mountains ahead to climb that wear you out; it's the pebble in your shoe.", author: "Muhammad Ali" },
+  { text: "The man who has no imagination has no wings.", author: "Muhammad Ali" },
+  { text: "Sell like your family's life depended on it.", author: "Wolf of Wall Street" },
+  { text: "The easiest way to make money is to not lose it.", author: "Wolf of Wall Street" },
+  { text: "Act as if. Act as if you are the president of this firm.", author: "Wolf of Wall Street" },
+  { text: "You become what you think about all day long.", author: "Alex Hormozi" },
+  { text: "Skill stacking makes you unstoppable.", author: "Alex Hormozi" },
+  { text: "The bottleneck is always the founder.", author: "Alex Hormozi" },
+  { text: "Ideas are shit. Execution is everything.", author: "Casey Neistat" },
+  { text: "Overthinking is the biggest waste of human potential.", author: "Casey Neistat" },
+  { text: "Welcome to the desert of the real.", author: "The Matrix" },
+  { text: "Choice. The problem is choice.", author: "The Matrix" },
+  { text: "Everything that has a beginning has an end.", author: "The Matrix" },
+  { text: "Conquering the world on horseback is easy; it is dismounting and governing that is hard.", author: "Genghis Khan" },
+  { text: "I am the punishment of God. If you had not committed great sins, God would not have sent a punishment like me upon you.", author: "Genghis Khan" },
 ];
+let _quoteShuffled = [];
+let _quoteIdx = 0;
 let quoteInterval;
 function rotateQuote() {
-  const q = LOADING_QUOTES[Math.floor(Math.random() * LOADING_QUOTES.length)];
+  // Shuffle on first call or when exhausted (no repeats until all shown)
+  if (_quoteShuffled.length === 0 || _quoteIdx >= _quoteShuffled.length) {
+    _quoteShuffled = [...LOADING_QUOTES].sort(() => Math.random() - 0.5);
+    _quoteIdx = 0;
+  }
+  const q = _quoteShuffled[_quoteIdx++];
   const el = document.getElementById('loading-quote');
   const au = document.getElementById('loading-quote-author');
   if (el) { el.style.animation = 'none'; el.offsetHeight; el.style.animation = ''; el.textContent = '"' + q.text + '"'; }
-  if (au) au.textContent = '— ' + q.author;
+  if (au) { au.style.animation = 'none'; au.offsetHeight; au.style.animation = ''; au.textContent = '— ' + q.author; }
 }
 
 // ── Loading Screen Progress ──
@@ -860,7 +888,7 @@ async function loadAllDataUpfront() {
 
     // 8. Final render
     step('render', 'active');
-    applyFilter();
+    try { applyFilter(); } catch (e) { console.warn('applyFilter error (non-fatal):', e.message); }
     startStatsRefresh();
     renderApiPills();
 
@@ -1109,7 +1137,7 @@ function renderAll(orders, lineItems) {
   renderHoursChart(orders);
   renderProductsChart(lineItems);
   renderHeatmap(allOrders);
-  renderMap(orders);
+  try { renderMap(orders); } catch (e) { console.warn('Map render error (non-fatal):', e.message); }
   renderMagnetProducts(orders);
   renderBoughtTogether(orders);
   renderTrending(orders);
@@ -3975,8 +4003,8 @@ function renderMap(orders) {
     loadAdspendRegions();
   }
 
-  refreshMapLayers();
-  setTimeout(() => mapInstance.invalidateSize(), 200);
+  try { refreshMapLayers(); } catch (e) { console.warn('Map layers error:', e.message); }
+  setTimeout(() => { try { mapInstance.invalidateSize(); } catch(e) {} }, 200);
 }
 
 function loadAdspendRegions() {
