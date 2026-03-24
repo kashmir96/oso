@@ -1143,7 +1143,7 @@ function renderStats(orders, lineItems) {
     },
     {
       label: 'Total Costs', value: fmt_money(totalCosts), color: '#E67E22',
-      sub: `${revenue > 0 ? ((totalCosts / revenue) * 100).toFixed(0) : 0}% of revenue`,
+      sub: totalCosts > revenue ? `${fmt_money(totalCosts - revenue)} rev remaining to cover` : `${fmt_money(revenue - totalCosts)} profit after costs`,
       spark: renderSparkBars(costSparkData.slice(0, currentHour + 1), '#E67E22'),
       expandSub: `<ul style="margin:0.3rem 0 0;padding-left:1rem;list-style:disc;font-size:0.7rem;line-height:1.6;">
         <li>COGS: ${fmt_money(periodCOGS)}</li>
