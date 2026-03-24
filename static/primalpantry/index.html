@@ -1435,6 +1435,42 @@
       </div>
     </div>
     <!-- Abandoned Checkouts -->
+    <div class="orders-card" style="margin-bottom:1.5rem;">
+      <h3>SKU Revenue Over Time</h3>
+      <div style="display:flex;gap:0.75rem;align-items:center;margin-bottom:0.75rem;flex-wrap:wrap;">
+        <label style="font-size:0.8rem;color:var(--muted);">From</label>
+        <input type="date" id="mkt-sku-time-from" style="background:var(--card);border:1px solid var(--border);color:var(--text);padding:0.3rem 0.5rem;border-radius:4px;font-size:0.8rem;">
+        <label style="font-size:0.8rem;color:var(--muted);">To</label>
+        <input type="date" id="mkt-sku-time-to" style="background:var(--card);border:1px solid var(--border);color:var(--text);padding:0.3rem 0.5rem;border-radius:4px;font-size:0.8rem;">
+        <button id="mkt-sku-time-reset" style="background:var(--card);border:1px solid var(--border);color:var(--muted);padding:0.3rem 0.6rem;border-radius:4px;font-size:0.75rem;cursor:pointer;">Reset to 30d</button>
+      </div>
+      <div class="chart-wrap" style="height:340px;margin-bottom:1.5rem;">
+        <canvas id="mkt-sku-time-chart"></canvas>
+      </div>
+    </div>
+
+    <div class="orders-card" style="margin-bottom:1.5rem;">
+      <h3>SKU Performance</h3>
+      <p style="font-size:0.8rem;color:var(--muted);margin-bottom:0.75rem;">Units sold, revenue, and refund rate per SKU across filtered orders.</p>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th class="sortable" data-mkt-sku-sort="sku">SKU</th>
+              <th>Product</th>
+              <th class="sortable" data-mkt-sku-sort="units" style="text-align:right;">Units Sold</th>
+              <th class="sortable" data-mkt-sku-sort="revenue" style="text-align:right;">Revenue</th>
+              <th class="sortable" data-mkt-sku-sort="refunds" style="text-align:right;">Refunds</th>
+              <th class="sortable" data-mkt-sku-sort="refund_rate" style="text-align:right;">Refund Rate</th>
+            </tr>
+          </thead>
+          <tbody id="mkt-sku-performance-table">
+            <tr><td colspan="6" class="loading">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <div class="chart-card" style="margin-bottom:1.5rem;">
       <h3>Abandoned Checkouts <span style="font-size:0.65rem;color:var(--dim);font-weight:400;">(from Stripe)</span></h3>
       <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.75rem;">

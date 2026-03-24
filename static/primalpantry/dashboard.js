@@ -8503,6 +8503,105 @@ document.getElementById('sku-time-reset').addEventListener('click', function() {
   renderSkuTimeSeries();
 });
 
+// ── Marketing Tab: SKU Performance (mirror) ──
+let mktSkuSortCol = 'revenue';
+let mktSkuSortAsc = false;
+
+function renderMktSkuPerformance() {
+  const tbody = document.getElementById('mkt-sku-performance-table');
+  if (!tbody) return;
+  const filteredIds = new Set(filteredOrders.map(o => o.id));
+  const refundedIds = new Set(filteredOrders.filter(o => (o.status || '').toLowerCase().includes('refund')).map(o => o.id));
+  const skuMap = {};
+  allLineItems.forEach(li => {
+    if (!filteredIds.has(li.order_id)) return;
+    const sku = li.sku || 'Unknown';
+    if (!skuMap[sku]) skuMap[sku] = { sku, name: li.description || sku, units: 0, revenue: 0, refundUnits: 0, orderIds: new Set(), refundOrderIds: new Set() };
+    const qty = li.quantity || 1;
+    skuMap[sku].units += qty;
+    skuMap[sku].revenue += qty * Number(li.unit_price || 0);
+    skuMap[sku].orderIds.add(li.order_id);
+    if (refundedIds.has(li.order_id)) { skuMap[sku].refundUnits += qty; skuMap[sku].refundOrderIds.add(li.order_id); }
+  });
+  let rows = Object.values(skuMap).map(s => ({ sku: s.sku, name: s.name, units: s.units, revenue: s.revenue, refunds: s.refundOrderIds.size, refund_rate: s.orderIds.size > 0 ? (s.refundOrderIds.size / s.orderIds.size * 100) : 0 }));
+  rows.sort((a, b) => { let av = a[mktSkuSortCol], bv = b[mktSkuSortCol]; if (typeof av === 'string') { av = av.toLowerCase(); bv = bv.toLowerCase(); } if (av < bv) return mktSkuSortAsc ? -1 : 1; if (av > bv) return mktSkuSortAsc ? 1 : -1; return 0; });
+  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="6" class="loading">No SKU data for this period.</td></tr>'; return; }
+  const maxRevenue = Math.max(...rows.map(r => r.revenue));
+  tbody.innerHTML = rows.map(r => {
+    const barW = maxRevenue > 0 ? (r.revenue / maxRevenue * 100) : 0;
+    const rateColor = r.refund_rate > 10 ? 'var(--red)' : r.refund_rate > 5 ? 'var(--amber)' : 'var(--sage)';
+    return `<tr><td style="font-weight:600;white-space:nowrap;">${r.sku}</td><td>${r.name}</td><td style="text-align:right;">${r.units.toLocaleString()}</td><td style="text-align:right;"><div style="display:flex;align-items:center;justify-content:flex-end;gap:0.5rem;">$${r.revenue.toFixed(2)} <span class="utm-bar" style="width:${barW}%;max-width:60px;"></span></div></td><td style="text-align:right;">${r.refunds}</td><td style="text-align:right;color:${rateColor};font-weight:600;">${r.refund_rate.toFixed(1)}%</td></tr>`;
+  }).join('');
+  document.querySelectorAll('[data-mkt-sku-sort]').forEach(th => { th.classList.remove('sort-asc', 'sort-desc'); if (th.dataset.mktSkuSort === mktSkuSortCol) th.classList.add(mktSkuSortAsc ? 'sort-asc' : 'sort-desc'); });
+}
+
+document.querySelectorAll('[data-mkt-sku-sort]').forEach(th => {
+  th.addEventListener('click', function() {
+    const col = this.dataset.mktSkuSort;
+    if (mktSkuSortCol === col) mktSkuSortAsc = !mktSkuSortAsc;
+    else { mktSkuSortCol = col; mktSkuSortAsc = col === 'sku'; }
+    renderMktSkuPerformance();
+  });
+});
+
+function renderMktSkuTimeSeries() {
+  const fromEl = document.getElementById('mkt-sku-time-from');
+  const toEl = document.getElementById('mkt-sku-time-to');
+  if (!fromEl || !toEl) return;
+  const today = localDateStr(new Date());
+  const defaultFrom = daysAgoLocal(30);
+  let from = fromEl.value || defaultFrom;
+  let to = toEl.value || today;
+  if (!fromEl.value) fromEl.value = defaultFrom;
+  if (!toEl.value) toEl.value = today;
+
+  const orderDateMap = {};
+  allOrders.forEach(o => { orderDateMap[o.id] = o.order_date; });
+  const skuDaily = {}, skuTotals = {};
+  allLineItems.forEach(li => {
+    const d = orderDateMap[li.order_id];
+    if (!d || d < from || d > to) return;
+    const sku = li.sku || 'Unknown';
+    const rev = (li.quantity || 1) * Number(li.unit_price || 0);
+    if (!skuDaily[sku]) { skuDaily[sku] = {}; skuTotals[sku] = 0; }
+    skuDaily[sku][d] = (skuDaily[sku][d] || 0) + rev;
+    skuTotals[sku] += rev;
+  });
+  const sorted = Object.entries(skuTotals).sort((a, b) => b[1] - a[1]);
+  const topSkus = sorted.slice(0, 10).map(s => s[0]);
+  const otherSkus = sorted.slice(10).map(s => s[0]);
+  const labels = [];
+  const dt = new Date(from + 'T00:00:00'), end = new Date(to + 'T00:00:00');
+  while (dt <= end) { labels.push(dt.toISOString().slice(0, 10)); dt.setDate(dt.getDate() + 1); }
+  const datasets = topSkus.map((sku, i) => ({ label: sku, data: labels.map(d => skuDaily[sku]?.[d] || 0), borderColor: SKU_COLORS[i % SKU_COLORS.length], backgroundColor: 'transparent', borderWidth: 2, tension: 0.3, pointRadius: 0, pointHitRadius: 8 }));
+  if (otherSkus.length > 0) { const otherData = labels.map(d => { let sum = 0; otherSkus.forEach(sku => { sum += skuDaily[sku]?.[d] || 0; }); return sum; }); datasets.push({ label: 'Other', data: otherData, borderColor: SKU_COLORS[10], backgroundColor: 'transparent', borderWidth: 1.5, borderDash: [4, 3], tension: 0.3, pointRadius: 0, pointHitRadius: 8 }); }
+
+  if (charts.mktSkuTime) charts.mktSkuTime.destroy();
+  charts.mktSkuTime = new Chart(document.getElementById('mkt-sku-time-chart'), {
+    type: 'line', data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true, labels: { color: '#9c9287', font: { size: 11, family: 'DM Sans' }, padding: 8, boxWidth: 12 } },
+        tooltip: { callbacks: { label: ctx => { const v = ctx.parsed.y; if (!v) return ''; return ctx.dataset.label + ': $' + v.toFixed(2); }, title: items => { const d = items[0].label; return new Date(d + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }); } } },
+      },
+      scales: {
+        x: { ticks: { color: '#9c9287', maxTicksLimit: 15, font: { size: 10 }, callback: function(val, i) { const d = labels[i]; return d ? new Date(d + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }) : ''; } }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { color: '#9c9287', callback: v => '$' + (v >= 1000 ? (v/1000).toFixed(1) + 'k' : v) }, grid: { color: 'rgba(51,45,39,0.5)' } },
+      },
+    },
+  });
+}
+
+document.getElementById('mkt-sku-time-from').addEventListener('change', renderMktSkuTimeSeries);
+document.getElementById('mkt-sku-time-to').addEventListener('change', renderMktSkuTimeSeries);
+document.getElementById('mkt-sku-time-reset').addEventListener('click', function() {
+  document.getElementById('mkt-sku-time-from').value = '';
+  document.getElementById('mkt-sku-time-to').value = '';
+  renderMktSkuTimeSeries();
+});
+
 // Manufacturing sub-tab switching
 const mfgPanels = ['batches', 'unit-costs', 'sku-performance', 'inventory', 'supplier-orders', 'stripe-products'];
 document.querySelectorAll('#mfg-sub-tabs .wa-panel-tab').forEach(tab => {
@@ -10382,6 +10481,9 @@ async function loadMarketingTab() {
   loadMktChangelog();
   // Auto-load abandoned checkouts
   if (typeof loadAbandonedCheckouts === 'function') loadAbandonedCheckouts();
+  // SKU performance on marketing tab
+  renderMktSkuPerformance();
+  renderMktSkuTimeSeries();
 }
 
 // ── Communications Tab ──
