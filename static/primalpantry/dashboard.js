@@ -12231,20 +12231,34 @@ window.actionDeepDive = async function(section, e) {
 async function refreshActionSummary() {
   const btn = document.getElementById('action-refresh-summary');
   btn.disabled = true; btn.innerHTML = '<span style="position:relative;z-index:1;">⏳ Summoning...</span>';
-  document.getElementById('action-summary-body').innerHTML = '<div class="loading" style="color:rgba(139,92,246,0.5);">Channelling the oracle...</div>';
-  try {
-    const res = await fetch('/.netlify/functions/action-engine?token='+encodeURIComponent(currentStaff.token)+'&refresh=1&summary=1');
-    const data = await res.json();
-    if (data.summary) renderActionSummary({ summary_text: data.summary, generated_at: new Date().toISOString() });
-    else document.getElementById('action-summary-body').innerHTML = '<div style="color:var(--dim);">Summary generated. '+data.alerts_created+' alerts created.</div>';
-    // Reload alerts
-    const ar = await db.from('action_alerts').select('*').order('created_at', { ascending: false }).limit(200);
-    actionAlerts = ar.data || [];
-    renderActionStats(); renderActionAlerts();
-  } catch (e) {
-    document.getElementById('action-summary-body').innerHTML = '<div style="color:var(--red);">Failed: '+e.message+'</div>';
-  }
-  btn.disabled = false; btn.innerHTML = '<span style="position:relative;z-index:1;">🔮 Summon Insight</span>';
+  document.getElementById('action-summary-body').innerHTML = '<div class="loading" style="color:rgba(139,92,246,0.5);">Channelling the oracle... this takes 30-60 seconds.</div>';
+
+  // Fire-and-forget: trigger the engine (don't wait for response — it times out)
+  fetch('/.netlify/functions/action-engine?token='+encodeURIComponent(currentStaff.token)+'&refresh=1&summary=1').catch(() => {});
+
+  // Poll Supabase for the updated summary
+  const startTime = Date.now();
+  const pollInterval = setInterval(async () => {
+    try {
+      const res = await db.from('action_daily_summary').select('*').order('generated_at', { ascending: false }).limit(1);
+      const row = res.data?.[0];
+      if (row && new Date(row.generated_at).getTime() > startTime - 5000) {
+        // Fresh summary found
+        clearInterval(pollInterval);
+        renderActionSummary(row);
+        // Reload alerts too
+        const ar = await db.from('action_alerts').select('*').order('created_at', { ascending: false }).limit(200);
+        actionAlerts = ar.data || [];
+        renderActionStats(); renderActionAlerts();
+        btn.disabled = false; btn.innerHTML = '<span style="position:relative;z-index:1;">🔮 Summon Insight</span>';
+      } else if (Date.now() - startTime > 120000) {
+        // Timeout after 2 minutes
+        clearInterval(pollInterval);
+        document.getElementById('action-summary-body').innerHTML = '<div style="color:var(--red);">Timed out waiting for the oracle. Check Netlify function logs.</div>';
+        btn.disabled = false; btn.innerHTML = '<span style="position:relative;z-index:1;">🔮 Summon Insight</span>';
+      }
+    } catch {}
+  }, 5000); // Poll every 5 seconds
 }
 
 function renderProductIntelligence() {
