@@ -1118,6 +1118,22 @@ function renderAll(orders, lineItems) {
 }
 
 // ── Money rain animation (mystical purple/gold) ──
+function showBestDayBanner(title, revenue) {
+  const banner = document.createElement('div');
+  banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9998;background:linear-gradient(135deg,#2d4a1e,#1e3a12);border-bottom:2px solid var(--sage);padding:1rem 2rem;text-align:center;animation:bestDaySlide 0.5s ease;';
+  banner.innerHTML = `<div style="font-size:1.4rem;font-weight:700;color:var(--sage);margin-bottom:0.2rem;">${title}</div>
+    <div style="font-size:0.85rem;color:var(--muted);">Today's revenue: <strong style="color:var(--honey);">$${revenue.toFixed(2)}</strong></div>`;
+  document.body.appendChild(banner);
+  // Add animation keyframes if not already
+  if (!document.getElementById('best-day-style')) {
+    const style = document.createElement('style');
+    style.id = 'best-day-style';
+    style.textContent = '@keyframes bestDaySlide { from { transform: translateY(-100%); } to { transform: translateY(0); } }';
+    document.head.appendChild(style);
+  }
+  setTimeout(() => { banner.style.transition = 'opacity 1s'; banner.style.opacity = '0'; setTimeout(() => banner.remove(), 1000); }, 8000);
+}
+
 function moneyRain() {
   const symbols = ['💰', '💵', '✨', '🪙', '💎', '⚡'];
   const count = 25;
@@ -1483,7 +1499,8 @@ function renderStats(orders, lineItems) {
 
   function renderStatCard(s) {
     const sensitive = ['Revenue', 'Profit', 'Total Orders'].includes(s.label);
-    return `<div class="stat-card${sensitive ? ' sensitive-stat' : ''}" onclick="document.querySelectorAll('#stats-grid .stat-card').forEach(c=>c.classList.toggle('expanded',!this.classList.contains('expanded')))">
+    const cardId = s.label === 'Revenue' ? ' id="revenue-stat-card"' : '';
+    return `<div class="stat-card${sensitive ? ' sensitive-stat' : ''}"${cardId} onclick="document.querySelectorAll('#stats-grid .stat-card').forEach(c=>c.classList.toggle('expanded',!this.classList.contains('expanded')))">
       <div class="label">${s.label}</div>
       <div class="value" style="color:${s.color}">${s.value}</div>
       <div class="sub">${s.sub}</div>
@@ -1526,6 +1543,41 @@ function renderStats(orders, lineItems) {
     if (revenueCard) { fireConfetti(revenueCard); playSaleSound(); moneyRain(); }
   }
   lastKnownRevenue = revenue;
+
+  // Best sales day celebration (check once per session)
+  if (!window._bestDayChecked && orders.length > 0) {
+    window._bestDayChecked = true;
+    const todayDate = new Date().toISOString().slice(0, 10);
+    const todayRev = orders.filter(o => o.order_date === todayDate).reduce((s, o) => s + Number(o.total_value || 0), 0);
+    if (todayRev > 0) {
+      // Calculate daily revenues for past 30 days
+      const dailyRevs = {};
+      const d30 = new Date(); d30.setDate(d30.getDate() - 30);
+      allOrders.forEach(o => {
+        if (o.order_date && o.order_date >= d30.toISOString().slice(0, 10) && o.order_date < todayDate) {
+          dailyRevs[o.order_date] = (dailyRevs[o.order_date] || 0) + Number(o.total_value || 0);
+        }
+      });
+      const pastDays = Object.entries(dailyRevs).sort((a, b) => b[1] - a[1]);
+      const best7d = pastDays.filter(([d]) => d >= new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10));
+      const best30d = pastDays;
+
+      const is30dBest = best30d.length >= 3 && todayRev > (best30d[0]?.[1] || 0);
+      const is7dBest = !is30dBest && best7d.length >= 2 && todayRev > (best7d[0]?.[1] || 0);
+
+      if (is30dBest) {
+        setTimeout(() => {
+          showBestDayBanner('30-Day Best Sales Day!', todayRev);
+          for (let i = 0; i < 5; i++) setTimeout(() => { moneyRain(); fireConfetti(document.getElementById('revenue-stat-card')); }, i * 600);
+        }, 2000);
+      } else if (is7dBest) {
+        setTimeout(() => {
+          showBestDayBanner('7-Day Best Sales Day!', todayRev);
+          for (let i = 0; i < 3; i++) setTimeout(() => { moneyRain(); fireConfetti(document.getElementById('revenue-stat-card')); }, i * 600);
+        }, 2000);
+      }
+    }
+  }
 
   // Async: fetch website visitors + live visitors from analytics
   if (currentStaff && currentStaff.token) {
