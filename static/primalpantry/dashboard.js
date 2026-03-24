@@ -8367,6 +8367,142 @@ document.querySelectorAll('[data-sku-sort]').forEach(th => {
   });
 });
 
+// ── SKU Revenue Time Series ──
+const SKU_COLORS = [
+  '#6B8F5B','#D4A84B','#5B8FA8','#A85B8F','#8F6B5B',
+  '#5BA88F','#8F8F5B','#5B5BA8','#A8845B','#7B5BA8','#9c9287'
+];
+
+function renderSkuTimeSeries() {
+  // Determine date range: custom inputs or default 30 days
+  const fromEl = document.getElementById('sku-time-from');
+  const toEl = document.getElementById('sku-time-to');
+  const today = localDateStr(new Date());
+  const defaultFrom = daysAgoLocal(30);
+
+  let from = fromEl.value || defaultFrom;
+  let to = toEl.value || today;
+
+  // Set placeholder values
+  if (!fromEl.value) fromEl.value = defaultFrom;
+  if (!toEl.value) toEl.value = today;
+
+  // Build order lookup
+  const orderDateMap = {};
+  allOrders.forEach(o => { orderDateMap[o.id] = o.order_date; });
+
+  // Aggregate: { sku: { date: revenue } }
+  const skuDaily = {};
+  const skuTotals = {};
+  allLineItems.forEach(li => {
+    const d = orderDateMap[li.order_id];
+    if (!d || d < from || d > to) return;
+    const sku = li.sku || 'Unknown';
+    const rev = (li.quantity || 1) * Number(li.unit_price || 0);
+    if (!skuDaily[sku]) { skuDaily[sku] = {}; skuTotals[sku] = 0; }
+    skuDaily[sku][d] = (skuDaily[sku][d] || 0) + rev;
+    skuTotals[sku] += rev;
+  });
+
+  // Top 10 SKUs by revenue, rest as "Other"
+  const sorted = Object.entries(skuTotals).sort((a, b) => b[1] - a[1]);
+  const topSkus = sorted.slice(0, 10).map(s => s[0]);
+  const otherSkus = sorted.slice(10).map(s => s[0]);
+
+  // Build date labels (every day in range)
+  const labels = [];
+  const dt = new Date(from + 'T00:00:00');
+  const end = new Date(to + 'T00:00:00');
+  while (dt <= end) {
+    labels.push(dt.toISOString().slice(0, 10));
+    dt.setDate(dt.getDate() + 1);
+  }
+
+  // Build datasets
+  const datasets = topSkus.map((sku, i) => ({
+    label: sku,
+    data: labels.map(d => skuDaily[sku]?.[d] || 0),
+    borderColor: SKU_COLORS[i % SKU_COLORS.length],
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    tension: 0.3,
+    pointRadius: 0,
+    pointHitRadius: 8,
+  }));
+
+  // "Other" aggregate
+  if (otherSkus.length > 0) {
+    const otherData = labels.map(d => {
+      let sum = 0;
+      otherSkus.forEach(sku => { sum += skuDaily[sku]?.[d] || 0; });
+      return sum;
+    });
+    datasets.push({
+      label: 'Other',
+      data: otherData,
+      borderColor: SKU_COLORS[10],
+      backgroundColor: 'transparent',
+      borderWidth: 1.5,
+      borderDash: [4, 3],
+      tension: 0.3,
+      pointRadius: 0,
+      pointHitRadius: 8,
+    });
+  }
+
+  if (charts.skuTime) charts.skuTime.destroy();
+  charts.skuTime = new Chart(document.getElementById('sku-time-chart'), {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          display: true,
+          labels: { color: '#9c9287', font: { size: 11, family: 'DM Sans' }, padding: 8, boxWidth: 12 },
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const v = ctx.parsed.y;
+              if (!v) return '';
+              return ctx.dataset.label + ': $' + v.toFixed(2);
+            },
+            title: items => {
+              const d = items[0].label;
+              return new Date(d + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
+            }
+          }
+        },
+      },
+      scales: {
+        x: {
+          ticks: {
+            color: '#9c9287', maxTicksLimit: 15, font: { size: 10 },
+            callback: function(val, i) { const d = labels[i]; return d ? new Date(d + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }) : ''; }
+          },
+          grid: { display: false },
+        },
+        y: {
+          beginAtZero: true,
+          ticks: { color: '#9c9287', callback: v => '$' + (v >= 1000 ? (v/1000).toFixed(1) + 'k' : v) },
+          grid: { color: 'rgba(51,45,39,0.5)' },
+        },
+      },
+    },
+  });
+}
+
+// SKU time series date picker events
+document.getElementById('sku-time-from').addEventListener('change', renderSkuTimeSeries);
+document.getElementById('sku-time-to').addEventListener('change', renderSkuTimeSeries);
+document.getElementById('sku-time-reset').addEventListener('click', function() {
+  document.getElementById('sku-time-from').value = '';
+  document.getElementById('sku-time-to').value = '';
+  renderSkuTimeSeries();
+});
+
 // Manufacturing sub-tab switching
 const mfgPanels = ['batches', 'unit-costs', 'sku-performance', 'inventory', 'supplier-orders', 'stripe-products'];
 document.querySelectorAll('#mfg-sub-tabs .wa-panel-tab').forEach(tab => {
@@ -8379,7 +8515,7 @@ document.querySelectorAll('#mfg-sub-tabs .wa-panel-tab').forEach(tab => {
       if (el) el.style.display = p === panel ? '' : 'none';
     });
     if (panel === 'unit-costs') { loadUnitCosts().then(function() { renderUnitCostsTable(); }); }
-    if (panel === 'sku-performance') { renderSkuPerformance(); }
+    if (panel === 'sku-performance') { renderSkuPerformance(); renderSkuTimeSeries(); }
     if (panel === 'inventory') { loadInventory(); }
     if (panel === 'supplier-orders') { loadSupplierOrders(); }
     if (panel === 'stripe-products') { loadStripeProducts(); }
