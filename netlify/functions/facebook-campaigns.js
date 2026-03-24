@@ -154,7 +154,9 @@ exports.handler = async (event) => {
     // Ad-level creative performance (with thumbnails)
     if (qs.ads === '1') {
       // Fetch ad-level insights with creative thumbnail
-      const adUrl = `https://graph.facebook.com/v21.0/act_${accountId}/ads?time_range=${encodeURIComponent(timeRange)}&fields=name,status,creative{thumbnail_url,object_story_spec},insights.time_range(${encodeURIComponent(timeRange)}){impressions,clicks,spend,actions,action_values,ctr,cpc}&limit=100&access_token=${accessToken}`;
+      // For /ads endpoint, insights.time_range uses inline JSON without outer encoding
+      const trInline = `{"since":"${from}","until":"${to}"}`;
+      const adUrl = `https://graph.facebook.com/v21.0/act_${accountId}/ads?fields=name,status,creative{thumbnail_url},insights.time_range(${trInline}){impressions,clicks,spend,actions,action_values,ctr,cpc}&filtering=[{"field":"ad.effective_status","operator":"IN","value":["ACTIVE","PAUSED"]}]&limit=100&access_token=${accessToken}`;
       let adData = [];
       let nextAdUrl = adUrl;
       while (nextAdUrl) {
