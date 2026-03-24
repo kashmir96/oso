@@ -1162,7 +1162,7 @@ function renderStats(orders, lineItems) {
 
   function renderStatCard(s) {
     const sensitive = ['Revenue', 'Profit', 'Total Orders'].includes(s.label);
-    return `<div class="stat-card${sensitive ? ' sensitive-stat' : ''}" onclick="this.classList.toggle('expanded')">
+    return `<div class="stat-card${sensitive ? ' sensitive-stat' : ''}" onclick="document.querySelectorAll('#stats-grid .stat-card').forEach(c=>c.classList.toggle('expanded',!this.classList.contains('expanded')))">
       <div class="label">${s.label}</div>
       <div class="value" style="color:${s.color}">${s.value}</div>
       <div class="sub">${s.sub}</div>
