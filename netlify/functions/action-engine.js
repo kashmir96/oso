@@ -112,12 +112,94 @@ async function loadRefunds(from) {
   } catch { return []; }
 }
 
-async function loadWebsiteAnalytics(from, to) {
+function toUTC(dateStr) {
+  const nzMonth = new Date().getMonth();
+  const nzOffset = (nzMonth >= 3 && nzMonth <= 8) ? '+12:00' : '+13:00';
+  return new Date(dateStr + 'T00:00:00' + nzOffset).toISOString();
+}
+function toUTCEnd(dateStr) {
+  const nzMonth = new Date().getMonth();
+  const nzOffset = (nzMonth >= 3 && nzMonth <= 8) ? '+12:00' : '+13:00';
+  const d = new Date(dateStr + 'T00:00:00' + nzOffset);
+  d.setDate(d.getDate() + 1);
+  return d.toISOString();
+}
+
+const SITE_ID = 'PrimalPantry.co.nz';
+const BASE_URL = 'https://primalpantry.co.nz';
+
+async function callRpc(name, params) {
+  const res = await sbFetch(`/rest/v1/rpc/${name}`, { method: 'POST', body: params });
+  const data = await res.json();
+  if (!res.ok) { console.error(`RPC ${name} failed:`, data); return null; }
+  return data;
+}
+
+async function loadAnalyticsSummary(from, to) {
+  return callRpc('analytics_summary', { p_site: SITE_ID, p_from: toUTC(from), p_to: toUTCEnd(to) });
+}
+
+async function loadAnalyticsPages(from, to) {
+  return callRpc('analytics_grouped', { p_site: SITE_ID, p_from: toUTC(from), p_to: toUTCEnd(to), p_column: 'pathname' });
+}
+
+async function loadAnalyticsDevices(from, to) {
+  return callRpc('analytics_grouped', { p_site: SITE_ID, p_from: toUTC(from), p_to: toUTCEnd(to), p_column: 'device_type' });
+}
+
+async function loadFunnelByPage(from, to) {
+  return callRpc('analytics_funnel_grouped', { p_site: SITE_ID, p_from: toUTC(from), p_to: toUTCEnd(to), p_column: 'pathname' });
+}
+
+async function loadEntryPages(from, to) {
+  return callRpc('analytics_entry_pages', { p_site: SITE_ID, p_from: toUTC(from), p_to: toUTCEnd(to) });
+}
+
+async function loadExitPages(from, to) {
+  return callRpc('analytics_exit_pages', { p_site: SITE_ID, p_from: toUTC(from), p_to: toUTCEnd(to) });
+}
+
+async function loadProductCOGS() {
+  const res = await sbFetch('/rest/v1/product_unit_costs?select=sku,ingredients,labor,packaging');
+  return (await res.json()) || [];
+}
+
+async function loadFBAdCreatives() {
   try {
-    const res = await sbFetch(`/rest/v1/rpc/analytics_summary`, { method: 'POST', body: { site: 'PrimalPantry.co.nz', from_date: from, to_date: to } });
+    const token = process.env.FB_ACCESS_TOKEN;
+    const accountId = process.env.FB_AD_ACCOUNT_ID;
+    if (!token || !accountId) return [];
+    const fields = 'name,creative{title,body,link_url},campaign_name,status';
+    const url = `https://graph.facebook.com/v21.0/${accountId}/ads?fields=${fields}&effective_status=["ACTIVE"]&limit=50&access_token=${token}`;
+    const res = await fetch(url);
     const data = await res.json();
-    return data || {};
-  } catch { return {}; }
+    return (data.data || []).map(ad => ({
+      name: ad.name, campaign: ad.campaign_name || '',
+      headline: ad.creative?.title || '', body: ad.creative?.body || '',
+      link_url: ad.creative?.link_url || '',
+    }));
+  } catch { return []; }
+}
+
+function stripTags(html) { return html.replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/gi, ' '); }
+function extractTitle(html) { const m = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i); return m ? m[1].trim().replace(/\s+/g, ' ') : ''; }
+function extractHeroText(html) { const h1 = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i); return h1 ? stripTags(h1[1]).trim().replace(/\s+/g, ' ').slice(0, 300) : ''; }
+function extractVisibleText(html) {
+  let t = html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<nav[\s\S]*?<\/nav>/gi, '').replace(/<footer[\s\S]*?<\/footer>/gi, '');
+  return stripTags(t).replace(/\s+/g, ' ').trim().slice(0, 2000);
+}
+
+async function fetchLivePage(url) {
+  try {
+    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PrimalPantryBot/1.0)' }, signal: AbortSignal.timeout(10000), redirect: 'follow' });
+    return res.ok ? res.text() : null;
+  } catch { return null; }
+}
+
+function pctChange(cur, prev) {
+  if (!prev || prev === 0) return cur > 0 ? '+100%' : '0%';
+  const p = ((cur - prev) / prev * 100).toFixed(1);
+  return (p >= 0 ? '+' : '') + p + '%';
 }
 
 async function loadLineItems() {
@@ -346,7 +428,8 @@ function evaluateInventory(inventoryData, orders, lineItems, config) {
 
 // ── AI Summary ──
 
-async function generateSummary(alerts, orders, campaigns, inventoryData, competitorChanges, customerEmails, lineItems, refunds = []) {
+async function generateSummary(alerts, orders, campaigns, inventoryData, competitorChanges, customerEmails, lineItems, refunds = [],
+  { curAnalytics, priorAnalytics, curPages, priorPages, curDevices, curFunnelByPage, entryPages, exitPages, productCOGS, fbAdCreatives, livePages } = {}) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return null;
 
@@ -461,6 +544,56 @@ async function generateSummary(alerts, orders, campaigns, inventoryData, competi
   if (month === 3 || month === 4) seasonalNotes.push('Autumn transition — winter skincare messaging opportunity');
   if (month === 5) seasonalNotes.push('Winter skincare season starting — moisturiser and balm demand rises');
 
+  // Product margin analysis from COGS
+  const cogsMap = {};
+  (productCOGS || []).forEach(c => { cogsMap[c.sku] = Number(c.ingredients || 0) + Number(c.labor || 0) + Number(c.packaging || 0); });
+  const productMargins = topProducts.map(([name, d]) => {
+    const matchingCogs = cogsMap[name] || 0;
+    const margin = d.units > 0 ? ((d.revenue / d.units) - matchingCogs).toFixed(2) : '?';
+    const marginPct = d.revenue > 0 && matchingCogs > 0 ? (((d.revenue / d.units - matchingCogs) / (d.revenue / d.units)) * 100).toFixed(0) + '%' : '?';
+    return { name, revenue: d.revenue.toFixed(2), units: d.units, cogs_per_unit: matchingCogs.toFixed(2), margin_per_unit: margin, margin_pct: marginPct };
+  });
+
+  // Website analytics: page trends (7d vs prior 7d)
+  const pagesTrend = (curPages || []).sort((a, b) => b.visitors - a.visitors).slice(0, 10).map(p => {
+    const prior = (priorPages || []).find(pp => pp.value === p.value);
+    const funnel = (curFunnelByPage || []).find(f => f.value === p.value);
+    return {
+      pathname: p.value, visitors: p.visitors, bounce_rate: p.bounce_rate,
+      visitors_change: prior ? pctChange(p.visitors, prior.visitors) : 'new',
+      bounce_change: prior ? ((p.bounce_rate || 0) - (prior.bounce_rate || 0)).toFixed(1) + 'pp' : null,
+      atc_rate: p.visitors > 0 ? ((funnel?.atc_uniques || 0) / p.visitors * 100).toFixed(1) + '%' : '0%',
+      conv_rate: p.visitors > 0 ? ((funnel?.sale_uniques || 0) / p.visitors * 100).toFixed(1) + '%' : '0%',
+    };
+  });
+
+  // Creative fatigue: campaigns with CPA > 30 for 14+ days
+  const fatiguedCreatives = creativeRanking.filter(c => Number(c.cpa) > 30 && c.conversions > 0).map(c => c.name);
+
+  // Ad ↔ page cross-reference
+  const adPageMapping = (fbAdCreatives || []).map(ad => {
+    let path = '';
+    try { path = ad.link_url ? new URL(ad.link_url).pathname : ''; } catch {}
+    return { campaign: ad.campaign, headline: ad.headline, body: (ad.body || '').slice(0, 200), landing_page: path };
+  }).filter(a => a.landing_page);
+
+  // Frequently bought together analysis
+  const orderProducts = {};
+  lineItems.forEach(li => {
+    if (!orderProducts[li.order_id]) orderProducts[li.order_id] = [];
+    orderProducts[li.order_id].push(li.description || li.sku);
+  });
+  const pairCounts = {};
+  Object.values(orderProducts).filter(items => items.length >= 2).forEach(items => {
+    for (let i = 0; i < items.length; i++) {
+      for (let j = i + 1; j < items.length; j++) {
+        const pair = [items[i], items[j]].sort().join(' + ');
+        pairCounts[pair] = (pairCounts[pair] || 0) + 1;
+      }
+    }
+  });
+  const topPairs = Object.entries(pairCounts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([pair, count]) => ({ pair, count }));
+
   const context = {
     date: yesterday,
     yesterday: { orders: yesterdayOrders.length, revenue: yRevenue.toFixed(2), aov: yesterdayOrders.length > 0 ? (yRevenue / yesterdayOrders.length).toFixed(2) : '0' },
@@ -469,15 +602,28 @@ async function generateSummary(alerts, orders, campaigns, inventoryData, competi
       cpa: totalConv > 0 ? (totalSpend / totalConv).toFixed(2) : 'N/A',
       roas: totalSpend > 0 ? (totalRev / totalSpend).toFixed(1) : 'N/A',
       byPlatform: platformStats,
-      campaigns: campaigns.slice(0, 10).map(c => ({ name: c.name, platform: c.platform, spend: c.spend.toFixed(2), conversions: c.conversions, cpa: c.conversions > 0 ? (c.spend / c.conversions).toFixed(2) : 'N/A', roas: c.spend > 0 ? (c.conversions_value / c.spend).toFixed(1) : '0', ctr: c.impressions > 0 ? ((c.clicks / c.impressions) * 100).toFixed(2) : '0' })),
+      campaigns: campaigns.slice(0, 15).map(c => ({ name: c.name, platform: c.platform, spend: c.spend.toFixed(2), conversions: c.conversions, cpa: c.conversions > 0 ? (c.spend / c.conversions).toFixed(2) : 'N/A', roas: c.spend > 0 ? (c.conversions_value / c.spend).toFixed(1) : '0', ctr: c.impressions > 0 ? ((c.clicks / c.impressions) * 100).toFixed(2) : '0' })),
     },
     creativeRanking: creativeRanking.slice(0, 10),
+    fatiguedCreatives,
     refunds: { totalRefunded: refundTotal.toFixed(2), refundCount: refunds.length, damagedCount: damagedOrders.length, refundRate: orders.length > 0 ? ((refundedOrders.length / orders.length) * 100).toFixed(1) + '%' : '0%', reasons: refundReasons },
     discounts: { discountedOrderPct: discountRate + '%', discountRevenue: discountRevenue.toFixed(2), fullPriceRevenue: nonDiscountRevenue.toFixed(2) },
     inventory: invStatus.filter(i => i.stock > 0 || i.velocity > 0),
-    activeAlerts: { total: alerts.length, p1: alerts.filter(a => a.priority === 'P1').length, p2: alerts.filter(a => a.priority === 'P2').length, p3: alerts.filter(a => a.priority === 'P3').length, list: alerts.slice(0, 15).map(a => ({ title: a.title, priority: a.priority, category: a.category })) },
-    topProducts: topProducts.map(([name, d]) => ({ name, revenue: d.revenue.toFixed(2), units: d.units })),
+    activeAlerts: { total: alerts.length, p1: alerts.filter(a => a.priority === 'P1').length, list: alerts.slice(0, 10).map(a => ({ title: a.title, priority: a.priority, category: a.category })) },
+    productMargins,
     topMagnets: topMagnets.map(([name, count]) => ({ name, firstPurchases: count })),
+    topPairs,
+    // Website analytics
+    websiteAnalytics: curAnalytics && priorAnalytics ? {
+      current: { visitors: curAnalytics.unique_visitors, pageviews: curAnalytics.total_pageviews, bounce: curAnalytics.bounce_rate, avgDuration: curAnalytics.avg_duration },
+      changes: { visitors: pctChange(curAnalytics.unique_visitors, priorAnalytics.unique_visitors), pageviews: pctChange(curAnalytics.total_pageviews, priorAnalytics.total_pageviews), bounce: ((curAnalytics.bounce_rate || 0) - (priorAnalytics.bounce_rate || 0)).toFixed(1) + 'pp' },
+    } : null,
+    pagesTrend,
+    devices: curDevices || [],
+    entryPages: (entryPages || []).slice(0, 5),
+    exitPages: (exitPages || []).slice(0, 5),
+    livePages: (livePages || []).map(p => ({ pathname: p.pathname, title: p.title, hero: p.hero, text: (p.text || '').slice(0, 1000) })),
+    adPageAlignment: adPageMapping.slice(0, 8),
     competitorChanges: competitorChanges.slice(0, 10).map(c => ({ summary: c.summary, type: c.change_type })),
     customerEmails: { themes: emailThemes, recentMessages: customerEmails.slice(0, 10).map(e => ({ subject: e.subject, snippet: (e.snippet || '').slice(0, 100) })) },
     seasonalNotes,
@@ -486,61 +632,53 @@ async function generateSummary(alerts, orders, campaigns, inventoryData, competi
   const dayOfWeek = new Date().getDay();
   const isMonday = dayOfWeek === 1;
 
-  const systemPrompt = `You are the AI business analyst for Primal Pantry, a NZ-based tallow skincare DTC brand. You make direct, specific, actionable recommendations. Use NZD. No fluff. Bold key numbers and actions. Every point must be something the owner can act on today.`;
+  const systemPrompt = `You are the AI business analyst for Primal Pantry, a NZ-based tallow skincare DTC brand. You combine sales, marketing, website analytics, product margin data, and customer intel into a single comprehensive briefing. Be direct, specific, data-driven. Use NZD. Bold (**text**) key numbers and actions. Every recommendation must be actionable.`;
 
-  const userPrompt = `Generate a ${isMonday ? 'weekly' : 'daily'} briefing for ${yesterday}.
+  const userPrompt = `Generate a comprehensive ${isMonday ? 'weekly' : 'daily'} sales & marketing briefing for ${yesterday}.
 
 Data:
 ${JSON.stringify(context, null, 2)}
 
 Structure your response as:
-${isMonday ? `**Weekly Summary**: Key wins, losses, trends. Revenue, orders, AOV vs last week.
 
-**🔴 Refunds & Damages**: Total refunded, damage count, top reasons. What to fix (packaging, product, shipping).
+**${isMonday ? 'Weekly' : 'Yesterday'}**: Revenue, orders, AOV${isMonday ? ' vs last week' : ''}. Key trend.
+
+**🔴 Refunds & Damages**: Total refunded, damage count, top reasons. What to fix.
 
 **📈 Marketing — Kill / Scale / Create**:
-• By platform (FB vs Google): which platform is winning, where to shift budget
-• Which campaigns to kill NOW (CPA too high), scale (ROAS strong), create new creatives for
-• Rank top 3 creatives by ROAS — where to focus spend
-• Opportunities to reduce CPA or increase volume
+• By platform (FB vs Google): which is winning, where to shift budget
+• Campaigns to kill NOW (CPA too high or fatigued — see fatiguedCreatives for CPA>$30 over 14d)
+• Campaigns to scale (strong ROAS)
+• Creative fatigue flags — which creatives to refresh
+• Regional / time-of-day / day-of-week opportunities from order patterns
 
-**🛒 Cross-sell & AOV**: Best upsell pairings from order data. Specific actions to increase AOV (bundles, thresholds, add-ons).
+**💰 Product Profitability & Margins**: From productMargins data — which products have the best margin? Which high-revenue products have poor margins? Recommend which products to push in ads based on profit per unit, not just revenue.
 
-**📦 Inventory**: Stock at risk, batch sizes needed, overstock to discount.
+**🛒 Bundles & Cross-sell**: From topPairs (frequently bought together) — specific bundle recommendations. Which product combinations to create or promote.
 
-**💰 Cost Reduction**: Opex/adspend cuts possible. Discount analysis — continue or kill?
+**🌐 Website Performance**:
+• Traffic changes this week vs last (visitors, bounce rate)
+• Pages gaining/losing traffic and why
+• Conversion opportunities — high traffic + low conversion pages, what to fix
+• Mobile vs desktop issues from device data
+• Ad ↔ landing page alignment — compare ad creative copy with actual page hero text. Flag mismatches.
+• For top pages: review actual live content (title, hero, text) and suggest specific improvements
 
-**🌐 Website**: Funnel drop-off insights. Pages to improve for conversion.
+**📦 Inventory**: Stock at risk, batch sizes needed, overstock to bundle/discount.
 
-**📧 Product & Customer Intel**: Email themes (complaints, requests, praise). Specific product improvement ideas or new product lines based on customer requests. Quote specific requests.
+**📧 Customer Intel**: Email themes. Specific product improvement ideas from customer feedback.
 
-**🏢 Competitive**: Notable competitor moves. Opportunities to differentiate.
+**🏢 Competitive**: Notable competitor moves.
 
-**✅ Top 3 Actions This Week**: The 3 most impactful things to do right now.` :
+**✅ Top 5 Actions ${isMonday ? 'This Week' : 'Today'}**: The 5 most impactful things to do right now, ranked by revenue impact. Blend marketing, website, product, and operational insights.
 
-`**Yesterday**: Revenue, orders, AOV, standout events.
-
-**🔴 Refunds & Damages**: Any refunds/damages yesterday? Root cause and fix.
-
-**📈 Ads — Kill / Scale / Create**: By platform. Which campaigns to kill, scale, or create new creatives for. Top 3 creatives to focus spend on. How to reduce CPA.
-
-**🛒 AOV & Cross-sell**: Current AOV trend. Best upsell opportunities from order data.
-
-**📦 Inventory**: Any SKUs at risk? Next batch sizes.
-
-**📧 Customer Intel**: Email themes today. Any product feedback, requests, or complaints to act on? Quote specific requests if relevant.
-
-**🏢 Environment**: Competitor changes, seasonal opportunities.
-
-**✅ Top 3 Actions Today**: Most impactful things to do right now.`}
-
-Keep each section to 1-3 sentences max. Be specific — name campaigns, SKUs, products, and numbers. Every recommendation must be actionable.`;
+Keep each section to 2-4 sentences max. Name specific campaigns, pages, products, and numbers.`;
 
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 2048, system: systemPrompt, messages: [{ role: 'user', content: userPrompt }] }),
+      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 4096, system: systemPrompt, messages: [{ role: 'user', content: userPrompt }] }),
     });
     const data = await res.json();
     const text = data.content?.[0]?.text || '';
@@ -593,7 +731,10 @@ exports.handler = async (event) => {
     const from14 = getNZDate(14);
     const today = getNZDate(0);
     const from30 = getNZDate(30);
-    const [fbCampaigns, gCampaigns, orders, lineItems, inventory, competitorChanges, customerEmails, refunds] = await Promise.all([
+    const from7 = getNZDate(7);
+    const [fbCampaigns, gCampaigns, orders, lineItems, inventory, competitorChanges, customerEmails, refunds,
+           curAnalytics, priorAnalytics, curPages, priorPages, curDevices, curFunnelByPage, entryPages, exitPages,
+           productCOGS, fbAdCreatives] = await Promise.all([
       loadFBCampaigns(from14, today),
       loadGoogleCampaigns(from14, today),
       loadOrders(30),
@@ -602,10 +743,30 @@ exports.handler = async (event) => {
       loadCompetitorChanges(),
       loadCustomerEmails(),
       loadRefunds(from30),
+      // Website analytics
+      loadAnalyticsSummary(from7, today),
+      loadAnalyticsSummary(from14, from7),
+      loadAnalyticsPages(from7, today),
+      loadAnalyticsPages(from14, from7),
+      loadAnalyticsDevices(from7, today),
+      loadFunnelByPage(from7, today),
+      loadEntryPages(from7, today),
+      loadExitPages(from7, today),
+      // Product costs
+      loadProductCOGS(),
+      loadFBAdCreatives(),
     ]);
 
     const allCampaigns = [...fbCampaigns, ...gCampaigns];
     console.log(`Loaded: ${allCampaigns.length} campaigns, ${orders.length} orders, ${inventory.reorderPoints.length} SKUs`);
+
+    // Fetch live HTML of top 5 pages
+    const topPagePaths = (curPages || []).sort((a, b) => b.visitors - a.visitors).slice(0, 5).map(p => p.value);
+    const livePages = [];
+    for (const p of topPagePaths) {
+      const html = await fetchLivePage(BASE_URL + p);
+      if (html) livePages.push({ pathname: p, title: extractTitle(html), hero: extractHeroText(html), text: extractVisibleText(html) });
+    }
 
     // 3. Run evaluators
     const ruleMap = {};
@@ -665,7 +826,8 @@ exports.handler = async (event) => {
     if (!qs.token || qs.summary === '1') {
       // Combine existing + new alerts for context
       const allAlertsList = [...newAlerts.map(a => ({ ...a })), ...recentAlerts];
-      summary = await generateSummary(allAlertsList, orders, allCampaigns, inventory, competitorChanges, customerEmails, lineItems, refunds);
+      summary = await generateSummary(allAlertsList, orders, allCampaigns, inventory, competitorChanges, customerEmails, lineItems, refunds,
+        { curAnalytics, priorAnalytics, curPages, priorPages, curDevices, curFunnelByPage, entryPages, exitPages, productCOGS, fbAdCreatives, livePages });
     }
 
     return {
