@@ -35,6 +35,7 @@
 
 [functions."action-engine"]
   schedule = "0 18 * * *"
+  timeout = 60
 
 [functions."abandoned-cart-auto"]
   schedule = "0 5 * * *"
@@ -44,6 +45,7 @@
 
 [functions."website-insights"]
   schedule = "30 18 * * *"
+  timeout = 60
 
 # ── Cache headers for dashboard static assets ──
 [[headers]]

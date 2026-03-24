@@ -12230,8 +12230,8 @@ window.actionDeepDive = async function(section, e) {
 
 async function refreshActionSummary() {
   const btn = document.getElementById('action-refresh-summary');
-  btn.disabled = true; btn.textContent = 'Generating...';
-  document.getElementById('action-summary-body').innerHTML = '<div class="loading">Generating AI briefing...</div>';
+  btn.disabled = true; btn.innerHTML = '<span style="position:relative;z-index:1;">⏳ Summoning...</span>';
+  document.getElementById('action-summary-body').innerHTML = '<div class="loading" style="color:rgba(139,92,246,0.5);">Channelling the oracle...</div>';
   try {
     const res = await fetch('/.netlify/functions/action-engine?token='+encodeURIComponent(currentStaff.token)+'&refresh=1&summary=1');
     const data = await res.json();
@@ -12244,7 +12244,7 @@ async function refreshActionSummary() {
   } catch (e) {
     document.getElementById('action-summary-body').innerHTML = '<div style="color:var(--red);">Failed: '+e.message+'</div>';
   }
-  btn.disabled = false; btn.textContent = 'Refresh';
+  btn.disabled = false; btn.innerHTML = '<span style="position:relative;z-index:1;">🔮 Summon Insight</span>';
 }
 
 function renderProductIntelligence() {
