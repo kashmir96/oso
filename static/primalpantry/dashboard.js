@@ -10324,6 +10324,10 @@ async function loadMarketingTab() {
   const [from, to] = getDateRange();
   const dateKey = from + '|' + to;
   // Cache for 5 minutes unless date range changed
+  // Render SKU data immediately (already in memory, no API wait)
+  renderMktSkuPerformance();
+  renderMktSkuTimeSeries();
+
   if (mktInited && mktLastLoaded && dateKey === mktLastDateRange && Date.now() - mktLastLoaded < 300000) return;
   if (!mktInited) {
     mktInited = true;
@@ -10481,9 +10485,6 @@ async function loadMarketingTab() {
   loadMktChangelog();
   // Auto-load abandoned checkouts
   if (typeof loadAbandonedCheckouts === 'function') loadAbandonedCheckouts();
-  // SKU performance on marketing tab
-  renderMktSkuPerformance();
-  renderMktSkuTimeSeries();
 }
 
 // ── Communications Tab ──
