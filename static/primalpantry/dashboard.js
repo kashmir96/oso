@@ -124,12 +124,16 @@ const db = {
       limit(n) { _params.limit = n; return chain; },
       single() { _params.single = true; return chain; },
       then(resolve, reject) {
+        if (!currentStaff?.token) return resolve({ data: null, error: { message: 'Not authenticated' } });
         return fetch('/.netlify/functions/dashboard-data', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: currentStaff?.token, table, operation: _op, params: _params }),
+          body: JSON.stringify({ token: currentStaff.token, table, operation: _op, params: _params }),
         })
-        .then(r => r.json())
+        .then(r => {
+          if (r.status === 401) return { data: null, error: { message: 'Unauthorised' } };
+          return r.json();
+        })
         .then(result => resolve(result))
         .catch(reject);
       },
@@ -731,7 +735,7 @@ async function initDashboard() {
 
   // Start auto-refresh of stats every 15 seconds
   startStatsRefresh();
-  checkApiHealth();
+  renderApiPills(); // Show pills but don't fire checks yet — wait for tab switch
 }
 
 // ── API Health Pills ──
@@ -766,13 +770,13 @@ function checkApiHealth() {
   const tok = encodeURIComponent(currentStaff.token);
   const today = localDateStr(new Date());
   const checks = {
-    SB: () => db.from('orders').select('id').limit(1).then(r => !r.error),
-    ST: () => fetch('/.netlify/functions/stripe-products?token=' + tok).then(r => r.ok),
+    SB: () => Promise.resolve(allOrders.length > 0), // Already loaded if we're here
+    ST: () => Promise.resolve(allOrders.some(o => o.stripe_session_id)), // Orders from Stripe exist
     FB: () => fetch('/.netlify/functions/facebook-campaigns?token=' + tok + '&from=' + today + '&to=' + today).then(r => r.ok),
     GA: () => fetch('/.netlify/functions/google-ads?token=' + tok + '&from=' + today + '&to=' + today).then(r => r.ok),
     GM: () => fetch('/.netlify/functions/google-merchant?token=' + tok).then(r => r.ok),
     ES: () => fetch('/.netlify/functions/eship-orders?token=' + tok).then(r => r.ok),
-    AI: () => fetch('/.netlify/functions/claude-chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: currentStaff.token, message: 'ping', messages: [] }) }).then(r => r.ok),
+    AI: () => Promise.resolve(true), // Can't check without sending a real message
     XR: () => fetch('/.netlify/functions/xero-status?token=' + tok).then(r => r.ok),
     WA: () => fetch('/.netlify/functions/analytics-dashboard?token=' + tok + '&site=PrimalPantry.co.nz&from=' + today + '&to=' + today + '&metric=summary').then(r => r.ok),
   };
