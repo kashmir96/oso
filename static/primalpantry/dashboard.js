@@ -682,8 +682,8 @@ async function loadAdSpend() {
     currentPaidConv = [...fbCampaigns, ...gCampaigns].reduce((s, c) => s + (c.conversions || 0), 0);
     currentPaidClicks = [...fbCampaigns, ...gCampaigns].reduce((s, c) => s + (c.clicks || 0), 0);
     currentPaidImpr = [...fbCampaigns, ...gCampaigns].reduce((s, c) => s + (c.impressions || 0), 0);
-    // Blended ad spend: use campaign-level totals (confirmed working for both today + date ranges)
-    // fbTodaySpend from insights endpoint is a fallback only if campaigns return 0
+    // Blended ad spend: use campaign-level totals for date ranges,
+    // hourly deltas for "today" (to handle NZ/UTC timezone offset)
     currentFbSpend = fbTotalSpend > 0 ? fbTotalSpend : fbTodaySpend;
     currentGSpend = gTotalSpend;
     currentAdSpend = currentFbSpend + currentGSpend;
@@ -1582,34 +1582,22 @@ function renderDailyPace() {
     }
   });
 
-  // Use stored cumulative adspend snapshots for the hourly chart
-  // Each row has the cumulative_spend at that hour — plot directly
+  // Use stored hourly_spend deltas for the pace chart (handles FB midnight reset correctly)
+  // Sum deltas cumulatively to build the adspend curve for the NZ day
   const cumAdspendByHour = Array(24).fill(null);
   let hasHourlyAdspend = false;
   if (window._adspendHourlyData && Array.isArray(window._adspendHourlyData)) {
     const todayData = window._adspendHourlyData.filter(r => r.date === todayStr);
     if (todayData.length > 0) {
       hasHourlyAdspend = true;
-      // Aggregate FB + Google cumulative spend per hour
-      const bySrc = {};
-      todayData.forEach(r => {
-        if (!bySrc[r.source]) bySrc[r.source] = {};
-        bySrc[r.source][r.hour] = Number(r.cumulative_spend || 0);
-      });
-      // For each hour up to current, sum all sources' cumulative values
+      // Sum hourly_spend deltas per hour (across all sources)
+      const deltaByHour = Array(24).fill(0);
+      todayData.forEach(r => { deltaByHour[r.hour] += Number(r.hourly_spend || 0); });
+      // Build cumulative from deltas
+      let runAds = 0;
       for (let h = 0; h <= currentHour; h++) {
-        let total = 0;
-        for (const src of Object.keys(bySrc)) {
-          // Use this hour's value, or carry forward from the last recorded hour
-          let val = bySrc[src][h];
-          if (val === undefined) {
-            for (let ph = h - 1; ph >= 0; ph--) {
-              if (bySrc[src][ph] !== undefined) { val = bySrc[src][ph]; break; }
-            }
-          }
-          total += val || 0;
-        }
-        cumAdspendByHour[h] = total;
+        runAds += deltaByHour[h];
+        cumAdspendByHour[h] = runAds;
       }
     }
   }

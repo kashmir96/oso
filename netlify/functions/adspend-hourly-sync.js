@@ -142,17 +142,21 @@ exports.handler = async (event) => {
   console.log(`[adspend-hourly] FB: $${fbSpend}, Google: $${gSpend}`);
 
   // For each source, get the previous hour's cumulative, calculate delta
+  // Handle FB/Google midnight reset: when cumulative drops, the new value IS the delta
   for (const [source, cumSpend] of [['facebook', fbSpend], ['google', gSpend]]) {
     if (cumSpend === null) continue;
 
-    // Get previous cumulative for today
+    // Get most recent previous row (could be today or yesterday — handles day boundary)
     const prevRes = await sbFetch(
-      `/rest/v1/adspend_hourly?date=eq.${todayDate}&source=eq.${source}&hour=lt.${currentHour}&order=hour.desc&limit=1`,
+      `/rest/v1/adspend_hourly?source=eq.${source}&order=date.desc,hour.desc&limit=1&not.and=(date.eq.${todayDate},hour.eq.${currentHour})`,
       { headers: { Accept: 'application/json' } }
     );
     const prevRows = await prevRes.json();
     const prevCum = prevRows.length > 0 ? Number(prevRows[0].cumulative_spend || 0) : 0;
-    const hourlyDelta = Math.max(0, cumSpend - prevCum);
+
+    // If cumulative dropped (ad platform reset at their midnight), the new cumulative IS the hourly spend
+    // Otherwise normal delta calculation
+    const hourlyDelta = cumSpend < prevCum ? cumSpend : (cumSpend - prevCum);
 
     // Upsert this hour
     await sbFetch('/rest/v1/adspend_hourly', {
@@ -168,7 +172,7 @@ exports.handler = async (event) => {
       }),
     });
 
-    console.log(`[adspend-hourly] Stored ${source}: cumulative=$${cumSpend}, hourly=$${hourlyDelta}`);
+    console.log(`[adspend-hourly] Stored ${source}: cumulative=$${cumSpend}, hourly=$${hourlyDelta}, prevCum=$${prevCum}${cumSpend < prevCum ? ' (RESET DETECTED)' : ''}`);
   }
 
   // Cleanup: delete rows older than 14 days
