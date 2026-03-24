@@ -12073,14 +12073,21 @@ function renderActionSummary(summary) {
     time.textContent = '';
     return;
   }
-  let html = summary.summary_text
+  const genieQuotes = [
+    'Stand still and you go backwards. Walk and you stay put. To get ahead, you have to hustle.',
+    'Back yourself into a corner. Give yourself no choice but to succeed.',
+  ];
+  const quote = genieQuotes[Math.floor(Math.random() * genieQuotes.length)];
+  let html = '<div style="font-size:1.1rem;font-weight:700;color:#c4b5fd;margin-bottom:0.75rem;">Whats up Cuh? 🔮</div>';
+  html += summary.summary_text
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\n---\n/g, '<hr style="border:none;border-top:1px solid var(--border);margin:1rem 0;">')
+    .replace(/\n---\n/g, '<hr style="border:none;border-top:1px solid rgba(139,92,246,0.15);margin:1rem 0;">')
     .replace(/\n/g, '<br>');
   // Replace deep-dive links with clickable buttons
   html = html.replace(/\[📊 Deep dive →\]\(#deepdive-([\w-]+)\)/g, (_, section) => {
-    return `<a href="#" onclick="actionDeepDive('${section}', event)" style="display:inline-block;margin:0.5rem 0;padding:4px 12px;background:var(--border);color:var(--green);border-radius:6px;font-size:0.75rem;text-decoration:none;font-weight:600;">📊 Deep dive into ${section} →</a>`;
+    return `<a href="#" onclick="actionDeepDive('${section}', event)" style="display:inline-block;margin:0.5rem 0;padding:4px 12px;background:rgba(139,92,246,0.15);color:#a78bfa;border:1px solid rgba(139,92,246,0.3);border-radius:6px;font-size:0.75rem;text-decoration:none;font-weight:600;">🔮 Deep dive into ${section} →</a>`;
   });
+  html += `<div style="margin-top:1.25rem;padding-top:0.75rem;border-top:1px solid rgba(139,92,246,0.1);text-align:center;"><em style="font-family:Georgia,'Times New Roman',serif;font-size:0.85rem;color:rgba(167,139,250,0.7);letter-spacing:0.02em;line-height:1.6;">"${quote}"</em></div>`;
   body.innerHTML = html;
   time.textContent = 'Generated ' + new Date(summary.generated_at).toLocaleDateString('en-NZ', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit', timeZone: 'Pacific/Auckland' });
 }
@@ -12096,9 +12103,9 @@ window.actionDeepDive = async function(section, e) {
   if (!container) {
     container = document.createElement('div');
     container.id = 'action-deepdive';
-    container.className = 'orders-card';
+    container.className = 'genie-card';
     container.style.cssText = 'margin-bottom:1rem;';
-    document.getElementById('action-summary-body').closest('.orders-card').after(container);
+    document.getElementById('action-summary-body').closest('.genie-card').after(container);
   }
   container.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
     <h3 style="margin:0;">🔍 Deep Dive: ${sectionName}</h3>

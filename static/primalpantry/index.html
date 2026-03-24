@@ -101,8 +101,8 @@
       Mission Control
     </button>
     <button class="nav-item nav-genie" data-tab="actions">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/><path d="M12 6v6l4 2"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>
-      Mystical Business Genie
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="18" rx="8" ry="3"/><path d="M16 18c0-2 2-4 2-7 0-4-2.69-7-6-7S6 7 6 11c0 3 2 5 2 7"/><path d="M10 11c0-1.1.9-2 2-2s2 .9 2 2"/><path d="M12 4V2"/><path d="M9 3l1 1"/><path d="M15 3l-1 1"/></svg>
+      Business Genie
       <span id="action-nav-badge" style="display:none;background:#7c3aed;color:white;font-size:0.6rem;font-weight:700;padding:0.1rem 0.35rem;border-radius:8px;margin-left:auto;"></span>
     </button>
     <button class="nav-item" data-tab="orders">
@@ -1463,6 +1463,9 @@
   </div><!-- /tab-marketing -->
 
   <div id="tab-finance" class="tab-content">
+    <div style="text-align:center;padding:0.75rem 1rem;margin-bottom:1rem;border:1px solid var(--border);border-radius:10px;background:var(--card);">
+      <em style="font-family:Georgia,'Times New Roman',serif;font-size:0.9rem;color:var(--honey);letter-spacing:0.02em;">"You gotta pump those numbers up, those are rookie numbers in this racket"</em>
+    </div>
     <!-- Connection banner (hidden when connected) -->
     <div id="xero-connect-banner" class="orders-card fin-connect" style="display:none;">
       <h3>Connect Xero Accounting</h3>
@@ -1641,7 +1644,7 @@
         </div>
         <div style="display:flex;gap:0.5rem;align-items:center;">
           <span id="action-summary-time" style="font-size:0.65rem;color:rgba(139,92,246,0.5);"></span>
-          <button class="genie-btn" id="action-refresh-summary">Summon Insight</button>
+          <button class="genie-btn" id="action-refresh-summary"><span style="position:relative;z-index:1;">🔮 Summon Insight</span></button>
         </div>
       </div>
       <div id="action-summary-body" style="font-size:0.85rem;line-height:1.7;color:var(--muted);">

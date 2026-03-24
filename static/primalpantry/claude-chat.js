@@ -9,12 +9,19 @@
 
   let chatMessages = []; // API message history
   let isSending = false;
+  let hasGreeted = false;
 
   // Toggle panel
   fab.addEventListener('click', () => {
     const isOpen = panel.classList.toggle('open');
     fab.classList.toggle('open', isOpen);
-    if (isOpen) input.focus();
+    if (isOpen) {
+      input.focus();
+      if (!hasGreeted && messagesEl.children.length === 0) {
+        hasGreeted = true;
+        addMessage('assistant', '<strong style="color:#c4b5fd;">Whats up Cuh?</strong> 🔮<br><br>Ask me anything about your business — sales, marketing, inventory, costs, whatever you need.');
+      }
+    }
   });
 
   // Clear chat
