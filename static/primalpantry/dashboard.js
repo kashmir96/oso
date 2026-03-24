@@ -1457,6 +1457,17 @@ function renderStats(orders, lineItems) {
     costSparkData.push(h <= currentHour ? runCostSpark : 0);
   }
 
+  // Reviana revenue from line items
+  const filteredIdSet = new Set(orders.map(o => o.id));
+  const priorIdSet = new Set(priorOrders.map(o => o.id));
+  let revianaRev = 0, revianaOrders = new Set(), priorRevianaRev = 0;
+  allLineItems.forEach(li => {
+    if (!(li.sku || '').startsWith('reviana-')) return;
+    const rev = (li.quantity || 1) * Number(li.unit_price || 0);
+    if (filteredIdSet.has(li.order_id)) { revianaRev += rev; revianaOrders.add(li.order_id); }
+    if (priorIdSet.has(li.order_id)) priorRevianaRev += rev;
+  });
+
   const stats = [
     {
       label: 'Live Visitors', value: '<span id="wa-live-count">-</span>', color: 'var(--cyan)',
@@ -1496,6 +1507,11 @@ function renderStats(orders, lineItems) {
       label: 'ROAS', value: currentAdSpend > 0 ? (currentPaidRev / currentAdSpend).toFixed(1) + 'x' : '-', color: 'var(--sage)',
       sub: 'return on ad spend',
       expandSub: `Adspend: ${fmt_money(currentAdSpend)}<br>Paid conversions: ${currentPaidConv}`,
+    },
+    {
+      label: 'Reviana Revenue', value: fmt_money(revianaRev), color: 'var(--honey)',
+      sub: `${revianaOrders.size} orders`,
+      prior: fmtDelta(revianaRev, priorRevianaRev, true),
     },
   ];
 
@@ -8817,6 +8833,188 @@ document.getElementById('mkt-sku-time-reset').addEventListener('click', function
   document.getElementById('mkt-sku-time-to').value = '';
   renderMktSkuTimeSeries();
 });
+
+// ── Marketing sub-tab switching ──
+const mktPanels = ['overview', 'reviana'];
+document.querySelectorAll('#mkt-sub-tabs .wa-panel-tab').forEach(tab => {
+  tab.addEventListener('click', function() {
+    document.querySelectorAll('#mkt-sub-tabs .wa-panel-tab').forEach(t => t.classList.remove('active'));
+    this.classList.add('active');
+    const panel = this.dataset.mktPanel;
+    mktPanels.forEach(p => {
+      const el = document.getElementById('mkt-panel-' + p);
+      if (el) el.style.display = p === panel ? '' : 'none';
+    });
+    if (panel === 'reviana') {
+      renderRevianaSkuTimeSeries();
+      renderRevianaFunnel();
+      renderRevianaQuickAdd();
+    }
+  });
+});
+
+// ── Reviana SKU Time Series (filtered to reviana- SKUs) ──
+function renderRevianaSkuTimeSeries() {
+  const fromEl = document.getElementById('reviana-time-from');
+  const toEl = document.getElementById('reviana-time-to');
+  if (!fromEl || !toEl) return;
+  const today = localDateStr(new Date());
+  const defaultFrom = daysAgoLocal(30);
+  let from = fromEl.value || defaultFrom;
+  let to = toEl.value || today;
+  if (!fromEl.value) fromEl.value = defaultFrom;
+  if (!toEl.value) toEl.value = today;
+
+  const orderDateMap = {};
+  allOrders.forEach(o => { orderDateMap[o.id] = o.order_date; });
+  const skuDaily = {}, skuTotals = {};
+  allLineItems.forEach(li => {
+    if (!(li.sku || '').startsWith('reviana-')) return;
+    const d = orderDateMap[li.order_id];
+    if (!d || d < from || d > to) return;
+    const sku = li.sku;
+    const rev = (li.quantity || 1) * Number(li.unit_price || 0);
+    if (!skuDaily[sku]) { skuDaily[sku] = {}; skuTotals[sku] = 0; }
+    skuDaily[sku][d] = (skuDaily[sku][d] || 0) + rev;
+    skuTotals[sku] += rev;
+  });
+  const sorted = Object.entries(skuTotals).sort((a, b) => b[1] - a[1]);
+  const labels = [];
+  const dt = new Date(from + 'T00:00:00'), end = new Date(to + 'T00:00:00');
+  while (dt <= end) { labels.push(dt.toISOString().slice(0, 10)); dt.setDate(dt.getDate() + 1); }
+  const datasets = sorted.map(([sku], i) => ({
+    label: sku.replace('reviana-', '').replace(/^\w/, c => c.toUpperCase()),
+    data: labels.map(d => skuDaily[sku]?.[d] || 0),
+    borderColor: SKU_COLORS[i % SKU_COLORS.length],
+    backgroundColor: 'transparent',
+    borderWidth: 2, tension: 0.3, pointRadius: 0, pointHitRadius: 8,
+  }));
+
+  if (charts.revianaSkuTime) charts.revianaSkuTime.destroy();
+  charts.revianaSkuTime = new Chart(document.getElementById('reviana-sku-time-chart'), {
+    type: 'line', data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true, labels: { color: '#9c9287', font: { size: 11, family: 'DM Sans' }, padding: 8, boxWidth: 12 } },
+        tooltip: { callbacks: { label: ctx => { const v = ctx.parsed.y; if (!v) return ''; return ctx.dataset.label + ': $' + v.toFixed(2); }, title: items => { const d = items[0].label; return new Date(d + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }); } } },
+      },
+      scales: {
+        x: { ticks: { color: '#9c9287', maxTicksLimit: 15, font: { size: 10 }, callback: function(val, i) { const d = labels[i]; return d ? new Date(d + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }) : ''; } }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { color: '#9c9287', callback: v => '$' + (v >= 1000 ? (v/1000).toFixed(1) + 'k' : v) }, grid: { color: 'rgba(51,45,39,0.5)' } },
+      },
+    },
+  });
+}
+
+document.getElementById('reviana-time-from').addEventListener('change', renderRevianaSkuTimeSeries);
+document.getElementById('reviana-time-to').addEventListener('change', renderRevianaSkuTimeSeries);
+document.getElementById('reviana-time-reset').addEventListener('click', function() {
+  document.getElementById('reviana-time-from').value = '';
+  document.getElementById('reviana-time-to').value = '';
+  renderRevianaSkuTimeSeries();
+});
+
+// ── Reviana Conversion Funnel ──
+async function renderRevianaFunnel() {
+  const container = document.getElementById('reviana-funnel-stats');
+  const barsEl = document.getElementById('reviana-funnel-bars');
+  if (!container) return;
+  const [from, to] = getDateRange();
+  const token = currentStaff ? currentStaff.token : '';
+  if (!token) { container.innerHTML = '<div class="loading">Not authenticated</div>'; return; }
+
+  try {
+    // Fetch page-level data and events for Reviana funnel
+    const [pagesRes, eventsRes] = await Promise.all([
+      fetch(`/.netlify/functions/analytics-dashboard?metric=pages&site=PrimalPantry.co.nz&from=${from}&to=${to}&token=${token}`).then(r => r.json()),
+      fetch(`/.netlify/functions/analytics-dashboard?metric=events&site=PrimalPantry.co.nz&from=${from}&to=${to}&token=${token}`).then(r => r.json()),
+    ]);
+
+    const pages = pagesRes.pages || pagesRes || [];
+    const events = eventsRes.events || eventsRes || [];
+
+    // Find Reviana-related page visitors
+    let cosmeticVisitors = 0, productPageVisitors = 0;
+    (Array.isArray(pages) ? pages : []).forEach(p => {
+      const path = (p.page || p.pathname || '').toLowerCase();
+      if (path.includes('/cosmetic-tallow')) cosmeticVisitors += (p.unique_visitors || p.visitors || p.uniques || 0);
+      if (path.includes('reviana') || path.includes('/cosmetic-tallow')) productPageVisitors += (p.unique_visitors || p.visitors || p.uniques || 0);
+    });
+
+    // Events
+    const atcCount = ((Array.isArray(events) ? events : []).find(e => (e.event_name || '').toLowerCase() === 'add to cart') || {}).uniques || 0;
+    const checkoutCount = ((Array.isArray(events) ? events : []).find(e => (e.event_name || '').toLowerCase() === 'proceed to checkout') || {}).uniques || 0;
+    const purchaseCount = ((Array.isArray(events) ? events : []).find(e => (e.event_name || '').toLowerCase() === 'checkout completed') || {}).uniques || 0;
+
+    // Reviana orders from line items (filtered period)
+    const filteredIds = new Set(filteredOrders.map(o => o.id));
+    let revOrders = new Set(), revRev = 0;
+    allLineItems.forEach(li => {
+      if (!(li.sku || '').startsWith('reviana-')) return;
+      if (!filteredIds.has(li.order_id)) return;
+      revOrders.add(li.order_id);
+      revRev += (li.quantity || 1) * Number(li.unit_price || 0);
+    });
+
+    const stages = [
+      { label: 'Landing Page Visitors', value: cosmeticVisitors, color: 'var(--blue)' },
+      { label: 'Product Page Visitors', value: productPageVisitors, color: 'var(--cyan)' },
+      { label: 'Add to Cart', value: atcCount, color: 'var(--sage)' },
+      { label: 'Checkout', value: checkoutCount, color: 'var(--honey)' },
+      { label: 'Reviana Purchases', value: revOrders.size, color: 'var(--green)' },
+    ];
+
+    // Stat cards
+    const convRate = cosmeticVisitors > 0 ? (revOrders.size / cosmeticVisitors * 100).toFixed(1) : '0.0';
+    container.innerHTML = [
+      { label: 'Landing Visitors', value: cosmeticVisitors.toLocaleString(), sub: '/cosmetic-tallow', color: 'var(--blue)' },
+      { label: 'Reviana Sales', value: revOrders.size.toString(), sub: fmt_money(revRev) + ' revenue', color: 'var(--green)' },
+      { label: 'Conversion Rate', value: convRate + '%', sub: 'visitors → purchase', color: Number(convRate) > 3 ? 'var(--green)' : Number(convRate) > 1 ? 'var(--honey)' : 'var(--red)' },
+    ].map(s => `<div class="stat-card"><div class="label">${s.label}</div><div class="value" style="color:${s.color}">${s.value}</div><div class="sub">${s.sub}</div></div>`).join('');
+
+    // Funnel bars
+    const maxVal = Math.max(...stages.map(s => s.value), 1);
+    barsEl.innerHTML = stages.map(s => {
+      const h = Math.max(8, (s.value / maxVal) * 160);
+      return `<div style="flex:1;text-align:center;">
+        <div style="font-size:0.75rem;font-weight:600;color:${s.color};margin-bottom:0.3rem;">${s.value.toLocaleString()}</div>
+        <div style="height:${h}px;background:${s.color};border-radius:4px 4px 0 0;opacity:0.8;"></div>
+        <div style="font-size:0.65rem;color:var(--muted);margin-top:0.3rem;line-height:1.2;">${s.label}</div>
+      </div>`;
+    }).join('');
+
+  } catch (e) {
+    console.error('Reviana funnel error:', e);
+    container.innerHTML = '<div class="loading">Failed to load funnel data</div>';
+  }
+}
+
+// ── Reviana Quick-Add Stats ──
+async function renderRevianaQuickAdd() {
+  const container = document.getElementById('reviana-quickadd-stats');
+  if (!container) return;
+  const [from, to] = getDateRange();
+  const token = currentStaff ? currentStaff.token : '';
+  if (!token) { container.innerHTML = '<div class="loading">Not authenticated</div>'; return; }
+
+  try {
+    const res = await fetch(`/.netlify/functions/analytics-dashboard?metric=events&site=PrimalPantry.co.nz&from=${from}&to=${to}&token=${token}`).then(r => r.json());
+    const events = res.events || res || [];
+    const qaEvent = (Array.isArray(events) ? events : []).find(e => (e.event_name || '').toLowerCase() === 'quick-add-reviana');
+    const clicks = qaEvent ? (qaEvent.uniques || qaEvent.total || 0) : 0;
+    const total = qaEvent ? (qaEvent.total || qaEvent.uniques || 0) : 0;
+
+    container.innerHTML = [
+      { label: 'Quick-Add Clicks', value: clicks.toLocaleString(), sub: 'unique visitors', color: 'var(--honey)' },
+      { label: 'Total Clicks', value: total.toLocaleString(), sub: 'all click events', color: 'var(--muted)' },
+    ].map(s => `<div class="stat-card"><div class="label">${s.label}</div><div class="value" style="color:${s.color}">${s.value}</div><div class="sub">${s.sub}</div></div>`).join('');
+  } catch (e) {
+    console.error('Reviana quick-add error:', e);
+    container.innerHTML = '<div class="loading">No data yet (tracking starts after deploy)</div>';
+  }
+}
 
 // Manufacturing sub-tab switching
 const mfgPanels = ['batches', 'unit-costs', 'sku-performance', 'inventory', 'supplier-orders', 'stripe-products'];

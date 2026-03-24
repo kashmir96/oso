@@ -1154,6 +1154,12 @@
   </div>
 
   <div id="tab-marketing" class="tab-content">
+    <div class="wa-panel-tabs" id="mkt-sub-tabs">
+      <button class="wa-panel-tab active" data-mkt-panel="overview">Overview</button>
+      <button class="wa-panel-tab" data-mkt-panel="reviana">Reviana</button>
+    </div>
+
+    <div id="mkt-panel-overview">
     <div class="stats" id="marketing-stats-grid"></div>
 
     <div class="chart-card" style="margin-bottom:1rem;">
@@ -1544,6 +1550,40 @@
         </table>
       </div>
     </div>
+
+    </div><!-- /mkt-panel-overview -->
+
+    <div id="mkt-panel-reviana" style="display:none;">
+      <div class="orders-card" style="margin-bottom:1.5rem;">
+        <h3>Reviana SKU Revenue Over Time</h3>
+        <div style="display:flex;gap:0.75rem;align-items:center;margin-bottom:0.75rem;flex-wrap:wrap;">
+          <label style="font-size:0.8rem;color:var(--muted);">From</label>
+          <input type="date" id="reviana-time-from" style="background:var(--card);border:1px solid var(--border);color:var(--text);padding:0.3rem 0.5rem;border-radius:4px;font-size:0.8rem;">
+          <label style="font-size:0.8rem;color:var(--muted);">To</label>
+          <input type="date" id="reviana-time-to" style="background:var(--card);border:1px solid var(--border);color:var(--text);padding:0.3rem 0.5rem;border-radius:4px;font-size:0.8rem;">
+          <button id="reviana-time-reset" style="background:var(--card);border:1px solid var(--border);color:var(--muted);padding:0.3rem 0.6rem;border-radius:4px;font-size:0.75rem;cursor:pointer;">Reset to 30d</button>
+        </div>
+        <div class="chart-wrap" style="height:340px;margin-bottom:1rem;">
+          <canvas id="reviana-sku-time-chart"></canvas>
+        </div>
+      </div>
+
+      <div class="orders-card" style="margin-bottom:1.5rem;">
+        <h3>Reviana Conversion Funnel</h3>
+        <p style="font-size:0.8rem;color:var(--muted);margin-bottom:0.75rem;">Visitor journey from landing page through to purchase.</p>
+        <div class="stats" id="reviana-funnel-stats" style="margin-bottom:1rem;">
+          <div class="loading">Loading funnel data...</div>
+        </div>
+        <div id="reviana-funnel-bars" style="display:flex;align-items:flex-end;gap:0.5rem;height:180px;padding:0 1rem;"></div>
+      </div>
+
+      <div class="orders-card" style="margin-bottom:1.5rem;">
+        <h3>Quick-Add Clicks <span style="font-size:0.65rem;color:var(--dim);font-weight:400;">(cross-sell from other pages)</span></h3>
+        <div class="stats" id="reviana-quickadd-stats">
+          <div class="loading">Loading...</div>
+        </div>
+      </div>
+    </div><!-- /mkt-panel-reviana -->
 
     <!-- Recovery Email Preview Modal -->
     <div class="modal-overlay" id="recovery-modal">
