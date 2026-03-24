@@ -153,30 +153,16 @@ exports.handler = async (event) => {
 
     // Ad-level creative performance (with thumbnails)
     if (qs.ads === '1') {
-      // Fetch ad-level insights with creative thumbnail
-      // For /ads endpoint, insights.time_range uses inline JSON without outer encoding
-      // Step 1: Get active campaign IDs
-      const campUrl = `https://graph.facebook.com/v21.0/act_${accountId}/campaigns?fields=id&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE"]}]&limit=500&access_token=${accessToken}`;
-      const campRes = await fetch(campUrl);
-      const campJson = await campRes.json();
-      const activeCampIds = (campJson.data || []).map(c => c.id);
-
-      if (activeCampIds.length === 0) {
-        return reply(200, { ads: [], error: 'No active campaigns' });
-      }
-
-      // Step 2: Fetch active ads within those campaigns
+      // Fetch active ads with their creative thumbnails and insights
       const trInline = `{"since":"${from}","until":"${to}"}`;
-      const campFilter = JSON.stringify([
-        {"field":"campaign.id","operator":"IN","value":activeCampIds},
-        {"field":"ad.effective_status","operator":"IN","value":["ACTIVE"]}
-      ]);
-      const adUrl = `https://graph.facebook.com/v21.0/act_${accountId}/ads?fields=name,status,creative{thumbnail_url},insights.time_range(${trInline}){impressions,clicks,spend,actions,action_values,ctr,cpc}&filtering=${encodeURIComponent(campFilter)}&limit=100&access_token=${accessToken}`;
+      const adUrl = `https://graph.facebook.com/v21.0/act_${accountId}/ads?fields=name,status,creative{thumbnail_url},insights.time_range(${trInline}){impressions,clicks,spend,actions,action_values,ctr,cpc}&filtering=${encodeURIComponent('[{"field":"effective_status","operator":"IN","value":["ACTIVE"]}]')}&limit=100&access_token=${accessToken}`;
+      console.log('[FB Ads] Fetching:', adUrl.replace(accessToken, '***'));
       let adData = [];
       let nextAdUrl = adUrl;
       while (nextAdUrl) {
         const adRes = await fetch(nextAdUrl);
         const adJson = await adRes.json();
+        console.log('[FB Ads] Response:', JSON.stringify({ dataCount: adJson.data?.length, error: adJson.error, hasMore: !!adJson.paging?.next }).slice(0, 500));
         if (adJson.error) {
           console.error('Facebook Ads API error:', adJson.error);
           return reply(200, { ads: [], error: adJson.error.message });
@@ -184,6 +170,7 @@ exports.handler = async (event) => {
         if (adJson.data) adData = adData.concat(adJson.data);
         nextAdUrl = adJson.paging?.next || null;
       }
+      console.log(`[FB Ads] Total ads fetched: ${adData.length}`);
 
       const ads = adData.map(ad => {
         const insights = ad.insights?.data?.[0] || {};
