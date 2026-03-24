@@ -4025,6 +4025,10 @@ function loadAdspendRegions() {
 window.refreshMapLayers = refreshMapLayers;
 function refreshMapLayers() {
   if (!mapInstance) return;
+  // Don't render if map container is hidden/zero-size (causes leaflet-heat IndexSizeError)
+  const mapContainer = mapInstance.getContainer();
+  if (!mapContainer || mapContainer.offsetWidth === 0 || mapContainer.offsetHeight === 0) return;
+  try { mapInstance.invalidateSize(); } catch(e) {}
   const layer = (document.getElementById('map-layer') || {}).value || 'both';
   const adSource = (document.getElementById('map-ad-source') || {}).value || 'all';
   const showOrders = layer === 'orders' || layer === 'both';
@@ -4152,10 +4156,12 @@ function refreshMapLayers() {
       for (let i = 0; i < m.count; i++) heatData.push([m.coords[0], m.coords[1], 1]);
     });
     if (heatData.length > 0) {
-      heatLayer = L.heatLayer(heatData, {
-        radius: 25, blur: 20, maxZoom: 10,
-        gradient: { 0.2: '#3b82f6', 0.4: '#8b5cf6', 0.6: '#ec4899', 0.8: '#f59e0b', 1.0: '#f43f5e' },
-      }).addTo(mapInstance);
+      try {
+        heatLayer = L.heatLayer(heatData, {
+          radius: 25, blur: 20, maxZoom: 10,
+          gradient: { 0.2: '#3b82f6', 0.4: '#8b5cf6', 0.6: '#ec4899', 0.8: '#f59e0b', 1.0: '#f43f5e' },
+        }).addTo(mapInstance);
+      } catch (e) { console.warn('Heatmap render skipped:', e.message); }
     }
 
     orderMarkerData.forEach(m => {
