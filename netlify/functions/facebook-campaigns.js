@@ -208,6 +208,87 @@ exports.handler = async (event) => {
       return reply(200, { ads });
     }
 
+    // ── Sync FB ad names → UTM mappings ──
+    if (qs.sync === 'utm') {
+      const SUPABASE_URL = process.env.SUPABASE_URL;
+      const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
+      const sbHeaders = {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Prefer': 'resolution=merge-duplicates,return=representation',
+      };
+
+      const mappings = [];
+
+      // Load existing mappings to skip already-mapped IDs
+      const existingRes = await fetch(`${SUPABASE_URL}/rest/v1/utm_mappings?select=utm_field,utm_value&platform=eq.facebook`, {
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` },
+      });
+      const existingRows = await existingRes.json();
+      const existingKeys = new Set((existingRows || []).map(r => r.utm_field + '::' + r.utm_value));
+
+      // 1. Campaigns (campaign_id → campaign_name) → utm_campaign
+      const campUrl = `https://graph.facebook.com/v21.0/act_${accountId}/campaigns?fields=id,name&limit=500&access_token=${accessToken}`;
+      let campNext = campUrl;
+      while (campNext) {
+        const r = await fetch(campNext);
+        const j = await r.json();
+        if (j.error) { console.error('[FB sync] campaigns error:', j.error); break; }
+        (j.data || []).forEach(c => {
+          if (c.id && c.name && !existingKeys.has('utm_campaign::' + c.id)) {
+            mappings.push({ utm_field: 'utm_campaign', utm_value: c.id, friendly_name: c.name, platform: 'facebook' });
+          }
+        });
+        campNext = j.paging?.next || null;
+      }
+
+      // 2. Adsets (adset_id → adset_name) → utm_adgroup
+      const adsetUrl = `https://graph.facebook.com/v21.0/act_${accountId}/adsets?fields=id,name&limit=500&access_token=${accessToken}`;
+      let adsetNext = adsetUrl;
+      while (adsetNext) {
+        const r = await fetch(adsetNext);
+        const j = await r.json();
+        if (j.error) { console.error('[FB sync] adsets error:', j.error); break; }
+        (j.data || []).forEach(a => {
+          if (a.id && a.name && !existingKeys.has('utm_adgroup::' + a.id)) {
+            mappings.push({ utm_field: 'utm_adgroup', utm_value: a.id, friendly_name: a.name, platform: 'facebook' });
+          }
+        });
+        adsetNext = j.paging?.next || null;
+      }
+
+      // 3. Ads (ad_id → ad_name) → utm_content
+      const adsUrl = `https://graph.facebook.com/v21.0/act_${accountId}/ads?fields=id,name&limit=500&access_token=${accessToken}`;
+      let adsNext = adsUrl;
+      while (adsNext) {
+        const r = await fetch(adsNext);
+        const j = await r.json();
+        if (j.error) { console.error('[FB sync] ads error:', j.error); break; }
+        (j.data || []).forEach(a => {
+          if (a.id && a.name && !existingKeys.has('utm_content::' + a.id)) {
+            mappings.push({ utm_field: 'utm_content', utm_value: a.id, friendly_name: a.name, platform: 'facebook' });
+          }
+        });
+        adsNext = j.paging?.next || null;
+      }
+
+      // Bulk upsert to utm_mappings
+      if (mappings.length > 0) {
+        // Chunk into batches of 200
+        for (let i = 0; i < mappings.length; i += 200) {
+          const chunk = mappings.slice(i, i + 200);
+          await fetch(`${SUPABASE_URL}/rest/v1/utm_mappings`, {
+            method: 'POST',
+            headers: sbHeaders,
+            body: JSON.stringify(chunk),
+          });
+        }
+      }
+
+      return reply(200, { synced: mappings.length, campaigns: mappings.filter(m => m.utm_field === 'utm_campaign').length, adsets: mappings.filter(m => m.utm_field === 'utm_adgroup').length, ads: mappings.filter(m => m.utm_field === 'utm_content').length });
+    }
+
     const campaigns = allData.map(d => {
       const { conversions, conversions_value } = parseActions(d.actions, d.action_values);
       return {

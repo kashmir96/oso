@@ -7168,6 +7168,52 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     e.target.value = '';
   });
 
+  // ── Sync from Facebook button ──
+  const fbSyncBtn = document.getElementById('utm-map-fb-sync-btn');
+  if (fbSyncBtn) {
+    fbSyncBtn.addEventListener('click', async () => {
+      fbSyncBtn.disabled = true;
+      fbSyncBtn.textContent = 'Syncing...';
+      try {
+        const [from, to] = getDateRange();
+        const tok = encodeURIComponent(currentStaff?.token || '');
+        const res = await fetch(`/.netlify/functions/facebook-campaigns?token=${tok}&from=${from}&to=${to}&sync=utm`);
+        const result = await res.json();
+        fbSyncBtn.textContent = `Synced ${result.synced || 0} new`;
+        if (result.synced > 0) await utmLoadMappings();
+        setTimeout(() => { fbSyncBtn.textContent = 'Sync from Facebook'; fbSyncBtn.disabled = false; }, 3000);
+      } catch (e) {
+        console.error('[FB sync] error:', e);
+        fbSyncBtn.textContent = 'Sync failed';
+        setTimeout(() => { fbSyncBtn.textContent = 'Sync from Facebook'; fbSyncBtn.disabled = false; }, 3000);
+      }
+    });
+  }
+
+  // ── Auto-sync FB UTM mappings every hour ──
+  let _fbUtmLastSync = 0;
+  async function autoSyncFbUtmMappings() {
+    const now = Date.now();
+    if (now - _fbUtmLastSync < 3600000) return; // skip if synced within last hour
+    _fbUtmLastSync = now;
+    try {
+      const [from, to] = getDateRange();
+      const tok = encodeURIComponent(currentStaff?.token || '');
+      const res = await fetch(`/.netlify/functions/facebook-campaigns?token=${tok}&from=${from}&to=${to}&sync=utm`);
+      const result = await res.json();
+      if (result.synced > 0) {
+        console.log(`[FB UTM sync] Auto-synced ${result.synced} new mappings`);
+        await utmLoadMappings();
+      }
+    } catch (e) {
+      console.error('[FB UTM auto-sync] error:', e);
+    }
+  }
+  // Run auto-sync on first UTM load
+  window.addEventListener('load', () => setTimeout(autoSyncFbUtmMappings, 5000));
+  // And every hour
+  setInterval(autoSyncFbUtmMappings, 3600000);
+
   // ── Checkout Errors ──
   async function waLoadCheckoutErrors() {
     const el = document.getElementById('wa-checkout-errors');
