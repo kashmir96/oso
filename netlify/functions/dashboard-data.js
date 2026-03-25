@@ -43,6 +43,7 @@ const ALLOWED_TABLES = new Set([
   'site_changelogs',
   'adspend_hourly',
   'expenses',
+  'tests',
 ]);
 
 const ALLOWED_OPS = new Set(['select', 'insert', 'update', 'delete', 'upsert']);

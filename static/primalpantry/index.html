@@ -951,6 +951,7 @@
       <button class="wa-sub-tab" data-wa-sub="acquisition" onclick="waSetSubTab('acquisition')">Acquisition</button>
       <button class="wa-sub-tab" data-wa-sub="engagement" onclick="waSetSubTab('engagement')">Engagement</button>
       <button class="wa-sub-tab" data-wa-sub="monetisation" onclick="waSetSubTab('monetisation')">Monetisation</button>
+      <button class="wa-sub-tab" data-wa-sub="tests" onclick="waSetSubTab('tests')">Tests</button>
     </div>
 
     <!-- ═══ REALTIME SUB-TAB ═══ -->
@@ -1114,6 +1115,11 @@
       </div>
     </div>
 
+    <!-- Tests sub-tab (Website) -->
+    <div id="wa-sub-tests" class="wa-sub-content" style="display:none;">
+      <div id="tests-panel-website"></div>
+    </div>
+
     <!-- Funnel modal kept as fallback -->
     <div class="wa-fm-overlay" id="wa-fm-overlay" onclick="if(event.target===this)waCloseFunnelModal()">
       <div class="wa-fm-modal">
@@ -1157,6 +1163,7 @@
     <div class="wa-panel-tabs" id="mkt-sub-tabs">
       <button class="wa-panel-tab active" data-mkt-panel="overview">Overview</button>
       <button class="wa-panel-tab" data-mkt-panel="reviana">Reviana</button>
+      <button class="wa-panel-tab" data-mkt-panel="tests">Tests</button>
     </div>
 
     <div id="mkt-panel-overview">
@@ -1584,6 +1591,11 @@
         </div>
       </div>
     </div><!-- /mkt-panel-reviana -->
+
+    <!-- Tests Panel (Marketing) -->
+    <div id="mkt-panel-tests" style="display:none;">
+      <div id="tests-panel-marketing"></div>
+    </div>
 
     <!-- Recovery Email Preview Modal -->
     <div class="modal-overlay" id="recovery-modal">

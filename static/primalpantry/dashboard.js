@@ -6317,7 +6317,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
   // Sub-tab switching
   window.waSetSubTab = function(tab) {
     waSubTab = tab;
-    ['realtime', 'acquisition', 'engagement', 'monetisation'].forEach(t => {
+    ['realtime', 'acquisition', 'engagement', 'monetisation', 'tests'].forEach(t => {
       const el = document.getElementById('wa-sub-' + t);
       if (el) el.style.display = t === tab ? '' : 'none';
     });
@@ -6328,6 +6328,10 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     if (tab === 'engagement' && !waFunnelInlineLoaded && waSite) {
       waFunnelInlineLoaded = true;
       waLoadInlineFunnel();
+    }
+    // Load tests when tests tab shown
+    if (tab === 'tests') {
+      loadTests().then(() => renderTestsPanel('tests-panel-website'));
     }
     // Show realtime panel directly when on realtime tab
     if (tab === 'realtime') {
@@ -8835,7 +8839,7 @@ document.getElementById('mkt-sku-time-reset').addEventListener('click', function
 });
 
 // ── Marketing sub-tab switching ──
-const mktPanels = ['overview', 'reviana'];
+const mktPanels = ['overview', 'reviana', 'tests'];
 document.querySelectorAll('#mkt-sub-tabs .wa-panel-tab').forEach(tab => {
   tab.addEventListener('click', function() {
     document.querySelectorAll('#mkt-sub-tabs .wa-panel-tab').forEach(t => t.classList.remove('active'));
@@ -8849,6 +8853,9 @@ document.querySelectorAll('#mkt-sub-tabs .wa-panel-tab').forEach(tab => {
       renderRevianaSkuTimeSeries();
       renderRevianaFunnel();
       renderRevianaQuickAdd();
+    }
+    if (panel === 'tests') {
+      loadTests().then(() => renderTestsPanel('tests-panel-marketing'));
     }
   });
 });
@@ -13185,3 +13192,334 @@ async function checkActionAlerts() {
     }
   } catch (e) { /* silent */ }
 }
+
+// ════════════════════════════════════════════════════════════════════
+// ── TESTS / EXPERIMENTS FEATURE ──
+// ════════════════════════════════════════════════════════════════════
+
+let allTests = [];
+let testsLoaded = false;
+
+const TEST_METRICS = {
+  revenue:         { label: 'Revenue',         fmt: v => '$' + Number(v||0).toFixed(2) },
+  orders:          { label: 'Orders',          fmt: v => String(Math.round(v||0)) },
+  conversion_rate: { label: 'Conversion Rate', fmt: v => (Number(v||0)).toFixed(2) + '%' },
+  aov:             { label: 'AOV',             fmt: v => '$' + Number(v||0).toFixed(2) },
+  cpa:             { label: 'CPA',             fmt: v => '$' + Number(v||0).toFixed(2) },
+  roas:            { label: 'ROAS',            fmt: v => Number(v||0).toFixed(2) + 'x' },
+  bounce_rate:     { label: 'Bounce Rate',     fmt: v => (Number(v||0)).toFixed(2) + '%' },
+  page_views:      { label: 'Page Views',      fmt: v => String(Math.round(v||0)) },
+};
+
+async function loadTests() {
+  try {
+    const res = await db.from('tests').select('*').order('created_at', { ascending: false });
+    allTests = res.data || [];
+    testsLoaded = true;
+  } catch (e) {
+    console.error('[Tests] Load error:', e);
+    allTests = [];
+  }
+}
+
+function calcMetricValue(metric, fromDate, toDate) {
+  const ords = allOrders.filter(o => o.order_date >= fromDate && (!toDate || o.order_date <= toDate));
+  const rev = ords.reduce((s, o) => s + Number(o.total_value || 0), 0);
+  const cnt = ords.length;
+  switch (metric) {
+    case 'revenue': return rev;
+    case 'orders': return cnt;
+    case 'aov': return cnt > 0 ? rev / cnt : 0;
+    case 'conversion_rate': return 0; // needs analytics — placeholder
+    case 'cpa': return cnt > 0 ? currentAdSpend / cnt : 0;
+    case 'roas': return currentAdSpend > 0 ? rev / currentAdSpend : 0;
+    case 'bounce_rate': return 0; // needs analytics — placeholder
+    case 'page_views': return 0; // needs analytics — placeholder
+    default: return 0;
+  }
+}
+
+function renderTestsPanel(containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+
+  const today = new Date().toISOString().slice(0, 10);
+  const active = allTests.filter(t => t.status === 'active');
+  const paused = allTests.filter(t => t.status === 'paused');
+  const completed = allTests.filter(t => t.status === 'completed');
+
+  // Update current_value for active tests
+  active.forEach(t => {
+    t._currentCalc = calcMetricValue(t.metric, t.start_date, today);
+    t._change = t.baseline_value > 0 ? ((t._currentCalc - t.baseline_value) / t.baseline_value * 100) : 0;
+    t._daysLeft = t.end_date ? Math.max(0, Math.ceil((new Date(t.end_date + 'T00:00:00') - new Date()) / 86400000)) : null;
+  });
+
+  const metricOpts = Object.entries(TEST_METRICS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
+
+  let html = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+      <h3 style="margin:0;">Tests & Experiments</h3>
+      <button id="test-create-btn-${containerId}" class="test-create-btn" style="background:var(--sage);color:#141210;border:none;padding:0.4rem 1rem;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600;">+ New Test</button>
+    </div>
+
+    <!-- Create Test Form (hidden by default) -->
+    <div id="test-form-${containerId}" class="test-form" style="display:none;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1.5rem;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+        <div style="grid-column:1/-1;">
+          <label style="font-size:0.72rem;color:var(--dim);text-transform:uppercase;letter-spacing:0.05em;">Test Name</label>
+          <input type="text" id="test-name-${containerId}" placeholder="e.g. Homepage hero image A/B" style="width:100%;padding:0.4rem 0.6rem;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;font-size:0.85rem;box-sizing:border-box;">
+        </div>
+        <div style="grid-column:1/-1;">
+          <label style="font-size:0.72rem;color:var(--dim);text-transform:uppercase;letter-spacing:0.05em;">Description</label>
+          <textarea id="test-desc-${containerId}" rows="2" placeholder="What are you testing and why?" style="width:100%;padding:0.4rem 0.6rem;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;font-size:0.85rem;resize:vertical;box-sizing:border-box;"></textarea>
+        </div>
+        <div>
+          <label style="font-size:0.72rem;color:var(--dim);text-transform:uppercase;letter-spacing:0.05em;">Variant A (Control)</label>
+          <input type="text" id="test-va-${containerId}" placeholder="e.g. Current hero image" style="width:100%;padding:0.4rem 0.6rem;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;font-size:0.85rem;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:0.72rem;color:var(--dim);text-transform:uppercase;letter-spacing:0.05em;">Variant B (Challenger)</label>
+          <input type="text" id="test-vb-${containerId}" placeholder="e.g. New lifestyle photo" style="width:100%;padding:0.4rem 0.6rem;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;font-size:0.85rem;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:0.72rem;color:var(--dim);text-transform:uppercase;letter-spacing:0.05em;">Metric to Track</label>
+          <select id="test-metric-${containerId}" style="width:100%;padding:0.4rem 0.6rem;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;font-size:0.85rem;">${metricOpts}</select>
+        </div>
+        <div>
+          <label style="font-size:0.72rem;color:var(--dim);text-transform:uppercase;letter-spacing:0.05em;">Start Date</label>
+          <input type="date" id="test-start-${containerId}" value="${today}" style="width:100%;padding:0.4rem 0.6rem;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;font-size:0.85rem;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:0.72rem;color:var(--dim);text-transform:uppercase;letter-spacing:0.05em;">Review Date</label>
+          <input type="date" id="test-end-${containerId}" style="width:100%;padding:0.4rem 0.6rem;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;font-size:0.85rem;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-size:0.72rem;color:var(--dim);text-transform:uppercase;letter-spacing:0.05em;">SMS Notification</label>
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-top:0.25rem;">
+            <input type="checkbox" id="test-sms-${containerId}" style="accent-color:var(--sage);">
+            <label for="test-sms-${containerId}" style="font-size:0.8rem;color:var(--muted);">Notify me when review date arrives</label>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:0.72rem;color:var(--dim);text-transform:uppercase;letter-spacing:0.05em;">Phone Number</label>
+          <input type="tel" id="test-phone-${containerId}" placeholder="+64 21 xxx xxxx" style="width:100%;padding:0.4rem 0.6rem;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;font-size:0.85rem;box-sizing:border-box;">
+        </div>
+      </div>
+      <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem;">
+        <button onclick="document.getElementById('test-form-${containerId}').style.display='none'" style="background:var(--card);border:1px solid var(--border);color:var(--muted);padding:0.4rem 1rem;border-radius:6px;cursor:pointer;font-size:0.8rem;">Cancel</button>
+        <button id="test-save-btn-${containerId}" style="background:var(--sage);color:#141210;border:none;padding:0.4rem 1rem;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600;">Create Test</button>
+      </div>
+    </div>`;
+
+  // Active tests
+  if (active.length > 0 || paused.length > 0) {
+    html += `<div class="test-cards">`;
+    [...active, ...paused].forEach(t => {
+      const m = TEST_METRICS[t.metric] || TEST_METRICS.revenue;
+      const currentVal = t._currentCalc !== undefined ? t._currentCalc : Number(t.current_value || 0);
+      const baseVal = Number(t.baseline_value || 0);
+      const change = t._change || (baseVal > 0 ? ((currentVal - baseVal) / baseVal * 100) : 0);
+      const changeColor = change > 0 ? 'var(--green)' : change < 0 ? 'var(--red)' : 'var(--dim)';
+      const changeArrow = change > 0 ? '↑' : change < 0 ? '↓' : '→';
+      const statusColor = t.status === 'active' ? 'var(--green)' : 'var(--honey)';
+      const daysLeft = t._daysLeft !== null && t._daysLeft !== undefined ? t._daysLeft : (t.end_date ? Math.max(0, Math.ceil((new Date(t.end_date + 'T00:00:00') - new Date()) / 86400000)) : null);
+
+      html += `
+      <div class="test-card" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:0.75rem;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.5rem;">
+          <div>
+            <h4 style="margin:0 0 0.25rem;font-size:0.95rem;">${t.name}</h4>
+            ${t.description ? `<p style="margin:0;font-size:0.78rem;color:var(--dim);">${t.description}</p>` : ''}
+          </div>
+          <span style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.05em;padding:0.15rem 0.5rem;border-radius:10px;background:${statusColor}20;color:${statusColor};font-weight:600;">${t.status}</span>
+        </div>
+
+        ${t.variant_a || t.variant_b ? `
+        <div style="display:flex;gap:1rem;margin-bottom:0.75rem;font-size:0.78rem;">
+          ${t.variant_a ? `<div><span style="color:var(--dim);">A:</span> <span style="color:var(--muted);">${t.variant_a}</span></div>` : ''}
+          ${t.variant_b ? `<div><span style="color:var(--dim);">B:</span> <span style="color:var(--muted);">${t.variant_b}</span></div>` : ''}
+        </div>` : ''}
+
+        <div style="display:flex;gap:1.5rem;align-items:center;margin-bottom:0.75rem;">
+          <div>
+            <div style="font-size:0.65rem;color:var(--dim);text-transform:uppercase;letter-spacing:0.05em;">${m.label}</div>
+            <div style="font-size:1.3rem;font-weight:700;color:var(--text);">${m.fmt(currentVal)}</div>
+          </div>
+          <div>
+            <div style="font-size:0.65rem;color:var(--dim);text-transform:uppercase;letter-spacing:0.05em;">Baseline</div>
+            <div style="font-size:1rem;color:var(--muted);">${m.fmt(baseVal)}</div>
+          </div>
+          <div>
+            <div style="font-size:0.65rem;color:var(--dim);text-transform:uppercase;letter-spacing:0.05em;">Change</div>
+            <div style="font-size:1rem;font-weight:600;color:${changeColor};">${changeArrow} ${Math.abs(change).toFixed(1)}%</div>
+          </div>
+          ${daysLeft !== null ? `
+          <div>
+            <div style="font-size:0.65rem;color:var(--dim);text-transform:uppercase;letter-spacing:0.05em;">Review In</div>
+            <div style="font-size:1rem;color:${daysLeft <= 1 ? 'var(--red)' : 'var(--muted)'};">${daysLeft}d</div>
+          </div>` : ''}
+        </div>
+
+        <div style="display:flex;gap:0.4rem;font-size:0.75rem;">
+          <span style="color:var(--dim);">${t.start_date}${t.end_date ? ' → ' + t.end_date : ''}</span>
+          ${t.notify_sms ? '<span style="color:var(--honey);" title="SMS notification enabled">📱</span>' : ''}
+        </div>
+
+        <div style="display:flex;gap:0.5rem;margin-top:0.75rem;border-top:1px solid var(--border);padding-top:0.75rem;">
+          ${t.status === 'active' ? `<button onclick="updateTestStatus(${t.id},'paused','${containerId}')" style="background:none;border:1px solid var(--border);color:var(--honey);padding:0.25rem 0.6rem;border-radius:4px;cursor:pointer;font-size:0.72rem;">Pause</button>` : ''}
+          ${t.status === 'paused' ? `<button onclick="updateTestStatus(${t.id},'active','${containerId}')" style="background:none;border:1px solid var(--border);color:var(--green);padding:0.25rem 0.6rem;border-radius:4px;cursor:pointer;font-size:0.72rem;">Resume</button>` : ''}
+          <button onclick="completeTest(${t.id},'${containerId}')" style="background:none;border:1px solid var(--border);color:var(--sage);padding:0.25rem 0.6rem;border-radius:4px;cursor:pointer;font-size:0.72rem;">Complete</button>
+          <button onclick="deleteTest(${t.id},'${containerId}')" style="background:none;border:1px solid var(--border);color:var(--red);padding:0.25rem 0.6rem;border-radius:4px;cursor:pointer;font-size:0.72rem;">Delete</button>
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  } else {
+    html += `<div style="text-align:center;padding:2rem;color:var(--dim);font-size:0.85rem;">No active tests. Click "+ New Test" to start an experiment.</div>`;
+  }
+
+  // Completed tests (collapsed)
+  if (completed.length > 0) {
+    html += `
+    <div style="margin-top:1.5rem;">
+      <button id="test-completed-toggle-${containerId}" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.8rem;padding:0;display:flex;align-items:center;gap:0.3rem;">
+        <span class="test-completed-arrow" style="transition:transform 0.2s;">▶</span> Completed Tests (${completed.length})
+      </button>
+      <div id="test-completed-list-${containerId}" style="display:none;margin-top:0.75rem;">`;
+    completed.forEach(t => {
+      const m = TEST_METRICS[t.metric] || TEST_METRICS.revenue;
+      const currentVal = Number(t.current_value || 0);
+      const baseVal = Number(t.baseline_value || 0);
+      const change = baseVal > 0 ? ((currentVal - baseVal) / baseVal * 100) : 0;
+      const changeColor = change > 0 ? 'var(--green)' : change < 0 ? 'var(--red)' : 'var(--dim)';
+      const changeArrow = change > 0 ? '↑' : change < 0 ? '↓' : '→';
+
+      html += `
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:0.75rem;margin-bottom:0.5rem;opacity:0.7;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <span style="font-weight:600;font-size:0.85rem;">${t.name}</span>
+            <span style="font-size:0.72rem;color:var(--dim);margin-left:0.5rem;">${t.start_date} → ${t.end_date || 'N/A'}</span>
+          </div>
+          <div style="display:flex;gap:1rem;align-items:center;">
+            <span style="font-size:0.78rem;color:var(--muted);">${m.label}: ${m.fmt(currentVal)}</span>
+            <span style="font-size:0.78rem;font-weight:600;color:${changeColor};">${changeArrow} ${Math.abs(change).toFixed(1)}%</span>
+            <button onclick="deleteTest(${t.id},'${containerId}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:0.72rem;opacity:0.6;">✕</button>
+          </div>
+        </div>
+        ${t.result_note ? `<p style="margin:0.4rem 0 0;font-size:0.78rem;color:var(--dim);font-style:italic;">${t.result_note}</p>` : ''}
+      </div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  el.innerHTML = html;
+
+  // Wire up create button
+  document.getElementById(`test-create-btn-${containerId}`)?.addEventListener('click', () => {
+    document.getElementById(`test-form-${containerId}`).style.display = '';
+  });
+
+  // Wire up save button
+  document.getElementById(`test-save-btn-${containerId}`)?.addEventListener('click', () => createTest(containerId));
+
+  // Wire up completed toggle
+  const toggleBtn = document.getElementById(`test-completed-toggle-${containerId}`);
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', () => {
+      const list = document.getElementById(`test-completed-list-${containerId}`);
+      const arrow = toggleBtn.querySelector('.test-completed-arrow');
+      if (list.style.display === 'none') {
+        list.style.display = '';
+        arrow.style.transform = 'rotate(90deg)';
+      } else {
+        list.style.display = 'none';
+        arrow.style.transform = '';
+      }
+    });
+  }
+}
+
+async function createTest(containerId) {
+  const name = document.getElementById(`test-name-${containerId}`).value.trim();
+  if (!name) { alert('Please enter a test name'); return; }
+
+  const metric = document.getElementById(`test-metric-${containerId}`).value;
+  const startDate = document.getElementById(`test-start-${containerId}`).value;
+  const endDate = document.getElementById(`test-end-${containerId}`).value;
+
+  // Determine which tab we're on
+  const tab = containerId.includes('marketing') ? 'marketing' : 'website';
+
+  // Snapshot baseline metric
+  const baseline = calcMetricValue(metric, startDate, startDate);
+
+  const testData = {
+    name,
+    description: document.getElementById(`test-desc-${containerId}`).value.trim() || null,
+    variant_a: document.getElementById(`test-va-${containerId}`).value.trim() || null,
+    variant_b: document.getElementById(`test-vb-${containerId}`).value.trim() || null,
+    metric,
+    start_date: startDate,
+    end_date: endDate || null,
+    tab,
+    notify_sms: document.getElementById(`test-sms-${containerId}`).checked,
+    notify_phone: document.getElementById(`test-phone-${containerId}`).value.trim() || null,
+    baseline_value: baseline,
+    current_value: baseline,
+    status: 'active',
+  };
+
+  try {
+    await db.from('tests').insert(testData);
+    await loadTests();
+    renderTestsPanel(containerId);
+  } catch (e) {
+    console.error('[Tests] Create error:', e);
+    alert('Error creating test');
+  }
+}
+
+window.updateTestStatus = async function(id, status, containerId) {
+  try {
+    const updates = { status, updated_at: new Date().toISOString() };
+    await db.from('tests').update(updates).eq('id', id);
+    await loadTests();
+    renderTestsPanel(containerId);
+  } catch (e) {
+    console.error('[Tests] Update error:', e);
+  }
+};
+
+window.completeTest = async function(id, containerId) {
+  const test = allTests.find(t => t.id === id);
+  if (!test) return;
+  const note = prompt('Result / conclusion (optional):');
+  const today = new Date().toISOString().slice(0, 10);
+  const finalValue = calcMetricValue(test.metric, test.start_date, today);
+  try {
+    await db.from('tests').update({
+      status: 'completed',
+      current_value: finalValue,
+      result_note: note || null,
+      end_date: test.end_date || today,
+      updated_at: new Date().toISOString(),
+    }).eq('id', id);
+    await loadTests();
+    renderTestsPanel(containerId);
+  } catch (e) {
+    console.error('[Tests] Complete error:', e);
+  }
+};
+
+window.deleteTest = async function(id, containerId) {
+  if (!confirm('Delete this test?')) return;
+  try {
+    await db.from('tests').delete().eq('id', id);
+    await loadTests();
+    renderTestsPanel(containerId);
+  } catch (e) {
+    console.error('[Tests] Delete error:', e);
+  }
+};
