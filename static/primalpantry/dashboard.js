@@ -385,6 +385,14 @@ const LOADING_QUOTES = [
   { text: "In the midst of chaos, there is also opportunity.", author: "The Art of War" },
   { text: "Victorious warriors win first and then go to war, while defeated warriors go to war first and then seek to win.", author: "The Art of War" },
   { text: "Opportunities multiply as they are seized.", author: "The Art of War" },
+  { text: "You have to increase activity to increase the chances luck strikes you.", author: "Tai Lopez" },
+  { text: "The real enemy is inaction.", author: "Tai Lopez" },
+  { text: "Knowledge is not power, it's potential power. Execution is power.", author: "Tai Lopez" },
+  { text: "Be too busy working on your own grass to notice if someone else's is greener.", author: "Tai Lopez" },
+  { text: "People overestimate what they can do in a day and underestimate what they can do in a year.", author: "Tai Lopez" },
+  { text: "Your network is your net worth.", author: "Tai Lopez" },
+  { text: "Read a book a day. Not all of it, just learn one thing from it.", author: "Tai Lopez" },
+  { text: "The good life is not built overnight. It's built daily.", author: "Tai Lopez" },
 ];
 let _quoteShuffled = [];
 let _quoteIdx = 0;
