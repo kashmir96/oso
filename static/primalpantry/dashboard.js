@@ -13201,14 +13201,16 @@ let allTests = [];
 let testsLoaded = false;
 
 const TEST_METRICS = {
-  revenue:         { label: 'Revenue',         fmt: v => '$' + Number(v||0).toFixed(2) },
-  orders:          { label: 'Orders',          fmt: v => String(Math.round(v||0)) },
-  conversion_rate: { label: 'Conversion Rate', fmt: v => (Number(v||0)).toFixed(2) + '%' },
-  aov:             { label: 'AOV',             fmt: v => '$' + Number(v||0).toFixed(2) },
-  cpa:             { label: 'CPA',             fmt: v => '$' + Number(v||0).toFixed(2) },
-  roas:            { label: 'ROAS',            fmt: v => Number(v||0).toFixed(2) + 'x' },
-  bounce_rate:     { label: 'Bounce Rate',     fmt: v => (Number(v||0)).toFixed(2) + '%' },
-  page_views:      { label: 'Page Views',      fmt: v => String(Math.round(v||0)) },
+  visitors:        { label: 'Visitors',         fmt: v => String(Math.round(v||0)) },
+  conversions:     { label: 'Conversions',      fmt: v => String(Math.round(v||0)) },
+  atc_rate:        { label: 'ATC Rate',         fmt: v => (Number(v||0)).toFixed(2) + '%' },
+  bounce_rate:     { label: 'Bounce Rate',      fmt: v => (Number(v||0)).toFixed(2) + '%' },
+  revenue:         { label: 'Revenue',          fmt: v => '$' + Number(v||0).toFixed(2) },
+  orders:          { label: 'Orders',           fmt: v => String(Math.round(v||0)) },
+  aov:             { label: 'AOV',              fmt: v => '$' + Number(v||0).toFixed(2) },
+  cpa:             { label: 'CPA',              fmt: v => '$' + Number(v||0).toFixed(2) },
+  roas:            { label: 'ROAS',             fmt: v => Number(v||0).toFixed(2) + 'x' },
+  page_views:      { label: 'Page Views',       fmt: v => String(Math.round(v||0)) },
 };
 
 async function loadTests() {
@@ -13222,7 +13224,7 @@ async function loadTests() {
   }
 }
 
-function calcMetricValue(metric, fromDate, toDate) {
+async function calcMetricValue(metric, fromDate, toDate) {
   const ords = allOrders.filter(o => o.order_date >= fromDate && (!toDate || o.order_date <= toDate));
   const rev = ords.reduce((s, o) => s + Number(o.total_value || 0), 0);
   const cnt = ords.length;
@@ -13230,16 +13232,47 @@ function calcMetricValue(metric, fromDate, toDate) {
     case 'revenue': return rev;
     case 'orders': return cnt;
     case 'aov': return cnt > 0 ? rev / cnt : 0;
-    case 'conversion_rate': return 0; // needs analytics — placeholder
     case 'cpa': return cnt > 0 ? currentAdSpend / cnt : 0;
     case 'roas': return currentAdSpend > 0 ? rev / currentAdSpend : 0;
-    case 'bounce_rate': return 0; // needs analytics — placeholder
-    case 'page_views': return 0; // needs analytics — placeholder
+    case 'visitors':
+    case 'conversions':
+    case 'atc_rate':
+    case 'bounce_rate':
+    case 'page_views':
+      return await fetchAnalyticsMetric(metric, fromDate, toDate);
     default: return 0;
   }
 }
 
-function renderTestsPanel(containerId) {
+async function fetchAnalyticsMetric(metric, from, to) {
+  const token = currentStaff ? currentStaff.token : '';
+  if (!token) return 0;
+  try {
+    const [summaryRes, eventsRes] = await Promise.all([
+      fetch(`/.netlify/functions/analytics-dashboard?metric=summary&site=PrimalPantry.co.nz&from=${from}&to=${to}&token=${token}`).then(r => r.json()),
+      fetch(`/.netlify/functions/analytics-dashboard?metric=events&site=PrimalPantry.co.nz&from=${from}&to=${to}&token=${token}`).then(r => r.json()),
+    ]);
+    const s = summaryRes || {};
+    const events = eventsRes.events || eventsRes || [];
+    const visitors = s.unique_visitors || 0;
+    const atcCount = ((Array.isArray(events) ? events : []).find(e => (e.event_name || '').toLowerCase() === 'add to cart') || {}).uniques || 0;
+    const convCount = ((Array.isArray(events) ? events : []).find(e => (e.event_name || '').toLowerCase() === 'checkout completed') || {}).uniques || 0;
+
+    switch (metric) {
+      case 'visitors': return visitors;
+      case 'conversions': return convCount;
+      case 'atc_rate': return visitors > 0 ? (atcCount / visitors * 100) : 0;
+      case 'bounce_rate': return Number(s.bounce_rate || 0);
+      case 'page_views': return s.total_pageviews || 0;
+      default: return 0;
+    }
+  } catch (e) {
+    console.error('[Tests] Analytics fetch error:', e);
+    return 0;
+  }
+}
+
+async function renderTestsPanel(containerId) {
   const el = document.getElementById(containerId);
   if (!el) return;
 
@@ -13249,11 +13282,11 @@ function renderTestsPanel(containerId) {
   const completed = allTests.filter(t => t.status === 'completed');
 
   // Update current_value for active tests
-  active.forEach(t => {
-    t._currentCalc = calcMetricValue(t.metric, t.start_date, today);
+  for (const t of active) {
+    t._currentCalc = await calcMetricValue(t.metric, t.start_date, today);
     t._change = t.baseline_value > 0 ? ((t._currentCalc - t.baseline_value) / t.baseline_value * 100) : 0;
     t._daysLeft = t.end_date ? Math.max(0, Math.ceil((new Date(t.end_date + 'T00:00:00') - new Date()) / 86400000)) : null;
-  });
+  }
 
   const metricOpts = Object.entries(TEST_METRICS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
 
@@ -13282,12 +13315,16 @@ function renderTestsPanel(containerId) {
           <label style="font-size:0.72rem;color:var(--dim);text-transform:uppercase;letter-spacing:0.05em;">Variant B (Challenger)</label>
           <input type="text" id="test-vb-${containerId}" placeholder="e.g. New lifestyle photo" style="width:100%;padding:0.4rem 0.6rem;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;font-size:0.85rem;box-sizing:border-box;">
         </div>
+        <div style="grid-column:1/-1;">
+          <label style="font-size:0.72rem;color:var(--dim);text-transform:uppercase;letter-spacing:0.05em;">Pages to Track <span style="font-weight:400;color:var(--muted);">(optional, comma-separated)</span></label>
+          <input type="text" id="test-pages-${containerId}" placeholder="e.g. /checkout, /cosmetic-tallow" style="width:100%;padding:0.4rem 0.6rem;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;font-size:0.85rem;box-sizing:border-box;">
+        </div>
         <div>
           <label style="font-size:0.72rem;color:var(--dim);text-transform:uppercase;letter-spacing:0.05em;">Metric to Track</label>
           <select id="test-metric-${containerId}" style="width:100%;padding:0.4rem 0.6rem;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;font-size:0.85rem;">${metricOpts}</select>
         </div>
         <div>
-          <label style="font-size:0.72rem;color:var(--dim);text-transform:uppercase;letter-spacing:0.05em;">Start Date</label>
+          <label style="font-size:0.72rem;color:var(--dim);text-transform:uppercase;letter-spacing:0.05em;">Change Date</label>
           <input type="date" id="test-start-${containerId}" value="${today}" style="width:100%;padding:0.4rem 0.6rem;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;font-size:0.85rem;box-sizing:border-box;">
         </div>
         <div>
@@ -13361,8 +13398,9 @@ function renderTestsPanel(containerId) {
           </div>` : ''}
         </div>
 
-        <div style="display:flex;gap:0.4rem;font-size:0.75rem;">
+        <div style="display:flex;gap:0.4rem;font-size:0.75rem;flex-wrap:wrap;">
           <span style="color:var(--dim);">${t.start_date}${t.end_date ? ' → ' + t.end_date : ''}</span>
+          ${t.pages && t.pages.length ? `<span style="color:var(--muted);">· ${t.pages.join(', ')}</span>` : ''}
           ${t.notify_sms ? '<span style="color:var(--honey);" title="SMS notification enabled">📱</span>' : ''}
         </div>
 
@@ -13452,8 +13490,12 @@ async function createTest(containerId) {
   // Determine which tab we're on
   const tab = containerId.includes('marketing') ? 'marketing' : 'website';
 
-  // Snapshot baseline metric
-  const baseline = calcMetricValue(metric, startDate, startDate);
+  // Snapshot baseline: use 30 days before start date
+  const baselineFrom = new Date(new Date(startDate + 'T00:00:00').getTime() - 30 * 86400000).toISOString().slice(0, 10);
+  const baseline = await calcMetricValue(metric, baselineFrom, startDate);
+
+  const pagesRaw = document.getElementById(`test-pages-${containerId}`).value.trim();
+  const pages = pagesRaw ? pagesRaw.split(',').map(p => p.trim()).filter(Boolean) : [];
 
   const testData = {
     name,
@@ -13461,6 +13503,7 @@ async function createTest(containerId) {
     variant_a: document.getElementById(`test-va-${containerId}`).value.trim() || null,
     variant_b: document.getElementById(`test-vb-${containerId}`).value.trim() || null,
     metric,
+    pages,
     start_date: startDate,
     end_date: endDate || null,
     tab,
@@ -13497,7 +13540,7 @@ window.completeTest = async function(id, containerId) {
   if (!test) return;
   const note = prompt('Result / conclusion (optional):');
   const today = new Date().toISOString().slice(0, 10);
-  const finalValue = calcMetricValue(test.metric, test.start_date, today);
+  const finalValue = await calcMetricValue(test.metric, test.start_date, today);
   try {
     await db.from('tests').update({
       status: 'completed',

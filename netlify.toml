@@ -30,6 +30,9 @@
 [functions."changelog-followup"]
   schedule = "0 * * * *"
 
+[functions."test-followup"]
+  schedule = "43 * * * *"
+
 [functions."gmail-sync"]
   schedule = "7 */4 * * *"
 
