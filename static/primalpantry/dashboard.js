@@ -11027,6 +11027,38 @@ async function loadMarketingTab() {
   if(gmcP.length>0){mktGmcPage=1;gmcWrap.style.display='table';gmcLoad.style.display='none';renderMktGmc(gmcP);}
   else if(gSt.connected&&gSt.merchantId){gmcLoad.textContent=gmcD.error||'No products found';gmcLoad.style.display='block';gmcWrap.style.display='none';}
   else{gmcLoad.textContent=gSt.connected?'Enter your Merchant Center ID above':'Connect Google to view product statuses';gmcLoad.style.display='block';gmcWrap.style.display='none';}
+  // ── Quiz Stats ──────────────────────────────────────
+  try {
+    const [quizLeadsRes, quizRefRes, quizBundleOrders] = await Promise.all([
+      db.from('quiz_leads').select('id,created_at,email').gte('created_at', from30 + 'T00:00:00').lte('created_at', to30 + 'T23:59:59').order('created_at', { ascending: true }),
+      db.from('quiz_referrals').select('id,created_at').gte('created_at', from + 'T00:00:00').lte('created_at', to + 'T23:59:59'),
+      db.from('orders').select('id,order_date').eq('quiz_bundle', true).gte('order_date', from).lte('order_date', to),
+    ]);
+    const quizLeads = (quizLeadsRes.data || []);
+    const quizRefs = (quizRefRes.data || []);
+    const quizBundles = (quizBundleOrders.data || []);
+    // Filtered count (date-picker range)
+    const filteredLeads = quizLeads.filter(l => l.created_at >= from + 'T00:00:00' && l.created_at <= to + 'T23:59:59');
+    const withEmail = filteredLeads.filter(l => l.email);
+    document.getElementById('quiz-total').textContent = filteredLeads.length;
+    document.getElementById('quiz-referrals').textContent = quizRefs.length;
+    document.getElementById('quiz-with-email').textContent = withEmail.length;
+    document.getElementById('quiz-bundle-flag').textContent = quizBundles.length;
+    // Timeseries — 30 day rolling
+    const quizByDate = {};
+    quizLeads.forEach(l => { const d = l.created_at.slice(0, 10); quizByDate[d] = (quizByDate[d] || 0) + 1; });
+    const qDates = []; const d30q = new Date(); d30q.setDate(d30q.getDate() - 30);
+    for (let i = 0; i < 30; i++) { const dt = new Date(d30q); dt.setDate(dt.getDate() + i); qDates.push(dt.toISOString().slice(0, 10)); }
+    const qCounts = qDates.map(d => quizByDate[d] || 0);
+    const qLabels = qDates.map(d => { const dt = new Date(d + 'T00:00:00'); return dt.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }); });
+    if (charts.mktQuizTimeseries) charts.mktQuizTimeseries.destroy();
+    charts.mktQuizTimeseries = new Chart(document.getElementById('mkt-quiz-timeseries-chart'), {
+      type: 'bar',
+      data: { labels: qLabels, datasets: [{ label: 'Quiz Submissions', data: qCounts, backgroundColor: 'rgba(107,143,91,0.65)', borderColor: '#6B8F5B', borderWidth: 1, borderRadius: 3 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.parsed.y + ' submissions' } } }, scales: { y: { beginAtZero: true, ticks: { color: '#9c9287', stepSize: 1 }, grid: { color: '#252220' } }, x: { ticks: { color: '#9c9287', maxTicksLimit: 15, font: { size: 10 } }, grid: { display: false } } } }
+    });
+  } catch (e) { console.warn('Quiz stats error:', e); }
+
   mktLastLoaded = Date.now();
   mktLastDateRange = from + '|' + to;
   // Load competitors section

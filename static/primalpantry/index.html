@@ -1176,6 +1176,18 @@
     <div id="mkt-panel-overview">
     <div class="stats" id="marketing-stats-grid"></div>
 
+    <!-- Skin Quiz Stats -->
+    <div class="wa-stats" id="quiz-stats-row" style="margin-bottom:1rem;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:0.75rem 1rem;">
+      <div class="wa-stat"><div class="wa-val" id="quiz-total" style="color:var(--sage);">–</div><div class="wa-lbl">Quiz Submissions</div></div>
+      <div class="wa-stat"><div class="wa-val" id="quiz-referrals" style="color:var(--honey);">–</div><div class="wa-lbl">Word of Mouth (Referrals)</div></div>
+      <div class="wa-stat"><div class="wa-val" id="quiz-with-email" style="color:var(--blue);">–</div><div class="wa-lbl">With Email</div></div>
+      <div class="wa-stat"><div class="wa-val" id="quiz-bundle-flag" style="color:var(--blush);">–</div><div class="wa-lbl">Quiz Bundle Orders</div></div>
+    </div>
+    <div class="chart-card" style="margin-bottom:1rem;">
+      <h3>Quiz Submissions Over Time <span style="font-size:0.7rem;color:var(--dim);font-weight:400;">(30-day rolling)</span></h3>
+      <div class="chart-wrap"><canvas id="mkt-quiz-timeseries-chart"></canvas></div>
+    </div>
+
     <div class="chart-card" style="margin-bottom:1rem;">
       <h3>Ad Spend by Hour of Day <span style="font-size:0.7rem;color:var(--dim);font-weight:400;">(Facebook + Google, stacked)</span></h3>
       <div class="chart-wrap"><canvas id="mkt-hourly-adspend-chart"></canvas></div>

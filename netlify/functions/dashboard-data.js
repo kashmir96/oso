@@ -44,6 +44,8 @@ const ALLOWED_TABLES = new Set([
   'adspend_hourly',
   'expenses',
   'tests',
+  'quiz_leads',
+  'quiz_referrals',
 ]);
 
 const ALLOWED_OPS = new Set(['select', 'insert', 'update', 'delete', 'upsert']);
