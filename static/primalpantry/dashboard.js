@@ -7745,6 +7745,33 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
     }
   }
 
+  // ── Abandoned Cart Recovery Banner (auto-load for marketing tab) ──
+  let acBannerLoaded = false;
+  async function loadAcBanner() {
+    if (acBannerLoaded) return;
+    acBannerLoaded = true;
+    try {
+      const res = await fetch(`${AC_BASE}?days=30`);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      const s = data.summary || {};
+      document.getElementById('acb-total').textContent = s.total || 0;
+      document.getElementById('acb-contacted').textContent = s.contacted || 0;
+      document.getElementById('acb-recovered').textContent = s.recovered || 0;
+    } catch (e) {
+      console.warn('AC banner load failed:', e);
+    }
+  }
+  // Load banner when marketing tab becomes active
+  const _origLoadActiveTab = typeof loadActiveTab === 'function' ? loadActiveTab : null;
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.tab === 'marketing') loadAcBanner();
+    });
+  });
+  // Also load if marketing is the default tab
+  if (activeTab === 'marketing') loadAcBanner();
+
   function renderAbandonedTable() {
     const tbody = document.getElementById('ac-table');
     if (!abandonedCheckouts.length) {
