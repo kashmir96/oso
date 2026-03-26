@@ -1520,13 +1520,15 @@ function renderStats(orders, lineItems) {
       label: 'Reviana Revenue', value: fmt_money(revianaRev), color: 'var(--honey)',
       sub: `${revianaOrders.size} orders`,
       prior: fmtDelta(revianaRev, priorRevianaRev, true),
+      clickAction: 'navigateToRevianaOrders',
     },
   ];
 
   function renderStatCard(s) {
     const sensitive = ['Revenue', 'Profit', 'Total Orders'].includes(s.label);
     const cardId = s.label === 'Revenue' ? ' id="revenue-stat-card"' : '';
-    return `<div class="stat-card${sensitive ? ' sensitive-stat' : ''}"${cardId} onclick="document.querySelectorAll('#stats-grid .stat-card').forEach(c=>c.classList.toggle('expanded',!this.classList.contains('expanded')))">
+    const click = s.clickAction ? s.clickAction + '()' : "document.querySelectorAll('#stats-grid .stat-card').forEach(c=>c.classList.toggle('expanded',!this.classList.contains('expanded')))"; 
+    return `<div class="stat-card${sensitive ? ' sensitive-stat' : ''}"${cardId} style="${s.clickAction ? 'cursor:pointer' : ''}" onclick="${click}">
       <div class="label">${s.label}</div>
       <div class="value" style="color:${s.color}">${s.value}</div>
       <div class="sub">${s.sub}</div>
@@ -4381,6 +4383,21 @@ document.getElementById('nav-hamburger-btn').addEventListener('click', () => {
   navDrawer.classList.contains('open') ? closeNav() : openNav();
 });
 navOverlay.addEventListener('click', closeNav);
+
+// Navigate to Orders tab filtered by Reviana products
+function navigateToRevianaOrders() {
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  const btn = document.querySelector('[data-tab="orders"]');
+  if (btn) btn.classList.add('active');
+  const tab = document.getElementById('tab-orders');
+  if (tab) tab.classList.add('active');
+  activeTab = 'orders';
+  const navLabel = document.getElementById('nav-label');
+  if (navLabel) navLabel.textContent = 'Orders';
+  const searchEl = document.getElementById('order-search');
+  if (searchEl) { searchEl.value = 'reviana'; searchEl.dispatchEvent(new Event('input')); }
+}
 
 document.querySelectorAll('.nav-item').forEach(btn => {
   btn.addEventListener('click', function() {
