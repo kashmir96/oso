@@ -11159,7 +11159,7 @@ async function loadMarketingTab() {
   // Daily timeseries always fetches 30 days for rolling charts
   const d30 = new Date(); d30.setDate(d30.getDate() - 30);
   const from30 = d30.toISOString().slice(0,10), to30 = new Date().toISOString().slice(0,10);
-  const [fbC, gC, fbD, gD, gmcD, trafficBySource, trafficByContent] = await Promise.all([
+  const [fbC, gC, fbD, gD, gmcD, trafficBySource, trafficByContent, quizLeads] = await Promise.all([
     mktApi('facebook-campaigns', { from, to }).catch(() => ({ campaigns: [] })),
     gSt.connected && gSt.adsCustomerId ? mktApi('google-ads', { from, to }).catch(() => ({ campaigns: [] })) : { campaigns: [] },
     mktApi('facebook-campaigns', { from: from30, to: to30, daily: '1' }).catch(() => ({ daily: [] })),
@@ -11167,6 +11167,7 @@ async function loadMarketingTab() {
     gSt.connected && gSt.merchantId ? mktApi('google-merchant', {}).catch(() => ({ products: [] })) : { products: [] },
     mktApi('analytics-dashboard', { site: 'PrimalPantry.co.nz', from, to, metric: 'campaigns', col: 'utm_source' }).catch(() => []),
     mktApi('analytics-dashboard', { site: 'PrimalPantry.co.nz', from, to, metric: 'campaigns', col: 'utm_content' }).catch(() => []),
+    fetchTable('quiz_leads', 'id,order_id,created_at').catch(() => []),
   ]);
   mktAllCampaigns = [...(fbC.campaigns||[]).map(c=>({...c,platform:'facebook'})), ...(gC.campaigns||[]).map(c=>({...c,platform:'google'}))].sort((a,b)=>b.spend-a.spend);
   mktGadsCampaigns = (gC.campaigns||[]).sort((a,b)=>b.spend-a.spend);
@@ -11194,6 +11195,16 @@ async function loadMarketingTab() {
     return (gD.daily||[]).filter(r => r.date === d).reduce((s,r) => s + r.spend, 0);
   });
 
+  // Quiz stats
+  const qlArr = Array.isArray(quizLeads) ? quizLeads : [];
+  const quizTotal = qlArr.length;
+  const quizConverted = qlArr.filter(q => q.order_id).length;
+  const quizConvOrders = qlArr.filter(q => q.order_id).map(q => q.order_id);
+  const quizRev = allOrders.filter(o => quizConvOrders.includes(o.id)).reduce((s,o) => s + Number(o.total_value||0), 0);
+  // Quiz daily spark (submissions per day over last 30 days)
+  const quizByDay = {}; qlArr.forEach(q => { const d = (q.created_at||'').slice(0,10); if (d >= from30) { quizByDay[d] = (quizByDay[d]||0) + 1; } });
+  const quizSpark = sortedDates.map(d => quizByDay[d] || 0);
+
   document.getElementById('marketing-stats-grid').innerHTML = [
     mktStatCard('Total Ad Spend','$'+tSpend.toFixed(2),tImpr.toLocaleString()+' impressions',spSpark.length>1?spSpark:[0],'var(--honey)'),
     mktStatCard('ROAS',tSpend>0?(tRev/tSpend).toFixed(1)+'x':'-','return on ad spend',roSpark.length>1?roSpark:[0],'var(--sage)'),
@@ -11203,6 +11214,9 @@ async function loadMarketingTab() {
     mktStatCard('Avg CPC',tClicks>0?'$'+(tSpend/tClicks).toFixed(2):'-','cost per click',spSpark.length>1?spSpark:[0],'var(--purple)'),
     mktStatCard('Facebook Ads','$'+fbSpend.toFixed(2),Math.round(fbConv)+' conv · CPA '+(fbCPA>0?'$'+fbCPA.toFixed(2):'-'),fbDailySpark.length>1?fbDailySpark:[0],'#4267B2'),
     mktStatCard('Google Ads','$'+gSpend.toFixed(2),Math.round(gConv)+' conv · CPA '+(gCPA>0?'$'+gCPA.toFixed(2):'-'),gDailySpark.length>1?gDailySpark:[0],'#4285F4'),
+    mktStatCard('Quizzes Taken',quizTotal.toLocaleString(),quizConverted+' converted · '+(quizTotal>0?(quizConverted/quizTotal*100).toFixed(1)+'%':'0%')+' CVR',quizSpark.length>1?quizSpark:[0],'var(--teal,#5f9ea0)'),
+    mktStatCard('Quiz Orders',quizConverted.toLocaleString(),'$'+quizRev.toFixed(2)+' revenue',quizSpark.length>1?quizSpark:[0],'var(--teal,#5f9ea0)'),
+    mktStatCard('Quiz Revenue','$'+quizRev.toFixed(2),quizConverted>0?'$'+(quizRev/quizConverted).toFixed(2)+' AOV':'-',quizSpark.length>1?quizSpark:[0],'var(--teal,#5f9ea0)'),
     renderLearningPhaseWidget(gC.campaigns||[]),
   ].join('');
   const fbSp=(fbC.campaigns||[]).reduce((s,c)=>s+c.spend,0),gSp=(gC.campaigns||[]).reduce((s,c)=>s+c.spend,0);const chL=[],chD=[],chC=[];if(fbSp>0){chL.push('Facebook');chD.push(fbSp);chC.push('#4267B2');}if(gSp>0){chL.push('Google Ads');chD.push(gSp);chC.push('#4285F4');}if(!chL.length){chL.push('No data');chD.push(1);chC.push('#332d27');}
