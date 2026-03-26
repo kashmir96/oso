@@ -4691,7 +4691,21 @@ function renderTagPills(email) {
   return html;
 }
 
+// Quiz data lookup by email for customer profiles
+let quizByEmail = {};
+async function loadQuizByEmail() {
+  if (Object.keys(quizByEmail).length) return;
+  try {
+    const res = await db.from('quiz_leads').select('*').not('email', 'is', null).order('created_at', { ascending: false });
+    (res.data || []).forEach(q => {
+      const em = (q.email || '').toLowerCase();
+      if (em && !quizByEmail[em]) quizByEmail[em] = q; // keep most recent
+    });
+  } catch {}
+}
+
 function renderCustomersTab() {
+  loadQuizByEmail(); // fire and forget, will be ready on expand
   const customers = {};
   allOrders.forEach(o => {
     if (!o.email) return;
@@ -4848,6 +4862,21 @@ function renderCustomersTab() {
       <div class="customer-orders-list">
         <div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.5rem;text-transform:uppercase;">Order History (${c.orders.length})</div>
         ${orderItems}
+        ${(() => {
+          const qz = quizByEmail[(c.email || '').toLowerCase()];
+          if (!qz) return '';
+          return `<div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border);">
+            <div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.5rem;text-transform:uppercase;">Quiz Result</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;font-size:0.8rem;">
+              <div><strong>Concerns:</strong> ${(qz.concerns || []).join(', ')}</div>
+              <div><strong>Age:</strong> ${qz.age_group || '-'} / ${qz.gender || '-'}</div>
+              <div><strong>Sensitivity:</strong> ${qz.sensitivity || '-'}/10</div>
+              <div><strong>Preference:</strong> ${qz.preference || '-'}</div>
+              <div style="grid-column:1/-1;"><strong>Areas:</strong> ${(qz.areas || []).join(', ') || '-'}</div>
+              <div style="grid-column:1/-1;"><strong>Products:</strong> ${(qz.recommended_products || []).join(', ') || '-'}</div>
+            </div>
+          </div>`;
+        })()}
         <div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border);">
           <div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.5rem;text-transform:uppercase;">Email History</div>
           <div class="customer-emails-container" data-email="${c.email}" id="cust-emails-${c.email.replace(/[^a-zA-Z0-9]/g, '_')}">
@@ -8937,7 +8966,7 @@ document.getElementById('mkt-sku-time-reset').addEventListener('click', function
 });
 
 // ── Marketing sub-tab switching ──
-const mktPanels = ['overview', 'reviana', 'tests'];
+const mktPanels = ['overview', 'reviana', 'quiz', 'tests'];
 document.querySelectorAll('#mkt-sub-tabs .wa-panel-tab').forEach(tab => {
   tab.addEventListener('click', function() {
     document.querySelectorAll('#mkt-sub-tabs .wa-panel-tab').forEach(t => t.classList.remove('active'));
@@ -8952,10 +8981,239 @@ document.querySelectorAll('#mkt-sub-tabs .wa-panel-tab').forEach(tab => {
       renderRevianaFunnel();
       renderRevianaQuickAdd();
     }
+    if (panel === 'quiz') {
+      renderQuizTab();
+    }
     if (panel === 'tests') {
       loadTests().then(() => renderTestsPanel('tests-panel-marketing'));
     }
   });
+});
+
+// ── Quiz Tab ──
+let quizSubmissions = null;
+let quizPage = 1;
+let quizLiveInterval = null;
+
+async function renderQuizTab() {
+  const [from, to] = getDateRange();
+  const token = currentStaff ? currentStaff.token : '';
+
+  // Load full quiz submissions if not cached
+  if (!quizSubmissions) {
+    try {
+      const res = await db.from('quiz_leads').select('*').order('created_at', { ascending: false }).limit(2000);
+      quizSubmissions = res.data || [];
+    } catch (e) { quizSubmissions = []; }
+  }
+
+  // Build email→customer lookup from orders
+  const customerByEmail = {};
+  allOrders.forEach(o => {
+    if (!o.email) return;
+    const em = o.email.toLowerCase();
+    if (!customerByEmail[em]) customerByEmail[em] = { name: o.customer_name || o.email, orders: 0, spend: 0 };
+    customerByEmail[em].orders++;
+    customerByEmail[em].spend += Number(o.total_value || 0);
+  });
+
+  // Filter by date range
+  const filtered = quizSubmissions.filter(q => {
+    const d = (q.created_at || '').slice(0, 10);
+    return d >= from && d <= to;
+  });
+
+  // Stats
+  const withEmail = filtered.filter(q => q.email);
+  const linkedCustomers = withEmail.filter(q => customerByEmail[(q.email || '').toLowerCase()]);
+  const concernCounts = {};
+  filtered.forEach(q => (q.concerns || []).forEach(c => { concernCounts[c] = (concernCounts[c] || 0) + 1; }));
+  const topConcern = Object.entries(concernCounts).sort((a, b) => b[1] - a[1])[0];
+
+  document.getElementById('quiz-tab-stats').innerHTML = [
+    { label: 'Submissions', value: filtered.length, sub: `${withEmail.length} with email`, color: 'var(--blue)' },
+    { label: 'Linked Customers', value: linkedCustomers.length, sub: `${withEmail.length ? (linkedCustomers.length / withEmail.length * 100).toFixed(0) : 0}% conversion`, color: 'var(--green)' },
+    { label: 'Top Concern', value: topConcern ? topConcern[0] : '-', sub: topConcern ? topConcern[1] + ' submissions' : '', color: 'var(--amber)' },
+    { label: 'Avg Sensitivity', value: filtered.length ? (filtered.reduce((s, q) => s + (q.sensitivity || 0), 0) / filtered.length).toFixed(1) : '-', sub: 'out of 10', color: 'var(--purple)' },
+  ].map(s => `<div class="stat-card"><div class="label">${s.label}</div><div class="value" style="color:${s.color}">${s.value}</div><div class="sub">${s.sub}</div></div>`).join('');
+
+  // Render table
+  renderQuizTable(filtered, customerByEmail);
+
+  // Start realtime polling
+  if (quizLiveInterval) clearInterval(quizLiveInterval);
+  loadQuizLiveVisitors();
+  quizLiveInterval = setInterval(loadQuizLiveVisitors, 15000);
+}
+
+function renderQuizTable(filtered, customerByEmail) {
+  const query = (document.getElementById('quiz-table-search').value || '').toLowerCase();
+  let list = filtered;
+  if (query) {
+    list = list.filter(q => {
+      const text = [q.email, ...(q.concerns || []), ...(q.recommended_products || []), q.age_group, q.gender, q.utm_source, q.preference].filter(Boolean).join(' ').toLowerCase();
+      return text.includes(query);
+    });
+  }
+
+  const tbody = document.getElementById('quiz-submissions-table');
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="10" class="loading">No submissions found</td></tr>';
+    document.getElementById('quiz-submissions-pagination').innerHTML = '';
+    return;
+  }
+
+  const start = (quizPage - 1) * 25;
+  const page = list.slice(start, start + 25);
+
+  tbody.innerHTML = page.map(q => {
+    const em = (q.email || '').toLowerCase();
+    const cust = em ? customerByEmail[em] : null;
+    const custPill = cust
+      ? `<span class="source-pill" style="background:var(--green);color:#fff;cursor:pointer;" onclick="event.stopPropagation(); navigateToCustomer('${em.replace(/'/g, "\\'")}')">${cust.name.split(' ')[0]} (${cust.orders})</span>`
+      : (em ? `<span style="color:var(--dim);font-size:0.75rem;">${em}</span>` : '<span style="color:var(--dim);">-</span>');
+    const concerns = (q.concerns || []).map(c => `<span class="source-pill" style="font-size:0.65rem;">${c}</span>`).join(' ');
+    const products = (q.recommended_products || []).map(p => `<span style="font-size:0.7rem;color:var(--muted);">${p}</span>`).join(', ');
+    const src = q.utm_source || q.referrer || '-';
+    const date = (q.created_at || '').slice(0, 16).replace('T', ' ');
+
+    return `<tr style="cursor:pointer;" onclick="openQuizModal(${q.id})">
+      <td style="white-space:nowrap;font-size:0.75rem;">${date}</td>
+      <td style="font-size:0.75rem;">${q.email || '-'}</td>
+      <td>${q.age_group || '-'}</td>
+      <td>${q.gender || '-'}</td>
+      <td>${concerns}</td>
+      <td>${q.sensitivity || '-'}</td>
+      <td>${q.preference || '-'}</td>
+      <td style="font-size:0.75rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;">${products || '-'}</td>
+      <td>${custPill}</td>
+      <td style="font-size:0.75rem;">${src}</td>
+    </tr>`;
+  }).join('');
+
+  renderPagination('quiz-submissions-pagination', quizPage, list.length, p => { quizPage = p; renderQuizTable(filtered, customerByEmail); }, 25);
+}
+
+// Navigate to customer in Customers tab
+function navigateToCustomer(email) {
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  const btn = document.querySelector('[data-tab="customers"]');
+  if (btn) btn.classList.add('active');
+  const tab = document.getElementById('tab-customers');
+  if (tab) tab.classList.add('active');
+  activeTab = 'customers';
+  const navLabel = document.getElementById('nav-label');
+  if (navLabel) navLabel.textContent = 'Customers';
+  const searchEl = document.getElementById('customer-search');
+  if (searchEl) { searchEl.value = email; searchEl.dispatchEvent(new Event('input')); }
+  renderCustomersTab();
+}
+
+// Quiz detail modal
+function openQuizModal(id) {
+  const q = (quizSubmissions || []).find(s => s.id === id);
+  if (!q) return;
+
+  const customerByEmail = {};
+  allOrders.forEach(o => {
+    if (!o.email) return;
+    const em = o.email.toLowerCase();
+    if (!customerByEmail[em]) customerByEmail[em] = { name: o.customer_name || o.email, orders: 0, spend: 0 };
+    customerByEmail[em].orders++;
+    customerByEmail[em].spend += Number(o.total_value || 0);
+  });
+
+  const em = (q.email || '').toLowerCase();
+  const cust = em ? customerByEmail[em] : null;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay active';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+
+  overlay.innerHTML = `<div style="background:var(--card);border-radius:12px;padding:1.5rem;max-width:600px;width:95%;max-height:85vh;overflow-y:auto;color:var(--text);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+      <h3 style="margin:0;">Quiz Submission</h3>
+      <button onclick="this.closest('.modal-overlay').remove()" style="background:none;border:none;color:var(--dim);font-size:1.2rem;cursor:pointer;">&times;</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;font-size:0.85rem;">
+      <div><strong>Date:</strong> ${(q.created_at || '').slice(0, 16).replace('T', ' ')}</div>
+      <div><strong>Email:</strong> ${q.email || 'Not provided'}</div>
+      <div><strong>Age Group:</strong> ${q.age_group || '-'}</div>
+      <div><strong>Gender:</strong> ${q.gender || '-'}</div>
+      <div><strong>Sensitivity:</strong> ${q.sensitivity || '-'}/10</div>
+      <div><strong>Preference:</strong> ${q.preference || '-'}</div>
+      <div style="grid-column:1/-1;"><strong>Concerns:</strong> ${(q.concerns || []).join(', ') || '-'}</div>
+      <div style="grid-column:1/-1;"><strong>Areas:</strong> ${(q.areas || []).join(', ') || '-'}</div>
+      <div style="grid-column:1/-1;"><strong>Allergens:</strong> ${(q.allergens || []).join(', ') || 'None'}</div>
+      <div style="grid-column:1/-1;"><strong>Tried Before:</strong> ${(q.tried_before || []).join(', ') || '-'}</div>
+      <div style="grid-column:1/-1;"><strong>Recommended Products:</strong> ${(q.recommended_products || []).join(', ') || '-'}</div>
+      <div><strong>Source:</strong> ${q.utm_source || '-'}</div>
+      <div><strong>Medium:</strong> ${q.utm_medium || '-'}</div>
+      <div><strong>Campaign:</strong> ${q.utm_campaign || '-'}</div>
+      <div><strong>Landing Page:</strong> ${q.landing_page || '-'}</div>
+    </div>
+    ${cust ? `<div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border);">
+      <strong>Linked Customer:</strong> ${cust.name} — ${cust.orders} orders, $${cust.spend.toFixed(2)} spent
+      <button class="tl-btn" style="margin-left:0.5rem;" onclick="this.closest('.modal-overlay').remove(); navigateToCustomer('${em.replace(/'/g, "\\'")}')">View Profile</button>
+    </div>` : ''}
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
+// Realtime quiz visitors
+async function loadQuizLiveVisitors() {
+  const container = document.getElementById('quiz-live-visitors');
+  const countEl = document.getElementById('quiz-live-count');
+  if (!container) return;
+  const token = currentStaff ? currentStaff.token : '';
+  try {
+    const res = await fetch('/.netlify/functions/analytics-realtime?site=PrimalPantry.co.nz&token=' + token);
+    const data = await res.json();
+    const visitors = data.visitors || [];
+    // Filter to visitors who have touched quiz pages
+    const quizVisitors = visitors.filter(v => {
+      const pages = v.pages || v.journey || [];
+      return pages.some(p => {
+        const path = (typeof p === 'string' ? p : p.pathname || p.page || '').toLowerCase();
+        return path.includes('quiz') || path.includes('skin-quiz');
+      });
+    });
+
+    countEl.textContent = quizVisitors.length + ' active';
+    if (!quizVisitors.length) {
+      container.innerHTML = '<span style="color:var(--dim);">No visitors on quiz pages right now</span>';
+      return;
+    }
+
+    container.innerHTML = quizVisitors.map(v => {
+      const pages = (v.pages || v.journey || []).map(p => typeof p === 'string' ? p : p.pathname || p.page || '');
+      const currentPage = pages[pages.length - 1] || '?';
+      const ref = v.referrer || v.referrer_domain || 'Direct';
+      const device = v.device_type || v.device || '?';
+      const country = v.country || '';
+      const browser = v.browser || '';
+      return `<div style="display:flex;gap:1rem;align-items:center;padding:0.5rem 0;border-bottom:1px solid var(--border);">
+        <span style="color:var(--green);">&#9679;</span>
+        <span style="flex:1;min-width:0;">
+          <strong>${currentPage}</strong>
+          <span style="color:var(--dim);margin-left:0.5rem;">${pages.length} pages</span>
+        </span>
+        <span style="font-size:0.75rem;color:var(--muted);">${ref}</span>
+        <span style="font-size:0.75rem;color:var(--muted);">${device}</span>
+        <span style="font-size:0.75rem;color:var(--muted);">${country}</span>
+        <span style="font-size:0.75rem;color:var(--muted);">${browser}</span>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    container.innerHTML = '<span style="color:var(--red);">Failed to load</span>';
+  }
+}
+
+document.getElementById('quiz-table-search').addEventListener('input', function() {
+  quizPage = 1;
+  renderQuizTab();
 });
 
 // ── Reviana SKU Time Series (filtered to reviana- SKUs) ──
@@ -11074,6 +11332,32 @@ async function loadMarketingTab() {
       data: { labels: qLabels, datasets: [{ label: 'Quiz Submissions', data: qCounts, backgroundColor: 'rgba(107,143,91,0.65)', borderColor: '#6B8F5B', borderWidth: 1, borderRadius: 3 }] },
       options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.parsed.y + ' submissions' } } }, scales: { y: { beginAtZero: true, ticks: { color: '#9c9287', stepSize: 1 }, grid: { color: '#252220' } }, x: { ticks: { color: '#9c9287', maxTicksLimit: 15, font: { size: 10 } }, grid: { display: false } } } }
     });
+    // Quiz Sources chart — referrer breakdown
+    try {
+      const srcRes = await db.from('quiz_leads').select('utm_source,referrer,landing_page').gte('created_at', from + 'T00:00:00').lte('created_at', to + 'T23:59:59');
+      const srcData = srcRes.data || [];
+      const srcCounts = {};
+      srcData.forEach(l => {
+        let src = l.utm_source || '';
+        if (!src && l.referrer) {
+          try { src = new URL(l.referrer).hostname.replace('www.', ''); } catch(e) { src = l.referrer; }
+        }
+        if (!src) src = 'Direct';
+        srcCounts[src] = (srcCounts[src] || 0) + 1;
+      });
+      const srcLabels = Object.keys(srcCounts).sort((a, b) => srcCounts[b] - srcCounts[a]);
+      const srcVals = srcLabels.map(k => srcCounts[k]);
+      const srcColors = ['#6B8F5B', '#C5A55A', '#8B6F4E', '#9c9287', '#5a7d9a', '#c07c5a', '#7a5c8a'];
+      if (charts.mktQuizSources) charts.mktQuizSources.destroy();
+      const srcCanvas = document.getElementById('mkt-quiz-sources-chart');
+      if (srcCanvas) {
+        charts.mktQuizSources = new Chart(srcCanvas, {
+          type: 'doughnut',
+          data: { labels: srcLabels, datasets: [{ data: srcVals, backgroundColor: srcColors.slice(0, srcLabels.length) }] },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#9c9287', font: { size: 11 } } } } }
+        });
+      }
+    } catch (e) { console.warn('Quiz sources chart error:', e); }
   } catch (e) { console.warn('Quiz stats error:', e); }
 
   mktLastLoaded = Date.now();

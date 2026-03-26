@@ -1163,6 +1163,7 @@
     <div class="wa-panel-tabs" id="mkt-sub-tabs">
       <button class="wa-panel-tab active" data-mkt-panel="overview">Overview</button>
       <button class="wa-panel-tab" data-mkt-panel="reviana">Reviana</button>
+      <button class="wa-panel-tab" data-mkt-panel="quiz">Quiz</button>
       <button class="wa-panel-tab" data-mkt-panel="tests">Tests</button>
     </div>
 
@@ -1182,6 +1183,10 @@
       <div class="wa-stat"><div class="wa-val" id="quiz-referrals" style="color:var(--honey);">–</div><div class="wa-lbl">Word of Mouth (Referrals)</div></div>
       <div class="wa-stat"><div class="wa-val" id="quiz-with-email" style="color:var(--blue);">–</div><div class="wa-lbl">With Email</div></div>
       <div class="wa-stat"><div class="wa-val" id="quiz-bundle-flag" style="color:var(--blush);">–</div><div class="wa-lbl">Quiz Bundle Orders</div></div>
+    </div>
+    <div class="chart-card" style="margin-bottom:1rem;">
+      <h3>Quiz Traffic Sources <span style="font-size:0.7rem;color:var(--dim);font-weight:400;">(where quiz-takers came from)</span></h3>
+      <div class="chart-wrap"><canvas id="mkt-quiz-sources-chart"></canvas></div>
     </div>
     <div class="chart-card" style="margin-bottom:1rem;">
       <h3>Quiz Submissions Over Time <span style="font-size:0.7rem;color:var(--dim);font-weight:400;">(30-day rolling)</span></h3>
@@ -1610,6 +1615,42 @@
         </div>
       </div>
     </div><!-- /mkt-panel-reviana -->
+
+    <!-- Quiz Panel (Marketing) -->
+    <div id="mkt-panel-quiz" style="display:none;">
+      <!-- Realtime quiz visitors -->
+      <div class="orders-card" style="margin-bottom:1.5rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+          <h3 style="margin:0;">Live Quiz Visitors</h3>
+          <span id="quiz-live-count" style="font-size:0.8rem;color:var(--dim);">0 active</span>
+        </div>
+        <div id="quiz-live-visitors" style="font-size:0.8rem;color:var(--dim);">Loading...</div>
+      </div>
+      <!-- Quiz stats -->
+      <div class="stats" id="quiz-tab-stats"></div>
+      <!-- Quiz submissions table -->
+      <div class="orders-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
+          <h3 style="margin:0;">Quiz Submissions</h3>
+          <input type="text" id="quiz-table-search" placeholder="Search email, concern, product..." class="search-input" style="max-width:300px;">
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="orders-table"><thead><tr>
+            <th>Date</th>
+            <th>Email</th>
+            <th>Age</th>
+            <th>Gender</th>
+            <th>Concerns</th>
+            <th>Sensitivity</th>
+            <th>Preference</th>
+            <th>Products Recommended</th>
+            <th>Customer</th>
+            <th>Source</th>
+          </tr></thead><tbody id="quiz-submissions-table"><tr><td colspan="10" class="loading">Loading...</td></tr></tbody></table>
+        </div>
+        <div id="quiz-submissions-pagination"></div>
+      </div>
+    </div>
 
     <!-- Tests Panel (Marketing) -->
     <div id="mkt-panel-tests" style="display:none;">
