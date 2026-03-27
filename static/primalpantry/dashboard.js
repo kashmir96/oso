@@ -1419,10 +1419,10 @@ function renderStats(orders, lineItems) {
   const dailyExpenses = expensesData.reduce((s, e) => s + expenseDailyEquiv(Number(e.amount), e.frequency), 0);
   const periodExpenses = dailyExpenses * periodDays;
   // eShip cost per order (global constant at top of file)
-  const shippedOrders = orders.filter(o => o.fulfillment_status === 'fulfilled' || o.shipping_status === 'shipped' || o.status === 'shipped');
-  const shippedCount = shippedOrders.length || orderCount; // fallback to all orders if status not tracked
+  const shippedOrders = orders.filter(o => o.shipped_at || o.fulfillment_status === 'fulfilled' || o.shipping_status === 'shipped' || o.status === 'shipped');
+  const shippedCount = shippedOrders.length;
   const periodShipping = shippedCount * ESHIP_COST_PER_ORDER;
-  const priorShippedCount = priorOrders.filter(o => o.fulfillment_status === 'fulfilled' || o.shipping_status === 'shipped' || o.status === 'shipped').length || priorOrderCount;
+  const priorShippedCount = priorOrders.filter(o => o.shipped_at || o.fulfillment_status === 'fulfilled' || o.shipping_status === 'shipped' || o.status === 'shipped').length;
   const priorShipping = priorShippedCount * ESHIP_COST_PER_ORDER;
   const avgShipping = orderCount > 0 ? periodShipping / orderCount : 0;
   const profit = revenue - periodCOGS - currentAdSpend - currentRefundTotal - periodExpenses - periodShipping;
@@ -2337,31 +2337,52 @@ function renderHeatmap(orders) {
   const max = Math.max(1, ...grid.flat());
   const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const container = document.getElementById('heatmap-container');
+  const nowDow = now.getDay();
+  const nowHour = now.getHours();
 
   let html = '<div class="heatmap-grid">';
   // Header row
   html += '<div></div>';
-  for (let h = 0; h < 24; h++) html += `<div class="heatmap-header">${h}</div>`;
+  for (let h = 0; h < 24; h++) {
+    const isNowHour = h === nowHour;
+    html += `<div class="heatmap-header" style="${isNowHour ? 'color:var(--green);font-weight:700;' : ''}">${h}</div>`;
+  }
   html += '<div class="heatmap-header" style="font-weight:600;">Total</div>';
 
   for (let d = 0; d < 7; d++) {
-    html += `<div class="heatmap-label">${dayLabels[d]}</div>`;
+    const isToday = d === nowDow;
+    html += `<div class="heatmap-label" style="${isToday ? 'color:var(--green);font-weight:700;' : ''}">${dayLabels[d]}${isToday ? ' ←' : ''}</div>`;
     for (let h = 0; h < 24; h++) {
+      const isFutureToday = isToday && h > nowHour;
+      const isCurrentCell = isToday && h === nowHour;
       const v = grid[d][h];
       const intensity = v / max;
-      const bg = v === 0 ? 'rgba(107,143,91,0.05)' : `rgba(${colorBase},${(0.15 + intensity * 0.85).toFixed(2)})`;
-      let display, tooltip;
-      if (mode === 'revenue') {
-        display = v > 0 ? '$' + Math.round(v) : '';
-        tooltip = `${dayLabels[d]} ${h}:00 — $${v.toFixed(2)} revenue`;
-      } else if (mode === 'cpa') {
-        display = v > 0 ? '$' + v.toFixed(2) : '';
-        tooltip = `${dayLabels[d]} ${h}:00 — ${orderGrid[d][h]} orders, CPA $${v.toFixed(2)}`;
+      let bg, display, tooltip;
+
+      if (isFutureToday) {
+        // Future hours today — show as empty/cleared
+        bg = 'repeating-linear-gradient(45deg,transparent,transparent 3px,rgba(255,255,255,0.03) 3px,rgba(255,255,255,0.03) 6px)';
+        display = '';
+        tooltip = `${dayLabels[d]} ${h}:00 — not yet`;
       } else {
-        display = v || '';
-        tooltip = `${dayLabels[d]} ${h}:00 — ${v} orders`;
+        bg = v === 0 ? 'rgba(107,143,91,0.05)' : `rgba(${colorBase},${(0.15 + intensity * 0.85).toFixed(2)})`;
+        if (mode === 'revenue') {
+          display = v > 0 ? '$' + Math.round(v) : '';
+          tooltip = `${dayLabels[d]} ${h}:00 — $${v.toFixed(2)} revenue`;
+        } else if (mode === 'cpa') {
+          display = v > 0 ? '$' + v.toFixed(2) : '';
+          tooltip = `${dayLabels[d]} ${h}:00 — ${orderGrid[d][h]} orders, CPA $${v.toFixed(2)}`;
+        } else {
+          display = v || '';
+          tooltip = `${dayLabels[d]} ${h}:00 — ${v} orders`;
+        }
       }
-      html += `<div class="heatmap-cell" style="background:${bg}" title="${tooltip}">${display}</div>`;
+
+      let cellStyle = `background:${bg}`;
+      if (isCurrentCell) cellStyle += ';box-shadow:inset 0 0 0 2px var(--green);border-radius:4px';
+      else if (isToday && !isFutureToday) cellStyle += ';box-shadow:inset 0 -2px 0 0 rgba(107,143,91,0.4)';
+
+      html += `<div class="heatmap-cell" style="${cellStyle}" title="${tooltip}">${display}</div>`;
     }
     // Row summary
     let rowSummary;
@@ -2372,7 +2393,8 @@ function renderHeatmap(orders) {
     } else {
       rowSummary = dayOrders[d] || '';
     }
-    html += `<div class="heatmap-cell" style="background:rgba(107,143,91,0.15);font-weight:600;font-size:0.6rem;" title="${dayLabels[d]} total">${rowSummary}</div>`;
+    const rowBg = isToday ? 'rgba(107,143,91,0.25)' : 'rgba(107,143,91,0.15)';
+    html += `<div class="heatmap-cell" style="background:${rowBg};font-weight:600;font-size:0.6rem;" title="${dayLabels[d]} total">${rowSummary}</div>`;
   }
   html += '</div>';
 
