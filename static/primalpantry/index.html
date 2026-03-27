@@ -1196,6 +1196,39 @@
       <div class="wa-stat"><div class="wa-val" id="quiz-with-email" style="color:var(--blue);">–</div><div class="wa-lbl">With Email</div></div>
       <div class="wa-stat"><div class="wa-val" id="quiz-bundle-flag" style="color:var(--blush);">–</div><div class="wa-lbl">Quiz Bundle Orders</div></div>
     </div>
+
+    <!-- Referral Programme -->
+    <div class="wa-stats" id="referral-programme-row" style="margin-bottom:1rem;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:0.75rem 1rem;">
+      <div class="wa-stat" style="flex:0 0 auto;min-width:120px;"><div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--dim);margin-bottom:4px;">🎁 Referral Programme</div><div style="font-size:0.72rem;color:var(--muted);">Friend voucher stats</div></div>
+      <div class="wa-stat"><div class="wa-val" id="ref-sent" style="color:var(--honey);">–</div><div class="wa-lbl">Vouchers Sent</div></div>
+      <div class="wa-stat"><div class="wa-val" id="ref-redeemed" style="color:var(--sage);">–</div><div class="wa-lbl">Vouchers Redeemed</div></div>
+      <div class="wa-stat"><div class="wa-val" id="ref-rate" style="color:var(--blue);">–</div><div class="wa-lbl">Redemption Rate</div></div>
+      <div class="wa-stat"><div class="wa-val" id="ref-leads" style="color:var(--blush);">–</div><div class="wa-lbl">Referral Leads</div></div>
+      <div class="wa-stat"><div class="wa-val" id="ref-converted" style="color:var(--cyan);">–</div><div class="wa-lbl">Leads Converted</div></div>
+    </div>
+
+    <!-- Recent Referrals Table -->
+    <div class="orders-card" id="referral-table-card" style="margin-bottom:1rem;">
+      <h3>Recent Referrals</h3>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Referrer</th><th>Friend</th><th>Friend Code</th><th>Status</th><th>Sent</th></tr></thead>
+          <tbody id="ref-table-body"><tr><td colspan="5" class="loading">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Referral Leads Table -->
+    <div class="orders-card" id="ref-leads-table-card" style="margin-bottom:1.5rem;">
+      <h3>Referral Leads <span style="font-size:0.7rem;color:var(--dim);font-weight:400;">(friends who received a voucher)</span></h3>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Email</th><th>Referred by</th><th>Converted</th><th>Added</th></tr></thead>
+          <tbody id="ref-leads-body"><tr><td colspan="4" class="loading">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
     <div class="chart-card" style="margin-bottom:1rem;">
       <h3>Quiz Traffic Sources <span style="font-size:0.7rem;color:var(--dim);font-weight:400;">(where quiz-takers came from)</span></h3>
       <div class="chart-wrap"><canvas id="mkt-quiz-sources-chart"></canvas></div>

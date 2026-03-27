@@ -11491,6 +11491,47 @@ async function loadMarketingTab() {
     } catch (e) { console.warn('Quiz sources chart error:', e); }
   } catch (e) { console.warn('Quiz stats error:', e); }
 
+  // ── Referral Programme Stats ─────────────────────────
+  try {
+    const [allRefRes, redeemedRefRes, refLeadsRes] = await Promise.all([
+      db.from('quiz_referrals').select('id,referrer_email,friend_email,friend_code,referrer_rewarded,created_at').order('created_at', { ascending: false }).limit(100),
+      db.from('quiz_referrals').select('id').eq('referrer_rewarded', true),
+      db.from('quiz_leads').select('email,referrer,order_id,created_at').eq('utm_source', 'referral').order('created_at', { ascending: false }).limit(100),
+    ]);
+    const allRefs = allRefRes.data || [];
+    const redeemed = redeemedRefRes.data || [];
+    const refLeads = refLeadsRes.data || [];
+    const refConverted = refLeads.filter(l => l.order_id).length;
+    document.getElementById('ref-sent').textContent = allRefs.length || '–';
+    document.getElementById('ref-redeemed').textContent = redeemed.length || '–';
+    document.getElementById('ref-rate').textContent = allRefs.length > 0 ? Math.round((redeemed.length / allRefs.length) * 100) + '%' : '–';
+    document.getElementById('ref-leads').textContent = refLeads.length || '–';
+    document.getElementById('ref-converted').textContent = refConverted || '–';
+    const fmtD = d => d ? new Date(d).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' }) : '–';
+    const refTbody = document.getElementById('ref-table-body');
+    if (allRefs.length === 0) {
+      refTbody.innerHTML = '<tr><td colspan="5" style="padding:12px;color:var(--dim);">No referrals yet</td></tr>';
+    } else {
+      refTbody.innerHTML = allRefs.map(r => {
+        const badge = r.referrer_rewarded
+          ? '<span style="background:rgba(107,143,91,0.2);color:#6B8F5B;padding:2px 8px;border-radius:12px;font-size:0.72rem;font-weight:700;">Redeemed</span>'
+          : '<span style="background:rgba(212,168,75,0.15);color:var(--honey);padding:2px 8px;border-radius:12px;font-size:0.72rem;font-weight:700;">Pending</span>';
+        return '<tr><td>' + (r.referrer_email || '–') + '</td><td>' + (r.friend_email || '–') + '</td><td><code style="font-size:0.75rem;">' + (r.friend_code || '–') + '</code></td><td>' + badge + '</td><td>' + fmtD(r.created_at) + '</td></tr>';
+      }).join('');
+    }
+    const leadsTbody = document.getElementById('ref-leads-body');
+    if (refLeads.length === 0) {
+      leadsTbody.innerHTML = '<tr><td colspan="4" style="padding:12px;color:var(--dim);">No referral leads yet</td></tr>';
+    } else {
+      leadsTbody.innerHTML = refLeads.map(l => {
+        const conv = l.order_id
+          ? '<span style="background:rgba(107,143,91,0.2);color:#6B8F5B;padding:2px 8px;border-radius:12px;font-size:0.72rem;font-weight:700;">Converted</span>'
+          : '<span style="background:rgba(212,168,75,0.15);color:var(--honey);padding:2px 8px;border-radius:12px;font-size:0.72rem;font-weight:700;">Lead</span>';
+        return '<tr><td>' + (l.email || '–') + '</td><td>' + (l.referrer || '–') + '</td><td>' + conv + '</td><td>' + fmtD(l.created_at) + '</td></tr>';
+      }).join('');
+    }
+  } catch(e) { console.error('[referral-stats]', e); }
+
   mktLastLoaded = Date.now();
   mktLastDateRange = from + '|' + to;
   // Load competitors section
