@@ -11297,6 +11297,31 @@ async function loadMarketingTab() {
   const quizByDay = {}; qlArr.forEach(q => { const d = (q.created_at||'').slice(0,10); if (d >= from30) { quizByDay[d] = (quizByDay[d]||0) + 1; } });
   const quizSpark = sortedDates.map(d => quizByDay[d] || 0);
 
+  // ── Cart Upsell Widget — Manuka Soap + Lip Balm add-ons ──
+  (function renderCartUpsellWidget() {
+    const filteredOrderIds = new Set(filteredOrders.map(o => o.id));
+    const totalOrders = filteredOrders.length;
+    // Match by SKU (manuka-soap, lip-manuka-tube) or description fallback
+    const isSoapUpsell  = li => (li.sku||'').toLowerCase().includes('manuka-soap')  || (li.description||'').toLowerCase().includes('manuka honey soap');
+    const isLipUpsell   = li => (li.sku||'').toLowerCase().includes('lip-manuka')   || (li.description||'').toLowerCase().includes('lip') && (li.sku||'').toLowerCase().includes('manuka');
+    const filteredLI = allLineItems.filter(li => filteredOrderIds.has(li.order_id));
+    // Orders containing each upsell
+    const soapOrderIds = new Set(filteredLI.filter(isSoapUpsell).map(li => li.order_id));
+    const lipOrderIds  = new Set(filteredLI.filter(isLipUpsell).map(li => li.order_id));
+    // Revenue from upsell line items only
+    const soapRev = filteredLI.filter(isSoapUpsell).reduce((s,li) => s + (Number(li.unit_price||0) * (li.quantity||1)), 0);
+    const lipRev  = filteredLI.filter(isLipUpsell).reduce((s,li)  => s + (Number(li.unit_price||0) * (li.quantity||1)), 0);
+    const soapRate = totalOrders > 0 ? (soapOrderIds.size / totalOrders * 100).toFixed(1) + '%' : '–';
+    const lipRate  = totalOrders > 0 ? (lipOrderIds.size  / totalOrders * 100).toFixed(1) + '%' : '–';
+    document.getElementById('upsell-soap-orders').textContent = soapOrderIds.size.toLocaleString();
+    document.getElementById('upsell-soap-rev').textContent    = '$' + soapRev.toFixed(2);
+    document.getElementById('upsell-soap-rate').textContent   = soapRate;
+    document.getElementById('upsell-lip-orders').textContent  = lipOrderIds.size.toLocaleString();
+    document.getElementById('upsell-lip-rev').textContent     = '$' + lipRev.toFixed(2);
+    document.getElementById('upsell-lip-rate').textContent    = lipRate;
+    document.getElementById('upsell-total-rev').textContent   = '$' + (soapRev + lipRev).toFixed(2);
+  })();
+
   document.getElementById('marketing-stats-grid').innerHTML = [
     mktStatCard('Total Ad Spend','$'+tSpend.toFixed(2),tImpr.toLocaleString()+' impressions',spSpark.length>1?spSpark:[0],'var(--honey)'),
     mktStatCard('ROAS',tSpend>0?(tRev/tSpend).toFixed(1)+'x':'-','return on ad spend',roSpark.length>1?roSpark:[0],'var(--sage)'),
