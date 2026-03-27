@@ -11259,7 +11259,7 @@ async function loadMarketingTab() {
     gSt.connected && gSt.merchantId ? mktApi('google-merchant', {}).catch(() => ({ products: [] })) : { products: [] },
     mktApi('analytics-dashboard', { site: 'PrimalPantry.co.nz', from, to, metric: 'campaigns', col: 'utm_source' }).catch(() => []),
     mktApi('analytics-dashboard', { site: 'PrimalPantry.co.nz', from, to, metric: 'campaigns', col: 'utm_content' }).catch(() => []),
-    fetchTable('quiz_leads', 'id,order_id,created_at').catch(() => []),
+    db.from('quiz_leads').select('id,order_id,created_at').catch(() => []),
   ]);
   mktAllCampaigns = [...(fbC.campaigns||[]).map(c=>({...c,platform:'facebook'})), ...(gC.campaigns||[]).map(c=>({...c,platform:'google'}))].sort((a,b)=>b.spend-a.spend);
   mktGadsCampaigns = (gC.campaigns||[]).sort((a,b)=>b.spend-a.spend);
