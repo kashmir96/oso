@@ -9062,10 +9062,80 @@ async function renderQuizTab() {
   // Render table
   renderQuizTable(filtered, customerByEmail);
 
+  // Load drop-off funnel
+  loadQuizFunnel();
+
   // Start realtime polling
   if (quizLiveInterval) clearInterval(quizLiveInterval);
   loadQuizLiveVisitors();
   quizLiveInterval = setInterval(loadQuizLiveVisitors, 15000);
+}
+
+async function loadQuizFunnel() {
+  const container = document.getElementById('quiz-funnel-container');
+  const rateEl = document.getElementById('quiz-funnel-rate');
+  if (!container) return;
+
+  try {
+    // Fetch last 30 days of quiz_sessions
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 30);
+    const cutoffStr = cutoff.toISOString();
+
+    const sessions = await db.from('quiz_sessions').select('step_index,step_name,completed,created_at')
+      .gte('created_at', cutoffStr).then(r => r.data || []).catch(() => []);
+
+    if (!sessions.length) {
+      container.innerHTML = '<div style="color:var(--dim);font-size:0.8rem;">No session data yet — data will appear as users take the quiz.</div>';
+      return;
+    }
+
+    const stepLabels = ['Age', 'Concerns', 'Tried Before', 'Tallow Feedback', 'Problem Areas', 'Severity', 'Sensitivity & Allergens', 'Hydration', 'Email', 'Completed'];
+    const totalStarts = sessions.length;
+    const totalCompleted = sessions.filter(s => s.completed).length;
+
+    // Count how many reached each step (max step_index per session)
+    const sessionMaxStep = {};
+    sessions.forEach(s => {
+      const key = s.session_id || (s.created_at + s.step_index);
+      const idx = s.completed ? 99 : (s.step_index || 0);
+      if (sessionMaxStep[key] === undefined || idx > sessionMaxStep[key]) {
+        sessionMaxStep[key] = s.completed ? 99 : idx;
+      }
+    });
+
+    // Count by step
+    const stepCounts = {};
+    Object.values(sessionMaxStep).forEach(maxIdx => {
+      for (let i = 0; i <= Math.min(maxIdx, 8); i++) {
+        stepCounts[i] = (stepCounts[i] || 0) + 1;
+      }
+      if (maxIdx === 99) stepCounts[9] = (stepCounts[9] || 0) + 1;
+    });
+
+    const maxCount = stepCounts[0] || totalStarts || 1;
+    if (rateEl) rateEl.textContent = totalCompleted + ' completed · ' + Math.round(totalCompleted / totalStarts * 100) + '% completion';
+
+    let html = '';
+    for (let i = 0; i <= 9; i++) {
+      const count = stepCounts[i] || 0;
+      const pct = Math.round(count / maxCount * 100);
+      const dropPct = i > 0 ? Math.round((1 - count / (stepCounts[i-1] || count)) * 100) : 0;
+      const isLast = i === 9;
+      const barColor = isLast ? 'var(--sage)' : (dropPct > 30 ? 'var(--red,#e05252)' : 'var(--blue)');
+      html += `<div style="display:flex;align-items:center;gap:10px;font-size:0.78rem;">
+        <div style="width:120px;flex-shrink:0;color:var(--text);">${stepLabels[i]}</div>
+        <div style="flex:1;background:var(--border);border-radius:4px;overflow:hidden;height:18px;">
+          <div style="width:${pct}%;height:100%;background:${barColor};border-radius:4px;transition:width 0.4s;"></div>
+        </div>
+        <div style="width:40px;text-align:right;font-weight:600;color:var(--text);">${count}</div>
+        ${i > 0 && dropPct > 0 ? `<div style="width:52px;text-align:right;font-size:0.68rem;color:${dropPct > 30 ? 'var(--red,#e05252)' : 'var(--dim)'};">−${dropPct}%</div>` : '<div style="width:52px;"></div>'}
+      </div>`;
+    }
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = '<div style="color:var(--dim);font-size:0.8rem;">Could not load funnel data.</div>';
+  }
 }
 
 function renderQuizTable(filtered, customerByEmail) {
