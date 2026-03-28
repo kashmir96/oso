@@ -47,6 +47,14 @@ const ALLOWED_TABLES = new Set([
   'quiz_leads',
   'quiz_referrals',
   'quiz_sessions',
+  'loyalty_points',
+  'loyalty_settings',
+  'loyalty_spins',
+  'affiliates',
+  'affiliate_orders',
+  'affiliate_payouts',
+  'affiliate_tokens',
+  'affiliate_clicks',
 ]);
 
 const ALLOWED_OPS = new Set(['select', 'insert', 'update', 'delete', 'upsert']);

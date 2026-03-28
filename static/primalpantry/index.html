@@ -1165,6 +1165,8 @@
       <button class="wa-panel-tab" data-mkt-panel="reviana">Reviana</button>
       <button class="wa-panel-tab" data-mkt-panel="quiz">Quiz</button>
       <button class="wa-panel-tab" data-mkt-panel="tests">Tests</button>
+      <button class="wa-panel-tab" data-mkt-panel="loyalty">Loyalty</button>
+      <button class="wa-panel-tab" data-mkt-panel="affiliates">Affiliates</button>
     </div>
 
     <!-- Abandoned Cart Recovery Banner -->
@@ -1713,6 +1715,102 @@
     <div id="mkt-panel-tests" style="display:none;">
       <div id="tests-panel-marketing"></div>
     </div>
+
+    <!-- Loyalty Panel -->
+    <div id="mkt-panel-loyalty" style="display:none;">
+
+      <!-- Stats row -->
+      <div class="orders-card" style="margin-bottom:1.5rem;">
+        <h3>PrimalPoints Overview</h3>
+        <div class="wa-stats" style="margin-top:1rem;">
+          <div class="wa-stat"><div class="wa-val" id="loy-stat-issued">–</div><div class="wa-lbl">Points Issued</div></div>
+          <div class="wa-stat"><div class="wa-val" id="loy-stat-redeemed">–</div><div class="wa-lbl">Redeemed</div></div>
+          <div class="wa-stat"><div class="wa-val" id="loy-stat-outstanding">–</div><div class="wa-lbl">Outstanding</div></div>
+          <div class="wa-stat"><div class="wa-val" id="loy-stat-customers">–</div><div class="wa-lbl">Customers</div></div>
+        </div>
+      </div>
+
+      <!-- Settings card -->
+      <div class="orders-card" style="margin-bottom:1.5rem;">
+        <h3>Settings</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-top:1rem;">
+          <label class="loy-field">
+            <span>Points per $1 spent</span>
+            <input type="number" id="loy-set-ppd" value="100" min="1">
+          </label>
+          <label class="loy-field">
+            <span>Points needed per $1 off</span>
+            <input type="number" id="loy-set-pdr" value="100" min="1">
+          </label>
+          <label class="loy-field">
+            <span>Min redemption (pts)</span>
+            <input type="number" id="loy-set-min" value="500" min="100">
+          </label>
+        </div>
+        <div style="display:flex;align-items:center;gap:1rem;margin-top:1rem;flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:0.875rem;cursor:pointer;">
+            <input type="checkbox" id="loy-set-dp-active" onchange="loyToggleDoublePoints()"> Double points active
+          </label>
+          <input type="text" id="loy-set-dp-sku" placeholder="SKU (blank = all)" style="width:140px;opacity:0.5;" disabled>
+          <input type="datetime-local" id="loy-set-dp-until" placeholder="Until" style="width:170px;opacity:0.5;" disabled>
+        </div>
+        <div style="margin-top:1rem;display:flex;gap:8px;align-items:center;">
+          <button class="action-btn" onclick="loySaveSettings()">Save Settings</button>
+          <span id="loy-set-msg" style="font-size:0.8rem;color:var(--green);"></span>
+        </div>
+      </div>
+
+      <!-- Customer lookup -->
+      <div class="orders-card" style="margin-bottom:1.5rem;">
+        <h3>Customer Lookup</h3>
+        <div style="display:flex;gap:8px;margin-top:1rem;flex-wrap:wrap;">
+          <input type="email" id="loy-lookup-email" placeholder="customer@email.com" style="flex:1;min-width:200px;" onkeydown="if(event.key==='Enter')loyLookup()">
+          <button class="action-btn" onclick="loyLookup()">Look up</button>
+        </div>
+        <div id="loy-lookup-result" style="margin-top:1rem;"></div>
+      </div>
+
+      <!-- Bulk actions -->
+      <div class="orders-card" style="margin-bottom:1.5rem;">
+        <h3>Bulk Actions</h3>
+        <p style="font-size:0.82rem;color:var(--muted);margin:0.5rem 0 1rem;">One email per line</p>
+        <textarea id="loy-bulk-emails" rows="4" placeholder="alice@email.com&#10;bob@email.com" style="width:100%;font-size:0.85rem;resize:vertical;"></textarea>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:0.75rem;align-items:center;">
+          <button class="action-btn" onclick="loyBulkSpin()">Send Spin Invites</button>
+          <button class="action-btn" onclick="loyBulkBalance()">Send Balance Emails</button>
+          <input type="number" id="loy-bulk-pts" placeholder="Bonus pts" style="width:110px;" min="1">
+          <input type="text" id="loy-bulk-desc" placeholder="Bonus reason" style="width:160px;">
+          <button class="action-btn" onclick="loyBulkBonus()">Award Bonus</button>
+        </div>
+        <div id="loy-bulk-msg" style="font-size:0.82rem;margin-top:0.5rem;"></div>
+      </div>
+
+      <!-- Leaderboard -->
+      <div class="orders-card" style="margin-bottom:1.5rem;">
+        <h3>Points Leaderboard <span style="font-size:0.78rem;font-weight:400;color:var(--muted);">(top 20 active balances)</span></h3>
+        <div id="loy-leaderboard" style="margin-top:1rem;">Loading...</div>
+      </div>
+
+      <!-- Transaction log -->
+      <div class="orders-card" style="margin-bottom:1.5rem;">
+        <h3>Transaction Log</h3>
+        <div style="display:flex;gap:8px;margin-top:0.75rem;flex-wrap:wrap;align-items:center;">
+          <select id="loy-log-type" onchange="loyLoadLog()" style="font-size:0.85rem;">
+            <option value="">All types</option>
+            <option value="purchase">Purchase</option>
+            <option value="spin">Spin</option>
+            <option value="bonus">Bonus</option>
+            <option value="redeem">Redeem</option>
+            <option value="expire">Expire</option>
+          </select>
+          <button class="action-btn" onclick="loyExpirePoints()" style="margin-left:auto;">Run Expiry Sweep</button>
+        </div>
+        <div id="loy-log" style="margin-top:1rem;overflow-x:auto;">Loading...</div>
+      </div>
+
+    </div><!-- /mkt-panel-loyalty -->
+
+    <div id="mkt-panel-affiliates" style="display:none;"></div>
 
     <!-- Recovery Email Preview Modal -->
     <div class="modal-overlay" id="recovery-modal">

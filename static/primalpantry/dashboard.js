@@ -8988,7 +8988,7 @@ document.getElementById('mkt-sku-time-reset').addEventListener('click', function
 });
 
 // ── Marketing sub-tab switching ──
-const mktPanels = ['overview', 'reviana', 'quiz', 'tests'];
+const mktPanels = ['overview', 'reviana', 'quiz', 'tests', 'loyalty', 'affiliates'];
 document.querySelectorAll('#mkt-sub-tabs .wa-panel-tab').forEach(tab => {
   tab.addEventListener('click', function() {
     document.querySelectorAll('#mkt-sub-tabs .wa-panel-tab').forEach(t => t.classList.remove('active'));
@@ -9009,8 +9009,246 @@ document.querySelectorAll('#mkt-sub-tabs .wa-panel-tab').forEach(tab => {
     if (panel === 'tests') {
       loadTests().then(() => renderTestsPanel('tests-panel-marketing'));
     }
+    if (panel === 'loyalty') {
+      loyLoadPanel();
+    }
+    if (panel === 'affiliates') {
+      loadAffiliatesPanel();
+    }
   });
 });
+
+// ═══════════════════════════════════════════════════
+// AFFILIATES PANEL
+// ═══════════════════════════════════════════════════
+let allAffiliates = [];
+let allAffiliateOrders = [];
+let allAffiliatePayouts = [];
+
+async function loadAffiliatesPanel() {
+  const panel = document.getElementById('mkt-panel-affiliates');
+  if (!panel) return;
+  panel.innerHTML = '<p style="padding:20px;opacity:.6;">Loading affiliates...</p>';
+
+  const [affRes, aoRes, apRes] = await Promise.all([
+    db.from('affiliates').select('*').order('created_at', { ascending: false }),
+    db.from('affiliate_orders').select('*').order('created_at', { ascending: false }),
+    db.from('affiliate_payouts').select('*').order('created_at', { ascending: false }),
+  ]);
+
+  allAffiliates = affRes.data || [];
+  allAffiliateOrders = aoRes.data || [];
+  allAffiliatePayouts = apRes.data || [];
+
+  renderAffiliatesPanel();
+}
+
+function renderAffiliatesPanel() {
+  const panel = document.getElementById('mkt-panel-affiliates');
+  const pending = allAffiliates.filter(a => a.status === 'pending');
+  const approved = allAffiliates.filter(a => a.status === 'approved');
+  const totalRevenue = allAffiliateOrders.reduce((s, o) => s + (Number(o.order_total) || 0), 0);
+  const totalCommission = allAffiliateOrders.reduce((s, o) => s + (Number(o.commission_amount) || 0), 0);
+  const totalPaid = allAffiliatePayouts.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+
+  let html = '';
+
+  // Stats row
+  html += '<div class="wa-stats" style="margin-bottom:1rem;">';
+  html += `<div class="wa-stat"><div class="wa-val">${allAffiliates.length}</div><div class="wa-lbl">Total Affiliates</div></div>`;
+  html += `<div class="wa-stat"><div class="wa-val" style="color:${pending.length > 0 ? 'var(--amber)' : ''}">${pending.length}</div><div class="wa-lbl">Pending</div></div>`;
+  html += `<div class="wa-stat"><div class="wa-val" style="color:var(--sage)">${approved.length}</div><div class="wa-lbl">Active</div></div>`;
+  html += `<div class="wa-stat"><div class="wa-val">$${totalRevenue.toFixed(2)}</div><div class="wa-lbl">Affiliate Revenue</div></div>`;
+  html += `<div class="wa-stat"><div class="wa-val" style="color:${(totalCommission - totalPaid) > 0 ? 'var(--amber)' : ''}">$${(totalCommission - totalPaid).toFixed(2)}</div><div class="wa-lbl">Commission Owed</div></div>`;
+  html += `<div class="wa-stat"><div class="wa-val">$${totalPaid.toFixed(2)}</div><div class="wa-lbl">Paid Out</div></div>`;
+  html += '</div>';
+
+  // Pending applications
+  if (pending.length > 0) {
+    html += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:1rem;">';
+    html += `<h3 style="margin:0 0 .75rem;font-size:.85rem;">Pending Applications (${pending.length})</h3>`;
+    html += '<div style="overflow-x:auto;"><table class="wa-tbl"><thead><tr><th>Date</th><th>Name</th><th>Email</th><th>Social</th><th>Website</th><th>Audience</th><th>Why</th><th>Actions</th></tr></thead><tbody>';
+    pending.forEach(a => {
+      html += '<tr>';
+      html += `<td>${new Date(a.created_at).toLocaleDateString('en-NZ')}</td>`;
+      html += `<td>${esc(a.name)}</td>`;
+      html += `<td>${esc(a.email)}</td>`;
+      html += `<td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(a.social_links || '-')}</td>`;
+      html += `<td>${a.website ? `<a href="${esc(a.website)}" target="_blank" style="color:var(--sage);">View</a>` : '-'}</td>`;
+      html += `<td>${esc(a.audience_size || '-')}</td>`;
+      html += `<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(a.reason || '')}">${esc(a.reason || '-')}</td>`;
+      html += '<td style="white-space:nowrap;">';
+      html += `<button class="wa-btn-sm" style="background:var(--sage);color:#fff;margin-right:4px;" onclick="approveAffiliate(${a.id})">Approve</button>`;
+      html += `<button class="wa-btn-sm" style="background:var(--red);color:#fff;" onclick="rejectAffiliate(${a.id})">Reject</button>`;
+      html += '</td></tr>';
+    });
+    html += '</tbody></table></div></div>';
+  }
+
+  // All affiliates
+  html += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1rem;">';
+  html += '<h3 style="margin:0 0 .75rem;font-size:.85rem;">All Affiliates</h3>';
+  if (allAffiliates.length === 0) {
+    html += '<p style="opacity:.5;font-size:.8rem;">No affiliates yet.</p>';
+  } else {
+    html += '<div style="overflow-x:auto;"><table class="wa-tbl"><thead><tr><th>Name</th><th>Code</th><th>Status</th><th>Orders</th><th>Revenue</th><th>Commission</th><th>Paid</th><th>Balance</th></tr></thead><tbody>';
+    allAffiliates.forEach(a => {
+      const affOrders = allAffiliateOrders.filter(o => o.affiliate_id === a.id);
+      const affPayouts = allAffiliatePayouts.filter(p => p.affiliate_id === a.id);
+      const rev = affOrders.reduce((s, o) => s + (Number(o.order_total) || 0), 0);
+      const comm = affOrders.reduce((s, o) => s + (Number(o.commission_amount) || 0), 0);
+      const paid = affPayouts.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+      const statusColor = a.status === 'approved' ? 'var(--sage)' : (a.status === 'pending' ? 'var(--amber)' : 'var(--red)');
+
+      html += `<tr style="cursor:pointer;" onclick="openAffiliateModal(${a.id})">`;
+      html += `<td>${esc(a.name)}</td>`;
+      html += `<td><code style="font-size:.75rem;">${esc(a.affiliate_code || '-')}</code></td>`;
+      html += `<td><span style="color:${statusColor};font-weight:600;">${a.status}</span></td>`;
+      html += `<td>${affOrders.length}</td>`;
+      html += `<td>$${rev.toFixed(2)}</td>`;
+      html += `<td>$${comm.toFixed(2)}</td>`;
+      html += `<td>$${paid.toFixed(2)}</td>`;
+      html += `<td style="font-weight:600;">$${(comm - paid).toFixed(2)}</td>`;
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+  html += '</div>';
+
+  panel.innerHTML = html;
+}
+
+async function approveAffiliate(id) {
+  if (!confirm('Approve this affiliate? This will create their Stripe promo code and send a welcome email.')) return;
+  try {
+    const res = await fetch('https://www.primalpantry.co.nz/.netlify/functions/affiliate-admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'approve', affiliate_id: id, token: currentStaff.token }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    showToast('Affiliate approved! Welcome email sent.');
+    loadAffiliatesPanel();
+  } catch (e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+async function rejectAffiliate(id) {
+  if (!confirm('Reject this application?')) return;
+  try {
+    const res = await fetch('https://www.primalpantry.co.nz/.netlify/functions/affiliate-admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reject', affiliate_id: id, token: currentStaff.token }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    showToast('Application rejected.');
+    loadAffiliatesPanel();
+  } catch (e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+function openAffiliateModal(id) {
+  const aff = allAffiliates.find(a => a.id === id);
+  if (!aff) return;
+  const affOrders = allAffiliateOrders.filter(o => o.affiliate_id === id);
+  const affPayouts = allAffiliatePayouts.filter(p => p.affiliate_id === id);
+  const rev = affOrders.reduce((s, o) => s + (Number(o.order_total) || 0), 0);
+  const comm = affOrders.reduce((s, o) => s + (Number(o.commission_amount) || 0), 0);
+  const paid = affPayouts.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+
+  let h = '<div style="max-width:700px;">';
+  h += `<h2 style="margin:0 0 4px;">${esc(aff.name)}</h2>`;
+  h += `<p style="opacity:.6;margin:0 0 16px;">${esc(aff.email)}</p>`;
+
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;font-size:.8rem;">';
+  h += `<div><strong>Status:</strong> ${aff.status}</div>`;
+  h += `<div><strong>Code:</strong> <code>${esc(aff.affiliate_code || 'Not assigned')}</code></div>`;
+  h += `<div><strong>Social:</strong> ${esc(aff.social_links || '-')}</div>`;
+  h += `<div><strong>Website:</strong> ${aff.website ? `<a href="${esc(aff.website)}" target="_blank" style="color:var(--sage);">${esc(aff.website)}</a>` : '-'}</div>`;
+  h += `<div><strong>Audience:</strong> ${esc(aff.audience_size || '-')}</div>`;
+  h += `<div><strong>Applied:</strong> ${new Date(aff.created_at).toLocaleDateString('en-NZ')}</div>`;
+  if (aff.reason) h += `<div style="grid-column:1/-1;"><strong>Why:</strong> ${esc(aff.reason)}</div>`;
+  h += '</div>';
+
+  // Stats
+  h += '<div class="wa-stats" style="margin-bottom:16px;">';
+  h += `<div class="wa-stat"><div class="wa-val">${aff.total_clicks || 0}</div><div class="wa-lbl">Clicks</div></div>`;
+  h += `<div class="wa-stat"><div class="wa-val">${affOrders.length}</div><div class="wa-lbl">Orders</div></div>`;
+  h += `<div class="wa-stat"><div class="wa-val">$${rev.toFixed(2)}</div><div class="wa-lbl">Revenue</div></div>`;
+  h += `<div class="wa-stat"><div class="wa-val">$${comm.toFixed(2)}</div><div class="wa-lbl">Commission</div></div>`;
+  h += `<div class="wa-stat"><div class="wa-val">$${paid.toFixed(2)}</div><div class="wa-lbl">Paid</div></div>`;
+  h += `<div class="wa-stat"><div class="wa-val" style="color:${(comm-paid)>0?'var(--amber)':''}">$${(comm-paid).toFixed(2)}</div><div class="wa-lbl">Balance</div></div>`;
+  h += '</div>';
+
+  // Orders
+  if (affOrders.length > 0) {
+    h += '<h3 style="font-size:.8rem;margin:12px 0 6px;">Attributed Orders</h3>';
+    h += '<table class="wa-tbl"><thead><tr><th>Date</th><th>Email</th><th>Total</th><th>Commission</th><th>Method</th></tr></thead><tbody>';
+    affOrders.slice(0, 20).forEach(o => {
+      h += `<tr><td>${new Date(o.created_at).toLocaleDateString('en-NZ')}</td><td>${esc(o.order_email||'-')}</td><td>$${(Number(o.order_total)||0).toFixed(2)}</td><td>$${(Number(o.commission_amount)||0).toFixed(2)}</td><td>${esc(o.attribution_method||'-')}</td></tr>`;
+    });
+    h += '</tbody></table>';
+  }
+
+  // Payouts
+  if (affPayouts.length > 0) {
+    h += '<h3 style="font-size:.8rem;margin:12px 0 6px;">Payout History</h3>';
+    h += '<table class="wa-tbl"><thead><tr><th>Date</th><th>Amount</th><th>Period</th><th>Notes</th></tr></thead><tbody>';
+    affPayouts.forEach(p => {
+      h += `<tr><td>${new Date(p.created_at).toLocaleDateString('en-NZ')}</td><td>$${(Number(p.amount)||0).toFixed(2)}</td><td>${p.period_from||''} → ${p.period_to||''}</td><td>${esc(p.notes||'-')}</td></tr>`;
+    });
+    h += '</tbody></table>';
+  }
+
+  // Record payout (if approved + balance owing)
+  if (aff.status === 'approved' && (comm - paid) > 0) {
+    h += '<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);">';
+    h += '<h3 style="font-size:.8rem;margin:0 0 8px;">Record Payout</h3>';
+    h += '<div style="display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap;">';
+    h += `<div><label style="font-size:.65rem;opacity:.6;">Amount</label><br><input type="number" id="aff-pay-amt" value="${(comm-paid).toFixed(2)}" step="0.01" class="wa-input" style="width:90px;"></div>`;
+    h += '<div><label style="font-size:.65rem;opacity:.6;">From</label><br><input type="date" id="aff-pay-from" class="wa-input" style="width:120px;"></div>';
+    h += '<div><label style="font-size:.65rem;opacity:.6;">To</label><br><input type="date" id="aff-pay-to" class="wa-input" style="width:120px;"></div>';
+    h += '<div><label style="font-size:.65rem;opacity:.6;">Notes</label><br><input type="text" id="aff-pay-notes" placeholder="Bank transfer" class="wa-input" style="width:130px;"></div>';
+    h += `<button class="wa-btn-sm" style="background:var(--sage);color:#fff;" onclick="recordAffiliatePayout(${id})">Record</button>`;
+    h += '</div></div>';
+  }
+
+  // Approve/reject for pending
+  if (aff.status === 'pending') {
+    h += '<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);display:flex;gap:6px;">';
+    h += `<button class="wa-btn-sm" style="background:var(--sage);color:#fff;" onclick="approveAffiliate(${id});document.querySelector('.modal-overlay.open .modal-close')?.click();">Approve</button>`;
+    h += `<button class="wa-btn-sm" style="background:var(--red);color:#fff;" onclick="rejectAffiliate(${id});document.querySelector('.modal-overlay.open .modal-close')?.click();">Reject</button>`;
+    h += '</div>';
+  }
+
+  h += '</div>';
+  openGenericModal(h);
+}
+
+async function recordAffiliatePayout(affiliateId) {
+  const amount = parseFloat(document.getElementById('aff-pay-amt').value);
+  if (!amount || amount <= 0) { showToast('Enter a valid amount', 'error'); return; }
+  try {
+    const res = await fetch('https://www.primalpantry.co.nz/.netlify/functions/affiliate-admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'record_payout', affiliate_id: affiliateId, amount,
+        period_from: document.getElementById('aff-pay-from').value,
+        period_to: document.getElementById('aff-pay-to').value,
+        notes: document.getElementById('aff-pay-notes').value,
+        paid_by: currentStaff?.display_name || currentStaff?.username,
+        token: currentStaff.token,
+      }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    showToast('Payout recorded.');
+    document.querySelector('.modal-overlay.open .modal-close')?.click();
+    loadAffiliatesPanel();
+  } catch (e) { showToast('Error: ' + e.message, 'error'); }
+}
 
 // ── Quiz Tab ──
 let quizSubmissions = null;
@@ -14151,4 +14389,253 @@ window.deleteTest = async function(id, containerId) {
   } catch (e) {
     console.error('[Tests] Delete error:', e);
   }
+};
+
+// ── Loyalty Panel ─────────────────────────────────────────────────────────
+
+const LOY_ADMIN_BASE = '/.netlify/functions/loyalty-admin';
+
+function loyAuthHeader() {
+  const tok = (typeof currentStaff !== 'undefined' && currentStaff?.token) ? currentStaff.token : '';
+  return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tok}` };
+}
+
+async function loyFetch(params, method = 'GET', body = null) {
+  const url = LOY_ADMIN_BASE + (params ? '?' + new URLSearchParams(params) : '');
+  const opts = { method, headers: loyAuthHeader() };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(url, opts);
+  return r.json();
+}
+
+async function loyLoadPanel() {
+  loyLoadStats();
+  loyLoadSettings();
+  loyLoadLeaderboard();
+  loyLoadLog();
+}
+
+async function loyLoadStats() {
+  try {
+    const d = await loyFetch({ action: 'stats' });
+    document.getElementById('loy-stat-issued').textContent = (d.total_issued || 0).toLocaleString();
+    document.getElementById('loy-stat-redeemed').textContent = (d.total_redeemed || 0).toLocaleString();
+    document.getElementById('loy-stat-outstanding').textContent = (d.outstanding || 0).toLocaleString();
+    document.getElementById('loy-stat-customers').textContent = (d.customers || 0).toLocaleString();
+  } catch (e) { console.error('[loyalty] stats error', e); }
+}
+
+async function loyLoadSettings() {
+  try {
+    const d = await loyFetch({ action: 'settings' });
+    if (!d || d.error) return;
+    document.getElementById('loy-set-ppd').value = d.points_per_dollar || 100;
+    document.getElementById('loy-set-pdr').value = d.points_to_dollar_rate || 100;
+    document.getElementById('loy-set-min').value = d.min_redemption_points || 500;
+    document.getElementById('loy-set-dp-active').checked = !!d.double_points_active;
+    document.getElementById('loy-set-dp-sku').value = d.double_points_sku || '';
+    if (d.double_points_until) {
+      document.getElementById('loy-set-dp-until').value = d.double_points_until.slice(0, 16);
+    }
+    loyToggleDoublePoints();
+  } catch (e) { console.error('[loyalty] settings error', e); }
+}
+
+window.loyToggleDoublePoints = function() {
+  const active = document.getElementById('loy-set-dp-active').checked;
+  document.getElementById('loy-set-dp-sku').disabled = !active;
+  document.getElementById('loy-set-dp-until').disabled = !active;
+  document.getElementById('loy-set-dp-sku').style.opacity = active ? '1' : '0.4';
+  document.getElementById('loy-set-dp-until').style.opacity = active ? '1' : '0.4';
+};
+
+window.loySaveSettings = async function() {
+  const btn = document.querySelector('#mkt-panel-loyalty .orders-card:nth-child(2) .action-btn');
+  const msg = document.getElementById('loy-set-msg');
+  msg.textContent = 'Saving...';
+  try {
+    const settings = {
+      points_per_dollar: parseInt(document.getElementById('loy-set-ppd').value) || 100,
+      points_to_dollar_rate: parseInt(document.getElementById('loy-set-pdr').value) || 100,
+      min_redemption_points: parseInt(document.getElementById('loy-set-min').value) || 500,
+      double_points_active: document.getElementById('loy-set-dp-active').checked,
+      double_points_sku: document.getElementById('loy-set-dp-sku').value.trim() || null,
+      double_points_until: document.getElementById('loy-set-dp-until').value
+        ? new Date(document.getElementById('loy-set-dp-until').value).toISOString()
+        : null,
+    };
+    const d = await loyFetch(null, 'POST', { action: 'update_settings', settings });
+    msg.textContent = d.ok ? '✓ Saved' : (d.error || 'Error');
+    msg.style.color = d.ok ? 'var(--green)' : 'var(--red)';
+    setTimeout(() => { msg.textContent = ''; }, 3000);
+  } catch (e) {
+    msg.textContent = 'Error — ' + e.message;
+    msg.style.color = 'var(--red)';
+  }
+};
+
+window.loyLookup = async function() {
+  const email = document.getElementById('loy-lookup-email').value.trim();
+  const result = document.getElementById('loy-lookup-result');
+  if (!email) return;
+  result.innerHTML = '<div style="color:var(--muted);font-size:0.82rem;">Loading...</div>';
+  try {
+    const d = await loyFetch({ action: 'balance', email });
+    if (d.error) { result.innerHTML = `<div style="color:var(--red);font-size:0.82rem;">${d.error}</div>`; return; }
+
+    const rows = (d.transactions || []).slice(0, 20);
+    const balance = d.balance || 0;
+
+    result.innerHTML = `
+      <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:1rem;">
+        <span style="font-size:1.6rem;font-weight:700;color:var(--sage);">${balance.toLocaleString()} pts</span>
+        <span style="font-size:0.82rem;color:var(--muted);">($${Math.floor(balance / (d.settings?.points_to_dollar_rate || 100))} redemption value)</span>
+      </div>
+      <table class="loy-table">
+        <thead><tr><th>Date</th><th>Type</th><th>Points</th><th>Description</th></tr></thead>
+        <tbody>
+          ${rows.map(r => `<tr>
+            <td style="color:var(--muted);">${new Date(r.created_at).toLocaleDateString('en-NZ')}</td>
+            <td><span class="loy-type-pill">${r.type}</span></td>
+            <td class="${r.points >= 0 ? 'loy-pts-pos' : 'loy-pts-neg'}">${r.points >= 0 ? '+' : ''}${r.points.toLocaleString()}</td>
+            <td style="color:var(--muted);font-size:0.78rem;">${r.description || '–'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+      <div style="margin-top:1rem;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <input type="number" id="loy-lookup-bonus-pts" placeholder="Bonus pts" style="width:110px;" min="1">
+        <input type="text" id="loy-lookup-bonus-desc" placeholder="Reason" style="width:150px;">
+        <button class="action-btn" onclick="loyAwardBonus('${email}')">Award Bonus</button>
+        <button class="action-btn" onclick="loySendSpinSingle('${email}')">Send Spin Invite</button>
+        <span id="loy-lookup-bonus-msg" style="font-size:0.8rem;"></span>
+      </div>`;
+  } catch (e) {
+    result.innerHTML = `<div style="color:var(--red);font-size:0.82rem;">Error: ${e.message}</div>`;
+  }
+};
+
+window.loyAwardBonus = async function(email) {
+  const pts = parseInt(document.getElementById('loy-lookup-bonus-pts')?.value) || 0;
+  const desc = document.getElementById('loy-lookup-bonus-desc')?.value || '';
+  const msg = document.getElementById('loy-lookup-bonus-msg');
+  if (!pts) { if (msg) { msg.textContent = 'Enter points'; msg.style.color = 'var(--red)'; } return; }
+  try {
+    const d = await loyFetch(null, 'POST', { action: 'award_bonus', email, points: pts, description: desc });
+    if (msg) {
+      msg.textContent = d.ok ? `✓ ${pts} pts awarded (balance: ${(d.new_balance || 0).toLocaleString()})` : (d.error || 'Error');
+      msg.style.color = d.ok ? 'var(--green)' : 'var(--red)';
+    }
+  } catch (e) { if (msg) { msg.textContent = e.message; msg.style.color = 'var(--red)'; } }
+};
+
+window.loySendSpinSingle = async function(email) {
+  const msg = document.getElementById('loy-lookup-bonus-msg');
+  try {
+    const d = await loyFetch(null, 'POST', { action: 'send_spin_invite', emails: [email] });
+    if (msg) {
+      msg.textContent = d.sent > 0 ? '✓ Spin invite sent' : (d.error || 'Error');
+      msg.style.color = d.sent > 0 ? 'var(--green)' : 'var(--red)';
+    }
+  } catch (e) { if (msg) { msg.textContent = e.message; msg.style.color = 'var(--red)'; } }
+};
+
+function loyGetBulkEmails() {
+  return document.getElementById('loy-bulk-emails').value
+    .split(/\n|,/)
+    .map(e => e.trim())
+    .filter(e => e.match(/.+@.+\..+/));
+}
+
+window.loyBulkSpin = async function() {
+  const emails = loyGetBulkEmails();
+  const msg = document.getElementById('loy-bulk-msg');
+  if (!emails.length) { msg.textContent = 'No valid emails'; msg.style.color = 'var(--red)'; return; }
+  msg.textContent = 'Sending...'; msg.style.color = 'var(--muted)';
+  try {
+    const d = await loyFetch(null, 'POST', { action: 'send_spin_invite', emails });
+    msg.textContent = d.error ? d.error : `✓ Spin invites sent to ${d.sent} customers`;
+    msg.style.color = d.error ? 'var(--red)' : 'var(--green)';
+  } catch (e) { msg.textContent = e.message; msg.style.color = 'var(--red)'; }
+};
+
+window.loyBulkBalance = async function() {
+  const emails = loyGetBulkEmails();
+  const msg = document.getElementById('loy-bulk-msg');
+  if (!emails.length) { msg.textContent = 'No valid emails'; msg.style.color = 'var(--red)'; return; }
+  msg.textContent = 'Sending...'; msg.style.color = 'var(--muted)';
+  try {
+    const d = await loyFetch(null, 'POST', { action: 'send_balance_email', emails });
+    msg.textContent = d.error ? d.error : `✓ Balance emails sent to ${d.sent} customers`;
+    msg.style.color = d.error ? 'var(--red)' : 'var(--green)';
+  } catch (e) { msg.textContent = e.message; msg.style.color = 'var(--red)'; }
+};
+
+window.loyBulkBonus = async function() {
+  const emails = loyGetBulkEmails();
+  const pts = parseInt(document.getElementById('loy-bulk-pts').value) || 0;
+  const desc = document.getElementById('loy-bulk-desc').value.trim();
+  const msg = document.getElementById('loy-bulk-msg');
+  if (!emails.length || !pts) { msg.textContent = 'Need emails and points'; msg.style.color = 'var(--red)'; return; }
+  msg.textContent = 'Awarding...'; msg.style.color = 'var(--muted)';
+  try {
+    const d = await loyFetch(null, 'POST', { action: 'award_bonus_bulk', emails, points: pts, description: desc });
+    msg.textContent = d.error ? d.error : `✓ ${pts} pts awarded to ${d.awarded} customers`;
+    msg.style.color = d.error ? 'var(--red)' : 'var(--green)';
+  } catch (e) { msg.textContent = e.message; msg.style.color = 'var(--red)'; }
+};
+
+async function loyLoadLeaderboard() {
+  const el = document.getElementById('loy-leaderboard');
+  if (!el) return;
+  try {
+    const d = await loyFetch({ action: 'leaderboard', limit: 20 });
+    if (!d.leaderboard || d.leaderboard.length === 0) { el.innerHTML = '<div style="color:var(--muted);font-size:0.82rem;">No data yet</div>'; return; }
+    el.innerHTML = `<table class="loy-table">
+      <thead><tr><th>#</th><th>Email</th><th>Balance</th><th>Value</th></tr></thead>
+      <tbody>
+        ${d.leaderboard.map((row, i) => `<tr>
+          <td style="color:var(--dim);">${i + 1}</td>
+          <td>${row.email}</td>
+          <td class="loy-pts-pos">${row.balance.toLocaleString()} pts</td>
+          <td style="color:var(--muted);">$${Math.floor(row.balance / 100)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+  } catch (e) { el.innerHTML = `<div style="color:var(--red);font-size:0.82rem;">Error: ${e.message}</div>`; }
+}
+
+window.loyLoadLog = async function() {
+  const el = document.getElementById('loy-log');
+  if (!el) return;
+  const type = document.getElementById('loy-log-type')?.value || '';
+  try {
+    const params = { action: 'log', limit: 60 };
+    if (type) params.type = type;
+    const d = await loyFetch(params);
+    const rows = d.rows || [];
+    if (!rows.length) { el.innerHTML = '<div style="color:var(--muted);font-size:0.82rem;">No transactions yet</div>'; return; }
+    el.innerHTML = `<table class="loy-table">
+      <thead><tr><th>Date</th><th>Email</th><th>Type</th><th>Points</th><th>Description</th><th>Expires</th></tr></thead>
+      <tbody>
+        ${rows.map(r => `<tr>
+          <td style="color:var(--muted);white-space:nowrap;">${new Date(r.created_at).toLocaleDateString('en-NZ')}</td>
+          <td style="font-size:0.78rem;">${r.email}</td>
+          <td><span class="loy-type-pill">${r.type}</span></td>
+          <td class="${r.points >= 0 ? 'loy-pts-pos' : 'loy-pts-neg'}">${r.points >= 0 ? '+' : ''}${r.points.toLocaleString()}</td>
+          <td style="color:var(--muted);font-size:0.78rem;">${r.description || '–'}</td>
+          <td style="color:var(--dim);font-size:0.75rem;">${r.expires_at ? new Date(r.expires_at).toLocaleDateString('en-NZ') : '–'}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+  } catch (e) { el.innerHTML = `<div style="color:var(--red);font-size:0.82rem;">Error: ${e.message}</div>`; }
+};
+
+window.loyExpirePoints = async function() {
+  if (!confirm('Run expiry sweep? This creates negative rows for all expired points.')) return;
+  try {
+    const d = await loyFetch(null, 'POST', { action: 'expire_points' });
+    alert(d.error ? d.error : `Done — expired ${d.expired} customer batches.`);
+    loyLoadStats();
+    loyLoadLog();
+  } catch (e) { alert('Error: ' + e.message); }
 };
