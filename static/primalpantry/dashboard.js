@@ -9320,7 +9320,7 @@ async function loadQuizFunnel() {
     cutoff.setDate(cutoff.getDate() - 30);
     const cutoffStr = cutoff.toISOString();
 
-    const sessions = await db.from('quiz_sessions').select('step_index,step_name,completed,created_at')
+    const sessions = await db.from('quiz_sessions').select('session_id,step_index,step_name,completed,created_at')
       .gte('created_at', cutoffStr).then(r => r.data || []).catch(() => []);
 
     if (!sessions.length) {
@@ -14410,9 +14410,46 @@ async function loyFetch(params, method = 'GET', body = null) {
 
 async function loyLoadPanel() {
   loyLoadStats();
+  loyLoadGiftStats();
   loyLoadSettings();
   loyLoadLeaderboard();
   loyLoadLog();
+}
+
+async function loyLoadGiftStats() {
+  try {
+    const d = await loyFetch({ action: 'gift_stats' });
+    document.getElementById('loy-gift-total').textContent = (d.total || 0).toLocaleString();
+    document.getElementById('loy-gift-clicks').textContent = (d.clicks || 0).toLocaleString();
+    document.getElementById('loy-gift-active').textContent = (d.active || 0).toLocaleString();
+    document.getElementById('loy-gift-redeemed').textContent = (d.redeemed || 0).toLocaleString();
+
+    const rows = d.recent || [];
+    const tbl = document.getElementById('loy-gift-table');
+    if (!tbl) return;
+    if (!rows.length) { tbl.innerHTML = '<p style="font-size:0.82rem;color:var(--dim);">No gift links sent yet.</p>'; return; }
+    tbl.innerHTML = `<table class="loy-table">
+      <thead><tr><th>Referrer</th><th>Code</th><th>Clicks</th><th>Sent</th><th>Expires</th><th>Status</th></tr></thead>
+      <tbody>${rows.map(r => {
+        const now = new Date();
+        const exp = r.expires_at ? new Date(r.expires_at) : null;
+        const expired = exp && exp < now;
+        const status = r.redeemed_at
+          ? `<span style="color:var(--green);font-weight:600;">✓ Redeemed</span>`
+          : expired
+            ? `<span style="color:var(--dim);">Expired</span>`
+            : `<span style="color:#c8a000;">Active</span>`;
+        return `<tr>
+          <td style="font-size:0.78rem;">${r.referrer_email || '–'}</td>
+          <td style="font-family:monospace;font-size:0.72rem;">${r.friend_code || '–'}</td>
+          <td style="text-align:center;">${r.click_count || 0}</td>
+          <td style="font-size:0.75rem;">${r.created_at ? new Date(r.created_at).toLocaleDateString('en-NZ') : '–'}</td>
+          <td style="font-size:0.75rem;">${exp ? exp.toLocaleDateString('en-NZ') : '–'}</td>
+          <td>${status}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+  } catch (e) { console.error('[loyalty] gift stats error', e); }
 }
 
 async function loyLoadStats() {
