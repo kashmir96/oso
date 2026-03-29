@@ -142,6 +142,7 @@ const db = {
   }
 };
 let allOrders = [], allLineItems = [], filteredOrders = [], charts = {};
+const isRevianaItem = li => (li.sku || '').startsWith('reviana-') || (li.description || '').toLowerCase().includes('reviana') || (li.description || '').toLowerCase().includes('reviora');
 let customerTags = {}; // email → Set of tags
 let shipmentsPage = 1;
 let trendingPage = 1;
@@ -1470,7 +1471,7 @@ function renderStats(orders, lineItems) {
   const priorIdSet = new Set(priorOrders.map(o => o.id));
   let revianaRev = 0, revianaOrders = new Set(), priorRevianaRev = 0;
   allLineItems.forEach(li => {
-    if (!(li.sku || '').startsWith('reviana-')) return;
+    if (!isRevianaItem(li)) return;
     const rev = (li.quantity || 1) * Number(li.unit_price || 0);
     if (filteredIdSet.has(li.order_id)) { revianaRev += rev; revianaOrders.add(li.order_id); }
     if (priorIdSet.has(li.order_id)) priorRevianaRev += rev;
@@ -9562,10 +9563,10 @@ function renderRevianaSkuTimeSeries() {
   allOrders.forEach(o => { orderDateMap[o.id] = o.order_date; });
   const skuDaily = {}, skuTotals = {};
   allLineItems.forEach(li => {
-    if (!(li.sku || '').startsWith('reviana-')) return;
+    if (!isRevianaItem(li)) return;
     const d = orderDateMap[li.order_id];
     if (!d || d < from || d > to) return;
-    const sku = li.sku;
+    const sku = li.sku || li.description || 'reviana-unknown';
     const rev = (li.quantity || 1) * Number(li.unit_price || 0);
     if (!skuDaily[sku]) { skuDaily[sku] = {}; skuTotals[sku] = 0; }
     skuDaily[sku][d] = (skuDaily[sku][d] || 0) + rev;
@@ -9576,7 +9577,7 @@ function renderRevianaSkuTimeSeries() {
   const dt = new Date(from + 'T00:00:00'), end = new Date(to + 'T00:00:00');
   while (dt <= end) { labels.push(dt.toISOString().slice(0, 10)); dt.setDate(dt.getDate() + 1); }
   const datasets = sorted.map(([sku], i) => ({
-    label: sku.replace('reviana-', '').replace(/^\w/, c => c.toUpperCase()),
+    label: sku.replace(/^reviana-/i, '').replace(/^reviana\s+/i, '').replace(/^\w/, c => c.toUpperCase()),
     data: labels.map(d => skuDaily[sku]?.[d] || 0),
     borderColor: SKU_COLORS[i % SKU_COLORS.length],
     backgroundColor: 'transparent',
@@ -9645,7 +9646,7 @@ async function renderRevianaFunnel() {
     const filteredIds = new Set(filteredOrders.map(o => o.id));
     let revOrders = new Set(), revRev = 0;
     allLineItems.forEach(li => {
-      if (!(li.sku || '').startsWith('reviana-')) return;
+      if (!isRevianaItem(li)) return;
       if (!filteredIds.has(li.order_id)) return;
       revOrders.add(li.order_id);
       revRev += (li.quantity || 1) * Number(li.unit_price || 0);
