@@ -62,12 +62,15 @@ exports.handler = async (event) => {
     // 1. Summary for counts
     const summaryData = await apiFetch('https://api.starshipit.com/api/orders/summary?order_status=printed', apiHeaders);
 
-    // 1b. Printed orders with FULL details (including tracking numbers)
-    // The summary endpoint doesn't return tracking_number, so we use the search endpoint
-    const printedSearch = await apiFetch(
-      `https://api.starshipit.com/api/orders/search?order_status=Printed&limit=${limit}&page=${page}`,
-      apiHeaders
-    );
+    // 1b. Try to get printed orders with tracking via search endpoint
+    let printedSearch = { orders: [] };
+    try {
+      printedSearch = await apiFetch(
+        `https://api.starshipit.com/api/orders/search?order_status=Printed&limit=${limit}&page=${page}`,
+        apiHeaders
+      );
+      if (!printedSearch || printedSearch.statusCode >= 400) printedSearch = { orders: [] };
+    } catch (_) { /* fall back to summary */ }
 
     // 2. Unshipped orders (New tab)
     const unshippedData = await apiFetch(
