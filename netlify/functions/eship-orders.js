@@ -59,8 +59,15 @@ exports.handler = async (event) => {
   try {
     // Sequential API calls with rate-limit retry
 
-    // 1. Summary for printed tab (gives counts + printed orders list)
+    // 1. Summary for counts
     const summaryData = await apiFetch('https://api.starshipit.com/api/orders/summary?order_status=printed', apiHeaders);
+
+    // 1b. Printed orders with FULL details (including tracking numbers)
+    // The summary endpoint doesn't return tracking_number, so we use the search endpoint
+    const printedSearch = await apiFetch(
+      `https://api.starshipit.com/api/orders/search?order_status=Printed&limit=${limit}&page=${page}`,
+      apiHeaders
+    );
 
     // 2. Unshipped orders (New tab)
     const unshippedData = await apiFetch(
@@ -76,7 +83,10 @@ exports.handler = async (event) => {
 
     // Parse order lists
     const unshippedList = Array.isArray(unshippedData.orders) ? unshippedData.orders : [];
-    const printedList = Array.isArray(summaryData.orders) ? summaryData.orders : [];
+    // Prefer search results (has tracking_number), fall back to summary
+    const printedFromSearch = Array.isArray(printedSearch.orders) ? printedSearch.orders : [];
+    const printedFromSummary = Array.isArray(summaryData.orders) ? summaryData.orders : [];
+    const printedList = printedFromSearch.length > 0 ? printedFromSearch : printedFromSummary;
     const shippedList = Array.isArray(shippedData.orders) ? shippedData.orders : [];
 
     const unshipped = unshippedList.map(o => ({
