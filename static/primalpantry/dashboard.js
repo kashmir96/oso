@@ -14478,9 +14478,9 @@ async function loyLoadSettings() {
   try {
     const d = await loyFetch({ action: 'settings' });
     if (!d || d.error) return;
-    document.getElementById('loy-set-ppd').value = d.points_per_dollar || 50;
-    document.getElementById('loy-set-pdr').value = d.points_to_dollar_rate || 1000;
-    document.getElementById('loy-set-min').value = d.min_redemption_points || 1000;
+    document.getElementById('loy-set-ppd').value = d.points_per_dollar || 100;
+    document.getElementById('loy-set-pdr').value = d.points_to_dollar_rate || 2000;
+    document.getElementById('loy-set-min').value = d.min_redemption_points || 2000;
     document.getElementById('loy-set-dp-active').checked = !!d.double_points_active;
     document.getElementById('loy-set-dp-sku').value = d.double_points_sku || '';
     if (d.double_points_until) {
