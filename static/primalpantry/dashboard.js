@@ -14413,6 +14413,7 @@ async function loyLoadPanel() {
   loyLoadStats();
   loyLoadGiftStats();
   loyLoadSettings();
+  loyLoadSkuPoints();
   loyLoadLeaderboard();
   loyLoadLog();
 }
@@ -14508,6 +14509,49 @@ window.loySaveSettings = async function() {
     setTimeout(() => { msg.textContent = ''; }, 3000);
   } catch (e) {
     msg.textContent = 'Error — ' + e.message;
+    msg.style.color = 'var(--red)';
+  }
+};
+
+// ── SKU Points Overrides ──────────────────────────────────────────────────
+
+window.loyLoadSkuPoints = async function() {
+  const tbody = document.getElementById('loy-sku-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text-dim);">Loading...</td></tr>';
+  try {
+    const d = await loyFetch({ action: 'sku_points' });
+    if (!d || !d.overrides) { tbody.innerHTML = '<tr><td colspan="4">Failed to load</td></tr>'; return; }
+    const rows = d.overrides;
+    if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text-dim);">No SKUs configured. Run the seed SQL first.</td></tr>'; return; }
+    tbody.innerHTML = rows.map(r => `<tr data-sku="${r.sku}">
+      <td>${r.description || r.sku}</td>
+      <td><code style="font-size:0.78rem;">${r.sku}</code></td>
+      <td><input type="number" class="loy-sku-mult" value="${r.multiplier}" min="0.5" max="10" step="0.5" style="width:60px;text-align:center;"></td>
+      <td><button class="action-btn" style="padding:4px 10px;font-size:0.75rem;" onclick="loySaveSkuMult(this)">Save</button></td>
+    </tr>`).join('');
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="4" style="color:var(--red);">Error loading SKU points</td></tr>';
+  }
+};
+
+window.loySaveSkuMult = async function(btn) {
+  const row = btn.closest('tr');
+  const sku = row.dataset.sku;
+  const mult = parseFloat(row.querySelector('.loy-sku-mult').value);
+  const msg = document.getElementById('loy-sku-msg');
+  btn.disabled = true;
+  btn.textContent = '...';
+  try {
+    const d = await loyFetch(null, 'POST', { action: 'update_sku_points', sku, multiplier: mult });
+    btn.textContent = d.ok ? '✓' : '!';
+    msg.textContent = d.ok ? `${sku} → ${mult}×` : (d.error || 'Error');
+    msg.style.color = d.ok ? 'var(--green)' : 'var(--red)';
+    setTimeout(() => { btn.textContent = 'Save'; btn.disabled = false; msg.textContent = ''; }, 2000);
+  } catch (e) {
+    btn.textContent = 'Save';
+    btn.disabled = false;
+    msg.textContent = 'Error';
     msg.style.color = 'var(--red)';
   }
 };

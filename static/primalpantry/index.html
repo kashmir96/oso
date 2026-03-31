@@ -1772,6 +1772,22 @@
         </div>
       </div>
 
+      <!-- Product Points -->
+      <div class="orders-card" style="margin-bottom:1.5rem;">
+        <h3>Product Points Multipliers</h3>
+        <p style="font-size:0.8rem;color:var(--text-dim);margin:4px 0 12px;">Set how many points each product earns. 1× = default rate. 2× = double points.</p>
+        <div id="loy-sku-table-wrap">
+          <table class="wa-table" style="font-size:0.85rem;">
+            <thead><tr><th>Product</th><th>SKU</th><th style="width:80px;">Multiplier</th><th style="width:60px;"></th></tr></thead>
+            <tbody id="loy-sku-tbody"><tr><td colspan="4" style="color:var(--text-dim);">Loading...</td></tr></tbody>
+          </table>
+        </div>
+        <div style="margin-top:8px;display:flex;gap:8px;align-items:center;">
+          <button class="action-btn" onclick="loyLoadSkuPoints()">Refresh</button>
+          <span id="loy-sku-msg" style="font-size:0.8rem;color:var(--green);"></span>
+        </div>
+      </div>
+
       <!-- Customer lookup -->
       <div class="orders-card" style="margin-bottom:1.5rem;">
         <h3>Customer Lookup</h3>
