@@ -1723,10 +1723,10 @@
       <div class="orders-card" style="margin-bottom:1.5rem;">
         <h3>PrimalPoints Overview</h3>
         <div class="wa-stats" style="margin-top:1rem;">
-          <div class="wa-stat"><div class="wa-val" id="loy-stat-issued">–</div><div class="wa-lbl">Points Issued</div></div>
-          <div class="wa-stat"><div class="wa-val" id="loy-stat-redeemed">–</div><div class="wa-lbl">Redeemed</div></div>
-          <div class="wa-stat"><div class="wa-val" id="loy-stat-outstanding">–</div><div class="wa-lbl">Outstanding</div></div>
-          <div class="wa-stat"><div class="wa-val" id="loy-stat-customers">–</div><div class="wa-lbl">Customers</div></div>
+          <div class="wa-stat" title="All points ever awarded across all customers"><div class="wa-val" id="loy-stat-issued">–</div><div class="wa-lbl">Points Issued</div></div>
+          <div class="wa-stat" title="Points that have been spent (negative redemption rows)"><div class="wa-val" id="loy-stat-redeemed">–</div><div class="wa-lbl">Redeemed</div></div>
+          <div class="wa-stat" title="Points currently held by customers that haven't been spent or expired"><div class="wa-val" id="loy-stat-outstanding">–</div><div class="wa-lbl">Outstanding</div></div>
+          <div class="wa-stat" title="Number of unique customers who have earned points"><div class="wa-val" id="loy-stat-customers">–</div><div class="wa-lbl">Customers</div></div>
         </div>
       </div>
 
@@ -1734,10 +1734,10 @@
       <div class="orders-card" style="margin-bottom:1.5rem;">
         <h3>Gift Vouchers <span style="font-size:0.7rem;color:var(--dim);font-weight:400;">(thank-you page shareable links)</span></h3>
         <div class="wa-stats" style="margin-top:1rem;">
-          <div class="wa-stat"><div class="wa-val" id="loy-gift-total">–</div><div class="wa-lbl">Sent</div></div>
-          <div class="wa-stat"><div class="wa-val" id="loy-gift-clicks">–</div><div class="wa-lbl">Link Clicks</div></div>
-          <div class="wa-stat"><div class="wa-val" id="loy-gift-active">–</div><div class="wa-lbl">Active</div></div>
-          <div class="wa-stat"><div class="wa-val" id="loy-gift-redeemed">–</div><div class="wa-lbl">Redeemed</div></div>
+          <div class="wa-stat" title="Total $5 gift links generated on the thank-you page (3 per order)"><div class="wa-val" id="loy-gift-total">–</div><div class="wa-lbl">Sent</div></div>
+          <div class="wa-stat" title="How many times a recipient clicked a gift link and landed on the shop"><div class="wa-val" id="loy-gift-clicks">–</div><div class="wa-lbl">Link Clicks</div></div>
+          <div class="wa-stat" title="Links that haven't been used yet and haven't expired (valid for 7 days)"><div class="wa-val" id="loy-gift-active">–</div><div class="wa-lbl">Active</div></div>
+          <div class="wa-stat" title="Gift vouchers that were successfully used at checkout"><div class="wa-val" id="loy-gift-redeemed">–</div><div class="wa-lbl">Redeemed</div></div>
         </div>
         <div id="loy-gift-table" style="margin-top:1.2rem;overflow-x:auto;"></div>
       </div>
@@ -1748,15 +1748,15 @@
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-top:1rem;">
           <label class="loy-field">
             <span>Points per $1 spent</span>
-            <input type="number" id="loy-set-ppd" value="100" min="1">
+            <input type="number" id="loy-set-ppd" value="50" min="1">
           </label>
           <label class="loy-field">
             <span>Points needed per $1 off</span>
-            <input type="number" id="loy-set-pdr" value="100" min="1">
+            <input type="number" id="loy-set-pdr" value="1000" min="1">
           </label>
           <label class="loy-field">
             <span>Min redemption (pts)</span>
-            <input type="number" id="loy-set-min" value="500" min="100">
+            <input type="number" id="loy-set-min" value="1000" min="100">
           </label>
         </div>
         <div style="display:flex;align-items:center;gap:1rem;margin-top:1rem;flex-wrap:wrap;">

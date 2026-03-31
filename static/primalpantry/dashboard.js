@@ -14478,9 +14478,9 @@ async function loyLoadSettings() {
   try {
     const d = await loyFetch({ action: 'settings' });
     if (!d || d.error) return;
-    document.getElementById('loy-set-ppd').value = d.points_per_dollar || 100;
-    document.getElementById('loy-set-pdr').value = d.points_to_dollar_rate || 100;
-    document.getElementById('loy-set-min').value = d.min_redemption_points || 500;
+    document.getElementById('loy-set-ppd').value = d.points_per_dollar || 50;
+    document.getElementById('loy-set-pdr').value = d.points_to_dollar_rate || 1000;
+    document.getElementById('loy-set-min').value = d.min_redemption_points || 1000;
     document.getElementById('loy-set-dp-active').checked = !!d.double_points_active;
     document.getElementById('loy-set-dp-sku').value = d.double_points_sku || '';
     if (d.double_points_until) {
@@ -14682,6 +14682,7 @@ async function loyLoadLeaderboard() {
   try {
     const d = await loyFetch({ action: 'leaderboard', limit: 20 });
     if (!d.leaderboard || d.leaderboard.length === 0) { el.innerHTML = '<div style="color:var(--muted);font-size:0.82rem;">No data yet</div>'; return; }
+    const pdr = d.settings?.points_to_dollar_rate || 1000;
     el.innerHTML = `<table class="loy-table">
       <thead><tr><th>#</th><th>Email</th><th>Balance</th><th>Value</th></tr></thead>
       <tbody>
@@ -14689,7 +14690,7 @@ async function loyLoadLeaderboard() {
           <td style="color:var(--dim);">${i + 1}</td>
           <td>${row.email}</td>
           <td class="loy-pts-pos">${row.balance.toLocaleString()} pts</td>
-          <td style="color:var(--muted);">$${Math.floor(row.balance / 100)}</td>
+          <td style="color:var(--muted);">$${(row.balance / pdr).toFixed(2)}</td>
         </tr>`).join('')}
       </tbody>
     </table>`;
