@@ -1,3 +1,12 @@
+// ── Toast notification ──
+function showToast(msg, type = 'success') {
+  const el = document.createElement('div');
+  el.textContent = msg;
+  el.style.cssText = `position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:8px;font-size:0.85rem;font-weight:600;z-index:99999;color:#fff;background:${type === 'error' ? '#c0392b' : '#3a5c2e'};box-shadow:0 4px 16px rgba(0,0,0,0.25);transition:opacity 0.4s;`;
+  document.body.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 400); }, 3000);
+}
+
 // ── Lazy-load Leaflet (only when map is needed) ──
 let leafletLoaded = false;
 function loadLeaflet() {
@@ -7087,6 +7096,7 @@ document.getElementById('mo-submit').addEventListener('click', async function() 
       const col = this.dataset.waCol || '';
       const { from, to } = waGetDates();
       const containerId = 'wa-' + panel + '-table';
+      if (!document.getElementById(containerId)) return;
 
       document.getElementById(containerId).innerHTML = '<div class="wa-loading">Loading...</div>';
 
@@ -11498,7 +11508,7 @@ async function loadMarketingTab() {
     gSt.connected && gSt.merchantId ? mktApi('google-merchant', {}).catch(() => ({ products: [] })) : { products: [] },
     mktApi('analytics-dashboard', { site: 'PrimalPantry.co.nz', from, to, metric: 'campaigns', col: 'utm_source' }).catch(() => []),
     mktApi('analytics-dashboard', { site: 'PrimalPantry.co.nz', from, to, metric: 'campaigns', col: 'utm_content' }).catch(() => []),
-    db.from('quiz_leads').select('id,order_id,created_at').catch(() => []),
+    db.from('quiz_leads').select('id,order_id,created_at').then(r => r.data || []).catch(() => []),
   ]);
   mktAllCampaigns = [...(fbC.campaigns||[]).map(c=>({...c,platform:'facebook'})), ...(gC.campaigns||[]).map(c=>({...c,platform:'google'}))].sort((a,b)=>b.spend-a.spend);
   mktGadsCampaigns = (gC.campaigns||[]).sort((a,b)=>b.spend-a.spend);
@@ -14394,7 +14404,7 @@ window.deleteTest = async function(id, containerId) {
 
 // ── Loyalty Panel ─────────────────────────────────────────────────────────
 
-const LOY_ADMIN_BASE = '/.netlify/functions/loyalty-admin';
+const LOY_ADMIN_BASE = 'https://www.primalpantry.co.nz/.netlify/functions/loyalty-admin';
 
 function loyAuthHeader() {
   const tok = (typeof currentStaff !== 'undefined' && currentStaff?.token) ? currentStaff.token : '';
