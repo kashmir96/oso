@@ -6,561 +6,455 @@
   <meta name="robots" content="noindex, nofollow">
   <title>Live · PrimalPantry</title>
   <link rel="icon" href="https://www.primalpantry.co.nz/img/pp-favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #0f0e0c;
-      --surface: #1a1916;
-      --border: #2a2825;
-      --text: #e8e0d5;
-      --dim: #9c9287;
-      --green: #6fb46f;
-      --red: #d4645a;
-      --amber: #c8a000;
-      --blue: #5b9bd5;
-      --sage: #8cb47a;
-      --pulse: #5adf8a;
+      --bg: #0f0e0c; --surface: #1a1916; --surface2: #201f1c;
+      --border: #2a2825; --text: #e8e0d5; --dim: #9c9287;
+      --green: #6fb46f; --red: #d4645a; --amber: #c8a000;
+      --sage: #8cb47a; --pulse: #5adf8a;
     }
-    body { background: var(--bg); color: var(--text); font-family: 'DM Sans', system-ui, sans-serif; min-height: 100vh; }
-    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
+    body { background: var(--bg); color: var(--text); font-family: 'DM Sans', system-ui, sans-serif; min-height: 100vh; font-size: 14px; }
 
-    /* ── Login ── */
-    #login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
-    .login-box { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 40px; width: 100%; max-width: 360px; }
-    .login-logo { font-size: 1.1rem; font-weight: 700; color: var(--sage); margin-bottom: 28px; letter-spacing: 0.04em; }
-    .login-title { font-size: 1.4rem; font-weight: 600; margin-bottom: 24px; }
-    .login-field { margin-bottom: 14px; }
-    .login-field input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 11px 14px; color: var(--text); font-size: 0.9rem; outline: none; transition: border-color 0.2s; }
-    .login-field input:focus { border-color: var(--sage); }
-    .login-btn { width: 100%; background: var(--sage); color: #111; font-weight: 700; border: none; border-radius: 8px; padding: 12px; font-size: 0.95rem; cursor: pointer; margin-top: 8px; transition: opacity 0.2s; }
-    .login-btn:hover { opacity: 0.88; }
-    .login-btn:disabled { opacity: 0.5; cursor: default; }
-    .login-error { color: var(--red); font-size: 0.82rem; margin-top: 10px; min-height: 18px; }
+    /* Login */
+    #login-screen { display:flex; align-items:center; justify-content:center; min-height:100vh; padding:24px; }
+    .login-box { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:40px; width:100%; max-width:360px; }
+    .login-logo { font-size:1.05rem; font-weight:700; color:var(--sage); margin-bottom:28px; }
+    .login-title { font-size:1.35rem; font-weight:600; margin-bottom:22px; }
+    .lf { margin-bottom:12px; }
+    .lf input { width:100%; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:11px 14px; color:var(--text); font-size:0.9rem; outline:none; }
+    .lf input:focus { border-color:var(--sage); }
+    .l-btn { width:100%; background:var(--sage); color:#111; font-weight:700; border:none; border-radius:8px; padding:12px; font-size:0.95rem; cursor:pointer; margin-top:6px; }
+    .l-btn:disabled { opacity:0.5; cursor:default; }
+    .l-err { color:var(--red); font-size:0.8rem; margin-top:10px; min-height:18px; }
 
-    /* ── App shell ── */
-    #app { display: none; flex-direction: column; min-height: 100vh; }
+    /* App shell */
+    #app { display:none; flex-direction:column; min-height:100vh; }
 
-    /* ── Header ── */
-    .live-header { display: flex; align-items: center; gap: 12px; padding: 14px 24px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg); z-index: 10; }
-    .live-wordmark { font-weight: 700; font-size: 0.92rem; color: var(--sage); letter-spacing: 0.04em; }
-    .live-badge { display: flex; align-items: center; gap: 6px; background: rgba(90, 223, 138, 0.1); border: 1px solid rgba(90, 223, 138, 0.25); border-radius: 100px; padding: 4px 10px 4px 8px; font-size: 0.72rem; font-weight: 600; color: var(--pulse); }
-    .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--pulse); animation: pulse-dot 1.8s infinite; }
-    @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.7)} }
-    .live-updated { margin-left: auto; font-size: 0.72rem; color: var(--dim); }
-    .live-logout { background: none; border: none; color: var(--dim); font-size: 0.72rem; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
-    .live-logout:hover { color: var(--text); background: var(--surface); }
+    /* Header */
+    .hdr { display:flex; align-items:center; gap:12px; padding:12px 20px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--bg); z-index:20; }
+    .hdr-brand { font-weight:700; font-size:0.88rem; color:var(--sage); letter-spacing:0.04em; }
+    .live-badge { display:flex; align-items:center; gap:5px; background:rgba(90,223,138,0.1); border:1px solid rgba(90,223,138,0.22); border-radius:100px; padding:3px 9px 3px 7px; font-size:0.68rem; font-weight:700; color:var(--pulse); letter-spacing:0.05em; }
+    .live-dot { width:6px; height:6px; border-radius:50%; background:var(--pulse); animation:blink 1.8s infinite; flex-shrink:0; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    .hdr-updated { margin-left:auto; font-size:0.7rem; color:var(--dim); }
+    .hdr-out { background:none; border:none; color:var(--dim); font-size:0.7rem; cursor:pointer; padding:4px 8px; border-radius:6px; }
+    .hdr-out:hover { color:var(--text); background:var(--surface); }
 
-    /* ── Content ── */
-    .live-content { padding: 24px; max-width: 1400px; margin: 0 auto; width: 100%; }
+    /* Period tabs */
+    .period-row { display:flex; gap:6px; padding:14px 20px 0; flex-wrap:wrap; }
+    .pt { background:none; border:1px solid var(--border); color:var(--dim); font-size:0.72rem; font-weight:600; padding:4px 11px; border-radius:6px; cursor:pointer; transition:all 0.15s; }
+    .pt.active { background:var(--sage); border-color:var(--sage); color:#111; }
+    .pt:hover:not(.active) { color:var(--text); border-color:#555; }
 
-    /* ── Big stats row ── */
-    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 24px; }
-    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
-    .stat-card.live-highlight { border-color: rgba(90,223,138,0.3); background: rgba(90,223,138,0.06); }
-    .stat-label { font-size: 0.7rem; font-weight: 600; color: var(--dim); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
-    .stat-val { font-size: 1.7rem; font-weight: 700; line-height: 1; color: var(--text); }
-    .stat-val.green { color: var(--green); }
-    .stat-val.pulse-color { color: var(--pulse); }
-    .stat-sub { font-size: 0.7rem; color: var(--dim); margin-top: 4px; }
+    /* Content */
+    .content { padding:16px 20px; max-width:1500px; margin:0 auto; width:100%; }
 
-    /* ── Two col layout ── */
-    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-    @media (max-width: 800px) { .two-col { grid-template-columns: 1fr; } }
+    /* Top stat strip */
+    .stat-strip { display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:10px; margin-bottom:16px; }
+    .sc { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:13px 15px; }
+    .sc.hl { border-color:rgba(90,223,138,0.3); background:rgba(90,223,138,0.05); }
+    .sc-lbl { font-size:0.65rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--dim); margin-bottom:6px; }
+    .sc-val { font-size:1.55rem; font-weight:700; line-height:1; }
+    .sc-val.glow { color:var(--pulse); }
+    .sc-val.green { color:var(--green); }
+    .sc-sub { font-size:0.67rem; color:var(--dim); margin-top:3px; }
 
-    /* ── Table cards ── */
-    .live-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
-    .live-card-head { padding: 14px 18px 10px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
-    .live-card-title { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--dim); }
-    .live-card-body { padding: 0; max-height: 320px; overflow-y: auto; }
-    .live-table { width: 100%; border-collapse: collapse; }
-    .live-table th { font-size: 0.67rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--dim); padding: 8px 18px; text-align: left; border-bottom: 1px solid var(--border); }
-    .live-table th:not(:first-child) { text-align: right; }
-    .live-table td { padding: 9px 18px; font-size: 0.82rem; border-bottom: 1px solid rgba(42,40,37,0.6); vertical-align: middle; }
-    .live-table td:not(:first-child) { text-align: right; color: var(--dim); }
-    .live-table td.bold { color: var(--text); font-weight: 600; }
-    .live-table tr:last-child td { border-bottom: none; }
-    .live-table tr:hover td { background: rgba(255,255,255,0.02); }
+    /* Main 3-col grid */
+    .main-grid { display:grid; grid-template-columns:1fr 320px; gap:14px; margin-bottom:14px; }
+    @media(max-width:900px){ .main-grid { grid-template-columns:1fr; } }
 
-    /* Bar overlay for top pages */
-    .bar-cell { position: relative; }
-    .bar-bg { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(140,180,122,0.1); border-radius: 0; pointer-events: none; transition: width 0.4s ease; }
-    .bar-text { position: relative; z-index: 1; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+    /* Cards */
+    .card { background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+    .card-hd { padding:12px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+    .card-title { font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--dim); }
+    .card-count { font-size:0.7rem; color:var(--pulse); font-weight:700; }
+    .card-body { max-height:480px; overflow-y:auto; }
 
-    /* ── Active visitors feed ── */
-    .visitor-list { padding: 0; }
-    .visitor-row { display: flex; align-items: center; gap: 10px; padding: 9px 18px; border-bottom: 1px solid rgba(42,40,37,0.6); font-size: 0.8rem; }
-    .visitor-row:last-child { border-bottom: none; }
-    .visitor-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--pulse); flex-shrink: 0; }
-    .visitor-page { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
-    .visitor-meta { color: var(--dim); font-size: 0.72rem; text-align: right; flex-shrink: 0; }
+    /* Visitor feed */
+    .visitor { display:grid; grid-template-columns:auto 1fr auto; gap:0 12px; padding:11px 16px; border-bottom:1px solid rgba(42,40,37,0.7); align-items:start; transition:background 0.15s; }
+    .visitor:last-child { border-bottom:none; }
+    .visitor:hover { background:rgba(255,255,255,0.02); }
+    .v-flag { font-size:1.1rem; line-height:1.3; padding-top:1px; }
+    .v-main { min-width:0; }
+    .v-page { font-size:0.83rem; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .v-journey { display:flex; align-items:center; gap:3px; margin-top:3px; flex-wrap:wrap; }
+    .v-crumb { font-size:0.67rem; color:var(--dim); background:var(--surface2); border:1px solid var(--border); border-radius:4px; padding:1px 5px; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .v-arrow { font-size:0.6rem; color:var(--border); flex-shrink:0; }
+    .v-crumb.current { color:var(--sage); border-color:rgba(140,180,122,0.3); background:rgba(140,180,122,0.08); }
+    .v-meta { font-size:0.67rem; color:var(--dim); text-align:right; white-space:nowrap; }
+    .v-device { font-size:0.85rem; }
+    .v-ref { margin-top:2px; max-width:90px; overflow:hidden; text-overflow:ellipsis; }
+    .v-empty { padding:32px 16px; text-align:center; color:var(--dim); font-size:0.82rem; }
 
-    /* ── UTM section ── */
-    .utm-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px; }
+    /* Active pages */
+    .page-row { display:flex; align-items:center; gap:10px; padding:9px 16px; border-bottom:1px solid rgba(42,40,37,0.7); position:relative; overflow:hidden; }
+    .page-row:last-child { border-bottom:none; }
+    .page-bar { position:absolute; left:0; top:0; bottom:0; background:rgba(140,180,122,0.08); pointer-events:none; transition:width 0.4s ease; }
+    .page-name { font-size:0.8rem; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; position:relative; z-index:1; }
+    .page-count { font-size:0.78rem; font-weight:700; color:var(--pulse); flex-shrink:0; position:relative; z-index:1; }
 
-    /* ── Period picker ── */
-    .period-bar { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
-    .period-btn { background: var(--surface); border: 1px solid var(--border); color: var(--dim); font-size: 0.75rem; font-weight: 600; padding: 5px 12px; border-radius: 6px; cursor: pointer; transition: all 0.15s; }
-    .period-btn.active { background: var(--sage); border-color: var(--sage); color: #111; }
-    .period-btn:hover:not(.active) { border-color: var(--dim); color: var(--text); }
-    .period-label { font-size: 0.72rem; color: var(--dim); margin-left: 4px; }
+    /* Country list */
+    .country-row { display:flex; align-items:center; gap:9px; padding:8px 16px; border-bottom:1px solid rgba(42,40,37,0.7); }
+    .country-row:last-child { border-bottom:none; }
+    .country-flag { font-size:1rem; flex-shrink:0; }
+    .country-name { font-size:0.8rem; flex:1; }
+    .country-bar-wrap { width:60px; height:4px; background:var(--border); border-radius:2px; flex-shrink:0; }
+    .country-bar { height:100%; background:var(--sage); border-radius:2px; transition:width 0.4s; }
+    .country-count { font-size:0.75rem; color:var(--dim); font-weight:600; min-width:20px; text-align:right; flex-shrink:0; }
 
-    /* ── Empty / loading ── */
-    .live-empty { padding: 28px 18px; text-align: center; color: var(--dim); font-size: 0.82rem; }
-    .spin { display: inline-block; animation: spin 1s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    /* Tables */
+    .ltbl { width:100%; border-collapse:collapse; }
+    .ltbl th { font-size:0.63rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--dim); padding:8px 16px; text-align:left; border-bottom:1px solid var(--border); }
+    .ltbl th:not(:first-child) { text-align:right; }
+    .ltbl td { padding:8px 16px; font-size:0.8rem; border-bottom:1px solid rgba(42,40,37,0.6); vertical-align:middle; }
+    .ltbl td:not(:first-child) { text-align:right; color:var(--dim); }
+    .ltbl td.b { color:var(--text); font-weight:500; }
+    .ltbl tr:last-child td { border-bottom:none; }
+    .ltbl tr:hover td { background:rgba(255,255,255,0.015); }
+    .tbl-bar-cell { position:relative; }
+    .tbl-bar { position:absolute; left:0; top:0; bottom:0; background:rgba(140,180,122,0.09); }
+    .tbl-bar-txt { position:relative; z-index:1; display:block; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
-    /* ── Scrollbar ── */
-    ::-webkit-scrollbar { width: 4px; height: 4px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    /* Misc */
+    .spin { animation:spin 1s linear infinite; display:inline-block; }
+    @keyframes spin { to{transform:rotate(360deg)} }
+    .t-empty { padding:24px; text-align:center; color:var(--dim); font-size:0.8rem; }
+    ::-webkit-scrollbar { width:3px; height:3px; }
+    ::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
   </style>
 </head>
 <body>
 
-<!-- ── Login ── -->
+<!-- Login -->
 <div id="login-screen">
   <div class="login-box">
     <div class="login-logo">🌿 PrimalPantry</div>
     <div class="login-title">Live Traffic</div>
-    <div class="login-field"><input type="text" id="l-user" placeholder="Username" autocomplete="username"></div>
-    <div class="login-field"><input type="password" id="l-pass" placeholder="Password" autocomplete="current-password"></div>
-    <button class="login-btn" id="l-btn">Sign in</button>
-    <div class="login-error" id="l-err"></div>
+    <div class="lf"><input type="text" id="l-user" placeholder="Username" autocomplete="username"></div>
+    <div class="lf"><input type="password" id="l-pass" placeholder="Password" autocomplete="current-password"></div>
+    <button class="l-btn" id="l-btn">Sign in</button>
+    <div class="l-err" id="l-err"></div>
   </div>
 </div>
 
-<!-- ── App ── -->
+<!-- App -->
 <div id="app">
-  <header class="live-header">
-    <span class="live-wordmark">PrimalPantry</span>
+  <header class="hdr">
+    <span class="hdr-brand">PrimalPantry</span>
     <span class="live-badge"><span class="live-dot"></span>LIVE</span>
-    <span class="live-updated" id="last-updated">–</span>
-    <button class="live-logout" id="logout-btn">Sign out</button>
+    <span class="hdr-updated" id="last-tick">–</span>
+    <button class="hdr-out" id="logout-btn">Sign out</button>
   </header>
 
-  <div class="live-content">
+  <!-- Period tabs -->
+  <div class="period-row">
+    <button class="pt active" data-p="today">Today</button>
+    <button class="pt" data-p="yesterday">Yesterday</button>
+    <button class="pt" data-p="7d">7 days</button>
+    <button class="pt" data-p="30d">30 days</button>
+  </div>
 
-    <!-- Period picker -->
-    <div class="period-bar">
-      <button class="period-btn active" data-period="today">Today</button>
-      <button class="period-btn" data-period="yesterday">Yesterday</button>
-      <button class="period-btn" data-period="7d">7 days</button>
-      <button class="period-btn" data-period="30d">30 days</button>
-      <span class="period-label" id="period-label">Refreshes every 5s</span>
-    </div>
+  <div class="content">
 
-    <!-- Big stats -->
-    <div class="stat-grid">
-      <div class="stat-card live-highlight">
-        <div class="stat-label">Live Visitors</div>
-        <div class="stat-val pulse-color" id="s-live">–</div>
-        <div class="stat-sub" id="s-live-pages">active now</div>
+    <!-- Stat strip -->
+    <div class="stat-strip">
+      <div class="sc hl">
+        <div class="sc-lbl">Live Now</div>
+        <div class="sc-val glow" id="s-live">–</div>
+        <div class="sc-sub">active visitors</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-label">Sessions</div>
-        <div class="stat-val" id="s-sessions">–</div>
-        <div class="stat-sub" id="s-sessions-vs">–</div>
+      <div class="sc">
+        <div class="sc-lbl">Sessions</div>
+        <div class="sc-val" id="s-sessions">–</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-label">Pageviews</div>
-        <div class="stat-val" id="s-views">–</div>
-        <div class="stat-sub" id="s-views-sub">–</div>
+      <div class="sc">
+        <div class="sc-lbl">Pageviews</div>
+        <div class="sc-val" id="s-views">–</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-label">Bounce Rate</div>
-        <div class="stat-val" id="s-bounce">–</div>
-        <div class="stat-sub">single-page sessions</div>
+      <div class="sc">
+        <div class="sc-lbl">Bounce</div>
+        <div class="sc-val" id="s-bounce">–</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-label">Avg Time</div>
-        <div class="stat-val" id="s-time">–</div>
-        <div class="stat-sub">on site</div>
+      <div class="sc">
+        <div class="sc-lbl">Avg Time</div>
+        <div class="sc-val" id="s-time">–</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-label">Events</div>
-        <div class="stat-val" id="s-events">–</div>
-        <div class="stat-sub">tracked actions</div>
+      <div class="sc">
+        <div class="sc-lbl">Events</div>
+        <div class="sc-val" id="s-events">–</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-label">Sales</div>
-        <div class="stat-val green" id="s-sales">–</div>
-        <div class="stat-sub">thank-you visits</div>
+      <div class="sc">
+        <div class="sc-lbl">Sales</div>
+        <div class="sc-val green" id="s-sales">–</div>
+        <div class="sc-sub">thank-you visits</div>
       </div>
     </div>
 
-    <!-- Pages + Referrers -->
-    <div class="two-col">
-      <div class="live-card">
-        <div class="live-card-head">
-          <span class="live-card-title">Top Pages</span>
+    <!-- Main: visitor feed + right sidebar -->
+    <div class="main-grid">
+
+      <!-- Visitor journey feed -->
+      <div class="card">
+        <div class="card-hd">
+          <span class="card-title">Active Visitors — Journey</span>
+          <span class="card-count" id="visitor-count">0 live</span>
         </div>
-        <div class="live-card-body">
-          <table class="live-table" id="pages-table">
-            <thead><tr><th>Page</th><th>Views</th><th>Visitors</th></tr></thead>
-            <tbody id="pages-body"><tr><td colspan="3" class="live-empty"><span class="spin">⟳</span></td></tr></tbody>
-          </table>
+        <div class="card-body" id="visitor-feed">
+          <div class="v-empty"><span class="spin">⟳</span> Loading…</div>
         </div>
       </div>
 
-      <div class="live-card">
-        <div class="live-card-head">
-          <span class="live-card-title">Referrers</span>
+      <!-- Right sidebar: active pages + countries -->
+      <div style="display:flex;flex-direction:column;gap:14px;">
+
+        <div class="card">
+          <div class="card-hd">
+            <span class="card-title">Hottest Pages</span>
+          </div>
+          <div class="card-body" id="hot-pages">
+            <div class="v-empty"><span class="spin">⟳</span></div>
+          </div>
         </div>
-        <div class="live-card-body">
-          <table class="live-table" id="ref-table">
-            <thead><tr><th>Source</th><th>Views</th><th>Visitors</th></tr></thead>
-            <tbody id="ref-body"><tr><td colspan="3" class="live-empty"><span class="spin">⟳</span></td></tr></tbody>
-          </table>
+
+        <div class="card">
+          <div class="card-hd">
+            <span class="card-title">Countries</span>
+          </div>
+          <div class="card-body" id="country-list">
+            <div class="v-empty"><span class="spin">⟳</span></div>
+          </div>
         </div>
+
       </div>
     </div>
 
-    <!-- Active visitors + UTM -->
-    <div class="two-col">
-      <div class="live-card">
-        <div class="live-card-head">
-          <span class="live-card-title">Active Right Now</span>
-        </div>
-        <div class="live-card-body visitor-list" id="active-visitors">
-          <div class="live-empty"><span class="spin">⟳</span></div>
-        </div>
-      </div>
-
-      <div class="live-card">
-        <div class="live-card-head">
-          <span class="live-card-title">UTM Sources</span>
-        </div>
-        <div class="live-card-body">
-          <table class="live-table">
-            <thead><tr><th>Source / Medium</th><th>Views</th><th>Visitors</th></tr></thead>
-            <tbody id="utm-body"><tr><td colspan="3" class="live-empty"><span class="spin">⟳</span></td></tr></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- Campaigns -->
-    <div class="live-card" style="margin-bottom:16px;">
-      <div class="live-card-head">
-        <span class="live-card-title">Campaigns</span>
-      </div>
-      <div class="live-card-body">
-        <table class="live-table">
-          <thead><tr><th>Campaign</th><th>Source</th><th>Medium</th><th>Views</th><th>Visitors</th></tr></thead>
-          <tbody id="campaign-body"><tr><td colspan="5" class="live-empty"><span class="spin">⟳</span></td></tr></tbody>
-        </table>
-      </div>
-    </div>
 
   </div>
 </div>
 
 <script>
-(function() {
-  'use strict';
+(function(){
+'use strict';
+const SITE = 'PrimalPantry.co.nz';
+const NINETY = 90 * 24 * 60 * 60 * 1000;
+let token = null, period = 'today', timer = null;
 
-  const SITE = 'PrimalPantry.co.nz';
-  const NINETY_DAYS = 90 * 24 * 60 * 60 * 1000;
-  const LIVE_TOKEN_KEY = 'pp_live_token';
-  const LIVE_TS_KEY = 'pp_live_ts';
+// ── Auth ──
+function loadToken() {
+  const lt = localStorage.getItem('pp_live_token'), lts = Number(localStorage.getItem('pp_live_ts')||0);
+  if (lt && Date.now()-lts < NINETY) { localStorage.setItem('pp_live_ts', Date.now()); return lt; }
+  try { const s = JSON.parse(localStorage.getItem('pp_staff')||'{}'); return s.token||null; } catch{ return null; }
+}
+function saveToken(t) { token=t; localStorage.setItem('pp_live_token',t); localStorage.setItem('pp_live_ts',Date.now()); }
+function clearToken() { localStorage.removeItem('pp_live_token'); localStorage.removeItem('pp_live_ts'); token=null; }
 
-  let token = null;
-  let activePeriod = 'today';
-  let refreshTimer = null;
-  let slowTimer = null;
+// ── Login ──
+async function doLogin() {
+  const u=document.getElementById('l-user').value.trim(), p=document.getElementById('l-pass').value;
+  const btn=document.getElementById('l-btn'), err=document.getElementById('l-err');
+  if (!u||!p) { err.textContent='Enter username and password.'; return; }
+  btn.disabled=true; btn.textContent='Signing in…'; err.textContent='';
+  try {
+    const r = await fetch('/.netlify/functions/staff-auth', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'login',username:u,password:p}) });
+    const d = await r.json();
+    if (!r.ok||d.error) { err.textContent=d.error||'Login failed.'; btn.disabled=false; btn.textContent='Sign in'; return; }
+    if (d.requires_totp) { err.textContent='TOTP required — sign into the main dashboard first.'; btn.disabled=false; btn.textContent='Sign in'; return; }
+    saveToken(d.token); showApp();
+  } catch(e) { err.textContent='Network error.'; btn.disabled=false; btn.textContent='Sign in'; }
+}
 
-  // ── Auth ──────────────────────────────────────────────
-  function getSavedToken() {
-    // Try live-specific token first (longer session)
-    const liveToken = localStorage.getItem(LIVE_TOKEN_KEY);
-    const liveTs = Number(localStorage.getItem(LIVE_TS_KEY) || 0);
-    if (liveToken && (Date.now() - liveTs) < NINETY_DAYS) {
-      localStorage.setItem(LIVE_TS_KEY, String(Date.now())); // refresh timestamp
-      return liveToken;
-    }
-    // Fall back to main dashboard token (30-day)
-    const saved = localStorage.getItem('pp_staff');
-    if (saved) {
-      try {
-        const staff = JSON.parse(saved);
-        return staff.token || null;
-      } catch { return null; }
-    }
-    return null;
+function showApp() { document.getElementById('login-screen').style.display='none'; document.getElementById('app').style.display='flex'; startRefresh(); }
+function showLogin() { document.getElementById('login-screen').style.display='flex'; document.getElementById('app').style.display='none'; if(timer) clearInterval(timer); }
+
+// ── Dates ──
+function localDate(d) { return d.toLocaleDateString('en-CA',{timeZone:'Pacific/Auckland'}); }
+function dates() {
+  const t=new Date(), today=localDate(t);
+  if (period==='today') return {from:today,to:today};
+  if (period==='yesterday') { const y=new Date(t); y.setDate(y.getDate()-1); const ys=localDate(y); return {from:ys,to:ys}; }
+  if (period==='7d') { const f=new Date(t); f.setDate(f.getDate()-6); return {from:localDate(f),to:today}; }
+  if (period==='30d') { const f=new Date(t); f.setDate(f.getDate()-29); return {from:localDate(f),to:today}; }
+  return {from:today,to:today};
+}
+function fmtDur(s) { if(!s||s<0) return '–'; const m=Math.floor(s/60); return m?m+'m '+(Math.round(s%60))+'s':Math.round(s)+'s'; }
+function fmtN(n) { return n==null?'–':Number(n).toLocaleString(); }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── Country flag ──
+function flag(code) {
+  if (!code||code.length!==2) return '🌐';
+  return String.fromCodePoint(...[...code.toUpperCase()].map(c=>c.charCodeAt(0)+127397));
+}
+function countryName(code) {
+  const names = {NZ:'New Zealand',AU:'Australia',US:'United States',GB:'United Kingdom',CA:'Canada',SG:'Singapore',DE:'Germany',FR:'France',JP:'Japan',IN:'India',IE:'Ireland',NL:'Netherlands',SE:'Sweden',NO:'Norway',DK:'Denmark',ZA:'South Africa',AE:'UAE',HK:'Hong Kong'};
+  return names[code] || code || 'Unknown';
+}
+function deviceIcon(d) { if (!d) return ''; d=d.toLowerCase(); if(d.includes('mobile')) return '📱'; if(d.includes('tablet')) return '📱'; return '🖥'; }
+
+// ── Fetch ──
+async function api(fn, params) {
+  const url = new URL('/.netlify/functions/'+fn, location.origin);
+  url.searchParams.set('token', token);
+  Object.entries(params).forEach(([k,v]) => url.searchParams.set(k,v));
+  const r = await fetch(url);
+  if (r.status===401) { clearToken(); showLogin(); throw new Error('auth'); }
+  return r.json();
+}
+
+// ── Render visitor feed ──
+function renderVisitors(visitors, pages) {
+  const el = document.getElementById('visitor-feed');
+  document.getElementById('visitor-count').textContent = (visitors.length||0) + ' live';
+  if (!visitors || visitors.length===0) {
+    el.innerHTML = '<div class="v-empty">No active visitors right now</div>';
+    return;
   }
+  el.innerHTML = visitors.slice(0,40).map(v => {
+    const vPages = v.pages || [];
+    const currentPage = vPages.length ? vPages[vPages.length-1].page : '?';
+    const journey = vPages.slice(-5); // last 5 pages
+    const f = flag(v.country);
+    const dev = deviceIcon(v.device);
+    const ref = v.referrer ? v.referrer.replace(/^www\./,'') : '';
 
-  function saveToken(t) {
-    token = t;
-    localStorage.setItem(LIVE_TOKEN_KEY, t);
-    localStorage.setItem(LIVE_TS_KEY, String(Date.now()));
-  }
-
-  function clearToken() {
-    localStorage.removeItem(LIVE_TOKEN_KEY);
-    localStorage.removeItem(LIVE_TS_KEY);
-    token = null;
-  }
-
-  // ── Login ──────────────────────────────────────────────
-  async function doLogin() {
-    const u = document.getElementById('l-user').value.trim();
-    const p = document.getElementById('l-pass').value;
-    const btn = document.getElementById('l-btn');
-    const err = document.getElementById('l-err');
-    if (!u || !p) { err.textContent = 'Enter username and password.'; return; }
-    btn.disabled = true; btn.textContent = 'Signing in…'; err.textContent = '';
-    try {
-      const r = await fetch('/.netlify/functions/staff-auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'login', username: u, password: p }),
-      });
-      const d = await r.json();
-      if (!r.ok || d.error) { err.textContent = d.error || 'Login failed.'; btn.disabled = false; btn.textContent = 'Sign in'; return; }
-      if (d.requires_totp) { err.textContent = 'TOTP required — use main dashboard to log in first.'; btn.disabled = false; btn.textContent = 'Sign in'; return; }
-      saveToken(d.token);
-      showApp();
-    } catch(e) { err.textContent = 'Network error.'; btn.disabled = false; btn.textContent = 'Sign in'; }
-  }
-
-  // ── Show/Hide ──────────────────────────────────────────
-  function showApp() {
-    document.getElementById('login-screen').style.display = 'none';
-    const app = document.getElementById('app');
-    app.style.display = 'flex';
-    startRefresh();
-  }
-
-  function showLogin() {
-    document.getElementById('login-screen').style.display = 'flex';
-    document.getElementById('app').style.display = 'none';
-    if (refreshTimer) clearInterval(refreshTimer);
-    if (slowTimer) clearInterval(slowTimer);
-  }
-
-  // ── Date helpers ──────────────────────────────────────
-  function localDateStr(d) {
-    return d.toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' });
-  }
-  function getPeriodDates(period) {
-    const now = new Date();
-    const today = localDateStr(now);
-    if (period === 'today') return { from: today, to: today };
-    if (period === 'yesterday') {
-      const y = new Date(now); y.setDate(y.getDate() - 1);
-      const ys = localDateStr(y);
-      return { from: ys, to: ys };
-    }
-    if (period === '7d') {
-      const f = new Date(now); f.setDate(f.getDate() - 6);
-      return { from: localDateStr(f), to: today };
-    }
-    if (period === '30d') {
-      const f = new Date(now); f.setDate(f.getDate() - 29);
-      return { from: localDateStr(f), to: today };
-    }
-    return { from: today, to: today };
-  }
-
-  function fmtDuration(secs) {
-    if (!secs || secs < 0) return '–';
-    const m = Math.floor(secs / 60);
-    const s = Math.round(secs % 60);
-    if (m === 0) return s + 's';
-    return m + 'm ' + s + 's';
-  }
-
-  function fmtNum(n) {
-    if (n === null || n === undefined) return '–';
-    return Number(n).toLocaleString();
-  }
-
-  // ── Fetch helpers ──────────────────────────────────────
-  async function apiFetch(fn, params) {
-    const url = new URL('/.netlify/functions/' + fn, window.location.origin);
-    url.searchParams.set('token', token);
-    Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-    const r = await fetch(url.toString());
-    if (r.status === 401) { clearToken(); showLogin(); throw new Error('auth'); }
-    return r.json();
-  }
-
-  // ── Render helpers ──────────────────────────────────────
-  function renderTableBody(tbodyId, rows, cols, barCol) {
-    const tbody = document.getElementById(tbodyId);
-    if (!rows || rows.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="' + cols.length + '" class="live-empty">No data</td></tr>';
-      return;
-    }
-    const maxVal = barCol ? Math.max(...rows.map(r => Number(r[barCol] || 0))) : 0;
-    tbody.innerHTML = rows.slice(0, 30).map((row, i) => {
-      return '<tr>' + cols.map((col, ci) => {
-        const val = row[col.key];
-        const display = col.fmt ? col.fmt(val) : (val || '–');
-        if (ci === 0 && barCol && maxVal > 0) {
-          const pct = (Number(row[barCol] || 0) / maxVal * 100).toFixed(1);
-          return '<td class="bar-cell" style="padding-left:18px;"><div class="bar-bg" style="width:' + pct + '%"></div><span class="bar-text">' + escHtml(String(display)) + '</span></td>';
-        }
-        return '<td class="' + (ci === 0 ? 'bold' : '') + '">' + escHtml(String(display)) + '</td>';
-      }).join('') + '</tr>';
+    const crumbs = journey.map((pg, i) => {
+      const isCurrent = i === journey.length - 1;
+      const name = (pg.page||'/').replace(/^\/shop\//,'/').replace(/\/$/,'') || '/';
+      return (i>0?'<span class="v-arrow">›</span>':'') +
+        '<span class="v-crumb'+(isCurrent?' current':'')+'">'+esc(name)+'</span>';
     }).join('');
-  }
 
-  function escHtml(s) {
-    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
+    return '<div class="visitor">'+
+      '<div class="v-flag">'+f+'</div>'+
+      '<div class="v-main">'+
+        '<div class="v-page">'+esc(currentPage)+'</div>'+
+        (journey.length>1 ? '<div class="v-journey">'+crumbs+'</div>' : '')+
+      '</div>'+
+      '<div class="v-meta">'+
+        '<div class="v-device">'+dev+'</div>'+
+        (ref?'<div class="v-ref">'+esc(ref)+'</div>':'')+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
 
-  // ── Refresh logic ──────────────────────────────────────
-  async function refreshLive() {
-    try {
-      const d = await apiFetch('analytics-realtime', { site: SITE, detail: '1' });
-      document.getElementById('s-live').textContent = d.active_visitors ?? d.count ?? 0;
+// ── Render hot pages ──
+function renderHotPages(pages) {
+  const el = document.getElementById('hot-pages');
+  if (!pages||pages.length===0) { el.innerHTML='<div class="v-empty">No active pages</div>'; return; }
+  const max = Math.max(...pages.map(p=>p.visitors||0), 1);
+  el.innerHTML = pages.slice(0,15).map(p => {
+    const pct = ((p.visitors||0)/max*100).toFixed(1);
+    const name = (p.pathname||'/');
+    return '<div class="page-row">'+
+      '<div class="page-bar" style="width:'+pct+'%"></div>'+
+      '<span class="page-name">'+esc(name)+'</span>'+
+      '<span class="page-count">'+fmtN(p.visitors)+'</span>'+
+    '</div>';
+  }).join('');
+}
 
-      // Active pages list
-      const pages = d.pages || [];
-      const el = document.getElementById('active-visitors');
-      if (pages.length === 0 && (!d.visitors || d.visitors.length === 0)) {
-        el.innerHTML = '<div class="live-empty">No active visitors</div>';
-      } else {
-        const visitors = d.visitors || [];
-        if (visitors.length > 0) {
-          el.innerHTML = visitors.slice(0, 20).map(v => {
-            const page = v.pathname || v.page || '–';
-            const ref = v.referrer_domain || v.referrer || '';
-            const country = v.country || '';
-            return '<div class="visitor-row"><span class="visitor-dot"></span><span class="visitor-page">' + escHtml(page) + '</span><span class="visitor-meta">' + escHtml([country, ref].filter(Boolean).join(' · ')) + '</span></div>';
-          }).join('');
-        } else {
-          el.innerHTML = pages.slice(0, 15).map(p => {
-            return '<div class="visitor-row"><span class="visitor-dot"></span><span class="visitor-page">' + escHtml(p.pathname || p.page || '–') + '</span><span class="visitor-meta">' + (p.visitors || p.count || 0) + ' active</span></div>';
-          }).join('');
-        }
-      }
-
-      const totalActive = pages.reduce((s, p) => s + (p.visitors || p.count || 0), 0);
-      document.getElementById('s-live-pages').textContent = pages.length > 0 ? pages.length + ' page' + (pages.length !== 1 ? 's' : '') : 'active now';
-
-      document.getElementById('last-updated').textContent = 'Updated ' + new Date().toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    } catch(e) { if (e.message !== 'auth') console.warn('realtime err', e); }
-  }
-
-  async function refreshStats() {
-    const { from, to } = getPeriodDates(activePeriod);
-    try {
-      // Summary
-      const sum = await apiFetch('analytics-dashboard', { site: SITE, from, to, metric: 'summary' });
-      const s = Array.isArray(sum) ? sum[0] : sum;
-      document.getElementById('s-sessions').textContent = fmtNum(s?.sessions ?? s?.unique_visitors);
-      document.getElementById('s-views').textContent = fmtNum(s?.pageviews ?? s?.views);
-      const bounce = s?.bounce_rate;
-      document.getElementById('s-bounce').textContent = bounce != null ? Math.round(bounce) + '%' : '–';
-      document.getElementById('s-time').textContent = fmtDuration(s?.avg_duration_seconds ?? s?.avg_duration);
-    } catch(e) { if (e.message !== 'auth') console.warn('summary err', e); }
-
-    try {
-      // Pages
-      const pg = await apiFetch('analytics-dashboard', { site: SITE, from, to, metric: 'pages' });
-      const rows = Array.isArray(pg) ? pg : (pg.data || []);
-      renderTableBody('pages-body', rows, [
-        { key: 'pathname', fmt: v => v || '/' },
-        { key: 'pageviews', fmt: fmtNum },
-        { key: 'visitors', fmt: fmtNum },
-      ], 'pageviews');
-
-      // Sales = thank-you page visits
-      const salesRow = rows.find(r => (r.pathname || '').includes('thank-you') || (r.pathname || '').includes('order-confirmation'));
-      document.getElementById('s-sales').textContent = salesRow ? fmtNum(salesRow.visitors || salesRow.pageviews) : '0';
-    } catch(e) { if (e.message !== 'auth') console.warn('pages err', e); }
-
-    try {
-      // Referrers
-      const ref = await apiFetch('analytics-dashboard', { site: SITE, from, to, metric: 'referrers' });
-      const rows = Array.isArray(ref) ? ref : (ref.data || []);
-      renderTableBody('ref-body', rows, [
-        { key: 'referrer_domain', fmt: v => v || '(direct)' },
-        { key: 'pageviews', fmt: fmtNum },
-        { key: 'visitors', fmt: fmtNum },
-      ], 'pageviews');
-    } catch(e) { if (e.message !== 'auth') console.warn('ref err', e); }
-
-    try {
-      // Events total
-      const ev = await apiFetch('analytics-dashboard', { site: SITE, from, to, metric: 'events' });
-      const evRows = Array.isArray(ev) ? ev : (ev.data || []);
-      const evTotal = evRows.reduce((s, r) => s + (Number(r.pageviews || r.count || 0)), 0);
-      document.getElementById('s-events').textContent = fmtNum(evTotal);
-    } catch(e) { if (e.message !== 'auth') console.warn('events err', e); }
-
-    try {
-      // UTM sources
-      const utm = await apiFetch('analytics-dashboard', { site: SITE, from, to, metric: 'campaigns', col: 'utm_source' });
-      const rows = Array.isArray(utm) ? utm : (utm.data || []);
-      renderTableBody('utm-body', rows, [
-        { key: 'name', fmt: v => v || '(none)' },
-        { key: 'pageviews', fmt: fmtNum },
-        { key: 'visitors', fmt: fmtNum },
-      ], 'pageviews');
-    } catch(e) { if (e.message !== 'auth') console.warn('utm err', e); }
-
-    try {
-      // Campaigns
-      const camp = await apiFetch('analytics-dashboard', { site: SITE, from, to, metric: 'campaigns', col: 'utm_campaign' });
-      const campRows = Array.isArray(camp) ? camp : (camp.data || []);
-
-      // Also fetch utm_source for enrichment
-      let srcMap = {};
-      try {
-        const srcData = await apiFetch('analytics-dashboard', { site: SITE, from, to, metric: 'campaigns', col: 'utm_source' });
-        (Array.isArray(srcData) ? srcData : []).forEach(r => { if (r.name) srcMap[r.name] = r; });
-      } catch {}
-
-      const tbody = document.getElementById('campaign-body');
-      if (!campRows || campRows.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="live-empty">No campaign data</td></tr>';
-      } else {
-        tbody.innerHTML = campRows.slice(0, 20).map(r => {
-          const campaign = r.name || r.utm_campaign || '(none)';
-          return '<tr><td class="bold">' + escHtml(campaign) + '</td><td>–</td><td>–</td><td>' + fmtNum(r.pageviews) + '</td><td>' + fmtNum(r.visitors) + '</td></tr>';
-        }).join('');
-      }
-    } catch(e) { if (e.message !== 'auth') console.warn('campaign err', e); }
-  }
-
-  function startRefresh() {
-    if (refreshTimer) clearInterval(refreshTimer);
-    if (slowTimer) clearInterval(slowTimer);
-    refreshLive();
-    refreshStats();
-    refreshTimer = setInterval(refreshLive, 5000);
-    slowTimer = setInterval(refreshStats, 30000);
-  }
-
-  // ── Period picker ──────────────────────────────────────
-  document.querySelectorAll('.period-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-      document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
-      this.classList.add('active');
-      activePeriod = this.dataset.period;
-      const labels = { today: 'Today · refreshes every 30s', yesterday: 'Yesterday', '7d': 'Last 7 days', '30d': 'Last 30 days' };
-      document.getElementById('period-label').textContent = labels[activePeriod] || '';
-      // Clear and reload
-      ['pages-body','ref-body','utm-body','campaign-body'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.innerHTML = '<tr><td colspan="5" class="live-empty"><span class="spin">⟳</span></td></tr>';
-      });
-      refreshStats();
-    });
+// ── Render countries (from live visitors) ──
+function renderCountries(visitors) {
+  const el = document.getElementById('country-list');
+  const counts = {};
+  visitors.forEach(v => {
+    const c = v.country || 'Unknown';
+    counts[c] = (counts[c]||0) + 1;
   });
+  const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  if (!sorted.length) { el.innerHTML='<div class="v-empty">–</div>'; return; }
+  const max = sorted[0][1];
+  el.innerHTML = sorted.slice(0,12).map(([code,n]) => {
+    const pct = (n/max*100).toFixed(1);
+    return '<div class="country-row">'+
+      '<span class="country-flag">'+flag(code)+'</span>'+
+      '<span class="country-name">'+esc(countryName(code))+'</span>'+
+      '<div class="country-bar-wrap"><div class="country-bar" style="width:'+pct+'%"></div></div>'+
+      '<span class="country-count">'+n+'</span>'+
+    '</div>';
+  }).join('');
+}
 
-  // ── Event listeners ──────────────────────────────────────
-  document.getElementById('l-btn').addEventListener('click', doLogin);
-  document.getElementById('l-pass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
-  document.getElementById('l-user').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('l-pass').focus(); });
-  document.getElementById('logout-btn').addEventListener('click', () => { clearToken(); showLogin(); });
+// ── Render table ──
+function renderTbl(tbodyId, rows, cols, barKey) {
+  const el = document.getElementById(tbodyId);
+  if (!rows||!rows.length) { el.innerHTML='<tr><td colspan="'+cols.length+'" class="t-empty">No data</td></tr>'; return; }
+  const max = barKey ? Math.max(...rows.map(r=>Number(r[barKey]||0)),1) : 1;
+  el.innerHTML = rows.slice(0,25).map(row => '<tr>'+cols.map((col,ci)=>{
+    const v = row[col.key]; const d = col.fmt ? col.fmt(v) : (v||'–');
+    if (ci===0 && barKey) {
+      const pct = (Number(row[barKey]||0)/max*100).toFixed(1);
+      return '<td class="b tbl-bar-cell"><div class="tbl-bar" style="width:'+pct+'%"></div><span class="tbl-bar-txt">'+esc(String(d))+'</span></td>';
+    }
+    return '<td class="'+(ci===0?'b':'')+'">'+esc(String(d))+'</td>';
+  }).join('')+'</tr>').join('');
+}
 
-  // ── Boot ──────────────────────────────────────────────
-  token = getSavedToken();
-  if (token) { showApp(); } else { document.getElementById('login-screen').style.display = 'flex'; }
+// ── Main refresh (every 5s) ──
+async function tick() {
+  try {
+    const d = await api('analytics-realtime', {site:SITE, detail:'1'});
+    document.getElementById('s-live').textContent = d.active_visitors ?? d.count ?? 0;
+    renderVisitors(d.visitors||[], d.pages||[]);
+    renderHotPages(d.pages||[]);
+    renderCountries(d.visitors||[]);
+    document.getElementById('last-tick').textContent = new Date().toLocaleTimeString('en-NZ',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  } catch(e) { if(e.message!=='auth') console.warn('rt err',e); }
+}
+
+// ── Stats refresh (every 5s too) ──
+async function stats() {
+  const {from,to} = dates();
+  try {
+    const s = await api('analytics-dashboard',{site:SITE,from,to,metric:'summary'});
+    const r = Array.isArray(s)?s[0]:s;
+    document.getElementById('s-sessions').textContent = fmtN(r?.sessions??r?.unique_visitors);
+    document.getElementById('s-views').textContent = fmtN(r?.pageviews??r?.views);
+    const b = r?.bounce_rate; document.getElementById('s-bounce').textContent = b!=null?Math.round(b)+'%':'–';
+    document.getElementById('s-time').textContent = fmtDur(r?.avg_duration_seconds??r?.avg_duration);
+  } catch(e) { if(e.message!=='auth') console.warn('sum err',e); }
+
+  try {
+    const pg = await api('analytics-dashboard',{site:SITE,from,to,metric:'pages'});
+    const rows = Array.isArray(pg)?pg:(pg.data||[]);
+    const sale = rows.find(r=>(r.pathname||'').includes('thank-you')||(r.pathname||'').includes('order-confirmation'));
+    document.getElementById('s-sales').textContent = sale ? fmtN(sale.visitors||sale.pageviews) : '0';
+  } catch(e) { if(e.message!=='auth') console.warn('pg err',e); }
+
+  try {
+    const ev = await api('analytics-dashboard',{site:SITE,from,to,metric:'events'});
+    const rows = Array.isArray(ev)?ev:(ev.data||[]);
+    document.getElementById('s-events').textContent = fmtN(rows.reduce((s,r)=>s+Number(r.pageviews||r.count||0),0));
+  } catch(e) { if(e.message!=='auth') console.warn('ev err',e); }
+}
+
+async function refresh() { await Promise.allSettled([tick(), stats()]); }
+
+function startRefresh() { refresh(); timer = setInterval(refresh, 5000); }
+
+// ── Period buttons ──
+document.querySelectorAll('.pt').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.pt').forEach(b=>b.classList.remove('active'));
+    this.classList.add('active');
+    period = this.dataset.p;
+    refresh();
+  });
+});
+
+// ── Events ──
+document.getElementById('l-btn').addEventListener('click', doLogin);
+document.getElementById('l-pass').addEventListener('keydown', e=>{if(e.key==='Enter') doLogin();});
+document.getElementById('l-user').addEventListener('keydown', e=>{if(e.key==='Enter') document.getElementById('l-pass').focus();});
+document.getElementById('logout-btn').addEventListener('click', ()=>{clearToken(); showLogin();});
+
+// ── Boot ──
+token = loadToken();
+if (token) showApp(); else document.getElementById('login-screen').style.display = 'flex';
 
 })();
 </script>
