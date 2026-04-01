@@ -210,6 +210,16 @@
         <div class="sc-val green" id="s-sales">–</div>
         <div class="sc-sub">thank-you visits</div>
       </div>
+      <div class="sc">
+        <div class="sc-lbl">🔥 Top Source</div>
+        <div class="sc-val" id="s-top-source" style="font-size:1rem;line-height:1.2;padding-top:2px;">–</div>
+        <div class="sc-sub" id="s-top-source-n">–</div>
+      </div>
+      <div class="sc">
+        <div class="sc-lbl">🎯 Top Ad</div>
+        <div class="sc-val" id="s-top-ad" style="font-size:1rem;line-height:1.2;padding-top:2px;">–</div>
+        <div class="sc-sub" id="s-top-ad-n">–</div>
+      </div>
     </div>
 
     <!-- Live funnel -->
@@ -422,6 +432,21 @@ function renderTbl(tbodyId, rows, cols, barKey) {
   }).join('')+'</tr>').join('');
 }
 
+// ── Top source from live visitors ──
+function renderTopSource(visitors) {
+  const counts = {};
+  visitors.forEach(v => {
+    const r = v.referrer || '(direct)';
+    counts[r] = (counts[r]||0) + 1;
+  });
+  const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  if (!sorted.length) return;
+  const [src, n] = sorted[0];
+  const clean = src.replace(/^www\./,'').replace(/^https?:\/\/(www\.)?/,'');
+  document.getElementById('s-top-source').textContent = clean;
+  document.getElementById('s-top-source-n').textContent = n + ' live visitor' + (n!==1?'s':'');
+}
+
 // ── Render funnel ──
 function renderFunnel(pages) {
   // Bucket active page visitors into funnel stages
@@ -464,6 +489,7 @@ async function tick() {
     renderHotPages(d.pages||[]);
     renderCountries(d.visitors||[]);
     renderFunnel(d.pages||[]);
+    renderTopSource(d.visitors||[]);
     document.getElementById('last-tick').textContent = new Date().toLocaleTimeString('en-NZ',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
   } catch(e) { if(e.message!=='auth') console.warn('rt err',e); }
 }
@@ -492,6 +518,19 @@ async function stats() {
     const rows = Array.isArray(ev)?ev:(ev.data||[]);
     document.getElementById('s-events').textContent = fmtN(rows.reduce((s,r)=>s+Number(r.pageviews||r.count||0),0));
   } catch(e) { if(e.message!=='auth') console.warn('ev err',e); }
+
+  try {
+    const camp = await api('analytics-dashboard',{site:SITE,from,to,metric:'campaigns',col:'utm_campaign'});
+    const rows = (Array.isArray(camp)?camp:(camp.data||[])).filter(r=>r.name);
+    if (rows.length) {
+      const top = rows.sort((a,b)=>Number(b.visitors||0)-Number(a.visitors||0))[0];
+      document.getElementById('s-top-ad').textContent = top.name;
+      document.getElementById('s-top-ad-n').textContent = fmtN(top.visitors) + ' visitors';
+    } else {
+      document.getElementById('s-top-ad').textContent = '–';
+      document.getElementById('s-top-ad-n').textContent = 'no campaigns';
+    }
+  } catch(e) { if(e.message!=='auth') console.warn('camp err',e); }
 }
 
 async function refresh() { await Promise.allSettled([tick(), stats()]); }
