@@ -79,6 +79,12 @@
     .funnel-stage.has-users .funnel-count { color:var(--text); }
     .funnel-stage:nth-child(5).has-users .funnel-count { color:var(--pulse); }
     .funnel-lbl { font-size:0.63rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--dim); margin-top:4px; position:relative; z-index:1; }
+    .funnel-stage.shake { animation: fn-shake 0.4s ease; }
+    @keyframes fn-shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-3px)} 40%{transform:translateX(3px)} 60%{transform:translateX(-2px)} 80%{transform:translateX(2px)} }
+    /* Funnel ball */
+    .fn-ball { position:fixed; width:10px; height:10px; border-radius:50%; background:var(--pulse); box-shadow:0 0 8px var(--pulse); pointer-events:none; z-index:9999; transform:translate(-50%,-50%); }
+    /* Smoke particles */
+    .fn-smoke { position:fixed; width:7px; height:7px; border-radius:50%; background:var(--pulse); pointer-events:none; z-index:9998; transform:translate(-50%,-50%); }
     @media(max-width:600px){ .funnel-stage { padding:10px 4px; } .funnel-lbl { display:none; } }
 
     /* Main 3-col grid */
@@ -447,6 +453,80 @@ function renderTopSource(visitors) {
   document.getElementById('s-top-source-n').textContent = n + ' live visitor' + (n!==1?'s':'');
 }
 
+// ── Funnel ball animation ──
+var prevFunnel = { shop:0, product:0, cart:0, checkout:0, ty:0 };
+var stageOrder = ['shop','product','cart','checkout','ty'];
+
+function funnelStageCenter(key) {
+  var el = document.getElementById('fn-'+key);
+  if (!el) return null;
+  var r = el.getBoundingClientRect();
+  return { x: r.left + r.width/2, y: r.top + r.height/2, top: r.top };
+}
+
+function launchBall(fromKey, toKey) {
+  var from = funnelStageCenter(fromKey);
+  var to = funnelStageCenter(toKey);
+  if (!from || !to) return;
+  var isSale = toKey === 'ty';
+  var ball = document.createElement('div');
+  ball.className = 'fn-ball';
+  if (isSale) ball.style.background = '#5adf8a';
+  document.body.appendChild(ball);
+
+  var startX = from.x, startY = from.top + 8;
+  var endX = to.x, endY = to.top + 8;
+  var arcHeight = Math.abs(endX - startX) * 0.55 + 40;
+  var dur = 520, t0 = performance.now();
+
+  function ease(t) { return t < 0.5 ? 2*t*t : -1+(4-2*t)*t; }
+
+  function frame(now) {
+    var p = Math.min((now - t0) / dur, 1);
+    var ep = ease(p);
+    var x = startX + (endX - startX) * ep;
+    var yLinear = startY + (endY - startY) * ep;
+    var arc = -arcHeight * 4 * p * (p - 1); // parabola, peak at p=0.5
+    ball.style.left = x + 'px';
+    ball.style.top = (yLinear - arc) + 'px';
+    if (p < 1) { requestAnimationFrame(frame); return; }
+    ball.remove();
+    // Shake the destination stage
+    var dest = document.getElementById('fn-'+toKey);
+    if (dest) {
+      dest.classList.remove('shake');
+      void dest.offsetWidth;
+      dest.classList.add('shake');
+      setTimeout(function(){ dest.classList.remove('shake'); }, 450);
+    }
+    if (isSale) emitSmoke(endX, endY);
+  }
+  requestAnimationFrame(frame);
+}
+
+function emitSmoke(cx, cy) {
+  var colors = ['#5adf8a','#8cb47a','#a8d8a0','#c8ffcc','#3a9a5c'];
+  for (var i = 0; i < 14; i++) {
+    (function(i) {
+      var p = document.createElement('div');
+      p.className = 'fn-smoke';
+      var angle = (i / 14) * Math.PI * 2 + (Math.random()-0.5) * 0.8;
+      var dist = 24 + Math.random() * 28;
+      var tx = Math.cos(angle) * dist, ty = Math.sin(angle) * dist - 10;
+      var size = 4 + Math.random() * 6;
+      p.style.cssText = 'left:'+cx+'px;top:'+cy+'px;width:'+size+'px;height:'+size+'px;background:'+colors[i%colors.length]+';opacity:0.9;transition:transform 0.55s ease-out,opacity 0.55s ease-out;';
+      document.body.appendChild(p);
+      requestAnimationFrame(function(){
+        requestAnimationFrame(function(){
+          p.style.transform = 'translate(calc(-50% + '+tx+'px), calc(-50% + '+ty+'px)) scale(0.2)';
+          p.style.opacity = '0';
+        });
+      });
+      setTimeout(function(){ p.remove(); }, 600);
+    })(i);
+  }
+}
+
 // ── Render funnel ──
 function renderFunnel(pages) {
   // Bucket active page visitors into funnel stages
@@ -467,6 +547,19 @@ function renderFunnel(pages) {
       stages.shop += v;
     }
   });
+  // Detect transitions and animate balls (skip on very first render when prev is all 0)
+  var anyPrev = stageOrder.some(k => prevFunnel[k] > 0);
+  if (anyPrev) {
+    stageOrder.forEach((key, i) => {
+      if (i === 0) return; // no stage before shop
+      var prev = stageOrder[i-1];
+      // A ball moves when this stage gains a visitor that the previous stage just had
+      if (stages[key] > prevFunnel[key] && prevFunnel[prev] > 0) {
+        launchBall(prev, key);
+      }
+    });
+  }
+
   [
     ['shop', stages.shop],
     ['product', stages.product],
@@ -478,6 +571,8 @@ function renderFunnel(pages) {
     const el = document.getElementById('fn-'+key);
     el.classList.toggle('has-users', count > 0);
   });
+
+  prevFunnel = Object.assign({}, stages);
 }
 
 // ── Main refresh (every 5s) ──
