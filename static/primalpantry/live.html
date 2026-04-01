@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
   <title>Live · PrimalPantry</title>
-  <link rel="icon" href="/img/pp-favicon.png">
+  <link rel="icon" href="https://www.primalpantry.co.nz/img/pp-favicon.png">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -260,7 +260,6 @@
   'use strict';
 
   const SITE = 'PrimalPantry.co.nz';
-  const BASE = 'https://primalpantry.co.nz/.netlify/functions';
   const NINETY_DAYS = 90 * 24 * 60 * 60 * 1000;
   const LIVE_TOKEN_KEY = 'pp_live_token';
   const LIVE_TS_KEY = 'pp_live_ts';
@@ -311,7 +310,7 @@
     if (!u || !p) { err.textContent = 'Enter username and password.'; return; }
     btn.disabled = true; btn.textContent = 'Signing in…'; err.textContent = '';
     try {
-      const r = await fetch('https://www.primalpantry.co.nz/.netlify/functions/staff-auth', {
+      const r = await fetch('/.netlify/functions/staff-auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'login', username: u, password: p }),
@@ -378,7 +377,7 @@
 
   // ── Fetch helpers ──────────────────────────────────────
   async function apiFetch(fn, params) {
-    const url = new URL('https://www.primalpantry.co.nz/.netlify/functions/' + fn);
+    const url = new URL('/.netlify/functions/' + fn, window.location.origin);
     url.searchParams.set('token', token);
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
     const r = await fetch(url.toString());
