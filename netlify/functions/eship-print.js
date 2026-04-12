@@ -79,13 +79,18 @@ exports.handler = async (event) => {
 
     // Call StarshipIt's print endpoint for each order
     // This creates shipments which the Desktop Agent will pick up and print
-    // If carrier_service_code is provided, override the bag size at print time
+    // ALWAYS include carrier_service_code — StarshipIt defaults to DL if not provided
+    // If explicit code passed (bulk bag mode), use that. Otherwise look up from order's shipping_method.
+    const orderShippingMethods = body.order_shipping_methods || {}; // { orderId: 'CPOLTPA5' }
+
     const results = [];
     for (const orderId of orderIds) {
       try {
         const shipmentBody = { order_id: orderId };
-        if (carrierServiceCode) {
-          shipmentBody.carrier_service_code = carrierServiceCode;
+        // Priority: explicit override > per-order lookup > nothing (let StarshipIt decide)
+        const codeForOrder = carrierServiceCode || orderShippingMethods[orderId] || null;
+        if (codeForOrder) {
+          shipmentBody.carrier_service_code = codeForOrder;
           shipmentBody.carrier = 'CourierPost';
         }
         console.log('[eship-print] Printing order', orderId, 'body:', JSON.stringify(shipmentBody));

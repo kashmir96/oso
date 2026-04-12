@@ -3018,7 +3018,13 @@ function openOrderModal(orderId) {
           // Print directly — pass carrier_service_code at print time if changing size
           reprintBtn.textContent = action === 'asis' ? 'Printing...' : 'Printing as ' + action + '...';
           const printBody = { order_ids: [shipment.order_id] };
-          if (action !== 'asis') printBody.carrier_service_code = SIZE_CODES[action];
+          if (action !== 'asis') {
+            printBody.carrier_service_code = SIZE_CODES[action];
+          } else {
+            // Even "as-is" needs the code — StarshipIt defaults to DL without it
+            const existingCode = shipment.shipping_method || shipment.carrier_service_code || shipment.product || '';
+            if (existingCode) printBody.carrier_service_code = existingCode;
+          }
           try {
             const res = await fetch('/.netlify/functions/eship-print', {
               method: 'POST',
@@ -5714,11 +5720,18 @@ document.getElementById('eship-print-btn').addEventListener('click', async () =>
   btn.style.opacity = '0.6';
 
   const orderIds = waitingOrders.map(o => o.order_id || o.id).filter(Boolean);
+  // Pass each order's shipping_method so eship-print applies correct bag sizes
+  const orderShippingMethods = {};
+  waitingOrders.forEach(o => {
+    const oid = o.order_id || o.id;
+    const method = o.shipping_method || o.carrier_service_code || '';
+    if (oid && method) orderShippingMethods[oid] = method;
+  });
   try {
     const res = await fetch('/.netlify/functions/eship-print', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ order_ids: orderIds }),
+      body: JSON.stringify({ order_ids: orderIds, order_shipping_methods: orderShippingMethods }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Print failed');
