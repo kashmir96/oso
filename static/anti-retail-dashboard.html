@@ -163,16 +163,26 @@ body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); col
 </style>
 </head>
 <body>
-<nav style="position:fixed;top:0;left:0;right:0;z-index:200;display:flex;align-items:center;justify-content:space-between;padding:1rem 2.5rem;border-bottom:1px solid rgba(139,115,85,0.12);background:rgba(250,244,235,0.92);backdrop-filter:blur(12px);">
-  <a href="the-primalpantry-anti-retail-store.html" style="font-family:'Fraunces',serif;font-size:1.25rem;font-weight:700;color:#2E1A0E;">Primal<span style="color:#6B8F5B;">Pantry</span><small style="display:block;font-family:'DM Sans',sans-serif;font-size:0.55rem;font-weight:500;letter-spacing:0.14em;text-transform:uppercase;color:#877B71;margin-top:0.1rem;">retail for growth</small></a>
+<style>
+.site-nav { position:fixed; top:0; left:0; right:0; z-index:200; display:flex; align-items:center; justify-content:space-between; padding:1.25rem 2.5rem; border-bottom:1px solid rgba(139,115,85,0.12); background:rgba(250,244,235,0.92); backdrop-filter:blur(12px); }
+.site-nav .sn-logo { font-family:'Fraunces',serif; font-size:1.25rem; font-weight:700; color:#2E1A0E; letter-spacing:-0.01em; }
+.site-nav .sn-logo span { color:#6B8F5B; }
+.site-nav .sn-cta { font-family:'DM Sans',sans-serif; font-size:0.82rem; font-weight:700; color:#FAF4EB; background:#2E1A0E; padding:0.6rem 1.6rem; border-radius:100px; transition:background 0.2s,transform 0.2s; }
+.site-nav .sn-cta:hover { background:#442A16; transform:translateY(-2px); }
+.site-nav .sn-link { font-size:0.82rem; font-weight:500; color:#877B71; transition:color 0.15s; }
+.site-nav .sn-link:hover { color:#2E1A0E; }
+.site-nav .sn-link.active { font-weight:700; color:#6B8F5B; }
+</style>
+<nav class="site-nav">
+  <a href="the-primalpantry-anti-retail-store.html" class="sn-logo">Primal<span>Pantry</span><small style="display:block;font-family:'DM Sans',sans-serif;font-size:0.72rem;font-weight:500;letter-spacing:0.14em;text-transform:uppercase;color:#877B71;margin-top:0.15rem;">retail for growth</small></a>
   <div style="display:flex;align-items:center;gap:1.5rem;">
-    <a href="the-primalpantry-anti-retail-store.html" style="font-size:0.82rem;font-weight:500;color:#877B71;">The Mission</a>
-    <a href="anti-retail-dashboard-pitch.html" style="font-size:0.82rem;font-weight:700;color:#6B8F5B;">Supplier Dashboard</a>
-    <a href="the-primalpantry-anti-retail-store-consumers.html" style="font-size:0.82rem;font-weight:500;color:#877B71;">Pitch to Consumers</a>
-    <a href="the-primalpantry-anti-retail-store.html#apply" style="font-family:'DM Sans',sans-serif;font-size:0.82rem;font-weight:700;color:#FAF4EB;background:#2E1A0E;padding:0.6rem 1.6rem;border-radius:100px;">Express an interest</a>
+    <a href="the-primalpantry-anti-retail-store.html" class="sn-link">The Mission</a>
+    <a href="anti-retail-dashboard-pitch.html" class="sn-link active">Supplier Dashboard</a>
+    <a href="the-primalpantry-anti-retail-store-consumers.html" class="sn-link">Pitch to Consumers</a>
+    <a href="the-primalpantry-anti-retail-store.html#apply" class="sn-cta">Express an interest</a>
   </div>
 </nav>
-<div class="shell" style="padding-top:70px;">
+<div class="shell" style="padding-top:75px;">
 
 <!-- SIDEBAR -->
 <div class="sidebar">
