@@ -201,7 +201,7 @@ body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); col
   </div>
 
   <!-- Stats -->
-  <div class="stats">
+  <div class="stats" id="overview-stats">
     <div class="stat-card">
       <div class="label">Revenue Today</div>
       <div class="value" style="color:var(--sage)">$1,247</div>
@@ -315,65 +315,61 @@ body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); col
     </table>
   </div>
 
-  <!-- Promo / Affiliate / Bundle — click to expand -->
+  <!-- Promo / Affiliate / Bundle — click to expand inline -->
   <div class="promo-grid">
-    <div class="click-card" onclick="toggleDetail('promo-detail')">
-      <div class="cc-label">Promo Codes</div>
-      <div class="cc-value" style="color:var(--honey)">$1,420</div>
-      <div class="cc-sub">23 redeemed this week · Click to view</div>
-    </div>
-    <div class="click-card" onclick="toggleDetail('affiliate-detail')">
-      <div class="cc-label">Affiliate Codes</div>
-      <div class="cc-value" style="color:var(--blush)">$2,180</div>
-      <div class="cc-sub">41 redeemed this week · Click to view</div>
-    </div>
-    <div class="click-card" onclick="toggleDetail('bundle-detail')">
-      <div class="cc-label">Bundle Deals</div>
-      <div class="cc-value" style="color:var(--sage)">$890</div>
-      <div class="cc-sub">14 redeemed this week · Click to view</div>
-    </div>
-  </div>
-
-  <!-- Expandable tables -->
-  <div class="expand-detail" id="promo-detail">
-    <div class="chart-card">
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <h3>Promo Code Performance</h3>
-        <button class="btn-outline" onclick="openModal('create-promo')">+ New Promo Code</button>
+    <div>
+      <div class="click-card" onclick="toggleDetail('promo-detail')">
+        <div class="cc-label">Promo Codes</div>
+        <div class="cc-value" style="color:var(--honey)">$1,420</div>
+        <div class="cc-sub">23 redeemed · Click to view</div>
       </div>
-      <table class="data-table"><thead><tr><th>Code</th><th>Discount</th><th>Uses</th><th>Revenue</th><th>Status</th></tr></thead><tbody>
-      <tr><td>WELCOME20</td><td>20% off</td><td>12</td><td>$680</td><td><span class="badge badge-sage">Active</span></td></tr>
-      <tr><td>SPRING15</td><td>15% off</td><td>8</td><td>$490</td><td><span class="badge badge-sage">Active</span></td></tr>
-      <tr><td>FREESHIP</td><td>Free shipping</td><td>3</td><td>$250</td><td><span class="badge badge-honey">Expiring soon</span></td></tr>
-      </tbody></table>
-    </div>
-  </div>
-
-  <div class="expand-detail" id="affiliate-detail">
-    <div class="chart-card">
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <h3>Affiliate Performance</h3>
-        <button class="btn-outline" onclick="openModal('create-affiliate')">+ New Affiliate</button>
+      <div class="expand-detail" id="promo-detail" style="margin-top:0.5rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+          <span style="font-size:0.72rem;font-weight:600;color:var(--muted);">Performance</span>
+          <button class="btn-outline" style="font-size:0.65rem;padding:0.3rem 0.5rem;" onclick="event.stopPropagation();openModal('create-promo')">+ New</button>
+        </div>
+        <table class="data-table"><thead><tr><th>Code</th><th>Uses</th><th>Revenue</th></tr></thead><tbody>
+        <tr><td>WELCOME20</td><td>12</td><td>$680</td></tr>
+        <tr><td>SPRING15</td><td>8</td><td>$490</td></tr>
+        <tr><td>FREESHIP</td><td>3</td><td>$250</td></tr>
+        </tbody></table>
       </div>
-      <table class="data-table"><thead><tr><th>Influencer</th><th>Code</th><th>Uses</th><th>Revenue</th><th>Commission</th></tr></thead><tbody>
-      <tr><td>@skincarewithjess</td><td>JESS10</td><td>18</td><td>$1,040</td><td>$104</td></tr>
-      <tr><td>@naturallyemma</td><td>EMMA15</td><td>14</td><td>$720</td><td>$108</td></tr>
-      <tr><td>@wellnesswithkat</td><td>KAT10</td><td>9</td><td>$420</td><td>$42</td></tr>
-      </tbody></table>
     </div>
-  </div>
-
-  <div class="expand-detail" id="bundle-detail">
-    <div class="chart-card">
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <h3>Bundle Deal Performance</h3>
-        <button class="btn-outline" onclick="openModal('create-bundle')">+ New Bundle</button>
+    <div>
+      <div class="click-card" onclick="toggleDetail('affiliate-detail')">
+        <div class="cc-label">Affiliate Codes</div>
+        <div class="cc-value" style="color:var(--blush)">$2,180</div>
+        <div class="cc-sub">41 redeemed · Click to view</div>
       </div>
-      <table class="data-table"><thead><tr><th>Bundle</th><th>Price</th><th>Savings</th><th>Sold</th><th>Revenue</th></tr></thead><tbody>
-      <tr><td>Day + Night Duo</td><td>$79.00</td><td>$8 off</td><td>6</td><td>$474</td></tr>
-      <tr><td>Full Skincare Set</td><td>$189.00</td><td>$9 off</td><td>2</td><td>$378</td></tr>
-      <tr><td>Eyes & Lips Kit</td><td>$65.00</td><td>$8 off</td><td>6</td><td>$390</td></tr>
-      </tbody></table>
+      <div class="expand-detail" id="affiliate-detail" style="margin-top:0.5rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+          <span style="font-size:0.72rem;font-weight:600;color:var(--muted);">Performance</span>
+          <button class="btn-outline" style="font-size:0.65rem;padding:0.3rem 0.5rem;" onclick="event.stopPropagation();openModal('create-affiliate')">+ New</button>
+        </div>
+        <table class="data-table"><thead><tr><th>Influencer</th><th>Uses</th><th>Revenue</th></tr></thead><tbody>
+        <tr><td>@skincarewithjess</td><td>18</td><td>$1,040</td></tr>
+        <tr><td>@naturallyemma</td><td>14</td><td>$720</td></tr>
+        <tr><td>@wellnesswithkat</td><td>9</td><td>$420</td></tr>
+        </tbody></table>
+      </div>
+    </div>
+    <div>
+      <div class="click-card" onclick="toggleDetail('bundle-detail')">
+        <div class="cc-label">Bundle Deals</div>
+        <div class="cc-value" style="color:var(--sage)">$890</div>
+        <div class="cc-sub">14 redeemed · Click to view</div>
+      </div>
+      <div class="expand-detail" id="bundle-detail" style="margin-top:0.5rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+          <span style="font-size:0.72rem;font-weight:600;color:var(--muted);">Performance</span>
+          <button class="btn-outline" style="font-size:0.65rem;padding:0.3rem 0.5rem;" onclick="event.stopPropagation();openModal('create-bundle')">+ New</button>
+        </div>
+        <table class="data-table"><thead><tr><th>Bundle</th><th>Sold</th><th>Revenue</th></tr></thead><tbody>
+        <tr><td>Day + Night Duo</td><td>6</td><td>$474</td></tr>
+        <tr><td>Full Skincare Set</td><td>2</td><td>$378</td></tr>
+        <tr><td>Eyes & Lips Kit</td><td>6</td><td>$390</td></tr>
+        </tbody></table>
+      </div>
     </div>
   </div>
 
@@ -551,19 +547,20 @@ var storeData = {
 
 function renderDashboard(store) {
   var d = storeData[store];
-  // Stat cards
-  document.querySelectorAll('.stat-card')[0].querySelector('.value').textContent = d.revToday;
-  document.querySelectorAll('.stat-card')[1].querySelector('.value').textContent = d.revWeek;
-  document.querySelectorAll('.stat-card')[1].querySelector('.pace-fill').style.width = d.paceW + '%';
-  document.querySelectorAll('.stat-card')[1].querySelector('.pace-label').textContent = d.paceW + '% of $10k target';
-  document.querySelectorAll('.stat-card')[2].querySelector('.value').textContent = d.orders;
-  document.querySelectorAll('.stat-card')[3].querySelector('.value').textContent = d.units;
-  document.querySelectorAll('.stat-card')[4].querySelector('.value').textContent = d.aov;
-  document.querySelectorAll('.stat-card')[5].querySelector('.value').textContent = d.emails;
-  document.querySelectorAll('.stat-card')[0].querySelector('.change').textContent = d.revChange;
-  document.querySelectorAll('.stat-card')[2].querySelector('.change').textContent = d.ordChange;
-  document.querySelectorAll('.stat-card')[3].querySelector('.change').textContent = d.unitChange;
-  document.querySelectorAll('.stat-card')[4].querySelector('.change').textContent = d.aovChange;
+  // Stat cards — scoped to overview
+  var sc = document.querySelectorAll('#overview-stats .stat-card');
+  sc[0].querySelector('.value').textContent = d.revToday;
+  sc[1].querySelector('.value').textContent = d.revWeek;
+  sc[1].querySelector('.pace-fill').style.width = d.paceW + '%';
+  sc[1].querySelector('.pace-label').textContent = d.paceW + '% of $10k target';
+  sc[2].querySelector('.value').textContent = d.orders;
+  sc[3].querySelector('.value').textContent = d.units;
+  sc[4].querySelector('.value').textContent = d.aov;
+  sc[5].querySelector('.value').textContent = d.emails;
+  sc[0].querySelector('.change').textContent = d.revChange;
+  sc[2].querySelector('.change').textContent = d.ordChange;
+  sc[3].querySelector('.change').textContent = d.unitChange;
+  sc[4].querySelector('.change').textContent = d.aovChange;
 
   // Revenue trend
   var tEl = document.getElementById('revenue-trend');
@@ -573,13 +570,15 @@ function renderDashboard(store) {
     tEl.innerHTML += '<div class="bar-col"><div class="bar" style="height:'+(item.v/tMax*100)+'%;background:var(--sage)"></div><div class="bar-label">'+item.d+'</div></div>';
   });
 
-  // Sales by hour
+  // Sales by hour — store hours only (9am-6pm)
   var hEl = document.getElementById('sales-hour');
   hEl.innerHTML = '';
-  var hMax = Math.max(...d.hourly);
-  d.hourly.forEach(function(v,i) {
+  var storeHours = d.hourly.slice(9, 19);
+  var hMax = Math.max(...storeHours);
+  storeHours.forEach(function(v,i) {
+    var hour = i + 9;
+    var lbl = hour <= 12 ? (hour === 12 ? '12pm' : hour+'am') : (hour-12)+'pm';
     var pct = hMax > 0 ? (v/hMax*100) : 0;
-    var lbl = i%3===0 ? i+':00' : '';
     hEl.innerHTML += '<div class="bar-col"><div class="bar" style="height:'+pct+'%;background:'+(v>Math.floor(hMax*0.7)?'var(--sage)':'var(--dim)')+'"></div><div class="bar-label">'+lbl+'</div></div>';
   });
 
