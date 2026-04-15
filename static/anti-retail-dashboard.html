@@ -59,7 +59,7 @@ body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); col
 .bar-label { font-size:0.55rem; color:var(--dim); }
 
 /* Heatmap - matching PrimalPantry style */
-.heatmap-grid { display:grid; grid-template-columns:40px repeat(24,1fr) minmax(35px,1fr); gap:2px; font-size:0.65rem; width:100%; }
+.heatmap-grid { display:grid; grid-template-columns:40px repeat(10,1fr) minmax(35px,1fr); gap:2px; font-size:0.65rem; width:100%; }
 .heatmap-label { display:flex; align-items:center; color:var(--dim); white-space:nowrap; font-size:0.65rem; }
 .heatmap-cell { min-height:26px; max-height:32px; border-radius:3px; display:flex; align-items:center; justify-content:center; font-size:0.6rem; color:var(--muted); cursor:default; transition:opacity 0.15s; }
 .heatmap-cell:hover { opacity:0.8; }
@@ -293,9 +293,9 @@ body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); col
 
   <!-- Heatmap + Day of week -->
   <div class="charts-row">
-    <div class="chart-card">
+    <div class="chart-card" style="overflow-x:auto;">
       <h3>Order Heatmap — This Week</h3>
-      <div id="heatmap-grid" class="heatmap-grid"></div>
+      <div id="heatmap-grid" class="heatmap-grid" style="min-width:400px;"></div>
     </div>
     <div class="chart-card">
       <h3>Sales by Day of Week</h3>
@@ -598,7 +598,7 @@ function toggleDetail(id) {
   var grid = document.getElementById('heatmap-grid');
   var days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   var hours = [];
-  for (var i = 6; i <= 20; i++) { hours.push(i <= 12 ? (i === 12 ? '12p' : i+'a') : (i-12)+'p'); }
+  for (var i = 9; i <= 18; i++) { hours.push(i <= 12 ? (i === 12 ? '12p' : i+'a') : (i-12)+'p'); }
   // Header row
   grid.innerHTML = '<div class="heatmap-label"></div>';
   hours.forEach(function(h) { grid.innerHTML += '<div class="heatmap-header">'+h+'</div>'; });
@@ -612,7 +612,7 @@ function toggleDetail(id) {
     grid.innerHTML += '<div class="heatmap-label">' + day + '</div>';
     var dayTotal = 0;
     hours.forEach(function(h, hi) {
-      var hour = hi + 6;
+      var hour = hi + 9;
       var base = peakHours.indexOf(hour) >= 0 ? 0.5 : 0.15;
       if (isWeekend && peakHours.indexOf(hour) >= 0) base = 0.7;
       var val = Math.min(1, base + Math.random() * 0.4);
