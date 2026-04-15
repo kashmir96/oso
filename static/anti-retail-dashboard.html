@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PrimalPantry — Supplier Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9/dist/leaflet.min.css">
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9/dist/leaflet.min.js"></script>
 <style>
 :root { --bg: #FAF4EB; --card: #FEFCF8; --border: rgba(139,115,85,0.15); --text: #2E1A0E; --muted: #877B71; --dim: #a89d93; --sage: #6B8F5B; --honey: #D4A84B; --blush: #DBBFA8; --red: #B5452A; --cream: #FAF4EB; --cream-deep: #EEDED0; }
 * { margin:0; padding:0; box-sizing:border-box; }
@@ -236,28 +238,7 @@ body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); col
   <div class="chart-card" style="margin-bottom:1.5rem;">
     <h3>Revenue by Store</h3>
     <div style="display:grid;grid-template-columns:1fr 280px;gap:1.5rem;align-items:center;">
-      <div style="position:relative;height:320px;background:var(--cream);border-radius:10px;overflow:hidden;border:1px solid var(--border);">
-        <!-- NZ Map -->
-        <svg viewBox="0 0 200 420" style="width:100%;height:100%;" fill="var(--cream-deep)" stroke="var(--border)" stroke-width="1">
-          <!-- North Island -->
-          <path d="M108 30 C104 35,95 42,92 55 C90 65,85 72,88 82 C90 90,96 95,100 105 C103 112,108 118,106 128 C104 135,98 142,96 150 C94 158,100 162,104 170 C107 176,102 182,98 188 C96 192,98 198,102 200 C106 202,112 198,115 192 C118 186,120 178,122 172 C124 166,120 158,118 152 C116 145,120 138,122 130 C124 122,128 114,126 105 C124 96,120 88,118 78 C116 68,112 58,110 48 C109 40,110 35,108 30Z"/>
-          <!-- South Island -->
-          <path d="M96 225 C90 232,84 242,82 255 C80 265,83 275,86 285 C88 295,86 305,84 315 C82 325,80 335,84 345 C87 352,92 358,96 362 C100 366,104 360,106 352 C108 344,106 335,104 325 C102 315,106 305,108 295 C110 285,108 275,106 265 C104 255,100 245,98 238 C97 232,96 228,96 225Z"/>
-        </svg>
-        <!-- Store dots -->
-        <div style="position:absolute;top:28%;left:58%;transform:translate(-50%,-50%);" title="Auckland">
-          <div style="width:14px;height:14px;background:var(--sage);border-radius:50%;border:2px solid var(--card);box-shadow:0 0 0 3px rgba(107,143,91,0.3);"></div>
-          <div style="position:absolute;left:20px;top:-4px;font-size:0.7rem;font-weight:600;color:var(--text);white-space:nowrap;">Auckland</div>
-        </div>
-        <div style="position:absolute;top:42%;left:52%;transform:translate(-50%,-50%);" title="Wellington">
-          <div style="width:12px;height:12px;background:var(--honey);border-radius:50%;border:2px solid var(--card);box-shadow:0 0 0 3px rgba(212,168,75,0.3);"></div>
-          <div style="position:absolute;left:18px;top:-4px;font-size:0.7rem;font-weight:600;color:var(--text);white-space:nowrap;">Wellington</div>
-        </div>
-        <div style="position:absolute;top:65%;left:48%;transform:translate(-50%,-50%);" title="Christchurch">
-          <div style="width:16px;height:16px;background:var(--sage);border-radius:50%;border:2px solid var(--card);box-shadow:0 0 0 4px rgba(107,143,91,0.3);"></div>
-          <div style="position:absolute;left:22px;top:-4px;font-size:0.7rem;font-weight:600;color:var(--text);white-space:nowrap;">Christchurch</div>
-        </div>
-      </div>
+      <div id="store-map" style="height:320px;border-radius:10px;overflow:hidden;border:1px solid var(--border);"></div>
       <div style="display:flex;flex-direction:column;gap:0.75rem;">
         <div class="stat-card" style="border-left:3px solid var(--sage);">
           <div class="label">Christchurch</div>
@@ -641,6 +622,32 @@ function toggleDetail(id) {
   data.forEach(function(item) {
     var pct = (item.v/max*100);
     el.innerHTML += '<div class="h-bar-row"><div class="h-bar-label">'+item.d+'</div><div class="h-bar-track"><div class="h-bar-fill" style="width:'+pct+'%;background:var(--sage)"></div></div><div class="h-bar-val">$'+item.v.toLocaleString()+'</div></div>';
+  });
+})();
+
+// Store map — Leaflet
+(function() {
+  var map = L.map('store-map', { scrollWheelZoom: false, zoomControl: false }).setView([-42.5, 172.5], 5);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '',
+    maxZoom: 12
+  }).addTo(map);
+
+  var stores = [
+    { name: 'Auckland', lat: -36.8485, lng: 174.7633, rev: '$2,410', orders: 31, color: '#6B8F5B', size: 12 },
+    { name: 'Wellington', lat: -41.2865, lng: 174.7762, rev: '$1,182', orders: 16, color: '#D4A84B', size: 10 },
+    { name: 'Christchurch', lat: -43.5321, lng: 172.6362, rev: '$3,240', orders: 42, color: '#6B8F5B', size: 14 }
+  ];
+
+  stores.forEach(function(s) {
+    var marker = L.circleMarker([s.lat, s.lng], {
+      radius: s.size,
+      fillColor: s.color,
+      color: '#fff',
+      weight: 2,
+      fillOpacity: 0.85
+    }).addTo(map);
+    marker.bindPopup('<div style="font-family:DM Sans,sans-serif;text-align:center;"><strong>' + s.name + '</strong><br><span style="font-size:1.2rem;font-weight:700;color:' + s.color + ';">' + s.rev + '</span><br><span style="font-size:0.75rem;color:#877B71;">' + s.orders + ' orders this week</span></div>');
   });
 })();
 </script>
