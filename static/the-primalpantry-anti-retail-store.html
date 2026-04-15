@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Primal Pantry Anti-Retail Store — We're Disrupting Retail</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,700;1,9..144,400&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bark: #2E1A0E;
+    --bark-mid: #442A16;
+    --bark-light: #6B4D38;
+    --cream: #FAF4EB;
+    --cream-deep: #EEDED0;
+    --off-white: #FEFCF8;
+    --sage: #6B8F5B;
+    --sage-light: #8CB47A;
+    --sage-pale: #E5EDDF;
+    --honey: #D4A84B;
+    --warm-gray: #877B71;
+    --charcoal: #1E1E1E;
+    --rule: rgba(139,115,85,0.12);
+    --rule-strong: rgba(139,115,85,0.2);
+    --card-bg: #FAF7F2;
+  }
+
+  html { font-size: 16px; scroll-behavior: smooth; }
+
+  body {
+    background: var(--cream);
+    color: var(--bark);
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-weight: 400;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* NAV */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1.25rem 2.5rem;
+    border-bottom: 1px solid var(--rule);
+    background: rgba(250,244,235,0.92);
+    backdrop-filter: blur(12px);
+  }
+  .logo {
+    font-family: 'Fraunces', serif;
+    font-size: 1.25rem; font-weight: 700;
+    color: var(--bark);
+    text-decoration: none;
+    letter-spacing: -0.01em;
+  }
+  .logo span { color: var(--sage); }
+  .nav-cta {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.82rem; font-weight: 700;
+    color: var(--cream);
+    background: var(--bark);
+    padding: 0.6rem 1.6rem;
+    border-radius: 100px;
+    text-decoration: none;
+    transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
+  }
+  .nav-cta:hover {
+    background: var(--bark-mid);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(46,26,14,0.16);
+  }
+
+  /* SECTIONS */
+  section { padding: 5rem 2.5rem; max-width: 860px; margin: 0 auto; }
+
+  /* HERO */
+  .hero {
+    min-height: 100vh;
+    display: flex; flex-direction: column; justify-content: center;
+    padding-top: 8rem; padding-bottom: 4rem;
+    max-width: 860px; margin: 0 auto;
+  }
+
+  .hero-eyebrow {
+    font-size: 0.72rem; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--sage); margin-bottom: 2rem;
+    display: flex; align-items: center; gap: 0.75rem;
+  }
+  .hero-eyebrow::before {
+    content: ''; display: block;
+    width: 2rem; height: 1px;
+    background: var(--sage);
+  }
+
+  .hero h1 {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(2.8rem, 7vw, 4.8rem);
+    font-weight: 400;
+    line-height: 1.12;
+    letter-spacing: -0.02em;
+    color: var(--bark);
+    margin-bottom: 1.75rem;
+  }
+  .hero h1 em {
+    font-style: italic;
+    color: var(--sage);
+  }
+
+  .hero-sub {
+    font-size: 1.06rem; line-height: 1.7;
+    color: var(--warm-gray); max-width: 540px;
+    margin-bottom: 3rem;
+  }
+
+  /* VIDEO BLOCK */
+  .video-placeholder {
+    width: 100%;
+    aspect-ratio: 16/9;
+    background: var(--cream-deep);
+    border: 1px solid var(--rule);
+    border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 1rem;
+    margin-bottom: 3rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .play-btn {
+    width: 64px; height: 64px;
+    border: 2px solid var(--bark-light);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    position: relative; z-index: 1;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .play-btn:hover { border-color: var(--bark); transform: scale(1.08); }
+  .play-btn::after {
+    content: '';
+    border-left: 18px solid var(--bark);
+    border-top: 11px solid transparent;
+    border-bottom: 11px solid transparent;
+    margin-left: 4px;
+  }
+  .video-label {
+    font-size: 0.72rem; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--warm-gray); position: relative; z-index: 1;
+  }
+
+  .hero-actions { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+  .btn-primary {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.92rem; font-weight: 700;
+    color: var(--cream);
+    background: var(--bark);
+    padding: 15px 32px;
+    border-radius: 100px;
+    text-decoration: none;
+    border: none;
+    transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
+    display: inline-block;
+  }
+  .btn-primary:hover {
+    background: var(--bark-mid);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(46,26,14,0.16);
+  }
+  .btn-ghost {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.92rem; font-weight: 700;
+    color: var(--bark);
+    padding: 15px 32px;
+    border-radius: 100px;
+    text-decoration: none;
+    border: 2px solid var(--bark);
+    transition: background 0.2s, color 0.2s;
+    display: inline-block;
+  }
+  .btn-ghost:hover { background: var(--bark); color: var(--cream); }
+
+  /* DIVIDER */
+  .divider {
+    border: none;
+    border-top: 1px solid var(--rule);
+    max-width: 860px; margin: 0 auto;
+  }
+
+  /* SECTION HEADERS */
+  .section-label {
+    font-size: 0.68rem; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--sage); margin-bottom: 2.5rem;
+    display: flex; align-items: center; gap: 0.75rem;
+  }
+  .section-label::before {
+    content: ''; display: block;
+    width: 1.5rem; height: 1px;
+    background: var(--sage);
+  }
+
+  h2 {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(1.8rem, 4.5vw, 2.8rem);
+    font-weight: 400;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    color: var(--bark);
+    margin-bottom: 1.5rem;
+  }
+  h3 {
+    font-family: 'Fraunces', serif;
+    font-size: 1.15rem; font-weight: 400;
+    letter-spacing: -0.01em;
+    margin-bottom: 0.75rem;
+    color: var(--bark);
+  }
+  p { color: var(--warm-gray); margin-bottom: 1.25rem; }
+  p strong { color: var(--bark); font-weight: 700; }
+
+  /* MATH BLOCK */
+  .math-block {
+    background: var(--off-white);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--sage);
+    border-radius: 12px;
+    padding: 2.5rem;
+    margin: 2.5rem 0;
+  }
+  .math-row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--rule);
+    font-size: 0.9rem;
+  }
+  .math-row:last-child { border-bottom: none; }
+  .math-row .label { color: var(--warm-gray); }
+  .math-row .value { font-weight: 700; color: var(--bark); }
+  .math-row .value.neg { color: #B5452A; }
+  .math-row .value.big {
+    font-family: 'Fraunces', serif;
+    font-size: 1.5rem; font-weight: 700;
+    color: #B5452A;
+  }
+  .math-caption {
+    margin-top: 1.5rem;
+    font-size: 0.88rem; color: var(--warm-gray);
+    font-style: italic;
+  }
+
+  /* COST LIST */
+  .cost-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    margin: 2.5rem 0;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .cost-item {
+    background: var(--off-white);
+    padding: 2rem;
+  }
+  .cost-icon {
+    font-size: 0.65rem; font-weight: 700;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--bark-light);
+    margin-bottom: 1rem;
+    background: var(--cream-deep);
+    display: inline-block; padding: 0.3rem 0.7rem;
+    border-radius: 50px;
+  }
+  .cost-item h3 { font-size: 1rem; margin-bottom: 0.5rem; }
+  .cost-item p { font-size: 0.88rem; margin: 0; }
+
+  /* OFFER BLOCK */
+  .offer-headline {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(1.5rem, 4vw, 2.5rem);
+    font-weight: 400; letter-spacing: -0.02em;
+    line-height: 1.15; margin-bottom: 3rem;
+    color: var(--bark);
+  }
+  .offer-headline em {
+    font-style: italic;
+    color: var(--sage);
+  }
+
+  .offer-row {
+    display: flex; gap: 2rem; align-items: flex-start;
+    padding: 2rem 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .offer-row:first-of-type { border-top: 1px solid var(--rule); }
+  .offer-num {
+    font-family: 'Fraunces', serif;
+    font-size: 2.5rem; font-weight: 400;
+    color: var(--cream-deep);
+    min-width: 3rem; line-height: 1;
+    flex-shrink: 0;
+  }
+  .offer-body h3 { color: var(--bark); font-size: 1.1rem; margin-bottom: 0.5rem; }
+  .offer-body p { font-size: 0.92rem; margin: 0; }
+
+  /* UPSELLS */
+  .upsell-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-top: 2.5rem;
+  }
+  .upsell-card {
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    padding: 1.5rem;
+    background: var(--off-white);
+    transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+  }
+  .upsell-card:hover {
+    border-color: var(--rule-strong);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.04);
+  }
+  .upsell-tag {
+    font-size: 0.6rem; font-weight: 700;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--sage); margin-bottom: 0.75rem;
+  }
+  .upsell-card h3 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem; font-weight: 700;
+    margin-bottom: 0.4rem; color: var(--bark);
+  }
+  .upsell-card p { font-size: 0.82rem; margin: 0; line-height: 1.55; }
+
+  /* PROOF / WHY */
+  .proof-block {
+    background: var(--off-white);
+    border: 1px solid var(--rule);
+    border-radius: 16px;
+    padding: 3rem;
+    margin: 2.5rem 0;
+    position: relative;
+  }
+  .stat-row {
+    display: flex; gap: 3rem; flex-wrap: wrap;
+    margin-bottom: 2.5rem;
+    padding-bottom: 2.5rem;
+    border-bottom: 1px solid var(--rule);
+  }
+  .stat-num {
+    font-family: 'Fraunces', serif;
+    font-size: 3rem; font-weight: 400;
+    letter-spacing: -0.03em;
+    line-height: 1; color: var(--bark);
+  }
+  .stat-num .accent { color: var(--sage); }
+  .stat-label {
+    font-size: 0.75rem; color: var(--warm-gray);
+    letter-spacing: 0.05em; margin-top: 0.25rem;
+  }
+  .quote {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 1.25rem; line-height: 1.6;
+    color: var(--bark);
+    margin-bottom: 1rem;
+  }
+  .quote-attr {
+    font-size: 0.75rem; color: var(--warm-gray);
+    letter-spacing: 0.06em;
+  }
+
+  /* OPEN BOOK */
+  .open-book {
+    background: var(--sage-pale);
+    border: 1px solid rgba(107,143,91,0.2);
+    border-radius: 16px;
+    padding: 2.5rem;
+    margin: 2.5rem 0;
+  }
+  .open-book h3 {
+    font-family: 'Fraunces', serif;
+    font-size: 1.25rem;
+    color: var(--bark);
+    margin-bottom: 0.75rem;
+  }
+  .open-book p { font-size: 0.92rem; margin-bottom: 0; }
+
+  /* CTA FINAL */
+  .cta-section {
+    text-align: center;
+    padding: 6rem 2.5rem;
+    max-width: 700px; margin: 0 auto;
+  }
+  .cta-section h2 { margin-bottom: 1rem; }
+  .cta-section p { margin-bottom: 2.5rem; }
+  .cta-section .btn-primary { font-size: 0.95rem; padding: 1rem 2.5rem; }
+  .spots {
+    margin-top: 1.5rem;
+    font-size: 0.72rem; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--warm-gray);
+  }
+
+  /* MODAL */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(46,26,14,0.45);
+    backdrop-filter: blur(6px);
+    align-items: center; justify-content: center;
+    padding: 2rem;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: var(--cream);
+    border-radius: 20px;
+    width: 100%; max-width: 620px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.18);
+    position: relative;
+    animation: modalIn 0.35s ease both;
+  }
+  @keyframes modalIn {
+    from { opacity: 0; transform: scale(0.97) translateY(12px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+  .modal-header {
+    padding: 2.5rem 2.5rem 0;
+  }
+  .modal-header h2 {
+    font-family: 'Fraunces', serif;
+    font-size: 1.6rem; font-weight: 400;
+    margin-bottom: 0.5rem;
+  }
+  .modal-header p {
+    font-size: 0.88rem; color: var(--warm-gray);
+    margin-bottom: 0;
+  }
+  .modal-close {
+    position: absolute; top: 1.25rem; right: 1.25rem;
+    width: 36px; height: 36px;
+    border: 1px solid var(--rule);
+    border-radius: 50%;
+    background: var(--off-white);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; color: var(--warm-gray);
+    transition: border-color 0.2s, color 0.2s;
+  }
+  .modal-close:hover { border-color: var(--bark); color: var(--bark); }
+  .modal-form {
+    padding: 2rem 2.5rem 2.5rem;
+    display: flex; flex-direction: column; gap: 1.25rem;
+  }
+  .form-group { display: flex; flex-direction: column; gap: 0.35rem; }
+  .form-group label {
+    font-size: 0.78rem; font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--bark);
+  }
+  .form-group .hint {
+    font-size: 0.74rem; color: var(--warm-gray);
+    font-weight: 400; margin-top: -0.1rem;
+  }
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.92rem;
+    padding: 0.7rem 0.9rem;
+    border: 1px solid var(--rule-strong);
+    border-radius: 10px;
+    background: var(--off-white);
+    color: var(--bark);
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .form-group input:focus,
+  .form-group select:focus,
+  .form-group textarea:focus {
+    border-color: var(--sage);
+    box-shadow: 0 0 0 3px rgba(107,143,91,0.12);
+  }
+  .form-group textarea { resize: vertical; min-height: 80px; }
+  .form-group select { cursor: pointer; }
+  .form-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
+  }
+  .form-divider {
+    border: none;
+    border-top: 1px solid var(--rule);
+    margin: 0.5rem 0;
+  }
+  .form-section-label {
+    font-size: 0.68rem; font-weight: 700;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--sage); margin-top: 0.25rem;
+  }
+  .btn-submit {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem; font-weight: 700;
+    color: var(--cream);
+    background: var(--bark);
+    padding: 1rem 2rem;
+    border: none;
+    border-radius: 100px;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
+    margin-top: 0.5rem;
+  }
+  .btn-submit:hover {
+    background: var(--bark-mid);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(46,26,14,0.16);
+  }
+  .form-privacy {
+    font-size: 0.72rem; color: var(--warm-gray);
+    text-align: center; margin-top: -0.5rem;
+  }
+
+  @media (max-width: 600px) {
+    .modal { border-radius: 16px; max-height: 95vh; }
+    .modal-header { padding: 2rem 1.5rem 0; }
+    .modal-form { padding: 1.5rem; }
+    .form-row { grid-template-columns: 1fr; }
+  }
+
+  /* FOOTER */
+  footer {
+    border-top: 1px solid var(--rule);
+    padding: 2rem 2.5rem;
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 1rem;
+    max-width: 860px; margin: 0 auto;
+  }
+  footer .logo-sm {
+    font-family: 'Fraunces', serif;
+    font-weight: 700; font-size: 1rem;
+    color: var(--warm-gray);
+  }
+  footer .logo-sm span { color: var(--sage); }
+  footer p { font-size: 0.78rem; color: var(--warm-gray); margin: 0; }
+
+  /* VISUALS */
+  .vs-graphic {
+    display: grid; grid-template-columns: 1fr auto 1fr;
+    gap: 0; margin: 3rem 0; align-items: stretch;
+  }
+  .vs-side {
+    padding: 2.5rem;
+    border-radius: 16px;
+    display: flex; flex-direction: column; gap: 1rem;
+  }
+  .vs-side.retail {
+    background: var(--cream-deep);
+    border: 1px solid var(--rule);
+  }
+  .vs-side.oso {
+    background: var(--sage-pale);
+    border: 1px solid rgba(107,143,91,0.25);
+  }
+  .vs-badge {
+    font-size: 0.62rem; font-weight: 700;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    display: inline-block; padding: 0.25rem 0.6rem;
+    border-radius: 50px; width: fit-content;
+  }
+  .vs-side.retail .vs-badge { background: rgba(181,69,42,0.1); color: #B5452A; }
+  .vs-side.oso .vs-badge { background: rgba(107,143,91,0.15); color: var(--sage); }
+  .vs-side h3 { font-size: 1.1rem; margin-bottom: 0.25rem; }
+  .vs-side ul {
+    list-style: none; padding: 0; margin: 0;
+    display: flex; flex-direction: column; gap: 0.5rem;
+  }
+  .vs-side ul li {
+    font-size: 0.85rem; color: var(--warm-gray);
+    display: flex; align-items: flex-start; gap: 0.5rem;
+    line-height: 1.5;
+  }
+  .vs-side ul li .icon { flex-shrink: 0; margin-top: 2px; }
+  .vs-side.retail ul li .icon { color: #B5452A; }
+  .vs-side.oso ul li .icon { color: var(--sage); }
+  .vs-divider {
+    display: flex; align-items: center; justify-content: center;
+    padding: 0 1.25rem;
+  }
+  .vs-divider span {
+    font-family: 'Fraunces', serif;
+    font-size: 1.1rem; font-weight: 400;
+    color: var(--warm-gray);
+    background: var(--cream);
+    padding: 0.5rem 0;
+  }
+
+  /* BAR CHART */
+  .bar-compare {
+    display: flex; gap: 1.5rem; align-items: flex-end;
+    margin: 2.5rem 0; padding: 2rem 0;
+  }
+  .bar-item {
+    display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+    flex: 1;
+  }
+  .bar-value {
+    font-family: 'Fraunces', serif;
+    font-size: 1.5rem; font-weight: 700;
+  }
+  .bar-fill {
+    width: 100%; border-radius: 8px 8px 0 0;
+    transition: height 0.6s ease;
+  }
+  .bar-item.retail .bar-fill {
+    background: var(--cream-deep);
+    border: 1px solid var(--rule);
+    height: 30px;
+  }
+  .bar-item.retail .bar-value { color: #B5452A; }
+  .bar-item.oso .bar-fill {
+    background: var(--sage-pale);
+    border: 1px solid rgba(107,143,91,0.25);
+    height: 210px;
+  }
+  .bar-item.oso .bar-value { color: var(--sage); }
+  .bar-label {
+    font-size: 0.72rem; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--warm-gray); text-align: center;
+  }
+
+  /* COST ITEM ICONS */
+  .cost-item-icon {
+    width: 40px; height: 40px;
+    margin-bottom: 1rem;
+    color: var(--bark-light);
+    opacity: 0.6;
+  }
+
+  /* DECORATIVE BLOBS */
+  .blob {
+    position: absolute; pointer-events: none; z-index: 0;
+    opacity: 0.5;
+  }
+
+  /* SECTION DECORATOR */
+  .section-with-decoration { position: relative; overflow: hidden; }
+  .section-with-decoration > * { position: relative; z-index: 1; }
+
+  /* OFFER ICON */
+  .offer-icon {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    margin-top: 0.25rem;
+  }
+  .offer-icon svg { width: 22px; height: 22px; }
+  .offer-icon.sage { background: var(--sage-pale); color: var(--sage); }
+  .offer-icon.honey { background: rgba(212,168,75,0.12); color: var(--honey); }
+  .offer-icon.bark { background: var(--cream-deep); color: var(--bark-light); }
+
+  /* FLOW ARROW */
+  .flow-arrow {
+    display: flex; align-items: center; justify-content: center;
+    margin: 1.5rem 0;
+    color: var(--sage);
+  }
+
+  @media (max-width: 600px) {
+    .vs-graphic { grid-template-columns: 1fr; }
+    .vs-divider { padding: 1rem 0; }
+    .vs-divider span { padding: 0 0.5rem; }
+    .bar-compare { flex-direction: row; }
+    .bar-item.oso .bar-fill { height: 200px; }
+    .bar-item.retail .bar-fill { height: 30px; }
+  }
+
+  /* REACH COMPARISON */
+  .reach-compare {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;
+    margin: 2rem 0;
+  }
+  .reach-card {
+    border-radius: 14px; padding: 2rem; text-align: center;
+  }
+  .reach-card.retail {
+    background: var(--cream-deep); border: 1px solid var(--rule);
+  }
+  .reach-card.online {
+    background: var(--sage-pale); border: 1px solid rgba(107,143,91,0.25);
+  }
+  .reach-number {
+    font-family: 'Fraunces', serif;
+    font-size: 2.5rem; font-weight: 700;
+    line-height: 1; margin-bottom: 0.25rem;
+  }
+  .reach-card.retail .reach-number { color: #B5452A; }
+  .reach-card.online .reach-number { color: var(--sage); }
+  .reach-subtitle {
+    font-size: 0.72rem; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--warm-gray); margin-bottom: 0.5rem;
+  }
+  .reach-desc {
+    font-size: 0.82rem; color: var(--warm-gray);
+    margin: 0; line-height: 1.5;
+  }
+
+  /* OFFER ICONS */
+  .offer-num {
+    display: flex; align-items: center; justify-content: center;
+    width: 3rem; height: 3rem;
+    background: var(--sage-pale);
+    border-radius: 12px;
+    color: var(--sage);
+  }
+
+  /* SCROLL REVEAL */
+  .reveal {
+    opacity: 0; transform: translateY(18px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+  .reveal.visible {
+    opacity: 1; transform: translateY(0);
+  }
+
+  /* HIGHLIGHT CALLOUT */
+  .callout {
+    background: var(--sage-pale);
+    border-left: 3px solid var(--sage);
+    border-radius: 0 12px 12px 0;
+    padding: 1.25rem 1.5rem;
+    margin: 1.5rem 0;
+    font-size: 0.95rem;
+    color: var(--bark);
+  }
+  .callout strong { color: var(--sage); }
+
+  /* ICON INLINE */
+  .inline-icon {
+    display: inline-flex; vertical-align: middle;
+    width: 20px; height: 20px; margin-right: 0.25rem;
+    color: var(--sage);
+  }
+
+  /* SECTION ACCENT STRIPE */
+  .accent-section {
+    background: var(--off-white);
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    padding: 5rem 2.5rem;
+    max-width: none;
+  }
+  .accent-section > * { max-width: 860px; margin-left: auto; margin-right: auto; }
+
+  @media (max-width: 600px) {
+    .reach-compare { grid-template-columns: 1fr; }
+    .reach-number { font-size: 2rem; }
+  }
+
+  /* ANIMATIONS */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .hero h1 { animation: fadeUp 0.7s ease forwards; }
+  .hero-sub { animation: fadeUp 0.7s 0.12s ease both; }
+  .hero-actions { animation: fadeUp 0.7s 0.2s ease both; }
+  .video-placeholder { animation: fadeUp 0.7s 0.05s ease both; }
+
+  @media (max-width: 600px) {
+    nav { padding: 1rem 1.25rem; }
+    section { padding: 3.5rem 1.25rem; }
+    .hero { padding-top: 6rem; }
+    .math-block { padding: 1.5rem; }
+    .proof-block { padding: 2rem 1.5rem; }
+    .open-book { padding: 2rem 1.5rem; }
+    .stat-row { gap: 2rem; }
+    footer { padding: 2rem 1.25rem; }
+    .cta-section { padding: 4rem 1.25rem; }
+    .offer-num { font-size: 2rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="logo">Primal <span>Pantry</span></a>
+  <a href="#" class="nav-cta" onclick="openModal(); return false;">Get a spot</a>
+</nav>
+
+<!-- HERO -->
+<div style="padding: 0 2.5rem;">
+  <div class="hero">
+
+    <p class="hero-eyebrow">The Primal Pantry Anti-Retail Store</p>
+
+    <h1>You're handing over<br>half your business<br><em>for a collection point.</em></h1>
+
+    <p class="hero-sub">Retail is broken and outdated. They're taking your customers, selling your data, and clipping the wings of your brand.</p>
+    <p class="hero-sub" style="margin-bottom: 1rem;"><strong style="color: var(--bark);">We're going to change that.</strong></p>
+    <p class="hero-sub" style="font-size: 0.82rem; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700; color: var(--sage);">Established brands with thousands of monthly customers only.</p>
+
+    <!-- VIDEO PLACEHOLDER -->
+    <div class="video-placeholder">
+      <div class="play-btn"></div>
+      <p class="video-label">Watch — why we built this</p>
+    </div>
+
+    <div class="hero-actions">
+      <a href="#" class="btn-primary" onclick="openModal(); return false;">Apply for a spot</a>
+      <a href="the-primalpantry-anti-retail-store-consumers.html" class="btn-ghost">View the pitch to consumers</a>
+    </div>
+
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- PROBLEM -->
+<section>
+  <p class="section-label">The problem</p>
+  <h2>You're paying them to take your customers.</h2>
+  <p>You're not paying for exposure. You're paying a retailer to own your customer relationship, remove your ability to advertise effectively, and cut off the data that feeds your growth.</p>
+  <p>And the ship is sinking. Retail is losing marketshare to online every year — and retailers can't stop it. They're squeezed from both sides: competing on price against massive international companies, and losing to D2C brands who still have the margins to advertise. Meanwhile, the brands stuck in the system can't make enough noise either — because the retailer already took the margin they needed to do it. They take 30-40%+ and then charge you more on top to advertise in their store. You're funding their business twice while yours stalls — because your customers go to them when you want to advertise.</p>
+  <p>Pick your best-performing retail store. Run the numbers.</p>
+
+  <!-- THE NUMBERS - SIMPLIFIED -->
+  <div class="math-block">
+    <div class="math-row" style="padding: 1rem 0;">
+      <span class="label"><strong>What you're handing a retailer per week</strong><br><span style="font-size:0.8rem;">Their 30-40% cut on 100 units at $10 each + co-op marketing fees. You make $1,000 — they make $2,000 and charge you to advertise on top.</span></span>
+      <span class="value big">$1,100</span>
+    </div>
+    <div class="math-row" style="padding: 1rem 0;">
+      <span class="label"><strong>Revenue you're giving up per week</strong><br><span style="font-size:0.8rem;">100 customers buy 1 product for $10. If they came to your website instead and were exposed to your other products, they'd spend $70. Our goal is to make this store do the same. That's $60 per customer left on the table — every week.</span></span>
+      <span class="value big">$6,000</span>
+    </div>
+    <div class="math-row" style="border-bottom: none; padding: 1rem 0;">
+      <span class="label"><strong>What a whole store costs to run per week</strong><br><span style="font-size:0.8rem;">50sqm CBD space — rent, wages, power, insurance, POS, everything. Christchurch ~$3,000, Wellington ~$3,500, Auckland ~$5,000. Split across 10 brands: $300-500 each.</span></span>
+      <span class="value big" style="color: var(--sage);">$3,000–5,000</span>
+    </div>
+  </div>
+
+  <p style="font-size: 1.06rem; line-height: 1.6;"><strong>And that's just one store. You're handing a retailer $1,100 a week and giving up $6,000 in lost revenue on top. The entire store costs $3,000-5,000 to run depending on the city — split 10 ways, that's $300-500 each. It doesn't take much to realise this doesn't make sense.</strong></p>
+  <div class="callout">
+    <strong>The flywheel:</strong> The more good brands we add, the more foot traffic everyone gets, the lower the operating costs per brand, and the more we can all spend on ads that actually drive growth.
+  </div>
+
+  <!-- BAR CHART VISUAL -->
+  <div class="bar-compare">
+    <div class="bar-item retail">
+      <div class="bar-value">$10</div>
+      <div class="bar-fill"></div>
+      <div class="bar-label">At a retailer<br><span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:0.68rem;">One product, no cross-sells</span></div>
+    </div>
+    <div class="bar-item oso">
+      <div class="bar-value">$70</div>
+      <div class="bar-fill"></div>
+      <div class="bar-label">Your website / our store<br><span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:0.68rem;">Flagship + 5 cross-sells — same experience</span></div>
+    </div>
+  </div>
+
+  <p><strong>Advertising is fuel.</strong> Retail doesn't just take your margin — it takes the engine. No data feeding your ads, no feedback loop, no way to optimise. You're flying blind and paying for the privilege.</p>
+
+  <p>Think about what that $1,100 a week actually buys you in each world. In retail, you get foot traffic — maybe 2,000 people walk past your shelf, 700 of them actually stop. Untargeted. No data. No follow-up.</p>
+  <div class="reach-compare">
+    <div class="reach-card retail">
+      <div class="reach-subtitle">$1,100 in retail</div>
+      <div class="reach-number">700</div>
+      <p class="reach-desc">people in the shop per day. A fraction of them are in your target market — and even fewer notice your product on a shelf among thousands.</p>
+    </div>
+    <div class="reach-card online">
+      <div class="reach-subtitle">$1,100 in online ads</div>
+      <div class="reach-number">100,000</div>
+      <p class="reach-desc">targeted people at $11 CPM. By interest, behaviour, and purchase history. Already looking for what you sell.</p>
+    </div>
+  </div>
+  <p>Now imagine putting even half of that lost revenue back into advertising too.</p>
+</section>
+
+<hr class="divider">
+
+<!-- BROKEN MODEL -->
+<section>
+  <p class="section-label">The broken model</p>
+  <h2>They win on convenience. But they strangle your growth.</h2>
+  <p>Retail gives your customers a place to pick up your product. That's it. That's the only thing it does for you. And for that convenience, <strong>they put themselves in the middle.</strong></p>
+  <p>They take 30-40%+ of your margin — then charge you more on top to advertise in their own store. They strangle growth by removing the one thing that scales a product: paid media that actually pays for itself. They bury your brand in thousands of SKUs where nobody can find anything. And they organise by category — so your customers can't find <em>you</em>, they just find a wall of competing products.</p>
+  <p>Meanwhile, retail's marketshare is steadily shifting to online — and the brands stuck in the old model are the ones losing ground.</p>
+  <p><strong>We give you the same convenience. Without the middleman.</strong> You keep 100% of your margin. Your ads work again. And the store is organised by brand, not by category — your customers walk in and find your area, your products, your story. Not aisle nine behind someone else's promotion.</p>
+
+  <!-- VS GRAPHIC -->
+  <div class="vs-graphic">
+    <div class="vs-side retail">
+      <span class="vs-badge">Traditional retail</span>
+      <h3>What you get</h3>
+      <ul>
+        <li><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M12 4L4 12M4 4l8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>30-40%+ margin gone — then pay more to advertise</li>
+        <li><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M12 4L4 12M4 4l8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>Your data sold to competitors</li>
+        <li><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M12 4L4 12M4 4l8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>Organised by category — you disappear</li>
+        <li><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M12 4L4 12M4 4l8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>Ads stop working</li>
+        <li><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M12 4L4 12M4 4l8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>30-90 day payment terms</li>
+        <li><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M12 4L4 12M4 4l8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>Pay for your own sales data</li>
+      </ul>
+    </div>
+    <div class="vs-divider">
+      <span>vs</span>
+    </div>
+    <div class="vs-side oso">
+      <span class="vs-badge">The anti-retail store</span>
+      <h3>What you keep</h3>
+      <ul>
+        <li><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>100% of your margin</li>
+        <li><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Your data — never shared</li>
+        <li><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Your own branded area</li>
+        <li><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Ads that actually pay for themselves</li>
+        <li><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Flat fee — paid like any other bill</li>
+        <li><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Real-time data included</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- REAL COST -->
+<section>
+  <p class="section-label">What it actually costs you</p>
+  <h2>It's not just margin.</h2>
+  <p>The fee is the obvious part. Here's what nobody talks about.</p>
+
+  <div class="cost-grid">
+    <div class="cost-item">
+      <svg class="cost-item-icon" viewBox="0 0 40 40" fill="none"><path d="M20 8v10l6 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="20" cy="20" r="14" stroke="currentColor" stroke-width="2"/><path d="M28 28l4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <div class="cost-icon">Voice</div>
+      <h3>You go silent online</h3>
+      <p>Ads stop working the moment you go in-store. You can't run them without paying for the same sale twice.</p>
+    </div>
+    <div class="cost-item">
+      <svg class="cost-item-icon" viewBox="0 0 40 40" fill="none"><path d="M12 14h16M12 20h16M12 26h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><rect x="8" y="8" width="24" height="24" rx="4" stroke="currentColor" stroke-width="2"/><path d="M30 16l4-4M30 24l4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <div class="cost-icon">Data</div>
+      <h3>They sell your data</h3>
+      <p>Your customer data is sold to your competitors. They use it to improve their own ads. You're funding their growth.</p>
+    </div>
+    <div class="cost-item">
+      <svg class="cost-item-icon" viewBox="0 0 40 40" fill="none"><rect x="8" y="16" width="6" height="16" rx="1" stroke="currentColor" stroke-width="2"/><rect x="17" y="12" width="6" height="20" rx="1" stroke="currentColor" stroke-width="2"/><rect x="26" y="20" width="6" height="12" rx="1" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2"/><path d="M29 14l-3 3m3-3l3 3m-3-3V8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <div class="cost-icon">Range</div>
+      <h3>Your range dies</h3>
+      <p>They only want winners. The products your customers would cross-sell on never make it to shelf.</p>
+    </div>
+    <div class="cost-item">
+      <svg class="cost-item-icon" viewBox="0 0 40 40" fill="none"><circle cx="16" cy="20" r="8" stroke="currentColor" stroke-width="2"/><path d="M16 16v8M13 20h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M24 20h8M28 16v8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="2 3"/><path d="M26 12l6 8-6 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"/></svg>
+      <div class="cost-icon">AOV</div>
+      <h3>$70 becomes $10</h3>
+      <p>A customer who'd buy the full range on your site walks into a retailer and picks up one item. Your cross-sells don't exist there. That $60 difference is gone forever.</p>
+    </div>
+    <div class="cost-item">
+      <svg class="cost-item-icon" viewBox="0 0 40 40" fill="none"><path d="M20 10v20M14 16l6-6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 32h20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="3 3"/></svg>
+      <div class="cost-icon">Control</div>
+      <h3>You become a number</h3>
+      <p>Stop performing and you're off the shelf. Their size means you negotiate from weakness, not strength.</p>
+    </div>
+    <div class="cost-item">
+      <svg class="cost-item-icon" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="14" r="6" stroke="currentColor" stroke-width="2"/><path d="M10 32c0-5.5 4.5-10 10-10s10 4.5 10 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M26 26l6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M30 26l2 2m0 0l2 2m-2-2l2-2m-2 2l-2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <div class="cost-icon">Customer</div>
+      <h3>You lose the relationship</h3>
+      <p>No email. No follow-up. No loyalty loop. Your customers belong to them, not to you.</p>
+    </div>
+    <div class="cost-item">
+      <svg class="cost-item-icon" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="12" stroke="currentColor" stroke-width="2"/><path d="M20 12v8l5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 8l-3 3M8 32l3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <div class="cost-icon">Cashflow</div>
+      <h3>They're slow to pay</h3>
+      <p>30, 60, 90 day payment terms. You've shipped the stock, it's on their shelf, and you're still waiting for the money. Your cash is tied up, you can't reinvest, and you're more exposed if anything goes wrong.</p>
+    </div>
+    <div class="cost-item">
+      <svg class="cost-item-icon" viewBox="0 0 40 40" fill="none"><rect x="8" y="8" width="24" height="24" rx="3" stroke="currentColor" stroke-width="2"/><path d="M14 20h12M14 15h12M14 25h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="30" cy="28" r="5" stroke="currentColor" stroke-width="2"/><path d="M28 28h4M30 26v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <div class="cost-icon">Insight</div>
+      <h3>You pay for your own data</h3>
+      <p>They collect your sales data and charge you to access it. You're paying to see how your own products are performing in their store.</p>
+    </div>
+    <div class="cost-item">
+      <svg class="cost-item-icon" viewBox="0 0 40 40" fill="none"><path d="M8 30l8-10 6 6 10-14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M26 12h6v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 30h24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="2 3"/></svg>
+      <div class="cost-icon">Attribution</div>
+      <h3>You're flying blind on ads</h3>
+      <p>You can't tell which ads drove the in-store sale. No attribution, no feedback loop. You're spending money on ads with no way to know what's working.</p>
+    </div>
+    <div class="cost-item">
+      <svg class="cost-item-icon" viewBox="0 0 40 40" fill="none"><circle cx="15" cy="20" r="7" stroke="currentColor" stroke-width="2"/><path d="M13 18v4l2 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="27" cy="20" r="7" stroke="currentColor" stroke-width="2"/><path d="M25 18v4l2 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M20 13v-3M20 27v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="2 2"/></svg>
+      <div class="cost-icon">Double-pay</div>
+      <h3>You pay twice for every sale</h3>
+      <p>Run ads that drive someone into a retailer and you've paid for the click and given up your margin. The retailer gets the sale, the data, and the customer. You get the ad bill.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- OFFER -->
+<section id="how">
+  <p class="section-label">The offer</p>
+  <div class="offer-headline">A shelf spot.<br><em>No strings attached.</em></div>
+
+  <p>We're creating three anti-retail stores — collection points for Kiwi wellness and natural product brands in key hubs across the country. Auckland. Wellington. Christchurch.</p>
+  <p><strong>This is for established brands only.</strong> You need thousands of customers a month and a strong online following to qualify. We're starting tight — once the concept is proven, we'll open it up to more brands and more sites. Right now, this is a small group of founders who are ready to take back their customers.</p>
+
+  <div class="offer-row">
+    <div class="offer-num">01</div>
+    <div class="offer-body">
+      <h3>Flat fee. Not a percentage.</h3>
+      <p>You pay a flat operating fee that covers rent and wages — your share of what it costs to keep the lights on. If your business grows, you don't pay more. We're not a retailer. We don't touch your margin.</p>
+    </div>
+  </div>
+  <div class="offer-row">
+    <div class="offer-num">02</div>
+    <div class="offer-body">
+      <h3>Keep 100% of your margin.</h3>
+      <p>Your flagship product sits at the lowest everyday retail price. The difference? Every dollar goes to you. The store is organised by brand, not by category — your products sit together in your own branded area, with five cross-sell spots next to your winner. Your customers know exactly where to find you.</p>
+    </div>
+  </div>
+  <div class="offer-row">
+    <div class="offer-num">03</div>
+    <div class="offer-body">
+      <h3>Your data stays yours.</h3>
+      <p>We will never share your customer data with competitors. Ever. You're included in shared marketing campaigns as part of the deal — if we all do well, we all benefit.</p>
+    </div>
+  </div>
+  <div class="offer-row">
+    <div class="offer-num">04</div>
+    <div class="offer-body">
+      <h3>$10 becomes $70.</h3>
+      <p>In traditional retail, a customer picks up your one flagship product for $10 and leaves. Here, they walk into your branded area and find your cross-sells right next to it. Same customer, same visit — but now they're buying the set, not the sample.</p>
+    </div>
+  </div>
+  <div class="offer-row">
+    <div class="offer-num">05</div>
+    <div class="offer-body">
+      <h3>Your data. Daily. For free.</h3>
+      <p>In retail, you're improving fortnightly or monthly — unless you spend tens of thousands for daily data. Online, you can improve every single day. Here, you get your sales data in real time. You know what's working, what to change, and how to grow — without paying someone else for the privilege of seeing your own numbers.</p>
+    </div>
+  </div>
+  <div class="offer-row">
+    <div class="offer-num">06</div>
+    <div class="offer-body">
+      <h3>Get paid weekly.</h3>
+      <p>No 60-90 day payment terms. You get paid every week. Scale faster, reinvest sooner, and leave yourself less exposed.</p>
+    </div>
+  </div>
+  <div class="offer-row">
+    <div class="offer-num">07</div>
+    <div class="offer-body">
+      <h3>Advertise without paying twice.</h3>
+      <p>Because you keep your margin, your ads still work. Point your campaigns at the store and capture the sale fully — not just a fraction of it.</p>
+    </div>
+  </div>
+
+  <div class="callout" style="margin-top: 3rem;">
+    <strong>How does the store get traffic without taking margins?</strong> Every brand in the store is pointing their own customers to the same place. We're all running ads, we're all driving traffic — and it compounds. Your magnet product sits at the lowest everyday retail price so your ads compete. Your cross-sells sit at full RRP right next to it. That's where the margin lives.
+  </div>
+
+  <p style="margin-top: 2.5rem; font-size: 0.88rem;">None of these are required. When you're ready to grow, they're there:</p>
+
+  <div class="upsell-grid">
+    <div class="upsell-card">
+      <p class="upsell-tag">Optional</p>
+      <h3>In-store marketing</h3>
+      <p>Paid placement, featured positioning and in-store campaign support.</p>
+    </div>
+    <div class="upsell-card">
+      <p class="upsell-tag">Optional</p>
+      <h3>POS to ad data</h3>
+      <p>Our proprietary software connects receipt emails to the Facebook Ads API — telling your ad account exactly which ads resulted in an in-store sale of your products. Real attribution, not guesswork.</p>
+    </div>
+    <div class="upsell-card">
+      <p class="upsell-tag">Optional</p>
+      <h3>3PL fulfilment</h3>
+      <p>Warehousing and logistics for brands scaling their online presence who are currently using retailers' infrastructure to do so.</p>
+    </div>
+    <div class="upsell-card">
+      <p class="upsell-tag">Optional</p>
+      <h3>Network & coaching</h3>
+      <p>Access to marketing experts who can help you navigate the transition to this new way of business. Plus a community of founders doing the same thing.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- WHY / SOCIAL PROOF -->
+<section>
+  <p class="section-label">Why this exists</p>
+  <h2>We don't need your margin to survive. We need shelf space.</h2>
+
+  <p>Our products will be on the shelves right next to yours. We're doing this because we're passionate about giving our own customers a better experience — and because we want to fight for fair.</p>
+
+  <p>We went into two of the biggest chains in the country. Within two months they told us we were at the top of their dry skin category — but the volume wasn't close to what we were doing ourselves. And I quickly found myself with a boss again. I started this business to have control — and suddenly I was uneasy, stressed, and answering to someone who didn't care about my brand the way I do. So we left.</p>
+
+  <p>They told us: <em>"Do you really think you'll get your customers back if you leave retail?"</em></p>
+
+  <div class="reach-compare" style="margin: 2rem 0;">
+    <div class="reach-card online" style="text-align: left;">
+      <div class="reach-number" style="font-size: 2rem;">+40%</div>
+      <p class="reach-desc">Revenue in first week back online</p>
+    </div>
+    <div class="reach-card online" style="text-align: left;">
+      <div class="reach-number" style="font-size: 2rem;">2 mo</div>
+      <p class="reach-desc">To top their category — still did better ourselves</p>
+    </div>
+  </div>
+
+  <p>I saw how it works on the other side and was shocked. <strong>That's my why — the same as yours.</strong></p>
+
+  <p>This is a transition for brave brands who don't like their current position but are too cautious to go fully direct on their own — and don't want to lose the benefits of a physical location. You keep everything that works about having a store, without everything that doesn't.</p>
+
+  <div class="callout" style="border-left-color: #B5452A; background: rgba(181,69,42,0.04);">
+    <strong style="color: #B5452A;">"Why should I justify shelf space if you're supporting other retailers too?"</strong> — That's what retailers say. But you're the one bringing all the customers. You're the one running the ads. They're not driving traffic to your product — you are. Point your customers somewhere that actually works for you.
+  </div>
+
+  <div class="open-book">
+    <h3>Kiwi brands helping each other win.</h3>
+    <p>We're not competing with each other — we're competing with massive international companies who have unlimited budgets. The only way to win is together. Trade notes, share what's working, get better as a group. Your win is my win.</p>
+  </div>
+
+  <p><strong>This isn't for passive, set-and-forget business owners. This is for founders who love the game — who move fast, take control, and actually build something. If that's you, let's talk.</strong></p>
+</section>
+
+<hr class="divider">
+
+<!-- FINAL CTA -->
+<div class="cta-section" id="apply">
+  <p class="section-label" style="justify-content: center;">Limited spots</p>
+  <h2>Ready to take back your business?</h2>
+  <p>This is for NZ wellness and natural product brands who want a voice, a real connection with their customers, and a physical presence that doesn't clip their wings. Spots are limited.</p>
+  <a href="#" class="btn-primary" onclick="openModal(); return false;">Apply now</a>
+  <p class="spots">A Primal Pantry project</p>
+</div>
+
+<!-- APPLICATION MODAL -->
+<div class="modal-overlay" id="appModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">&times;</button>
+    <div class="modal-header">
+      <h2>Apply for a spot</h2>
+      <p>Tell us about your brand. Takes about 3 minutes.</p>
+    </div>
+    <form class="modal-form" onsubmit="handleSubmit(event)">
+
+      <p class="form-section-label">About you</p>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="name">Your name</label>
+          <input type="text" id="name" name="name" required placeholder="First and last">
+        </div>
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" required placeholder="you@brand.co.nz">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="company">Company name</label>
+          <input type="text" id="company" name="company" required>
+        </div>
+        <div class="form-group">
+          <label for="website">Website</label>
+          <input type="url" id="website" name="website" placeholder="https://...">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="founded">Year founded</label>
+          <input type="number" id="founded" name="founded" min="1990" max="2026" placeholder="e.g. 2020">
+        </div>
+        <div class="form-group">
+          <label for="category">Product category</label>
+          <select id="category" name="category" required>
+            <option value="" disabled selected>Select one</option>
+            <option value="skincare">Skincare</option>
+            <option value="supplements">Supplements</option>
+            <option value="food-bev">Food & beverage</option>
+            <option value="personal-care">Personal care</option>
+            <option value="baby-kids">Baby & kids</option>
+            <option value="pet">Pet wellness</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+      </div>
+
+      <hr class="form-divider">
+      <p class="form-section-label">Your presence</p>
+
+      <div class="form-group">
+        <label for="socials">Social media links</label>
+        <span class="hint">Instagram, TikTok, Facebook — whatever you're active on</span>
+        <textarea id="socials" name="socials" placeholder="instagram.com/yourbrand&#10;tiktok.com/@yourbrand"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label for="monthly_customers">Estimated customers per month</label>
+        <span class="hint">Rough number is fine. We won't share this with anyone.</span>
+        <input type="text" id="monthly_customers" name="monthly_customers" placeholder="e.g. 2,000">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="ad_platforms">Where are you advertising?</label>
+          <input type="text" id="ad_platforms" name="ad_platforms" placeholder="Meta, Google, TikTok...">
+        </div>
+        <div class="form-group">
+          <label for="marketing_team">In-house marketing team?</label>
+          <select id="marketing_team" name="marketing_team">
+            <option value="" disabled selected>Select one</option>
+            <option value="yes-team">Yes — dedicated team</option>
+            <option value="yes-solo">Yes — just me</option>
+            <option value="agency">We use an agency</option>
+            <option value="no">Not yet</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="channels">What channels do you currently sell through?</label>
+        <input type="text" id="channels" name="channels" placeholder="e.g. D2C, retail, B2B wholesale, marketplace">
+      </div>
+
+      <hr class="form-divider">
+      <p class="form-section-label">Your products</p>
+
+      <div class="form-group">
+        <label for="flagship">What's your flagship product?</label>
+        <span class="hint">Your main magnet — the one that gets people in the door</span>
+        <input type="text" id="flagship" name="flagship" required placeholder="e.g. Tallow Day Cream 50ml">
+      </div>
+
+      <div class="form-group">
+        <label for="crosssells">What cross-sells would you want on the shelf next to it?</label>
+        <span class="hint">Up to 5 products that complement your flagship</span>
+        <textarea id="crosssells" name="crosssells" placeholder="e.g. Night cream, Eye serum, Body butter, Lip balm"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label for="product_size">How big are your products roughly?</label>
+        <span class="hint">Helps us plan shelf space — dimensions or a comparison</span>
+        <input type="text" id="product_size" name="product_size" placeholder="e.g. 50ml jar, about the size of a tennis ball">
+      </div>
+
+      <hr class="form-divider">
+
+      <div class="form-group">
+        <label for="anything_else">Anything else we should know?</label>
+        <textarea id="anything_else" name="anything_else" placeholder="Current retail frustrations, what you're hoping to get out of this, questions — anything."></textarea>
+      </div>
+
+      <button type="submit" class="btn-submit">Submit application</button>
+      <p class="form-privacy">Your data stays between us. We don't share it with anyone.</p>
+    </form>
+  </div>
+</div>
+
+<script>
+  function openModal() {
+    document.getElementById('appModal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeModal() {
+    document.getElementById('appModal').classList.remove('active');
+    document.body.style.overflow = '';
+  }
+  document.getElementById('appModal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+  });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeModal();
+  });
+  function handleSubmit(e) {
+    e.preventDefault();
+    var form = e.target;
+    var data = new FormData(form);
+    var entries = {};
+    data.forEach(function(v, k) { entries[k] = v; });
+    console.log('Application submitted:', entries);
+    form.innerHTML = '<div style="text-align:center;padding:3rem 1rem;"><h2 style="margin-bottom:1rem;">Application received.</h2><p style="color:var(--warm-gray);">We\'ll be in touch within 48 hours.</p></div>';
+  }
+
+  // Scroll reveal
+  var reveals = document.querySelectorAll('.math-block, .cost-grid, .vs-graphic, .bar-compare, .reach-compare, .proof-block, .open-book, .offer-row, .upsell-grid, .callout');
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('reveal', 'visible');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.15 });
+  reveals.forEach(function(el) {
+    el.classList.add('reveal');
+    observer.observe(el);
+  });
+</script>
+
+<!-- FOOTER -->
+<hr class="divider">
+<footer>
+  <div class="logo-sm">Primal <span>Pantry</span></div>
+  <p>Anti-retail. Pro-founder. New Zealand.</p>
+</footer>
+
+</body>
+</html>
