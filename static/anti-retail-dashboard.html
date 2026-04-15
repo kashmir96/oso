@@ -58,10 +58,27 @@ body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); col
 .bar { border-radius:3px 3px 0 0; width:100%; min-height:2px; transition:height 0.3s; }
 .bar-label { font-size:0.55rem; color:var(--dim); }
 
-/* Heatmap */
-.heatmap { display:grid; grid-template-columns:repeat(24,1fr); gap:2px; }
-.heat-cell { aspect-ratio:1; border-radius:2px; position:relative; }
-.heat-cell:hover::after { content:attr(data-tip); position:absolute; bottom:calc(100% + 4px); left:50%; transform:translateX(-50%); background:var(--text); color:var(--bg); padding:0.2rem 0.4rem; border-radius:4px; font-size:0.6rem; white-space:nowrap; z-index:10; }
+/* Heatmap - matching PrimalPantry style */
+.heatmap-grid { display:grid; grid-template-columns:40px repeat(24,1fr) minmax(35px,1fr); gap:2px; font-size:0.65rem; width:100%; }
+.heatmap-label { display:flex; align-items:center; color:var(--dim); white-space:nowrap; font-size:0.65rem; }
+.heatmap-cell { min-height:26px; max-height:32px; border-radius:3px; display:flex; align-items:center; justify-content:center; font-size:0.6rem; color:var(--muted); cursor:default; transition:opacity 0.15s; }
+.heatmap-cell:hover { opacity:0.8; }
+.heatmap-header { color:var(--dim); text-align:center; font-size:0.6rem; padding:2px 0; white-space:nowrap; }
+
+/* Expandable detail */
+.expand-detail { display:none; margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid var(--border); }
+.expand-detail.open { display:block; }
+
+/* Attribution flow */
+.flow-steps { display:flex; gap:0; align-items:stretch; margin:1.5rem 0; }
+.flow-step { flex:1; padding:1.25rem; background:var(--card); border:1px solid var(--border); text-align:center; position:relative; }
+.flow-step:first-child { border-radius:10px 0 0 10px; }
+.flow-step:last-child { border-radius:0 10px 10px 0; }
+.flow-step:not(:last-child)::after { content:'→'; position:absolute; right:-12px; top:50%; transform:translateY(-50%); color:var(--sage); font-size:1.2rem; z-index:1; background:var(--bg); width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:1px solid var(--border); }
+.flow-step .step-num { font-size:0.6rem; font-weight:700; color:var(--sage); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:0.4rem; }
+.flow-step .step-title { font-size:0.85rem; font-weight:600; color:var(--text); margin-bottom:0.25rem; }
+.flow-step .step-desc { font-size:0.72rem; color:var(--muted); line-height:1.4; }
+.flow-step .step-icon { font-size:1.5rem; margin-bottom:0.5rem; }
 
 /* Horizontal bar */
 .h-bars { display:flex; flex-direction:column; gap:0.5rem; }
@@ -169,6 +186,12 @@ body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); col
   <div class="page-header">
     <h1>Overview <span>Wednesday, 16 Apr</span></h1>
     <div class="hdr-controls">
+      <select id="store-filter" style="font-weight:600;">
+        <option value="all">All Stores</option>
+        <option value="chch">Christchurch</option>
+        <option value="wlg">Wellington</option>
+        <option value="akl">Auckland</option>
+      </select>
       <input type="date" value="2026-04-10" id="date-from">
       <span style="color:var(--dim)">→</span>
       <input type="date" value="2026-04-16" id="date-to">
@@ -209,6 +232,53 @@ body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); col
     </div>
   </div>
 
+  <!-- Store Map -->
+  <div class="chart-card" style="margin-bottom:1.5rem;">
+    <h3>Revenue by Store</h3>
+    <div style="display:grid;grid-template-columns:1fr 280px;gap:1.5rem;align-items:center;">
+      <div style="position:relative;height:320px;background:var(--cream);border-radius:10px;overflow:hidden;border:1px solid var(--border);">
+        <!-- NZ Map SVG simplified -->
+        <svg viewBox="0 0 200 400" style="width:100%;height:100%;opacity:0.15;" fill="none" stroke="var(--muted)" stroke-width="0.5">
+          <path d="M95 40 C90 50,80 65,85 80 C88 90,100 95,105 110 C108 120,100 130,95 140 C92 150,98 155,102 165 C105 170,95 180,90 185 L92 195 C95 198,105 195,108 190 C112 185,115 175,118 170 C120 165,115 155,112 150 C110 142,115 135,118 128 C120 120,125 110,122 100 C120 90,115 80,112 70 C110 60,100 50,95 40Z"/>
+          <path d="M88 220 C82 230,78 245,82 260 C85 270,90 280,88 295 C86 305,80 315,82 325 C84 330,92 335,95 340 C98 345,100 335,102 328 C104 320,100 310,98 300 C96 290,100 280,102 270 C104 260,98 245,95 235 C93 228,90 225,88 220Z"/>
+        </svg>
+        <!-- Store dots -->
+        <div style="position:absolute;top:28%;left:58%;transform:translate(-50%,-50%);" title="Auckland">
+          <div style="width:14px;height:14px;background:var(--sage);border-radius:50%;border:2px solid var(--card);box-shadow:0 0 0 3px rgba(107,143,91,0.3);"></div>
+          <div style="position:absolute;left:20px;top:-4px;font-size:0.7rem;font-weight:600;color:var(--text);white-space:nowrap;">Auckland</div>
+        </div>
+        <div style="position:absolute;top:42%;left:52%;transform:translate(-50%,-50%);" title="Wellington">
+          <div style="width:12px;height:12px;background:var(--honey);border-radius:50%;border:2px solid var(--card);box-shadow:0 0 0 3px rgba(212,168,75,0.3);"></div>
+          <div style="position:absolute;left:18px;top:-4px;font-size:0.7rem;font-weight:600;color:var(--text);white-space:nowrap;">Wellington</div>
+        </div>
+        <div style="position:absolute;top:65%;left:48%;transform:translate(-50%,-50%);" title="Christchurch">
+          <div style="width:16px;height:16px;background:var(--sage);border-radius:50%;border:2px solid var(--card);box-shadow:0 0 0 4px rgba(107,143,91,0.3);"></div>
+          <div style="position:absolute;left:22px;top:-4px;font-size:0.7rem;font-weight:600;color:var(--text);white-space:nowrap;">Christchurch</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:0.75rem;">
+        <div class="stat-card" style="border-left:3px solid var(--sage);">
+          <div class="label">Christchurch</div>
+          <div class="value" style="font-size:1.3rem;color:var(--sage)">$3,240</div>
+          <div class="sub">42 orders · Top store</div>
+          <div class="paceline" style="margin-top:0.3rem;"><div class="pace-bar"><div class="pace-fill" style="width:78%;background:var(--sage)"></div></div><span class="pace-label">78%</span></div>
+        </div>
+        <div class="stat-card" style="border-left:3px solid var(--sage);">
+          <div class="label">Auckland</div>
+          <div class="value" style="font-size:1.3rem;">$2,410</div>
+          <div class="sub">31 orders</div>
+          <div class="paceline" style="margin-top:0.3rem;"><div class="pace-bar"><div class="pace-fill" style="width:58%;background:var(--sage)"></div></div><span class="pace-label">58%</span></div>
+        </div>
+        <div class="stat-card" style="border-left:3px solid var(--honey);">
+          <div class="label">Wellington</div>
+          <div class="value" style="font-size:1.3rem;">$1,182</div>
+          <div class="sub">16 orders</div>
+          <div class="paceline" style="margin-top:0.3rem;"><div class="pace-bar"><div class="pace-fill" style="width:35%;background:var(--honey)"></div></div><span class="pace-label">35%</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Revenue trend + Sales by hour -->
   <div class="charts-row">
     <div class="chart-card">
@@ -225,16 +295,7 @@ body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); col
   <div class="charts-row">
     <div class="chart-card">
       <h3>Order Heatmap — This Week</h3>
-      <div style="display:flex;gap:2px;margin-bottom:4px;">
-        <span style="flex:1;font-size:0.5rem;color:var(--dim);text-align:center" class="heat-day">Mon</span>
-        <span style="flex:1;font-size:0.5rem;color:var(--dim);text-align:center" class="heat-day">Tue</span>
-        <span style="flex:1;font-size:0.5rem;color:var(--dim);text-align:center" class="heat-day">Wed</span>
-        <span style="flex:1;font-size:0.5rem;color:var(--dim);text-align:center" class="heat-day">Thu</span>
-        <span style="flex:1;font-size:0.5rem;color:var(--dim);text-align:center" class="heat-day">Fri</span>
-        <span style="flex:1;font-size:0.5rem;color:var(--dim);text-align:center" class="heat-day">Sat</span>
-        <span style="flex:1;font-size:0.5rem;color:var(--dim);text-align:center" class="heat-day">Sun</span>
-      </div>
-      <div id="heatmap-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;"></div>
+      <div id="heatmap-grid" class="heatmap-grid"></div>
     </div>
     <div class="chart-card">
       <h3>Sales by Day of Week</h3>
@@ -255,29 +316,103 @@ body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); col
     </div>
   </div>
 
-  <!-- Promo / Affiliate / Bundle -->
+  <!-- Promo / Affiliate / Bundle — click to expand -->
   <div class="promo-grid">
-    <div class="click-card" onclick="openModal('promo-modal')">
+    <div class="click-card" onclick="toggleDetail('promo-detail')">
       <div class="cc-label">Promo Codes</div>
       <div class="cc-value" style="color:var(--honey)">$1,420</div>
-      <div class="cc-sub">23 redeemed this week</div>
+      <div class="cc-sub">23 redeemed this week · Click to view</div>
     </div>
-    <div class="click-card" onclick="openModal('affiliate-modal')">
+    <div class="click-card" onclick="toggleDetail('affiliate-detail')">
       <div class="cc-label">Affiliate Codes</div>
       <div class="cc-value" style="color:var(--blush)">$2,180</div>
-      <div class="cc-sub">41 redeemed this week</div>
+      <div class="cc-sub">41 redeemed this week · Click to view</div>
     </div>
-    <div class="click-card" onclick="openModal('bundle-modal')">
+    <div class="click-card" onclick="toggleDetail('bundle-detail')">
       <div class="cc-label">Bundle Deals</div>
       <div class="cc-value" style="color:var(--sage)">$890</div>
-      <div class="cc-sub">14 redeemed this week</div>
+      <div class="cc-sub">14 redeemed this week · Click to view</div>
     </div>
   </div>
 
-  <div style="display:flex;gap:0.5rem;margin-bottom:1.5rem;">
-    <button class="btn-outline" onclick="openModal('create-promo')">+ New Promo Code</button>
-    <button class="btn-outline" onclick="openModal('create-affiliate')">+ New Affiliate</button>
-    <button class="btn-outline" onclick="openModal('create-bundle')">+ New Bundle</button>
+  <!-- Expandable tables -->
+  <div class="expand-detail" id="promo-detail">
+    <div class="chart-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <h3>Promo Code Performance</h3>
+        <button class="btn-outline" onclick="openModal('create-promo')">+ New Promo Code</button>
+      </div>
+      <table class="data-table"><thead><tr><th>Code</th><th>Discount</th><th>Uses</th><th>Revenue</th><th>Status</th></tr></thead><tbody>
+      <tr><td>WELCOME20</td><td>20% off</td><td>12</td><td>$680</td><td><span class="badge badge-sage">Active</span></td></tr>
+      <tr><td>SPRING15</td><td>15% off</td><td>8</td><td>$490</td><td><span class="badge badge-sage">Active</span></td></tr>
+      <tr><td>FREESHIP</td><td>Free shipping</td><td>3</td><td>$250</td><td><span class="badge badge-honey">Expiring soon</span></td></tr>
+      </tbody></table>
+    </div>
+  </div>
+
+  <div class="expand-detail" id="affiliate-detail">
+    <div class="chart-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <h3>Affiliate Performance</h3>
+        <button class="btn-outline" onclick="openModal('create-affiliate')">+ New Affiliate</button>
+      </div>
+      <table class="data-table"><thead><tr><th>Influencer</th><th>Code</th><th>Uses</th><th>Revenue</th><th>Commission</th></tr></thead><tbody>
+      <tr><td>@skincarewithjess</td><td>JESS10</td><td>18</td><td>$1,040</td><td>$104</td></tr>
+      <tr><td>@naturallyemma</td><td>EMMA15</td><td>14</td><td>$720</td><td>$108</td></tr>
+      <tr><td>@wellnesswithkat</td><td>KAT10</td><td>9</td><td>$420</td><td>$42</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+
+  <div class="expand-detail" id="bundle-detail">
+    <div class="chart-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <h3>Bundle Deal Performance</h3>
+        <button class="btn-outline" onclick="openModal('create-bundle')">+ New Bundle</button>
+      </div>
+      <table class="data-table"><thead><tr><th>Bundle</th><th>Price</th><th>Savings</th><th>Sold</th><th>Revenue</th></tr></thead><tbody>
+      <tr><td>Day + Night Duo</td><td>$79.00</td><td>$8 off</td><td>6</td><td>$474</td></tr>
+      <tr><td>Full Skincare Set</td><td>$189.00</td><td>$9 off</td><td>2</td><td>$378</td></tr>
+      <tr><td>Eyes & Lips Kit</td><td>$65.00</td><td>$8 off</td><td>6</td><td>$390</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+
+  <!-- Ad Attribution -->
+  <div class="chart-card" style="margin-top:1.5rem;margin-bottom:1.5rem;">
+    <h3>Ad Attribution — In-Store Conversion Tracking</h3>
+    <div class="flow-steps">
+      <div class="flow-step">
+        <div class="step-icon">📱</div>
+        <div class="step-num">Step 1</div>
+        <div class="step-title">Add offer to ad</div>
+        <div class="step-desc">Create a promo or affiliate code and attach it to your Facebook/Instagram ad</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-icon">🏪</div>
+        <div class="step-num">Step 2</div>
+        <div class="step-title">Customer scans in store</div>
+        <div class="step-desc">Customer redeems the code at POS. Receipt captures their email</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-icon">🔄</div>
+        <div class="step-num">Step 3</div>
+        <div class="step-title">Sale attributed to ad</div>
+        <div class="step-desc">Our software matches the email to the Facebook Ads API — the ad that drove the sale gets the credit</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-icon">📊</div>
+        <div class="step-num">Step 4</div>
+        <div class="step-title">Optimise & scale</div>
+        <div class="step-desc">Your ad account learns which ads drive in-store sales. Scale what works, cut what doesn't</div>
+      </div>
+    </div>
+    <div class="stats" style="grid-template-columns:repeat(4,1fr);margin-top:1rem;margin-bottom:0;">
+      <div class="stat-card"><div class="label">Ads Attributed</div><div class="value" style="color:var(--sage)">34</div><div class="sub">This week</div></div>
+      <div class="stat-card"><div class="label">Revenue Attributed</div><div class="value">$2,860</div><div class="sub">From ad-driven sales</div></div>
+      <div class="stat-card"><div class="label">ROAS</div><div class="value" style="color:var(--sage)">4.2x</div><div class="sub">Return on ad spend</div></div>
+      <div class="stat-card"><div class="label">Cost Per Sale</div><div class="value">$19.80</div><div class="sub">Avg across campaigns</div></div>
+    </div>
   </div>
 </div>
 
@@ -388,27 +523,6 @@ body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); col
 </div><!-- /shell -->
 
 <!-- MODALS -->
-<div class="modal-bg" id="promo-modal"><div class="modal-box"><button class="modal-close" onclick="closeModals()">×</button><h2>Promo Code Performance</h2>
-<table class="data-table"><thead><tr><th>Code</th><th>Discount</th><th>Uses</th><th>Revenue</th></tr></thead><tbody>
-<tr><td>WELCOME20</td><td>20% off</td><td>12</td><td>$680</td></tr>
-<tr><td>SPRING15</td><td>15% off</td><td>8</td><td>$490</td></tr>
-<tr><td>FREESHIP</td><td>Free shipping</td><td>3</td><td>$250</td></tr>
-</tbody></table></div></div>
-
-<div class="modal-bg" id="affiliate-modal"><div class="modal-box"><button class="modal-close" onclick="closeModals()">×</button><h2>Affiliate Performance</h2>
-<table class="data-table"><thead><tr><th>Influencer</th><th>Code</th><th>Uses</th><th>Revenue</th></tr></thead><tbody>
-<tr><td>@skincarewithjess</td><td>JESS10</td><td>18</td><td>$1,040</td></tr>
-<tr><td>@naturallyemma</td><td>EMMA15</td><td>14</td><td>$720</td></tr>
-<tr><td>@wellnesswithkat</td><td>KAT10</td><td>9</td><td>$420</td></tr>
-</tbody></table></div></div>
-
-<div class="modal-bg" id="bundle-modal"><div class="modal-box"><button class="modal-close" onclick="closeModals()">×</button><h2>Bundle Deal Performance</h2>
-<table class="data-table"><thead><tr><th>Bundle</th><th>Price</th><th>Sold</th><th>Revenue</th></tr></thead><tbody>
-<tr><td>Day + Night Duo</td><td>$79.00</td><td>6</td><td>$474</td></tr>
-<tr><td>Full Skincare Set</td><td>$189.00</td><td>2</td><td>$378</td></tr>
-<tr><td>Eyes & Lips Kit</td><td>$65.00</td><td>6</td><td>$390</td></tr>
-</tbody></table></div></div>
-
 <div class="modal-bg" id="create-promo"><div class="modal-box"><button class="modal-close" onclick="closeModals()">×</button><h2>Create Promo Code</h2>
 <div class="create-form"><label>Code</label><input placeholder="e.g. SUMMER20"><label>Discount Type</label><select><option>Percentage</option><option>Fixed amount</option></select><label>Value</label><input type="number" placeholder="20"><label>Expiry</label><input type="date"><button class="btn-sage">Create Code</button></div></div></div>
 
@@ -431,6 +545,14 @@ function switchTab(id, el) {
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModals() { document.querySelectorAll('.modal-bg').forEach(m => m.classList.remove('open')); }
 document.querySelectorAll('.modal-bg').forEach(m => { m.addEventListener('click', e => { if (e.target === m) closeModals(); }); });
+
+// Expand/collapse detail tables
+function toggleDetail(id) {
+  var el = document.getElementById(id);
+  var isOpen = el.classList.contains('open');
+  document.querySelectorAll('.expand-detail').forEach(d => d.classList.remove('open'));
+  if (!isOpen) el.classList.add('open');
+}
 
 // Revenue trend chart
 (function() {
@@ -455,24 +577,42 @@ document.querySelectorAll('.modal-bg').forEach(m => { m.addEventListener('click'
   });
 })();
 
-// Heatmap
+// Heatmap — PrimalPantry style (days × hours grid)
 (function() {
   var grid = document.getElementById('heatmap-grid');
-  var hours = ['6am','7','8','9','10','11','12pm','1','2','3','4','5','6pm'];
-  // 7 days x 13 hours
-  for (var h = 0; h < 13; h++) {
-    for (var d = 0; d < 7; d++) {
-      var val = Math.random();
-      var intensity;
-      if (val < 0.2) intensity = 'rgba(140,180,122,0.05)';
-      else if (val < 0.4) intensity = 'rgba(140,180,122,0.15)';
-      else if (val < 0.6) intensity = 'rgba(140,180,122,0.3)';
-      else if (val < 0.8) intensity = 'rgba(140,180,122,0.5)';
-      else intensity = 'rgba(140,180,122,0.75)';
-      var orders = Math.floor(val * 8);
-      grid.innerHTML += '<div class="heat-cell" style="background:'+intensity+'" data-tip="'+orders+' orders"></div>';
-    }
-  }
+  var days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  var hours = [];
+  for (var i = 6; i <= 20; i++) { hours.push(i <= 12 ? (i === 12 ? '12p' : i+'a') : (i-12)+'p'); }
+  // Header row
+  grid.innerHTML = '<div class="heatmap-label"></div>';
+  hours.forEach(function(h) { grid.innerHTML += '<div class="heatmap-header">'+h+'</div>'; });
+  grid.innerHTML += '<div class="heatmap-header" style="font-weight:600;">Total</div>';
+  // Update grid columns for 15 hours
+  grid.style.gridTemplateColumns = '40px repeat('+hours.length+',1fr) minmax(35px,1fr)';
+  // Data rows
+  var peakHours = [10,11,12,13,14,15,16]; // 10am-4pm peak
+  days.forEach(function(day, di) {
+    var isWeekend = di >= 5;
+    grid.innerHTML += '<div class="heatmap-label">' + day + '</div>';
+    var dayTotal = 0;
+    hours.forEach(function(h, hi) {
+      var hour = hi + 6;
+      var base = peakHours.indexOf(hour) >= 0 ? 0.5 : 0.15;
+      if (isWeekend && peakHours.indexOf(hour) >= 0) base = 0.7;
+      var val = Math.min(1, base + Math.random() * 0.4);
+      var orders = Math.floor(val * 6);
+      dayTotal += orders;
+      var bg;
+      if (orders === 0) bg = 'rgba(107,143,91,0.03)';
+      else if (orders <= 1) bg = 'rgba(107,143,91,0.12)';
+      else if (orders <= 2) bg = 'rgba(107,143,91,0.25)';
+      else if (orders <= 3) bg = 'rgba(107,143,91,0.4)';
+      else if (orders <= 4) bg = 'rgba(107,143,91,0.55)';
+      else bg = 'rgba(107,143,91,0.7)';
+      grid.innerHTML += '<div class="heatmap-cell" style="background:'+bg+'" title="'+day+' '+h+': '+orders+' orders">'+( orders > 0 ? orders : '')+'</div>';
+    });
+    grid.innerHTML += '<div class="heatmap-cell" style="background:rgba(107,143,91,0.08);font-weight:600;font-size:0.6rem;" title="'+day+' total">'+dayTotal+'</div>';
+  });
 })();
 
 // Day of week
