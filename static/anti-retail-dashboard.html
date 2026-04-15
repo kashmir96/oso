@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PrimalPantry — Supplier Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root { --bg: #141210; --card: #1e1b18; --border: #332d27; --text: #e8e2da; --muted: #9c9287; --dim: #6e6259; --sage: #8CB47A; --honey: #D4A84B; --blush: #DBBFA8; --red: #e06050; --cream: #e8e2da; --cream-deep: #252220; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+/* Layout */
+.shell { display:flex; min-height:100vh; }
+.sidebar { width:220px; background:var(--card); border-right:1px solid var(--border); padding:1.5rem 0; flex-shrink:0; position:fixed; top:0; bottom:0; overflow-y:auto; }
+.main { margin-left:220px; flex:1; padding:1.5rem 2rem; }
+
+/* Sidebar */
+.sb-logo { padding:0 1.25rem 1.5rem; font-size:1.2rem; font-weight:700; color:var(--text); border-bottom:1px solid var(--border); margin-bottom:1rem; }
+.sb-logo span { color:var(--sage); }
+.sb-label { font-size:0.6rem; font-weight:700; color:var(--dim); text-transform:uppercase; letter-spacing:0.1em; padding:0.75rem 1.25rem 0.4rem; }
+.sb-nav { list-style:none; }
+.sb-nav li a { display:flex; align-items:center; gap:0.6rem; padding:0.55rem 1.25rem; color:var(--muted); text-decoration:none; font-size:0.85rem; font-weight:500; transition:all 0.15s; border-left:3px solid transparent; }
+.sb-nav li a:hover { color:var(--text); background:var(--cream-deep); }
+.sb-nav li a.active { color:var(--sage); border-left-color:var(--sage); background:rgba(140,180,122,0.06); }
+.sb-nav li a svg { width:18px; height:18px; opacity:0.5; }
+.sb-nav li a.active svg { opacity:1; }
+.sb-brand { margin:1.5rem 1.25rem; padding:0.75rem; background:var(--cream-deep); border-radius:8px; border:1px solid var(--border); }
+.sb-brand-name { font-size:0.8rem; font-weight:600; color:var(--text); }
+.sb-brand-cat { font-size:0.65rem; color:var(--dim); margin-top:0.15rem; }
+
+/* Header */
+.page-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem; }
+.page-header h1 { font-size:1.4rem; font-weight:700; }
+.page-header h1 span { color:var(--sage); font-weight:400; font-size:0.85rem; margin-left:0.5rem; }
+.hdr-controls { display:flex; gap:0.5rem; align-items:center; }
+.hdr-controls input[type="date"], .hdr-controls select { background:var(--card); border:1px solid var(--border); color:var(--text); padding:0.4rem 0.6rem; border-radius:6px; font-size:0.8rem; font-family:inherit; }
+
+/* Stat Cards */
+.stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:0.75rem; margin-bottom:1.5rem; }
+.stat-card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:1rem; }
+.stat-card .label { font-size:0.7rem; color:var(--dim); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.4rem; }
+.stat-card .value { font-size:1.6rem; font-weight:700; line-height:1; }
+.stat-card .change { font-size:0.72rem; margin-top:0.3rem; }
+.stat-card .change.up { color:var(--sage); }
+.stat-card .change.down { color:var(--red); }
+.stat-card .sub { font-size:0.7rem; color:var(--dim); margin-top:0.2rem; }
+
+/* Charts */
+.charts-row { display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:1.5rem; }
+.chart-card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:1.25rem; }
+.chart-card h3 { font-size:0.8rem; font-weight:600; color:var(--muted); margin-bottom:1rem; }
+.chart-card.full { grid-column:1/-1; }
+
+/* Bar chart */
+.bar-chart { display:flex; align-items:flex-end; gap:4px; height:120px; padding-top:0.5rem; }
+.bar-col { flex:1; display:flex; flex-direction:column; align-items:center; gap:0.25rem; }
+.bar { border-radius:3px 3px 0 0; width:100%; min-height:2px; transition:height 0.3s; }
+.bar-label { font-size:0.55rem; color:var(--dim); }
+
+/* Heatmap */
+.heatmap { display:grid; grid-template-columns:repeat(24,1fr); gap:2px; }
+.heat-cell { aspect-ratio:1; border-radius:2px; position:relative; }
+.heat-cell:hover::after { content:attr(data-tip); position:absolute; bottom:calc(100% + 4px); left:50%; transform:translateX(-50%); background:var(--text); color:var(--bg); padding:0.2rem 0.4rem; border-radius:4px; font-size:0.6rem; white-space:nowrap; z-index:10; }
+
+/* Horizontal bar */
+.h-bars { display:flex; flex-direction:column; gap:0.5rem; }
+.h-bar-row { display:flex; align-items:center; gap:0.5rem; }
+.h-bar-label { font-size:0.75rem; color:var(--muted); min-width:50px; text-align:right; }
+.h-bar-track { flex:1; height:20px; background:var(--cream-deep); border-radius:4px; overflow:hidden; }
+.h-bar-fill { height:100%; border-radius:4px; }
+.h-bar-val { font-size:0.75rem; color:var(--text); font-weight:600; min-width:50px; }
+
+/* Tables */
+.data-table { width:100%; border-collapse:collapse; margin-top:0.75rem; }
+.data-table th { text-align:left; padding:0.6rem 0.75rem; font-size:0.65rem; color:var(--dim); text-transform:uppercase; letter-spacing:0.04em; border-bottom:1px solid var(--border); }
+.data-table td { padding:0.6rem 0.75rem; font-size:0.85rem; border-bottom:1px solid var(--cream-deep); }
+.data-table tr:hover td { background:var(--cream-deep); }
+.badge { display:inline-block; padding:0.15rem 0.45rem; border-radius:4px; font-size:0.65rem; font-weight:600; }
+.badge-sage { background:rgba(140,180,122,0.15); color:var(--sage); }
+.badge-honey { background:rgba(212,168,75,0.15); color:var(--honey); }
+.badge-blush { background:rgba(219,191,168,0.15); color:var(--blush); }
+.badge-red { background:rgba(224,96,80,0.15); color:var(--red); }
+
+/* Clickable cards */
+.click-card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:1rem; cursor:pointer; transition:border-color 0.15s; }
+.click-card:hover { border-color:var(--sage); }
+.click-card .cc-label { font-size:0.7rem; color:var(--dim); text-transform:uppercase; letter-spacing:0.04em; }
+.click-card .cc-value { font-size:1.4rem; font-weight:700; margin:0.3rem 0 0.15rem; }
+.click-card .cc-sub { font-size:0.72rem; color:var(--muted); }
+
+/* Modal */
+.modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); z-index:100; align-items:center; justify-content:center; }
+.modal-bg.open { display:flex; }
+.modal-box { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:2rem; max-width:700px; width:90%; max-height:80vh; overflow-y:auto; position:relative; }
+.modal-box h2 { font-size:1.1rem; margin-bottom:1rem; }
+.modal-close { position:absolute; top:1rem; right:1rem; background:none; border:1px solid var(--border); color:var(--muted); width:28px; height:28px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:0.9rem; }
+.modal-close:hover { border-color:var(--text); color:var(--text); }
+
+/* Promo grid */
+.promo-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:0.75rem; margin-bottom:1.25rem; }
+
+/* Create form */
+.create-form { display:flex; flex-direction:column; gap:0.75rem; margin-top:1rem; }
+.create-form label { font-size:0.72rem; color:var(--dim); text-transform:uppercase; letter-spacing:0.04em; }
+.create-form input, .create-form select, .create-form textarea { background:var(--bg); border:1px solid var(--border); color:var(--text); padding:0.5rem 0.7rem; border-radius:6px; font-size:0.85rem; font-family:inherit; }
+.create-form input:focus, .create-form select:focus { border-color:var(--sage); outline:none; }
+.btn-sage { background:var(--sage); color:#141210; border:none; padding:0.6rem 1.25rem; border-radius:6px; font-weight:600; font-size:0.85rem; cursor:pointer; font-family:inherit; }
+.btn-sage:hover { opacity:0.85; }
+.btn-outline { background:none; border:1px solid var(--border); color:var(--muted); padding:0.5rem 1rem; border-radius:6px; font-size:0.8rem; cursor:pointer; font-family:inherit; }
+.btn-outline:hover { border-color:var(--sage); color:var(--text); }
+
+/* Tab content */
+.tab-content { display:none; }
+.tab-content.active { display:block; }
+
+/* Freq purchased */
+.freq-pairs { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:0.5rem; margin-top:0.75rem; }
+.freq-pair { background:var(--cream-deep); border:1px solid var(--border); border-radius:8px; padding:0.75rem; display:flex; align-items:center; gap:0.5rem; }
+.freq-pair .plus { color:var(--dim); font-size:0.8rem; }
+.freq-pair .pair-name { font-size:0.8rem; color:var(--text); }
+.freq-pair .pair-count { font-size:0.7rem; color:var(--sage); margin-left:auto; font-weight:600; }
+
+/* Paceline */
+.paceline { margin-top:0.25rem; display:flex; align-items:center; gap:0.5rem; }
+.pace-bar { flex:1; height:6px; background:var(--cream-deep); border-radius:3px; overflow:hidden; }
+.pace-fill { height:100%; border-radius:3px; }
+.pace-label { font-size:0.65rem; color:var(--dim); white-space:nowrap; }
+
+/* Search */
+.search-bar { display:flex; gap:0.5rem; margin-bottom:1rem; }
+.search-bar input { flex:1; background:var(--card); border:1px solid var(--border); color:var(--text); padding:0.5rem 0.75rem; border-radius:6px; font-size:0.85rem; font-family:inherit; }
+.search-bar input:focus { border-color:var(--sage); outline:none; }
+
+/* Responsive */
+@media(max-width:768px) {
+  .sidebar { display:none; }
+  .main { margin-left:0; padding:1rem; }
+  .stats { grid-template-columns:repeat(2,1fr); }
+  .charts-row { grid-template-columns:1fr; }
+  .promo-grid { grid-template-columns:1fr; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="sb-logo">Primal<span>Pantry</span></div>
+  <p class="sb-label">Dashboard</p>
+  <ul class="sb-nav">
+    <li><a href="#" class="active" onclick="switchTab('overview',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Overview</a></li>
+    <li><a href="#" onclick="switchTab('sales',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 01-8 0"/></svg>Your Sales</a></li>
+    <li><a href="#" onclick="switchTab('customers',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>Customers</a></li>
+    <li><a href="#" onclick="switchTab('inventory',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><path d="M3.27 6.96L12 12.01l8.73-5.05"/><path d="M12 22.08V12"/></svg>Product & Inventory</a></li>
+  </ul>
+  <div class="sb-brand">
+    <div class="sb-brand-name">NaturGlow Skincare</div>
+    <div class="sb-brand-cat">Skincare · Christchurch Store</div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+<!-- ===== OVERVIEW ===== -->
+<div class="tab-content active" id="tab-overview">
+  <div class="page-header">
+    <h1>Overview <span>Wednesday, 16 Apr</span></h1>
+    <div class="hdr-controls">
+      <input type="date" value="2026-04-10" id="date-from">
+      <span style="color:var(--dim)">→</span>
+      <input type="date" value="2026-04-16" id="date-to">
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat-card">
+      <div class="label">Revenue Today</div>
+      <div class="value" style="color:var(--sage)">$1,247</div>
+      <div class="change up">↑ 18% vs yesterday</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Revenue This Week</div>
+      <div class="value">$6,832</div>
+      <div class="paceline"><div class="pace-bar"><div class="pace-fill" style="width:68%;background:var(--sage)"></div></div><span class="pace-label">68% of $10k target</span></div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Total Orders</div>
+      <div class="value">89</div>
+      <div class="change up">↑ 12% vs last week</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Total Units Sold</div>
+      <div class="value">214</div>
+      <div class="change up">↑ 8% vs last week</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">AOV (Your Range)</div>
+      <div class="value">$76.80</div>
+      <div class="change up">↑ $4.20 vs last week</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Emails Collected</div>
+      <div class="value">67</div>
+      <div class="sub">From purchases this week</div>
+    </div>
+  </div>
+
+  <!-- Revenue trend + Sales by hour -->
+  <div class="charts-row">
+    <div class="chart-card">
+      <h3>Revenue — Last 7 Days</h3>
+      <div class="bar-chart" id="revenue-trend"></div>
+    </div>
+    <div class="chart-card">
+      <h3>Sales by Hour of Day</h3>
+      <div class="bar-chart" id="sales-hour"></div>
+    </div>
+  </div>
+
+  <!-- Heatmap + Day of week -->
+  <div class="charts-row">
+    <div class="chart-card">
+      <h3>Order Heatmap — This Week</h3>
+      <div style="display:flex;gap:2px;margin-bottom:4px;">
+        <span style="flex:1;font-size:0.5rem;color:var(--dim);text-align:center" class="heat-day">Mon</span>
+        <span style="flex:1;font-size:0.5rem;color:var(--dim);text-align:center" class="heat-day">Tue</span>
+        <span style="flex:1;font-size:0.5rem;color:var(--dim);text-align:center" class="heat-day">Wed</span>
+        <span style="flex:1;font-size:0.5rem;color:var(--dim);text-align:center" class="heat-day">Thu</span>
+        <span style="flex:1;font-size:0.5rem;color:var(--dim);text-align:center" class="heat-day">Fri</span>
+        <span style="flex:1;font-size:0.5rem;color:var(--dim);text-align:center" class="heat-day">Sat</span>
+        <span style="flex:1;font-size:0.5rem;color:var(--dim);text-align:center" class="heat-day">Sun</span>
+      </div>
+      <div id="heatmap-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;"></div>
+    </div>
+    <div class="chart-card">
+      <h3>Sales by Day of Week</h3>
+      <div class="h-bars" id="day-of-week"></div>
+    </div>
+  </div>
+
+  <!-- Frequently purchased together -->
+  <div class="chart-card" style="margin-bottom:1.5rem;">
+    <h3>Most Frequently Purchased Together</h3>
+    <div class="freq-pairs">
+      <div class="freq-pair"><span class="pair-name">Day Cream</span><span class="plus">+</span><span class="pair-name">Night Cream</span><span class="pair-count">34×</span></div>
+      <div class="freq-pair"><span class="pair-name">Day Cream</span><span class="plus">+</span><span class="pair-name">Eye Serum</span><span class="pair-count">28×</span></div>
+      <div class="freq-pair"><span class="pair-name">Night Cream</span><span class="plus">+</span><span class="pair-name">Body Butter</span><span class="pair-count">21×</span></div>
+      <div class="freq-pair"><span class="pair-name">Eye Serum</span><span class="plus">+</span><span class="pair-name">Lip Balm</span><span class="pair-count">18×</span></div>
+      <div class="freq-pair"><span class="pair-name">Day Cream</span><span class="plus">+</span><span class="pair-name">Body Butter</span><span class="pair-count">15×</span></div>
+      <div class="freq-pair"><span class="pair-name">Full Set</span><span class="plus">×</span><span class="pair-name">All 5 SKUs</span><span class="pair-count">12×</span></div>
+    </div>
+  </div>
+
+  <!-- Promo / Affiliate / Bundle -->
+  <div class="promo-grid">
+    <div class="click-card" onclick="openModal('promo-modal')">
+      <div class="cc-label">Promo Codes</div>
+      <div class="cc-value" style="color:var(--honey)">$1,420</div>
+      <div class="cc-sub">23 redeemed this week</div>
+    </div>
+    <div class="click-card" onclick="openModal('affiliate-modal')">
+      <div class="cc-label">Affiliate Codes</div>
+      <div class="cc-value" style="color:var(--blush)">$2,180</div>
+      <div class="cc-sub">41 redeemed this week</div>
+    </div>
+    <div class="click-card" onclick="openModal('bundle-modal')">
+      <div class="cc-label">Bundle Deals</div>
+      <div class="cc-value" style="color:var(--sage)">$890</div>
+      <div class="cc-sub">14 redeemed this week</div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:0.5rem;margin-bottom:1.5rem;">
+    <button class="btn-outline" onclick="openModal('create-promo')">+ New Promo Code</button>
+    <button class="btn-outline" onclick="openModal('create-affiliate')">+ New Affiliate</button>
+    <button class="btn-outline" onclick="openModal('create-bundle')">+ New Bundle</button>
+  </div>
+</div>
+
+<!-- ===== YOUR SALES ===== -->
+<div class="tab-content" id="tab-sales">
+  <div class="page-header">
+    <h1>Your Sales</h1>
+    <div class="hdr-controls">
+      <select><option>All statuses</option><option>Completed</option><option>Pending</option><option>Refunded</option></select>
+      <input type="date" value="2026-04-10">
+      <span style="color:var(--dim)">→</span>
+      <input type="date" value="2026-04-16">
+    </div>
+  </div>
+  <div class="stats" style="grid-template-columns:repeat(4,1fr);">
+    <div class="stat-card"><div class="label">Total Sales</div><div class="value">89</div></div>
+    <div class="stat-card"><div class="label">Revenue</div><div class="value" style="color:var(--sage)">$6,832</div></div>
+    <div class="stat-card"><div class="label">Units Sold</div><div class="value">214</div></div>
+    <div class="stat-card"><div class="label">Avg Items/Order</div><div class="value">2.4</div></div>
+  </div>
+  <div class="chart-card">
+    <h3>Order History</h3>
+    <table class="data-table">
+      <thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>#4821</td><td>16 Apr, 2:14pm</td><td>Sarah M.</td><td>Day Cream, Night Cream, Eye Serum</td><td>$134.00</td><td><span class="badge badge-sage">Completed</span></td></tr>
+        <tr><td>#4819</td><td>16 Apr, 11:42am</td><td>James L.</td><td>Day Cream, Lip Balm</td><td>$62.00</td><td><span class="badge badge-sage">Completed</span></td></tr>
+        <tr><td>#4817</td><td>16 Apr, 10:08am</td><td>Emma W.</td><td>Full Set (5 SKUs)</td><td>$189.00</td><td><span class="badge badge-sage">Completed</span></td></tr>
+        <tr><td>#4814</td><td>15 Apr, 4:33pm</td><td>Mike R.</td><td>Day Cream</td><td>$45.00</td><td><span class="badge badge-sage">Completed</span></td></tr>
+        <tr><td>#4812</td><td>15 Apr, 2:19pm</td><td>Lisa T.</td><td>Night Cream, Body Butter</td><td>$87.00</td><td><span class="badge badge-sage">Completed</span></td></tr>
+        <tr><td>#4809</td><td>15 Apr, 11:55am</td><td>Kate P.</td><td>Eye Serum</td><td>$55.00</td><td><span class="badge badge-sage">Completed</span></td></tr>
+        <tr><td>#4806</td><td>15 Apr, 9:22am</td><td>Tom H.</td><td>Day Cream, Night Cream</td><td>$85.00</td><td><span class="badge badge-sage">Completed</span></td></tr>
+        <tr><td>#4801</td><td>14 Apr, 3:47pm</td><td>Anna K.</td><td>Body Butter, Lip Balm</td><td>$58.00</td><td><span class="badge badge-sage">Completed</span></td></tr>
+        <tr><td>#4798</td><td>14 Apr, 1:15pm</td><td>Ben S.</td><td>Full Set (5 SKUs)</td><td>$189.00</td><td><span class="badge badge-honey">Pending pickup</span></td></tr>
+        <tr><td>#4795</td><td>14 Apr, 10:30am</td><td>Rachel D.</td><td>Day Cream</td><td>$45.00</td><td><span class="badge badge-red">Refunded</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ===== CUSTOMERS ===== -->
+<div class="tab-content" id="tab-customers">
+  <div class="page-header">
+    <h1>Customers</h1>
+    <div class="hdr-controls">
+      <button class="btn-outline">Export CSV</button>
+    </div>
+  </div>
+  <div class="stats" style="grid-template-columns:repeat(4,1fr);">
+    <div class="stat-card"><div class="label">Total Customers</div><div class="value">312</div></div>
+    <div class="stat-card"><div class="label">Emails Collected</div><div class="value" style="color:var(--sage)">287</div></div>
+    <div class="stat-card"><div class="label">Repeat Buyers</div><div class="value">48</div><div class="sub">15.4% repeat rate</div></div>
+    <div class="stat-card"><div class="label">Avg Lifetime Value</div><div class="value">$142</div></div>
+  </div>
+  <div class="chart-card">
+    <div class="search-bar">
+      <input type="text" placeholder="Search by name or email...">
+    </div>
+    <table class="data-table">
+      <thead><tr><th>Customer</th><th>Email</th><th>Orders</th><th>Total Spent</th><th>Last Purchase</th><th>Source</th></tr></thead>
+      <tbody>
+        <tr><td>Sarah Mitchell</td><td>sarah.m@gmail.com</td><td>4</td><td>$412.00</td><td>16 Apr</td><td><span class="badge badge-sage">In-store</span></td></tr>
+        <tr><td>James Liu</td><td>james.liu@outlook.com</td><td>3</td><td>$287.00</td><td>16 Apr</td><td><span class="badge badge-sage">In-store</span></td></tr>
+        <tr><td>Emma Wilson</td><td>emma.w@yahoo.co.nz</td><td>2</td><td>$324.00</td><td>16 Apr</td><td><span class="badge badge-honey">Collection</span></td></tr>
+        <tr><td>Mike Roberts</td><td>mike.r@hotmail.com</td><td>1</td><td>$45.00</td><td>15 Apr</td><td><span class="badge badge-sage">In-store</span></td></tr>
+        <tr><td>Lisa Thompson</td><td>lisa.t@gmail.com</td><td>5</td><td>$567.00</td><td>15 Apr</td><td><span class="badge badge-sage">In-store</span></td></tr>
+        <tr><td>Kate Parker</td><td>kate.p@icloud.com</td><td>2</td><td>$148.00</td><td>15 Apr</td><td><span class="badge badge-honey">Collection</span></td></tr>
+        <tr><td>Tom Henderson</td><td>tom.h@gmail.com</td><td>3</td><td>$265.00</td><td>15 Apr</td><td><span class="badge badge-sage">In-store</span></td></tr>
+        <tr><td>Anna Kim</td><td>anna.k@outlook.co.nz</td><td>1</td><td>$58.00</td><td>14 Apr</td><td><span class="badge badge-sage">In-store</span></td></tr>
+        <tr><td>Ben Stewart</td><td>ben.s@gmail.com</td><td>2</td><td>$234.00</td><td>14 Apr</td><td><span class="badge badge-honey">Collection</span></td></tr>
+        <tr><td>Rachel Davis</td><td>rachel.d@yahoo.com</td><td>1</td><td>$45.00</td><td>14 Apr</td><td><span class="badge badge-sage">In-store</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ===== PRODUCT & INVENTORY ===== -->
+<div class="tab-content" id="tab-inventory">
+  <div class="page-header">
+    <h1>Product & Inventory</h1>
+    <div class="hdr-controls">
+      <button class="btn-outline">+ Restock Request</button>
+    </div>
+  </div>
+  <div class="stats" style="grid-template-columns:repeat(4,1fr);">
+    <div class="stat-card"><div class="label">Active SKUs</div><div class="value">6</div></div>
+    <div class="stat-card"><div class="label">Total Units in Store</div><div class="value">184</div></div>
+    <div class="stat-card"><div class="label">Low Stock Alerts</div><div class="value" style="color:var(--red)">2</div></div>
+    <div class="stat-card"><div class="label">Sell-through Rate</div><div class="value" style="color:var(--sage)">72%</div><div class="sub">Last 30 days</div></div>
+  </div>
+  <div class="chart-card">
+    <h3>Your Products</h3>
+    <table class="data-table">
+      <thead><tr><th>Product</th><th>SKU</th><th>Price</th><th>In Stock</th><th>Sold (7d)</th><th>Revenue (7d)</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Day Cream 50ml</strong></td><td>NG-DC50</td><td>$45.00</td><td>42</td><td>38</td><td>$1,710</td><td><span class="badge badge-sage">Good</span></td></tr>
+        <tr><td><strong>Night Cream 50ml</strong></td><td>NG-NC50</td><td>$42.00</td><td>35</td><td>29</td><td>$1,218</td><td><span class="badge badge-sage">Good</span></td></tr>
+        <tr><td><strong>Eye Serum 15ml</strong></td><td>NG-ES15</td><td>$55.00</td><td>28</td><td>22</td><td>$1,210</td><td><span class="badge badge-sage">Good</span></td></tr>
+        <tr><td><strong>Body Butter 200ml</strong></td><td>NG-BB200</td><td>$38.00</td><td>8</td><td>18</td><td>$684</td><td><span class="badge badge-red">Low stock</span></td></tr>
+        <tr><td><strong>Lip Balm 10ml</strong></td><td>NG-LB10</td><td>$18.00</td><td>5</td><td>15</td><td>$270</td><td><span class="badge badge-red">Low stock</span></td></tr>
+        <tr><td><strong>Full Set (5 SKUs)</strong></td><td>NG-SET</td><td>$189.00</td><td>12</td><td>8</td><td>$1,512</td><td><span class="badge badge-sage">Good</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+</div><!-- /main -->
+</div><!-- /shell -->
+
+<!-- MODALS -->
+<div class="modal-bg" id="promo-modal"><div class="modal-box"><button class="modal-close" onclick="closeModals()">×</button><h2>Promo Code Performance</h2>
+<table class="data-table"><thead><tr><th>Code</th><th>Discount</th><th>Uses</th><th>Revenue</th></tr></thead><tbody>
+<tr><td>WELCOME20</td><td>20% off</td><td>12</td><td>$680</td></tr>
+<tr><td>SPRING15</td><td>15% off</td><td>8</td><td>$490</td></tr>
+<tr><td>FREESHIP</td><td>Free shipping</td><td>3</td><td>$250</td></tr>
+</tbody></table></div></div>
+
+<div class="modal-bg" id="affiliate-modal"><div class="modal-box"><button class="modal-close" onclick="closeModals()">×</button><h2>Affiliate Performance</h2>
+<table class="data-table"><thead><tr><th>Influencer</th><th>Code</th><th>Uses</th><th>Revenue</th></tr></thead><tbody>
+<tr><td>@skincarewithjess</td><td>JESS10</td><td>18</td><td>$1,040</td></tr>
+<tr><td>@naturallyemma</td><td>EMMA15</td><td>14</td><td>$720</td></tr>
+<tr><td>@wellnesswithkat</td><td>KAT10</td><td>9</td><td>$420</td></tr>
+</tbody></table></div></div>
+
+<div class="modal-bg" id="bundle-modal"><div class="modal-box"><button class="modal-close" onclick="closeModals()">×</button><h2>Bundle Deal Performance</h2>
+<table class="data-table"><thead><tr><th>Bundle</th><th>Price</th><th>Sold</th><th>Revenue</th></tr></thead><tbody>
+<tr><td>Day + Night Duo</td><td>$79.00</td><td>6</td><td>$474</td></tr>
+<tr><td>Full Skincare Set</td><td>$189.00</td><td>2</td><td>$378</td></tr>
+<tr><td>Eyes & Lips Kit</td><td>$65.00</td><td>6</td><td>$390</td></tr>
+</tbody></table></div></div>
+
+<div class="modal-bg" id="create-promo"><div class="modal-box"><button class="modal-close" onclick="closeModals()">×</button><h2>Create Promo Code</h2>
+<div class="create-form"><label>Code</label><input placeholder="e.g. SUMMER20"><label>Discount Type</label><select><option>Percentage</option><option>Fixed amount</option></select><label>Value</label><input type="number" placeholder="20"><label>Expiry</label><input type="date"><button class="btn-sage">Create Code</button></div></div></div>
+
+<div class="modal-bg" id="create-affiliate"><div class="modal-box"><button class="modal-close" onclick="closeModals()">×</button><h2>Create Affiliate Code</h2>
+<div class="create-form"><label>Influencer Name</label><input placeholder="e.g. @skincarewithjess"><label>Code</label><input placeholder="e.g. JESS10"><label>Commission %</label><input type="number" placeholder="10"><button class="btn-sage">Create Affiliate</button></div></div></div>
+
+<div class="modal-bg" id="create-bundle"><div class="modal-box"><button class="modal-close" onclick="closeModals()">×</button><h2>Create Bundle Deal</h2>
+<div class="create-form"><label>Bundle Name</label><input placeholder="e.g. Day + Night Duo"><label>Products (select multiple)</label><select multiple style="height:100px"><option>Day Cream 50ml</option><option>Night Cream 50ml</option><option>Eye Serum 15ml</option><option>Body Butter 200ml</option><option>Lip Balm 10ml</option></select><label>Bundle Price</label><input type="number" placeholder="79.00"><button class="btn-sage">Create Bundle</button></div></div></div>
+
+<script>
+// Tab switching
+function switchTab(id, el) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  document.querySelectorAll('.sb-nav a').forEach(a => a.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// Modals
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModals() { document.querySelectorAll('.modal-bg').forEach(m => m.classList.remove('open')); }
+document.querySelectorAll('.modal-bg').forEach(m => { m.addEventListener('click', e => { if (e.target === m) closeModals(); }); });
+
+// Revenue trend chart
+(function() {
+  var data = [{d:'Thu',v:820},{d:'Fri',v:1340},{d:'Sat',v:1580},{d:'Sun',v:680},{d:'Mon',v:920},{d:'Tue',v:1045},{d:'Wed',v:1247}];
+  var max = Math.max(...data.map(x=>x.v));
+  var el = document.getElementById('revenue-trend');
+  data.forEach(function(item) {
+    var pct = (item.v/max*100);
+    el.innerHTML += '<div class="bar-col"><div class="bar" style="height:'+pct+'%;background:var(--sage)"></div><div class="bar-label">'+item.d+'</div></div>';
+  });
+})();
+
+// Sales by hour
+(function() {
+  var data = [0,0,0,0,0,0,0,0,3,8,14,12,10,7,9,11,8,6,3,1,0,0,0,0];
+  var max = Math.max(...data);
+  var el = document.getElementById('sales-hour');
+  data.forEach(function(v,i) {
+    var pct = max>0?(v/max*100):0;
+    var lbl = i%3===0?i+':00':'';
+    el.innerHTML += '<div class="bar-col"><div class="bar" style="height:'+pct+'%;background:'+(v>10?'var(--sage)':'var(--dim)')+'"></div><div class="bar-label">'+lbl+'</div></div>';
+  });
+})();
+
+// Heatmap
+(function() {
+  var grid = document.getElementById('heatmap-grid');
+  var hours = ['6am','7','8','9','10','11','12pm','1','2','3','4','5','6pm'];
+  // 7 days x 13 hours
+  for (var h = 0; h < 13; h++) {
+    for (var d = 0; d < 7; d++) {
+      var val = Math.random();
+      var intensity;
+      if (val < 0.2) intensity = 'rgba(140,180,122,0.05)';
+      else if (val < 0.4) intensity = 'rgba(140,180,122,0.15)';
+      else if (val < 0.6) intensity = 'rgba(140,180,122,0.3)';
+      else if (val < 0.8) intensity = 'rgba(140,180,122,0.5)';
+      else intensity = 'rgba(140,180,122,0.75)';
+      var orders = Math.floor(val * 8);
+      grid.innerHTML += '<div class="heat-cell" style="background:'+intensity+'" data-tip="'+orders+' orders"></div>';
+    }
+  }
+})();
+
+// Day of week
+(function() {
+  var data = [{d:'Mon',v:920},{d:'Tue',v:1045},{d:'Wed',v:1247},{d:'Thu',v:820},{d:'Fri',v:1340},{d:'Sat',v:1580},{d:'Sun',v:680}];
+  var max = Math.max(...data.map(x=>x.v));
+  var el = document.getElementById('day-of-week');
+  data.forEach(function(item) {
+    var pct = (item.v/max*100);
+    el.innerHTML += '<div class="h-bar-row"><div class="h-bar-label">'+item.d+'</div><div class="h-bar-track"><div class="h-bar-fill" style="width:'+pct+'%;background:var(--sage)"></div></div><div class="h-bar-val">$'+item.v.toLocaleString()+'</div></div>';
+  });
+})();
+</script>
+</body>
+</html>
