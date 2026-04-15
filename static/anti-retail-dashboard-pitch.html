@@ -18,7 +18,7 @@ html { font-size: 16px; scroll-behavior: smooth; }
 body { background: var(--cream); color: var(--bark); font-family: 'DM Sans', -apple-system, sans-serif; font-weight: 400; line-height: 1.65; -webkit-font-smoothing: antialiased; }
 
 /* Nav */
-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 2.5rem; border-bottom: 1px solid var(--rule); background: rgba(250,244,235,0.92); backdrop-filter: blur(12px); }
+nav { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 2.5rem; border-bottom: 1px solid var(--rule); background: var(--cream); }
 .logo { font-family: 'Fraunces', serif; font-size: 1.25rem; font-weight: 700; color: var(--bark); text-decoration: none; }
 .logo span { color: var(--sage); }
 .logo small { display: block; font-family: 'DM Sans', sans-serif; font-size: 0.72rem; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: var(--warm-gray); margin-top: 0.1rem; }
@@ -30,11 +30,11 @@ section { padding: 5rem 2.5rem; max-width: 860px; margin: 0 auto; }
 .divider { border: none; border-top: 1px solid var(--rule); max-width: 860px; margin: 0 auto; }
 
 /* Hero */
-.hero { min-height: 100vh; display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center; padding-top: 8rem; padding-bottom: 4rem; max-width: 1100px; margin: 0 auto; }
+.hero { min-height: 100vh; display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center; padding-top: 3rem; padding-bottom: 4rem; max-width: 1100px; margin: 0 auto; }
 .hero-text { display: flex; flex-direction: column; }
 .hero-eyebrow { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--sage); margin-bottom: 2rem; display: flex; align-items: center; gap: 0.75rem; }
 .hero-eyebrow::before { content: ''; display: block; width: 2rem; height: 1px; background: var(--sage); }
-.hero h1 { font-family: 'Fraunces', serif; font-size: clamp(2rem, 4.5vw, 3.2rem); font-weight: 400; line-height: 1.15; letter-spacing: -0.02em; color: var(--bark); margin-bottom: 1.5rem; }
+.hero h1 { font-family: 'Fraunces', serif; font-size: clamp(1.8rem, 3.5vw, 2.6rem); font-weight: 400; line-height: 1.15; letter-spacing: -0.02em; color: var(--bark); margin-bottom: 1.5rem; }
 .hero h1 em { font-style: italic; color: var(--sage); }
 .hero-sub { font-size: 1rem; line-height: 1.7; color: var(--warm-gray); margin-bottom: 1.25rem; }
 .hero-sub strong { color: var(--bark); font-weight: 700; }
@@ -42,7 +42,7 @@ section { padding: 5rem 2.5rem; max-width: 860px; margin: 0 auto; }
 /* Section labels */
 .section-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--sage); margin-bottom: 2.5rem; display: flex; align-items: center; gap: 0.75rem; }
 .section-label::before { content: ''; display: block; width: 1.5rem; height: 1px; background: var(--sage); }
-h2 { font-family: 'Fraunces', serif; font-size: clamp(1.8rem, 4.5vw, 2.8rem); font-weight: 400; line-height: 1.15; letter-spacing: -0.02em; color: var(--bark); margin-bottom: 1.5rem; }
+h2 { font-family: 'Fraunces', serif; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 400; line-height: 1.15; letter-spacing: -0.02em; color: var(--bark); margin-bottom: 1.5rem; }
 h3 { font-family: 'Fraunces', serif; font-size: 1.15rem; font-weight: 400; margin-bottom: 0.75rem; color: var(--bark); }
 p { color: var(--warm-gray); margin-bottom: 1.25rem; }
 p strong { color: var(--bark); font-weight: 700; }
@@ -95,6 +95,12 @@ p strong { color: var(--bark); font-weight: 700; }
 
 /* Screenshot preview */
 .dash-preview { border-radius: 12px; overflow: hidden; border: 1px solid var(--rule); box-shadow: 0 12px 40px rgba(0,0,0,0.08); margin: 2rem 0; }
+.dash-preview-mobile { display: block; }
+.dash-preview-desktop { display: none; }
+@media (max-width: 768px) {
+  .dash-preview-mobile { display: none; }
+  .dash-preview-desktop { display: block; }
+}
 .dash-preview img { width: 100%; display: block; }
 .dash-preview-placeholder { width: 100%; aspect-ratio: 16/9; background: var(--cream-deep); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 0.5rem; }
 .dash-preview-placeholder span { font-size: 0.75rem; color: var(--warm-gray); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
@@ -156,6 +162,7 @@ footer p { font-size: 0.78rem; color: var(--warm-gray); margin: 0; }
     <div class="hero-text">
       <p class="hero-eyebrow">Your supplier dashboard</p>
       <h1>The marketing tools <em>retailers should have built you.</em></h1>
+      <p class="hero-sub"><strong>The big retailers want you to think you need them to make money. You don't.</strong> You just need the tools they've been keeping from you.</p>
       <p class="hero-sub">What happens when you take someone who worked in software for 6 years, built a successful ecommerce business with massive marketing wins, and then watched retail nearly sink it?</p>
       <p class="hero-sub"><strong>Real change.</strong></p>
       <p class="hero-sub">Retailers are in the stone ages. They leave you in the dark, drip-feed you data monthly, and expect you to grow your business without knowing what's working. That's not a partnership — that's negligence.</p>
@@ -166,8 +173,17 @@ footer p { font-size: 0.78rem; color: var(--warm-gray); margin: 0; }
     </div>
     <div>
       <a href="anti-retail-dashboard.html" style="display:block;text-decoration:none;">
-        <div class="dash-preview" style="position:relative;cursor:pointer;overflow:hidden;">
-          <iframe src="anti-retail-dashboard.html" style="width:166%;height:900px;border:none;pointer-events:none;transform:scale(0.6);transform-origin:top left;opacity:0.35;filter:blur(1px);" title="Dashboard preview" tabindex="-1"></iframe>
+        <!-- Mobile preview (shown on desktop) -->
+        <div class="dash-preview dash-preview-mobile" style="position:relative;cursor:pointer;overflow:hidden;max-height:600px;max-width:320px;margin:0 auto;">
+          <iframe src="anti-retail-dashboard.html" style="width:375px;height:900px;border:none;pointer-events:none;transform:scale(0.85);transform-origin:top left;opacity:0.35;filter:blur(1px);display:block;" title="Dashboard preview" tabindex="-1"></iframe>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:0.75rem;background:rgba(250,244,235,0.5);">
+            <span style="font-size:0.75rem;color:var(--warm-gray);font-weight:600;letter-spacing:0.08em;text-transform:uppercase;">Click to explore the live dashboard</span>
+            <div style="font-family:'DM Sans',sans-serif;font-size:0.85rem;font-weight:700;color:var(--cream);background:var(--bark);padding:0.6rem 1.5rem;border-radius:100px;display:inline-block;box-shadow:0 4px 12px rgba(46,26,14,0.2);">Open Demo Dashboard →</div>
+          </div>
+        </div>
+        <!-- Desktop preview (shown on mobile) -->
+        <div class="dash-preview dash-preview-desktop" style="position:relative;cursor:pointer;overflow:hidden;max-height:400px;">
+          <iframe src="anti-retail-dashboard.html" style="width:1400px;height:900px;border:none;pointer-events:none;transform:scale(0.25);transform-origin:top left;opacity:0.35;filter:blur(1px);display:block;" title="Dashboard preview" tabindex="-1"></iframe>
           <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:0.75rem;background:rgba(250,244,235,0.5);">
             <span style="font-size:0.75rem;color:var(--warm-gray);font-weight:600;letter-spacing:0.08em;text-transform:uppercase;">Click to explore the live dashboard</span>
             <div style="font-family:'DM Sans',sans-serif;font-size:0.85rem;font-weight:700;color:var(--cream);background:var(--bark);padding:0.6rem 1.5rem;border-radius:100px;display:inline-block;box-shadow:0 4px 12px rgba(46,26,14,0.2);">Open Demo Dashboard →</div>

@@ -164,7 +164,7 @@ body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); col
 </head>
 <body>
 <style>
-.site-nav { position:fixed; top:0; left:0; right:0; z-index:200; display:flex; align-items:center; justify-content:space-between; padding:1.25rem 2.5rem; border-bottom:1px solid rgba(139,115,85,0.12); background:rgba(250,244,235,0.92); backdrop-filter:blur(12px); }
+.site-nav { position:relative; display:flex; align-items:center; justify-content:space-between; padding:1.25rem 2.5rem; border-bottom:1px solid rgba(139,115,85,0.12); background:#FAF4EB; }
 .site-nav .sn-logo { font-family:'Fraunces',serif; font-size:1.25rem; font-weight:700; color:#2E1A0E; letter-spacing:-0.01em; }
 .site-nav .sn-logo span { color:#6B8F5B; }
 .site-nav .sn-cta { font-family:'DM Sans',sans-serif; font-size:0.82rem; font-weight:700; color:#FAF4EB; background:#2E1A0E; padding:0.6rem 1.6rem; border-radius:100px; transition:background 0.2s,transform 0.2s; }
@@ -179,10 +179,10 @@ body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); col
     <a href="the-primalpantry-anti-retail-store.html" class="sn-link">The Mission</a>
     <a href="anti-retail-dashboard-pitch.html" class="sn-link active">Supplier Dashboard</a>
     <a href="the-primalpantry-anti-retail-store-consumers.html" class="sn-link">Pitch to Consumers</a>
-    <a href="the-primalpantry-anti-retail-store.html#apply" class="sn-cta">Express an interest</a>
+    <a href="#" class="sn-cta" onclick="openAppModal(); return false;">Express an interest</a>
   </div>
 </nav>
-<div class="shell" style="padding-top:75px;">
+<div class="shell">
 
 <!-- SIDEBAR -->
 <div class="sidebar">
@@ -705,5 +705,98 @@ renderDashboard('all');
   });
 })();
 </script>
+<!-- APPLICATION MODAL -->
+<style>
+.app-modal-overlay { display:none; position:fixed; inset:0; z-index:300; background:rgba(46,26,14,0.45); backdrop-filter:blur(6px); align-items:center; justify-content:center; padding:2rem; }
+.app-modal-overlay.active { display:flex; }
+.app-modal { background:#FAF4EB; border-radius:20px; width:100%; max-width:620px; max-height:90vh; overflow-y:auto; box-shadow:0 32px 80px rgba(0,0,0,0.18); position:relative; animation:appModalIn 0.35s ease both; }
+@keyframes appModalIn { from { opacity:0; transform:scale(0.97) translateY(12px); } to { opacity:1; transform:scale(1) translateY(0); } }
+.app-modal-header { padding:2.5rem 2.5rem 0; }
+.app-modal-header h2 { font-family:'Fraunces',serif; font-size:1.6rem; font-weight:400; margin-bottom:0.5rem; color:#2E1A0E; }
+.app-modal-header p { font-size:0.88rem; color:#877B71; margin-bottom:0; }
+.app-modal-close { position:absolute; top:1.25rem; right:1.25rem; width:36px; height:36px; border:1px solid rgba(139,115,85,0.2); border-radius:50%; background:#FEFCF8; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1.1rem; color:#877B71; transition:border-color 0.2s,color 0.2s; }
+.app-modal-close:hover { border-color:#2E1A0E; color:#2E1A0E; }
+.app-modal-form { padding:2rem 2.5rem 2.5rem; display:flex; flex-direction:column; gap:1.25rem; }
+.app-modal-form .fg { display:flex; flex-direction:column; gap:0.35rem; }
+.app-modal-form .fg label { font-size:0.78rem; font-weight:700; letter-spacing:0.04em; color:#2E1A0E; }
+.app-modal-form .fg .hint { font-size:0.74rem; color:#877B71; font-weight:400; margin-top:-0.1rem; }
+.app-modal-form .fg input, .app-modal-form .fg select, .app-modal-form .fg textarea { font-family:'DM Sans',sans-serif; font-size:0.92rem; padding:0.7rem 0.9rem; border:1px solid rgba(139,115,85,0.2); border-radius:10px; background:#FEFCF8; color:#2E1A0E; outline:none; transition:border-color 0.2s,box-shadow 0.2s; }
+.app-modal-form .fg input:focus, .app-modal-form .fg select:focus, .app-modal-form .fg textarea:focus { border-color:#6B8F5B; box-shadow:0 0 0 3px rgba(107,143,91,0.12); }
+.app-modal-form .fg textarea { resize:vertical; min-height:80px; }
+.app-modal-form .fg select { cursor:pointer; }
+.app-modal-form .fr { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+.app-modal-form .fd { border:none; border-top:1px solid rgba(139,115,85,0.12); margin:0.5rem 0; }
+.app-modal-form .fsl { font-size:0.68rem; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:#6B8F5B; margin-top:0.25rem; }
+.app-modal-form .btn-submit { font-family:'DM Sans',sans-serif; font-size:0.95rem; font-weight:700; color:#FAF4EB; background:#2E1A0E; padding:1rem 2rem; border:none; border-radius:100px; cursor:pointer; transition:background 0.2s,transform 0.2s,box-shadow 0.2s; margin-top:0.5rem; }
+.app-modal-form .btn-submit:hover { background:#442A16; transform:translateY(-2px); box-shadow:0 8px 20px rgba(46,26,14,0.16); }
+.app-modal-form .fp { font-size:0.72rem; color:#877B71; text-align:center; margin-top:-0.5rem; }
+</style>
+
+<div class="app-modal-overlay" id="appModal">
+  <div class="app-modal">
+    <button class="app-modal-close" onclick="closeAppModal()">&times;</button>
+    <div class="app-modal-header">
+      <h2>Express an interest</h2>
+      <p>This is completely confidential — we won't tell anyone you expressed your interest. We only use this to vet brands due to limited spots.</p>
+    </div>
+    <form class="app-modal-form" onsubmit="handleAppSubmit(event)">
+      <p class="fsl">About you</p>
+      <div class="fr">
+        <div class="fg"><label>Your name</label><input type="text" name="name" required placeholder="First and last"></div>
+        <div class="fg"><label>Email</label><input type="email" name="email" required placeholder="you@brand.co.nz"></div>
+      </div>
+      <div class="fr">
+        <div class="fg"><label>Company name</label><input type="text" name="company" required></div>
+        <div class="fg"><label>Website</label><input type="url" name="website" placeholder="https://..."></div>
+      </div>
+      <div class="fg"><label>Product category</label>
+        <select name="category" required><option value="" disabled selected>Select one</option><option value="skincare">Skincare</option><option value="supplements">Supplements</option><option value="food-bev">Food & beverage</option><option value="personal-care">Personal care</option><option value="baby-kids">Baby & kids</option><option value="pet">Pet wellness</option><option value="other">Other</option></select>
+      </div>
+      <hr class="fd"><p class="fsl">Your presence</p>
+      <div class="fg"><label>Social media links</label><span class="hint">Instagram, TikTok, Facebook — whatever you're active on</span><textarea name="socials" placeholder="instagram.com/yourbrand&#10;tiktok.com/@yourbrand"></textarea></div>
+      <div class="fg"><label>Estimated customers per month</label><span class="hint">This stays confidential. We only use it to assess fit.</span>
+        <select name="monthly_customers" required><option value="" disabled selected>Select a range</option><option value="under-1000">Under 1,000</option><option value="1000-2500">1,000 – 2,500</option><option value="2500-5000">2,500 – 5,000</option><option value="5000-10000">5,000 – 10,000</option><option value="10000-25000">10,000 – 25,000</option><option value="25000-50000">25,000 – 50,000</option><option value="50000+">50,000+</option></select>
+      </div>
+      <div class="fr">
+        <div class="fg"><label>Where are you advertising?</label><input type="text" name="ad_platforms" placeholder="Meta, Google, TikTok..."></div>
+        <div class="fg"><label>In-house marketing team?</label>
+          <select name="marketing_team"><option value="" disabled selected>Select one</option><option value="yes-team">Yes — dedicated team</option><option value="yes-solo">Yes — just me</option><option value="agency">We use an agency</option><option value="no">Not yet</option></select>
+        </div>
+      </div>
+      <div class="fg"><label>What channels do you currently sell through?</label><input type="text" name="channels" placeholder="e.g. D2C, retail, B2B wholesale, marketplace"></div>
+      <hr class="fd"><p class="fsl">Your products</p>
+      <div class="fg"><label>What's your flagship product?</label><span class="hint">Your main magnet — the one that gets people in the door</span><input type="text" name="flagship" required placeholder="e.g. Tallow Day Cream 50ml"></div>
+      <div class="fg"><label>What cross-sells would you want on the shelf next to it?</label><span class="hint">Up to 5 products that complement your flagship</span><textarea name="crosssells" placeholder="e.g. Night cream, Eye serum, Body butter, Lip balm"></textarea></div>
+      <div class="fg"><label>How big are your products roughly?</label><span class="hint">Helps us plan shelf space — dimensions or a comparison</span><input type="text" name="product_size" placeholder="e.g. 50ml jar, about the size of a tennis ball"></div>
+      <hr class="fd">
+      <div class="fg"><label>Anything else we should know?</label><textarea name="anything_else" placeholder="Current retail frustrations, what you're hoping to get out of this, questions — anything."></textarea></div>
+      <button type="submit" class="btn-submit">Submit application</button>
+      <p class="fp">100% confidential. We won't tell anyone you expressed your interest.</p>
+    </form>
+  </div>
+</div>
+
+<script>
+function openAppModal() { document.getElementById('appModal').classList.add('active'); document.body.style.overflow = 'hidden'; }
+function closeAppModal() { document.getElementById('appModal').classList.remove('active'); document.body.style.overflow = ''; }
+document.getElementById('appModal').addEventListener('click', function(e) { if (e.target === this) closeAppModal(); });
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeAppModal(); });
+function handleAppSubmit(e) {
+  e.preventDefault();
+  var form = e.target;
+  var btn = form.querySelector('.btn-submit');
+  btn.textContent = 'Submitting...'; btn.disabled = true;
+  var data = new FormData(form);
+  var entries = {}; data.forEach(function(v, k) { entries[k] = v; });
+  fetch('/.netlify/functions/anti-retail-interest', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(entries)
+  }).then(function() {
+    form.innerHTML = '<div style="text-align:center;padding:3rem 1rem;"><h2 style="margin-bottom:1rem;">We\'ve got your details.</h2><p style="color:#877B71;">This is completely confidential. We\'ll be in touch within 48 hours.</p></div>';
+  }).catch(function() {
+    form.innerHTML = '<div style="text-align:center;padding:3rem 1rem;"><h2 style="margin-bottom:1rem;">We\'ve got your details.</h2><p style="color:#877B71;">This is completely confidential. We\'ll be in touch within 48 hours.</p></div>';
+  });
+}
+</script>
+
 </body>
 </html>
