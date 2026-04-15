@@ -166,7 +166,7 @@ body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); col
 
 <!-- SIDEBAR -->
 <div class="sidebar">
-  <div class="sb-logo">Primal<span>Pantry</span></div>
+  <div class="sb-logo">Primal<span>Pantry</span><small style="display:block;font-family:'DM Sans',sans-serif;font-size:0.55rem;font-weight:500;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.4);margin-top:0.1rem;">retail for growth</small></div>
   <p class="sb-label">Dashboard</p>
   <ul class="sb-nav">
     <li><a href="#" class="active" onclick="switchTab('overview',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Overview</a></li>
@@ -266,11 +266,30 @@ body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); col
   <div class="charts-row">
     <div class="chart-card">
       <h3>Revenue — Last 7 Days</h3>
-      <div class="bar-chart" id="revenue-trend"></div>
+      <div class="bar-chart" id="revenue-trend">
+        <div class="bar-col"><div class="bar" style="height:52%;background:var(--sage)"></div><div class="bar-label">Thu</div></div>
+        <div class="bar-col"><div class="bar" style="height:85%;background:var(--sage)"></div><div class="bar-label">Fri</div></div>
+        <div class="bar-col"><div class="bar" style="height:100%;background:var(--sage)"></div><div class="bar-label">Sat</div></div>
+        <div class="bar-col"><div class="bar" style="height:43%;background:var(--sage)"></div><div class="bar-label">Sun</div></div>
+        <div class="bar-col"><div class="bar" style="height:58%;background:var(--sage)"></div><div class="bar-label">Mon</div></div>
+        <div class="bar-col"><div class="bar" style="height:66%;background:var(--sage)"></div><div class="bar-label">Tue</div></div>
+        <div class="bar-col"><div class="bar" style="height:79%;background:var(--sage)"></div><div class="bar-label">Wed</div></div>
+      </div>
     </div>
     <div class="chart-card">
       <h3>Sales by Hour of Day</h3>
-      <div class="bar-chart" id="sales-hour"></div>
+      <div class="bar-chart" id="sales-hour">
+        <div class="bar-col"><div class="bar" style="height:21%;background:var(--dim)"></div><div class="bar-label">9am</div></div>
+        <div class="bar-col"><div class="bar" style="height:57%;background:var(--sage)"></div><div class="bar-label">10</div></div>
+        <div class="bar-col"><div class="bar" style="height:100%;background:var(--sage)"></div><div class="bar-label">11</div></div>
+        <div class="bar-col"><div class="bar" style="height:86%;background:var(--sage)"></div><div class="bar-label">12pm</div></div>
+        <div class="bar-col"><div class="bar" style="height:71%;background:var(--sage)"></div><div class="bar-label">1</div></div>
+        <div class="bar-col"><div class="bar" style="height:50%;background:var(--dim)"></div><div class="bar-label">2</div></div>
+        <div class="bar-col"><div class="bar" style="height:64%;background:var(--sage)"></div><div class="bar-label">3</div></div>
+        <div class="bar-col"><div class="bar" style="height:79%;background:var(--sage)"></div><div class="bar-label">4</div></div>
+        <div class="bar-col"><div class="bar" style="height:57%;background:var(--dim)"></div><div class="bar-label">5</div></div>
+        <div class="bar-col"><div class="bar" style="height:43%;background:var(--dim)"></div><div class="bar-label">6pm</div></div>
+      </div>
     </div>
   </div>
 

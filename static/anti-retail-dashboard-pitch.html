@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PrimalPantry — The Marketing Dashboard Retailers Should Have Built</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,700;1,9..144,400&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bark: #2E1A0E; --bark-mid: #442A16; --bark-light: #6B4D38;
+  --cream: #FAF4EB; --cream-deep: #EEDED0; --off-white: #FEFCF8;
+  --sage: #6B8F5B; --sage-light: #8CB47A; --sage-pale: #E5EDDF;
+  --honey: #D4A84B; --warm-gray: #877B71;
+  --rule: rgba(139,115,85,0.12); --rule-strong: rgba(139,115,85,0.2);
+}
+html { font-size: 16px; scroll-behavior: smooth; }
+body { background: var(--cream); color: var(--bark); font-family: 'DM Sans', -apple-system, sans-serif; font-weight: 400; line-height: 1.65; -webkit-font-smoothing: antialiased; }
+
+/* Nav */
+nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 2.5rem; border-bottom: 1px solid var(--rule); background: rgba(250,244,235,0.92); backdrop-filter: blur(12px); }
+.logo { font-family: 'Fraunces', serif; font-size: 1.25rem; font-weight: 700; color: var(--bark); text-decoration: none; }
+.logo span { color: var(--sage); }
+.logo small { display: block; font-family: 'DM Sans', sans-serif; font-size: 0.72rem; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: var(--warm-gray); margin-top: 0.1rem; }
+.nav-cta { font-family: 'DM Sans', sans-serif; font-size: 0.82rem; font-weight: 700; color: var(--cream); background: var(--bark); padding: 0.6rem 1.6rem; border-radius: 100px; text-decoration: none; transition: background 0.2s, transform 0.2s; }
+.nav-cta:hover { background: var(--bark-mid); transform: translateY(-2px); }
+
+/* Layout */
+section { padding: 5rem 2.5rem; max-width: 860px; margin: 0 auto; }
+.divider { border: none; border-top: 1px solid var(--rule); max-width: 860px; margin: 0 auto; }
+
+/* Hero */
+.hero { min-height: 100vh; display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center; padding-top: 8rem; padding-bottom: 4rem; max-width: 1100px; margin: 0 auto; }
+.hero-text { display: flex; flex-direction: column; }
+.hero-eyebrow { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--sage); margin-bottom: 2rem; display: flex; align-items: center; gap: 0.75rem; }
+.hero-eyebrow::before { content: ''; display: block; width: 2rem; height: 1px; background: var(--sage); }
+.hero h1 { font-family: 'Fraunces', serif; font-size: clamp(2rem, 4.5vw, 3.2rem); font-weight: 400; line-height: 1.15; letter-spacing: -0.02em; color: var(--bark); margin-bottom: 1.5rem; }
+.hero h1 em { font-style: italic; color: var(--sage); }
+.hero-sub { font-size: 1rem; line-height: 1.7; color: var(--warm-gray); margin-bottom: 1.25rem; }
+.hero-sub strong { color: var(--bark); font-weight: 700; }
+
+/* Section labels */
+.section-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--sage); margin-bottom: 2.5rem; display: flex; align-items: center; gap: 0.75rem; }
+.section-label::before { content: ''; display: block; width: 1.5rem; height: 1px; background: var(--sage); }
+h2 { font-family: 'Fraunces', serif; font-size: clamp(1.8rem, 4.5vw, 2.8rem); font-weight: 400; line-height: 1.15; letter-spacing: -0.02em; color: var(--bark); margin-bottom: 1.5rem; }
+h3 { font-family: 'Fraunces', serif; font-size: 1.15rem; font-weight: 400; margin-bottom: 0.75rem; color: var(--bark); }
+p { color: var(--warm-gray); margin-bottom: 1.25rem; }
+p strong { color: var(--bark); font-weight: 700; }
+
+/* Buttons */
+.btn-primary { font-family: 'DM Sans', sans-serif; font-size: 0.92rem; font-weight: 700; color: var(--cream); background: var(--bark); padding: 15px 32px; border-radius: 100px; text-decoration: none; transition: background 0.2s, transform 0.2s, box-shadow 0.2s; display: inline-block; }
+.btn-primary:hover { background: var(--bark-mid); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(46,26,14,0.16); }
+.btn-ghost { font-family: 'DM Sans', sans-serif; font-size: 0.92rem; font-weight: 700; color: var(--bark); padding: 15px 32px; border-radius: 100px; text-decoration: none; border: 2px solid var(--bark); transition: background 0.2s, color 0.2s; display: inline-block; }
+.btn-ghost:hover { background: var(--bark); color: var(--cream); }
+.hero-actions { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 1rem; }
+
+/* VS cards */
+.vs-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 2.5rem 0; }
+.vs-card { padding: 2rem; border-radius: 14px; }
+.vs-card.old { background: var(--cream-deep); border: 1px solid var(--rule); }
+.vs-card.new { background: var(--sage-pale); border: 1px solid rgba(107,143,91,0.25); }
+.vs-badge { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; display: inline-block; padding: 0.25rem 0.6rem; border-radius: 50px; margin-bottom: 1rem; }
+.vs-card.old .vs-badge { background: rgba(181,69,42,0.1); color: #B5452A; }
+.vs-card.new .vs-badge { background: rgba(107,143,91,0.15); color: var(--sage); }
+.vs-card ul { list-style: none; display: flex; flex-direction: column; gap: 0.6rem; }
+.vs-card ul li { font-size: 0.88rem; color: var(--warm-gray); display: flex; align-items: flex-start; gap: 0.5rem; line-height: 1.5; }
+.vs-card ul li .ic { flex-shrink: 0; margin-top: 2px; }
+.vs-card.old ul li .ic { color: #B5452A; }
+.vs-card.new ul li .ic { color: var(--sage); }
+.x-svg { display: inline-block; }
+.c-svg { display: inline-block; }
+
+/* Feature grid */
+.feat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1.25rem; margin: 2.5rem 0; }
+.feat-card { background: var(--off-white); border: 1px solid var(--rule); border-radius: 14px; padding: 1.75rem; transition: transform 0.2s, box-shadow 0.2s; }
+.feat-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.04); }
+.feat-icon { font-size: 1.5rem; margin-bottom: 0.75rem; }
+.feat-card h3 { font-size: 1rem; margin-bottom: 0.4rem; }
+.feat-card p { font-size: 0.85rem; margin: 0; line-height: 1.55; }
+
+/* Flow steps */
+.flow-steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin: 2rem 0; }
+.flow-step { padding: 1.5rem; background: var(--off-white); border: 1px solid var(--rule); text-align: center; position: relative; }
+.flow-step:first-child { border-radius: 12px 0 0 12px; }
+.flow-step:last-child { border-radius: 0 12px 12px 0; }
+.flow-step:not(:last-child)::after { content: '→'; position: absolute; right: -12px; top: 50%; transform: translateY(-50%); color: var(--sage); font-size: 1rem; z-index: 1; background: var(--cream); width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1px solid var(--rule); }
+.flow-step .fs-icon { font-size: 1.5rem; margin-bottom: 0.5rem; }
+.flow-step .fs-num { font-size: 0.6rem; font-weight: 700; color: var(--sage); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.3rem; }
+.flow-step .fs-title { font-size: 0.85rem; font-weight: 700; color: var(--bark); margin-bottom: 0.2rem; }
+.flow-step .fs-desc { font-size: 0.72rem; color: var(--warm-gray); line-height: 1.4; }
+
+/* Callout */
+.callout { background: var(--sage-pale); border-left: 3px solid var(--sage); border-radius: 0 12px 12px 0; padding: 1.25rem 1.5rem; margin: 1.5rem 0; font-size: 0.95rem; color: var(--bark); }
+.callout strong { color: var(--sage); }
+
+/* Screenshot preview */
+.dash-preview { border-radius: 12px; overflow: hidden; border: 1px solid var(--rule); box-shadow: 0 12px 40px rgba(0,0,0,0.08); margin: 2rem 0; }
+.dash-preview img { width: 100%; display: block; }
+.dash-preview-placeholder { width: 100%; aspect-ratio: 16/9; background: var(--cream-deep); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 0.5rem; }
+.dash-preview-placeholder span { font-size: 0.75rem; color: var(--warm-gray); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+
+/* CTA */
+.cta-section { text-align: center; padding: 6rem 2.5rem; max-width: 700px; margin: 0 auto; }
+.cta-section h2 { margin-bottom: 1rem; }
+.cta-section p { margin-bottom: 2.5rem; }
+
+/* Footer */
+footer { border-top: 1px solid var(--rule); padding: 2rem 2.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; max-width: 860px; margin: 0 auto; }
+footer .logo-sm { font-family: 'Fraunces', serif; font-weight: 700; font-size: 1rem; color: var(--warm-gray); }
+footer .logo-sm span { color: var(--sage); }
+footer p { font-size: 0.78rem; color: var(--warm-gray); margin: 0; }
+
+/* Animations */
+@keyframes fadeUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+.hero h1 { animation: fadeUp 0.7s ease forwards; }
+.hero-sub { animation: fadeUp 0.7s 0.12s ease both; }
+.hero-actions { animation: fadeUp 0.7s 0.2s ease both; }
+
+@media (max-width: 768px) {
+  .hero { grid-template-columns: 1fr; gap: 2rem; padding-top: 6rem; }
+  .vs-row { grid-template-columns: 1fr; }
+  .flow-steps { grid-template-columns: 1fr 1fr; }
+  .flow-step:first-child { border-radius: 12px 0 0 0; }
+  .flow-step:nth-child(2) { border-radius: 0 12px 0 0; }
+  .flow-step:nth-child(3) { border-radius: 0 0 0 12px; }
+  .flow-step:last-child { border-radius: 0 0 12px 0; }
+  .flow-step:nth-child(2)::after { display: none; }
+  nav { padding: 1rem 1.25rem; }
+  section { padding: 3.5rem 1.25rem; }
+}
+@media (max-width: 500px) {
+  .flow-steps { grid-template-columns: 1fr; }
+  .flow-step { border-radius: 0 !important; }
+  .flow-step:first-child { border-radius: 12px 12px 0 0 !important; }
+  .flow-step:last-child { border-radius: 0 0 12px 12px !important; }
+  .flow-step::after { display: none !important; }
+  .feat-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="the-primalpantry-anti-retail-store.html" class="logo">Primal<span>Pantry</span><small>retail for growth</small></a>
+  <a href="anti-retail-dashboard.html" class="nav-cta">See the dashboard</a>
+</nav>
+
+<!-- HERO -->
+<div style="padding: 0 2.5rem;">
+  <div class="hero">
+    <div class="hero-text">
+      <p class="hero-eyebrow">Your supplier dashboard</p>
+      <h1>The marketing tools <em>retailers should have built you.</em></h1>
+      <p class="hero-sub">What happens when you take someone who worked in software for 6 years, built a successful ecommerce business with massive marketing wins, and then watched retail nearly sink it?</p>
+      <p class="hero-sub"><strong>Real change.</strong></p>
+      <p class="hero-sub">Retailers are in the stone ages. They leave you in the dark, drip-feed you data monthly, and expect you to grow your business without knowing what's working. That's not a partnership — that's negligence.</p>
+      <div class="hero-actions">
+        <a href="anti-retail-dashboard.html" class="btn-primary">Explore the dashboard</a>
+        <a href="the-primalpantry-anti-retail-store.html" class="btn-ghost">Back to the pitch</a>
+      </div>
+    </div>
+    <div>
+      <div class="dash-preview">
+        <iframe src="anti-retail-dashboard.html" style="width:100%;height:500px;border:none;pointer-events:none;transform:scale(0.6);transform-origin:top left;width:166%;height:833px;" title="Dashboard preview"></iframe>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- THE PROBLEM -->
+<section>
+  <p class="section-label">The problem</p>
+  <h2>How are you supposed to grow without knowing what's working?</h2>
+  <p>Right now, your retailer gives you a sales report once a month — maybe fortnightly if you're lucky. If you want daily data, you're paying tens of thousands for it. And even then, you can't tie a single sale back to an ad.</p>
+  <p><strong>You're spending money on advertising with absolutely no feedback loop.</strong> No way to optimise. No way to know which creative is driving in-store purchases. No way to scale what works.</p>
+  <p>This is core to what we're building. Not only are we leaving you with the margins you need to grow — we're giving you the tools to actually do it.</p>
+
+  <div class="vs-row">
+    <div class="vs-card old">
+      <span class="vs-badge">What retailers give you</span>
+      <ul>
+        <li><span class="ic"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M12 4L4 12M4 4l8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>Monthly sales reports — if you're lucky</li>
+        <li><span class="ic"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M12 4L4 12M4 4l8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>Pay extra to access your own data</li>
+        <li><span class="ic"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M12 4L4 12M4 4l8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>No idea which ads drive sales</li>
+        <li><span class="ic"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M12 4L4 12M4 4l8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>No customer emails or data</li>
+        <li><span class="ic"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M12 4L4 12M4 4l8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>No ability to create promos or bundles</li>
+        <li><span class="ic"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M12 4L4 12M4 4l8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>No attribution. No feedback loop. Nothing.</li>
+      </ul>
+    </div>
+    <div class="vs-card new">
+      <span class="vs-badge">What we give you</span>
+      <ul>
+        <li><span class="ic"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Real-time sales data — updated live</li>
+        <li><span class="ic"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Included free. It's your data.</li>
+        <li><span class="ic"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Full ad attribution — in-store to Facebook</li>
+        <li><span class="ic"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Customer emails captured at POS</li>
+        <li><span class="ic"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Create bundles, promos, affiliates — from your dashboard</li>
+        <li><span class="ic"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Revenue by store, heatmaps, trending products</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- FEATURES -->
+<section>
+  <p class="section-label">What you get</p>
+  <h2>Built by a founder who needed these tools and didn't have them.</h2>
+
+  <div class="feat-grid">
+    <div class="feat-card">
+      <div class="feat-icon">📊</div>
+      <h3>Real-time revenue</h3>
+      <p>See today's revenue, weekly paceline, orders, units sold, and AOV — live. Not in a PDF next month.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🗺️</div>
+      <h3>Revenue by store</h3>
+      <p>See how each location is performing. Filter all stats by store or view across all three.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🔥</div>
+      <h3>Trending products</h3>
+      <p>Know which products are moving, which are slowing down, and what's being bought together.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🎟️</div>
+      <h3>Promo codes</h3>
+      <p>Create discount codes, track redemptions, and see exactly how much revenue each code drives.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🤝</div>
+      <h3>Affiliate tracking</h3>
+      <p>Give influencers unique codes. Track uses, revenue, and commission — all from your dashboard.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">📦</div>
+      <h3>Bundle deals</h3>
+      <p>Create bundles from your products, set a discounted price, and track performance. Increase AOV on your terms.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">📧</div>
+      <h3>Customer emails</h3>
+      <p>Every purchase captures an email. Build your list from in-store sales — something no retailer gives you.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">📦</div>
+      <h3>Inventory & stock</h3>
+      <p>See stock levels per store, get low-stock alerts, and track sell-through rate. Never run out unexpectedly.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- AD ATTRIBUTION -->
+<section>
+  <p class="section-label">The game changer</p>
+  <h2>Run a Facebook ad. Scan the offer in store. Attribute the sale to the ad.</h2>
+  <p>This is the thing retailers can't do — and it's the thing that changes everything. Our proprietary software connects in-store sales back to your Facebook ad account. For the first time, you'll know exactly which ads are driving physical purchases.</p>
+
+  <div class="flow-steps">
+    <div class="flow-step">
+      <div class="fs-icon">📱</div>
+      <div class="fs-num">Step 1</div>
+      <div class="fs-title">Add offer to ad</div>
+      <div class="fs-desc">Attach a promo or affiliate code to your Facebook/Instagram ad</div>
+    </div>
+    <div class="flow-step">
+      <div class="fs-icon">🏪</div>
+      <div class="fs-num">Step 2</div>
+      <div class="fs-title">Customer scans in store</div>
+      <div class="fs-desc">They redeem the code at POS. Receipt captures their email</div>
+    </div>
+    <div class="flow-step">
+      <div class="fs-icon">🔄</div>
+      <div class="fs-num">Step 3</div>
+      <div class="fs-title">Sale attributed</div>
+      <div class="fs-desc">Our software matches the email to Facebook Ads API — the ad gets the credit</div>
+    </div>
+    <div class="flow-step">
+      <div class="fs-icon">📈</div>
+      <div class="fs-num">Step 4</div>
+      <div class="fs-title">Optimise & scale</div>
+      <div class="fs-desc">Your ad account learns what works. Scale winners, cut losers</div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>This is impossible with traditional retail.</strong> They don't share POS data with your ad account. They don't capture emails. They don't let you run promos. We do all of it — and relay the sale info directly back to Facebook so your campaigns get smarter over time.
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- CTA -->
+<div class="cta-section">
+  <p class="section-label" style="justify-content: center;">See it in action</p>
+  <h2>This is what a retail partnership should look like.</h2>
+  <p>Real-time data. Full attribution. Tools that actually help you grow. Explore the demo dashboard and see what you've been missing.</p>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:1rem;">
+    <a href="anti-retail-dashboard.html" class="btn-primary">Explore the dashboard</a>
+    <a href="the-primalpantry-anti-retail-store.html" class="btn-ghost">Read the full pitch</a>
+  </div>
+</div>
+
+<hr class="divider">
+<footer>
+  <div class="logo-sm">Primal<span>Pantry</span></div>
+  <p>PrimalPantry — retail for growth. New Zealand.</p>
+</footer>
+
+</body>
+</html>
