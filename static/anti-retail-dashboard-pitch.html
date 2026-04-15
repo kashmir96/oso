@@ -15,6 +15,8 @@
   --rule: rgba(139,115,85,0.12); --rule-strong: rgba(139,115,85,0.2);
 }
 html { font-size: 16px; scroll-behavior: smooth; }
+html, body { overflow-x: hidden; max-width: 100vw; }
+*, *::before, *::after { box-sizing: border-box; }
 body { background: var(--cream); color: var(--bark); font-family: 'DM Sans', -apple-system, sans-serif; font-weight: 400; line-height: 1.65; -webkit-font-smoothing: antialiased; }
 
 /* Nav */
@@ -22,10 +24,14 @@ nav { position: relative; display: flex; align-items: center; justify-content: s
 .logo { font-family: 'Fraunces', serif; font-size: 1.25rem; font-weight: 700; color: var(--bark); text-decoration: none; }
 .logo span { color: var(--sage); }
 .logo small { display: block; font-family: 'DM Sans', sans-serif; font-size: 0.72rem; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: var(--warm-gray); margin-top: 0.1rem; }
+.nav-links { display: flex; align-items: center; gap: 1.5rem; }
+.nav-toggle { display: none; background: none; border: none; cursor: pointer; padding: 0.25rem; color: var(--bark); flex-shrink: 0; }
+.nav-cta-mobile { display: none; }
 .nav-cta { font-family: 'DM Sans', sans-serif; font-size: 0.82rem; font-weight: 700; color: var(--cream); background: var(--bark); padding: 0.6rem 1.6rem; border-radius: 100px; text-decoration: none; transition: background 0.2s, transform 0.2s; }
 .nav-cta:hover { background: var(--bark-mid); transform: translateY(-2px); }
 
 /* Layout */
+.hero-wrap { padding: 0 2.5rem; }
 section { padding: 5rem 2.5rem; max-width: 860px; margin: 0 auto; }
 .divider { border: none; border-top: 1px solid var(--rule); max-width: 860px; margin: 0 auto; }
 
@@ -123,7 +129,21 @@ footer p { font-size: 0.78rem; color: var(--warm-gray); margin: 0; }
 .hero-actions { animation: fadeUp 0.7s 0.2s ease both; }
 
 @media (max-width: 768px) {
-  .hero { grid-template-columns: 1fr; gap: 2rem; padding-top: 6rem; }
+  nav { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 0.75rem; padding: 1rem 1.25rem; }
+  .logo { order: 2; text-align: center; justify-self: center; }
+  .nav-toggle { display: block; order: 1; }
+  .nav-cta.nav-cta-mobile { order: 3; font-size: 0.72rem; padding: 0.5rem 1rem; }
+  .nav-links { display: none; order: 4; grid-column: 1 / -1; flex-direction: column; gap: 0; padding-top: 0.75rem; border-top: 1px solid var(--rule); }
+  .nav-links a { display: block; padding: 0.75rem 0; border-bottom: 1px solid var(--rule); font-size: 0.88rem !important; font-weight: 500 !important; color: var(--warm-gray) !important; text-decoration: none; }
+  .nav-links a:last-child { border-bottom: none; }
+  .nav-links .nav-cta-desktop { display: none; }
+  nav.nav-open .nav-links { display: flex; }
+  .hero-wrap { padding: 0 1.25rem; }
+  .hero { grid-template-columns: 1fr; gap: 2rem; padding-top: 2rem; min-height: auto; }
+  .hero > * { min-width: 0; overflow: hidden; }
+  .hero h1 { font-size: 1.6rem; word-wrap: break-word; }
+  .hero-sub { font-size: 0.9rem; }
+  .btn-primary, .btn-ghost { font-size: 0.82rem; padding: 12px 24px; }
   .vs-row { grid-template-columns: 1fr; }
   .flow-steps { grid-template-columns: 1fr 1fr; }
   .flow-step:first-child { border-radius: 12px 0 0 0; }
@@ -131,7 +151,6 @@ footer p { font-size: 0.78rem; color: var(--warm-gray); margin: 0; }
   .flow-step:nth-child(3) { border-radius: 0 0 0 12px; }
   .flow-step:last-child { border-radius: 0 0 12px 0; }
   .flow-step:nth-child(2)::after { display: none; }
-  nav { padding: 1rem 1.25rem; }
   section { padding: 3.5rem 1.25rem; }
 }
 @media (max-width: 500px) {
@@ -146,18 +165,22 @@ footer p { font-size: 0.78rem; color: var(--warm-gray); margin: 0; }
 </head>
 <body>
 
-<nav>
+<nav id="mainNav">
+  <button class="nav-toggle" onclick="document.getElementById('mainNav').classList.toggle('nav-open')" aria-label="Menu">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+  </button>
   <a href="the-primalpantry-anti-retail-store.html" class="logo">Primal<span>Pantry</span><small>retail for growth</small></a>
-  <div style="display:flex;align-items:center;gap:1.5rem;">
-    <a href="the-primalpantry-anti-retail-store.html" style="font-size:0.82rem;font-weight:500;color:var(--warm-gray);text-decoration:none;transition:color 0.15s;" onmouseover="this.style.color='var(--bark)'" onmouseout="this.style.color='var(--warm-gray)'">The Mission</a>
+  <a href="the-primalpantry-anti-retail-store.html#apply" class="nav-cta nav-cta-mobile">Express interest</a>
+  <div class="nav-links">
+    <a href="the-primalpantry-anti-retail-store.html" style="font-size:0.82rem;font-weight:500;color:var(--warm-gray);text-decoration:none;">The Mission</a>
     <a href="anti-retail-dashboard-pitch.html" style="font-size:0.82rem;font-weight:700;color:var(--sage);text-decoration:none;">Supplier Dashboard</a>
-    <a href="the-primalpantry-anti-retail-store-consumers.html" style="font-size:0.82rem;font-weight:500;color:var(--warm-gray);text-decoration:none;transition:color 0.15s;" onmouseover="this.style.color='var(--bark)'" onmouseout="this.style.color='var(--warm-gray)'">Pitch to Consumers</a>
-    <a href="the-primalpantry-anti-retail-store.html#apply" class="nav-cta">Express an interest</a>
+    <a href="the-primalpantry-anti-retail-store-consumers.html" style="font-size:0.82rem;font-weight:500;color:var(--warm-gray);text-decoration:none;">Pitch to Consumers</a>
+    <a href="the-primalpantry-anti-retail-store.html#apply" class="nav-cta nav-cta-desktop">Express an interest</a>
   </div>
 </nav>
 
 <!-- HERO -->
-<div style="padding: 0 2.5rem;">
+<div class="hero-wrap">
   <div class="hero">
     <div class="hero-text">
       <p class="hero-eyebrow">Your supplier dashboard</p>

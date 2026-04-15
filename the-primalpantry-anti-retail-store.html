@@ -39,13 +39,13 @@
   }
 
   /* NAV */
+  html, body { overflow-x: hidden; }
   nav {
-    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    position: relative;
     display: flex; align-items: center; justify-content: space-between;
     padding: 1.25rem 2.5rem;
     border-bottom: 1px solid var(--rule);
-    background: rgba(250,244,235,0.92);
-    backdrop-filter: blur(12px);
+    background: var(--cream);
   }
   .logo {
     font-family: 'Fraunces', serif;
@@ -55,6 +55,14 @@
     letter-spacing: -0.01em;
   }
   .logo span { color: var(--sage); }
+  .nav-links {
+    display: flex; align-items: center; gap: 1.5rem;
+  }
+  .nav-toggle {
+    display: none; background: none; border: none; cursor: pointer; padding: 0.25rem;
+    color: var(--bark); flex-shrink: 0;
+  }
+  .nav-cta-mobile { display: none; }
   .nav-cta {
     font-family: 'DM Sans', sans-serif;
     font-size: 0.82rem; font-weight: 700;
@@ -70,6 +78,32 @@
     transform: translateY(-2px);
     box-shadow: 0 8px 20px rgba(46,26,14,0.16);
   }
+  @media (max-width: 768px) {
+    nav {
+      display: grid; grid-template-columns: auto 1fr auto;
+      align-items: center; gap: 0.75rem;
+      padding: 1rem 1.25rem;
+    }
+    .logo { order: 2; text-align: center; justify-self: center; }
+    .nav-toggle { display: block; order: 1; }
+    .nav-cta.nav-cta-mobile { order: 3; font-size: 0.72rem; padding: 0.5rem 1rem; }
+    .nav-links {
+      display: none; order: 4; grid-column: 1 / -1;
+      flex-direction: column; gap: 0; padding-top: 0.75rem;
+      border-top: 1px solid var(--rule);
+    }
+    .nav-links a {
+      display: block; padding: 0.75rem 0; border-bottom: 1px solid var(--rule);
+      font-size: 0.88rem !important; font-weight: 500 !important;
+      color: var(--warm-gray) !important; text-decoration: none;
+    }
+    .nav-links a:last-child { border-bottom: none; }
+    .nav-links .nav-cta-desktop { display: none; }
+    nav.nav-open .nav-links { display: flex; }
+  }
+
+  /* LAYOUT */
+  .hero-wrap { padding: 0 2.5rem; }
 
   /* SECTIONS */
   section { padding: 5rem 2.5rem; max-width: 860px; margin: 0 auto; }
@@ -79,7 +113,7 @@
     min-height: 100vh;
     display: grid; grid-template-columns: 1fr 1fr; gap: 3rem;
     align-items: center;
-    padding-top: 8rem; padding-bottom: 4rem;
+    padding-top: 3rem; padding-bottom: 4rem;
     max-width: 1100px; margin: 0 auto;
   }
   .hero-text { display: flex; flex-direction: column; }
@@ -99,7 +133,7 @@
 
   .hero h1 {
     font-family: 'Fraunces', serif;
-    font-size: clamp(2.2rem, 5.5vw, 4.8rem);
+    font-size: clamp(2rem, 3.5vw, 3rem);
     font-weight: 400;
     line-height: 1.12;
     letter-spacing: -0.02em;
@@ -205,7 +239,7 @@
 
   h2 {
     font-family: 'Fraunces', serif;
-    font-size: clamp(1.8rem, 4.5vw, 2.8rem);
+    font-size: clamp(1.6rem, 3vw, 2.2rem);
     font-weight: 400;
     line-height: 1.15;
     letter-spacing: -0.02em;
@@ -281,7 +315,7 @@
   /* OFFER BLOCK */
   .offer-headline {
     font-family: 'Fraunces', serif;
-    font-size: clamp(1.5rem, 4vw, 2.5rem);
+    font-size: clamp(1.5rem, 3vw, 2rem);
     font-weight: 400; letter-spacing: -0.02em;
     line-height: 1.15; margin-bottom: 3rem;
     color: var(--bark);
@@ -775,10 +809,10 @@
   .hero-actions { animation: fadeUp 0.7s 0.2s ease both; }
   .video-placeholder { animation: fadeUp 0.7s 0.05s ease both; }
 
-  @media (max-width: 600px) {
-    nav { padding: 1rem 1.25rem; }
+  @media (max-width: 768px) {
     section { padding: 3.5rem 1.25rem; }
-    .hero { padding-top: 6rem; grid-template-columns: 1fr; gap: 2rem; }
+    .hero-wrap { padding: 0 1.25rem; }
+    .hero { padding-top: 2rem; grid-template-columns: 1fr; gap: 2rem; min-height: auto; }
     .math-block { padding: 1.5rem; }
     .proof-block { padding: 2rem 1.5rem; }
     .open-book { padding: 2rem 1.5rem; }
@@ -792,18 +826,22 @@
 <body>
 
 <!-- NAV -->
-<nav>
+<nav id="mainNav">
+  <button class="nav-toggle" onclick="document.getElementById('mainNav').classList.toggle('nav-open')" aria-label="Menu">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+  </button>
   <a href="the-primalpantry-anti-retail-store.html" class="logo">Primal<span>Pantry</span><small style="display:block;font-family:'DM Sans',sans-serif;font-size:0.72rem;font-weight:500;letter-spacing:0.14em;text-transform:uppercase;color:var(--warm-gray);margin-top:0.15rem;">retail for growth</small></a>
-  <div style="display:flex;align-items:center;gap:1.5rem;">
+  <a href="#" class="nav-cta nav-cta-mobile" onclick="openModal(); return false;">Express interest</a>
+  <div class="nav-links">
     <a href="the-primalpantry-anti-retail-store.html" style="font-size:0.82rem;font-weight:700;color:var(--sage);text-decoration:none;">The Mission</a>
     <a href="anti-retail-dashboard-pitch.html" style="font-size:0.82rem;font-weight:500;color:var(--warm-gray);text-decoration:none;transition:color 0.15s;" onmouseover="this.style.color='var(--bark)'" onmouseout="this.style.color='var(--warm-gray)'">Supplier Dashboard</a>
     <a href="the-primalpantry-anti-retail-store-consumers.html" style="font-size:0.82rem;font-weight:500;color:var(--warm-gray);text-decoration:none;transition:color 0.15s;" onmouseover="this.style.color='var(--bark)'" onmouseout="this.style.color='var(--warm-gray)'">Pitch to Consumers</a>
-    <a href="#" class="nav-cta" onclick="openModal(); return false;">Express an interest</a>
+    <a href="#" class="nav-cta nav-cta-desktop" onclick="openModal(); return false;">Express an interest</a>
   </div>
 </nav>
 
 <!-- HERO -->
-<div style="padding: 0 2.5rem;">
+<div class="hero-wrap">
   <div class="hero">
 
     <div class="hero-text">
@@ -850,12 +888,12 @@
       <span class="value big">$6,000</span>
     </div>
     <div class="math-row" style="border-bottom: none; padding: 1rem 0;">
-      <span class="label"><strong>What it costs you per location</strong><br><span style="font-size:0.8rem;">A fixed price per brand, per location. Covers rent, wages, power, insurance, POS — everything it takes to keep the lights on. No percentage of sales. No surprises.</span></span>
-      <span class="value big" style="color: var(--sage);">Fixed fee</span>
+      <span class="label"><strong>What it costs you per location</strong><br><span style="font-size:0.8rem;">~$300-500 per week fixed fee per brand, per location. Covers rent, wages, power, insurance, POS — everything it takes to keep the lights on. No percentage of sales. No surprises.</span></span>
+      <span class="value big" style="color: var(--sage);">~$300–500/wk</span>
     </div>
   </div>
 
-  <p style="font-size: 1.06rem; line-height: 1.6;"><strong>And that's just one store. You're handing a retailer $1,100 a week and giving up $6,000 in lost revenue on top. With us, you pay a fixed price per location — no percentage of sales, no hidden fees. It doesn't take much to realise this doesn't make sense.</strong></p>
+  <p style="font-size: 1.06rem; line-height: 1.6;"><strong>And that's just one store. You're handing a retailer $1,100 a week and giving up $6,000 in lost revenue on top. With us, you pay a ~$300-500 per week fixed fee per location — no percentage of sales, no hidden fees. It doesn't take much to realise this doesn't make sense.</strong></p>
   <div class="callout">
     <strong>The flywheel:</strong> The more good brands we add, the more foot traffic everyone gets, the lower the operating costs per brand, and the more we can all spend on ads that actually drive growth.
   </div>
@@ -1021,7 +1059,7 @@
     <div class="offer-num">01</div>
     <div class="offer-body">
       <h3>Flat fee. Not a percentage.</h3>
-      <p>You pay a fixed price per brand, per location. If your business grows, you don't pay more. We're not a retailer. We don't touch your margin.</p>
+      <p>You pay a ~$300-500 per week fixed fee per brand, per location. If your business grows, you don't pay more. We're not a retailer. We don't touch your margin.</p>
     </div>
   </div>
   <div class="offer-row">

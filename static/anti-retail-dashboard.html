@@ -164,22 +164,41 @@ body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); col
 </head>
 <body>
 <style>
+html, body { overflow-x: hidden; }
 .site-nav { position:relative; display:flex; align-items:center; justify-content:space-between; padding:1.25rem 2.5rem; border-bottom:1px solid rgba(139,115,85,0.12); background:#FAF4EB; }
-.site-nav .sn-logo { font-family:'Fraunces',serif; font-size:1.25rem; font-weight:700; color:#2E1A0E; letter-spacing:-0.01em; }
+.site-nav .sn-logo { font-family:'Fraunces',serif; font-size:1.25rem; font-weight:700; color:#2E1A0E; letter-spacing:-0.01em; text-decoration:none; }
 .site-nav .sn-logo span { color:#6B8F5B; }
-.site-nav .sn-cta { font-family:'DM Sans',sans-serif; font-size:0.82rem; font-weight:700; color:#FAF4EB; background:#2E1A0E; padding:0.6rem 1.6rem; border-radius:100px; transition:background 0.2s,transform 0.2s; }
+.site-nav .sn-links { display:flex; align-items:center; gap:1.5rem; }
+.site-nav .sn-toggle { display:none; background:none; border:none; cursor:pointer; padding:0.25rem; color:#2E1A0E; flex-shrink:0; }
+.site-nav .sn-cta-mobile { display:none; }
+.site-nav .sn-cta { font-family:'DM Sans',sans-serif; font-size:0.82rem; font-weight:700; color:#FAF4EB; background:#2E1A0E; padding:0.6rem 1.6rem; border-radius:100px; text-decoration:none; transition:background 0.2s,transform 0.2s; }
 .site-nav .sn-cta:hover { background:#442A16; transform:translateY(-2px); }
-.site-nav .sn-link { font-size:0.82rem; font-weight:500; color:#877B71; transition:color 0.15s; }
+.site-nav .sn-link { font-size:0.82rem; font-weight:500; color:#877B71; text-decoration:none; transition:color 0.15s; }
 .site-nav .sn-link:hover { color:#2E1A0E; }
 .site-nav .sn-link.active { font-weight:700; color:#6B8F5B; }
+@media (max-width:768px) {
+  .site-nav { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:0.75rem; padding:1rem 1.25rem; }
+  .site-nav .sn-logo { order:2; text-align:center; justify-self:center; }
+  .site-nav .sn-toggle { display:block; order:1; }
+  .site-nav .sn-cta.sn-cta-mobile { order:3; font-size:0.72rem; padding:0.5rem 1rem; }
+  .site-nav .sn-links { display:none; order:4; grid-column:1/-1; flex-direction:column; gap:0; padding-top:0.75rem; border-top:1px solid rgba(139,115,85,0.12); }
+  .site-nav .sn-links a { display:block; padding:0.75rem 0; border-bottom:1px solid rgba(139,115,85,0.12); font-size:0.88rem; }
+  .site-nav .sn-links a:last-child { border-bottom:none; }
+  .site-nav .sn-links .sn-cta-desktop { display:none; }
+  .site-nav.nav-open .sn-links { display:flex; }
+}
 </style>
-<nav class="site-nav">
+<nav class="site-nav" id="dashNav">
+  <button class="sn-toggle" onclick="document.getElementById('dashNav').classList.toggle('nav-open')" aria-label="Menu">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+  </button>
   <a href="the-primalpantry-anti-retail-store.html" class="sn-logo">Primal<span>Pantry</span><small style="display:block;font-family:'DM Sans',sans-serif;font-size:0.72rem;font-weight:500;letter-spacing:0.14em;text-transform:uppercase;color:#877B71;margin-top:0.15rem;">retail for growth</small></a>
-  <div style="display:flex;align-items:center;gap:1.5rem;">
+  <a href="#" class="sn-cta sn-cta-mobile" onclick="openAppModal(); return false;">Express interest</a>
+  <div class="sn-links">
     <a href="the-primalpantry-anti-retail-store.html" class="sn-link">The Mission</a>
     <a href="anti-retail-dashboard-pitch.html" class="sn-link active">Supplier Dashboard</a>
     <a href="the-primalpantry-anti-retail-store-consumers.html" class="sn-link">Pitch to Consumers</a>
-    <a href="#" class="sn-cta" onclick="openAppModal(); return false;">Express an interest</a>
+    <a href="#" class="sn-cta sn-cta-desktop" onclick="openAppModal(); return false;">Express an interest</a>
   </div>
 </nav>
 <div class="shell">
@@ -357,12 +376,12 @@ body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); col
   <!-- Promo / Affiliate / Bundle — click to expand inline -->
   <div class="promo-grid">
     <div>
-      <div class="click-card" onclick="toggleDetail('promo-detail')">
+      <div class="click-card">
         <div class="cc-label">Promo Codes</div>
         <div class="cc-value" style="color:var(--honey)">$1,420</div>
-        <div class="cc-sub">23 redeemed · Click to view</div>
+        <div class="cc-sub">23 redeemed</div>
       </div>
-      <div class="expand-detail" id="promo-detail" style="margin-top:0.5rem;">
+      <div class="expand-detail open" id="promo-detail" style="margin-top:0.5rem;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
           <span style="font-size:0.72rem;font-weight:600;color:var(--muted);">Performance</span>
           <button class="btn-outline" style="font-size:0.65rem;padding:0.3rem 0.5rem;" onclick="event.stopPropagation();openModal('create-promo')">+ New</button>
@@ -375,12 +394,12 @@ body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); col
       </div>
     </div>
     <div>
-      <div class="click-card" onclick="toggleDetail('affiliate-detail')">
+      <div class="click-card">
         <div class="cc-label">Affiliate Codes</div>
         <div class="cc-value" style="color:var(--blush)">$2,180</div>
-        <div class="cc-sub">41 redeemed · Click to view</div>
+        <div class="cc-sub">41 redeemed</div>
       </div>
-      <div class="expand-detail" id="affiliate-detail" style="margin-top:0.5rem;">
+      <div class="expand-detail open" id="affiliate-detail" style="margin-top:0.5rem;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
           <span style="font-size:0.72rem;font-weight:600;color:var(--muted);">Performance</span>
           <button class="btn-outline" style="font-size:0.65rem;padding:0.3rem 0.5rem;" onclick="event.stopPropagation();openModal('create-affiliate')">+ New</button>
@@ -393,12 +412,12 @@ body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); col
       </div>
     </div>
     <div>
-      <div class="click-card" onclick="toggleDetail('bundle-detail')">
+      <div class="click-card">
         <div class="cc-label">Bundle Deals</div>
         <div class="cc-value" style="color:var(--sage)">$890</div>
-        <div class="cc-sub">14 redeemed · Click to view</div>
+        <div class="cc-sub">14 redeemed</div>
       </div>
-      <div class="expand-detail" id="bundle-detail" style="margin-top:0.5rem;">
+      <div class="expand-detail open" id="bundle-detail" style="margin-top:0.5rem;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
           <span style="font-size:0.72rem;font-weight:600;color:var(--muted);">Performance</span>
           <button class="btn-outline" style="font-size:0.65rem;padding:0.3rem 0.5rem;" onclick="event.stopPropagation();openModal('create-bundle')">+ New</button>
