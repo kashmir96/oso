@@ -237,10 +237,12 @@ body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); col
     <h3>Revenue by Store</h3>
     <div style="display:grid;grid-template-columns:1fr 280px;gap:1.5rem;align-items:center;">
       <div style="position:relative;height:320px;background:var(--cream);border-radius:10px;overflow:hidden;border:1px solid var(--border);">
-        <!-- NZ Map SVG simplified -->
-        <svg viewBox="0 0 200 400" style="width:100%;height:100%;opacity:0.15;" fill="none" stroke="var(--muted)" stroke-width="0.5">
-          <path d="M95 40 C90 50,80 65,85 80 C88 90,100 95,105 110 C108 120,100 130,95 140 C92 150,98 155,102 165 C105 170,95 180,90 185 L92 195 C95 198,105 195,108 190 C112 185,115 175,118 170 C120 165,115 155,112 150 C110 142,115 135,118 128 C120 120,125 110,122 100 C120 90,115 80,112 70 C110 60,100 50,95 40Z"/>
-          <path d="M88 220 C82 230,78 245,82 260 C85 270,90 280,88 295 C86 305,80 315,82 325 C84 330,92 335,95 340 C98 345,100 335,102 328 C104 320,100 310,98 300 C96 290,100 280,102 270 C104 260,98 245,95 235 C93 228,90 225,88 220Z"/>
+        <!-- NZ Map -->
+        <svg viewBox="0 0 200 420" style="width:100%;height:100%;" fill="var(--cream-deep)" stroke="var(--border)" stroke-width="1">
+          <!-- North Island -->
+          <path d="M108 30 C104 35,95 42,92 55 C90 65,85 72,88 82 C90 90,96 95,100 105 C103 112,108 118,106 128 C104 135,98 142,96 150 C94 158,100 162,104 170 C107 176,102 182,98 188 C96 192,98 198,102 200 C106 202,112 198,115 192 C118 186,120 178,122 172 C124 166,120 158,118 152 C116 145,120 138,122 130 C124 122,128 114,126 105 C124 96,120 88,118 78 C116 68,112 58,110 48 C109 40,110 35,108 30Z"/>
+          <!-- South Island -->
+          <path d="M96 225 C90 232,84 242,82 255 C80 265,83 275,86 285 C88 295,86 305,84 315 C82 325,80 335,84 345 C87 352,92 358,96 362 C100 366,104 360,106 352 C108 344,106 335,104 325 C102 315,106 305,108 295 C110 285,108 275,106 265 C104 255,100 245,98 238 C97 232,96 228,96 225Z"/>
         </svg>
         <!-- Store dots -->
         <div style="position:absolute;top:28%;left:58%;transform:translate(-50%,-50%);" title="Auckland">
