@@ -6,28 +6,28 @@
 <title>PrimalPantry — Supplier Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-:root { --bg: #141210; --card: #1e1b18; --border: #332d27; --text: #e8e2da; --muted: #9c9287; --dim: #6e6259; --sage: #8CB47A; --honey: #D4A84B; --blush: #DBBFA8; --red: #e06050; --cream: #e8e2da; --cream-deep: #252220; }
+:root { --bg: #FAF4EB; --card: #FEFCF8; --border: rgba(139,115,85,0.15); --text: #2E1A0E; --muted: #877B71; --dim: #a89d93; --sage: #6B8F5B; --honey: #D4A84B; --blush: #DBBFA8; --red: #B5452A; --cream: #FAF4EB; --cream-deep: #EEDED0; }
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
 
 /* Layout */
 .shell { display:flex; min-height:100vh; }
-.sidebar { width:220px; background:var(--card); border-right:1px solid var(--border); padding:1.5rem 0; flex-shrink:0; position:fixed; top:0; bottom:0; overflow-y:auto; }
+.sidebar { width:220px; background:#2E1A0E; border-right:1px solid rgba(255,255,255,0.08); padding:1.5rem 0; flex-shrink:0; position:fixed; top:0; bottom:0; overflow-y:auto; }
 .main { margin-left:220px; flex:1; padding:1.5rem 2rem; }
 
 /* Sidebar */
-.sb-logo { padding:0 1.25rem 1.5rem; font-size:1.2rem; font-weight:700; color:var(--text); border-bottom:1px solid var(--border); margin-bottom:1rem; }
+.sb-logo { padding:0 1.25rem 1.5rem; font-size:1.2rem; font-weight:700; color:#FAF4EB; border-bottom:1px solid rgba(255,255,255,0.08); margin-bottom:1rem; }
 .sb-logo span { color:var(--sage); }
-.sb-label { font-size:0.6rem; font-weight:700; color:var(--dim); text-transform:uppercase; letter-spacing:0.1em; padding:0.75rem 1.25rem 0.4rem; }
+.sb-label { font-size:0.6rem; font-weight:700; color:rgba(255,255,255,0.35); text-transform:uppercase; letter-spacing:0.1em; padding:0.75rem 1.25rem 0.4rem; }
 .sb-nav { list-style:none; }
-.sb-nav li a { display:flex; align-items:center; gap:0.6rem; padding:0.55rem 1.25rem; color:var(--muted); text-decoration:none; font-size:0.85rem; font-weight:500; transition:all 0.15s; border-left:3px solid transparent; }
-.sb-nav li a:hover { color:var(--text); background:var(--cream-deep); }
-.sb-nav li a.active { color:var(--sage); border-left-color:var(--sage); background:rgba(140,180,122,0.06); }
+.sb-nav li a { display:flex; align-items:center; gap:0.6rem; padding:0.55rem 1.25rem; color:rgba(255,255,255,0.5); text-decoration:none; font-size:0.85rem; font-weight:500; transition:all 0.15s; border-left:3px solid transparent; }
+.sb-nav li a:hover { color:#FAF4EB; background:rgba(255,255,255,0.05); }
+.sb-nav li a.active { color:var(--sage); border-left-color:var(--sage); background:rgba(140,180,122,0.1); }
 .sb-nav li a svg { width:18px; height:18px; opacity:0.5; }
 .sb-nav li a.active svg { opacity:1; }
-.sb-brand { margin:1.5rem 1.25rem; padding:0.75rem; background:var(--cream-deep); border-radius:8px; border:1px solid var(--border); }
-.sb-brand-name { font-size:0.8rem; font-weight:600; color:var(--text); }
-.sb-brand-cat { font-size:0.65rem; color:var(--dim); margin-top:0.15rem; }
+.sb-brand { margin:1.5rem 1.25rem; padding:0.75rem; background:rgba(255,255,255,0.05); border-radius:8px; border:1px solid rgba(255,255,255,0.08); }
+.sb-brand-name { font-size:0.8rem; font-weight:600; color:#FAF4EB; }
+.sb-brand-cat { font-size:0.65rem; color:rgba(255,255,255,0.4); margin-top:0.15rem; }
 
 /* Header */
 .page-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem; }
@@ -38,7 +38,7 @@ body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); col
 
 /* Stat Cards */
 .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:0.75rem; margin-bottom:1.5rem; }
-.stat-card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:1rem; }
+.stat-card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:1rem; box-shadow:0 1px 3px rgba(0,0,0,0.04); }
 .stat-card .label { font-size:0.7rem; color:var(--dim); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.4rem; }
 .stat-card .value { font-size:1.6rem; font-weight:700; line-height:1; }
 .stat-card .change { font-size:0.72rem; margin-top:0.3rem; }
@@ -48,7 +48,7 @@ body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); col
 
 /* Charts */
 .charts-row { display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:1.5rem; }
-.chart-card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:1.25rem; }
+.chart-card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:1.25rem; box-shadow:0 1px 3px rgba(0,0,0,0.04); }
 .chart-card h3 { font-size:0.8rem; font-weight:600; color:var(--muted); margin-bottom:1rem; }
 .chart-card.full { grid-column:1/-1; }
 
@@ -92,7 +92,7 @@ body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); col
 /* Modal */
 .modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); z-index:100; align-items:center; justify-content:center; }
 .modal-bg.open { display:flex; }
-.modal-box { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:2rem; max-width:700px; width:90%; max-height:80vh; overflow-y:auto; position:relative; }
+.modal-box { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:2rem; max-width:700px; width:90%; max-height:80vh; overflow-y:auto; position:relative; box-shadow:0 12px 40px rgba(0,0,0,0.12); }
 .modal-box h2 { font-size:1.1rem; margin-bottom:1rem; }
 .modal-close { position:absolute; top:1rem; right:1rem; background:none; border:1px solid var(--border); color:var(--muted); width:28px; height:28px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:0.9rem; }
 .modal-close:hover { border-color:var(--text); color:var(--text); }
@@ -103,9 +103,9 @@ body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); col
 /* Create form */
 .create-form { display:flex; flex-direction:column; gap:0.75rem; margin-top:1rem; }
 .create-form label { font-size:0.72rem; color:var(--dim); text-transform:uppercase; letter-spacing:0.04em; }
-.create-form input, .create-form select, .create-form textarea { background:var(--bg); border:1px solid var(--border); color:var(--text); padding:0.5rem 0.7rem; border-radius:6px; font-size:0.85rem; font-family:inherit; }
+.create-form input, .create-form select, .create-form textarea { background:var(--cream); border:1px solid var(--border); color:var(--text); padding:0.5rem 0.7rem; border-radius:6px; font-size:0.85rem; font-family:inherit; }
 .create-form input:focus, .create-form select:focus { border-color:var(--sage); outline:none; }
-.btn-sage { background:var(--sage); color:#141210; border:none; padding:0.6rem 1.25rem; border-radius:6px; font-weight:600; font-size:0.85rem; cursor:pointer; font-family:inherit; }
+.btn-sage { background:var(--sage); color:#fff; border:none; padding:0.6rem 1.25rem; border-radius:6px; font-weight:600; font-size:0.85rem; cursor:pointer; font-family:inherit; }
 .btn-sage:hover { opacity:0.85; }
 .btn-outline { background:none; border:1px solid var(--border); color:var(--muted); padding:0.5rem 1rem; border-radius:6px; font-size:0.8rem; cursor:pointer; font-family:inherit; }
 .btn-outline:hover { border-color:var(--sage); color:var(--text); }
@@ -116,7 +116,7 @@ body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); col
 
 /* Freq purchased */
 .freq-pairs { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:0.5rem; margin-top:0.75rem; }
-.freq-pair { background:var(--cream-deep); border:1px solid var(--border); border-radius:8px; padding:0.75rem; display:flex; align-items:center; gap:0.5rem; }
+.freq-pair { background:var(--cream); border:1px solid var(--border); border-radius:8px; padding:0.75rem; display:flex; align-items:center; gap:0.5rem; }
 .freq-pair .plus { color:var(--dim); font-size:0.8rem; }
 .freq-pair .pair-name { font-size:0.8rem; color:var(--text); }
 .freq-pair .pair-count { font-size:0.7rem; color:var(--sage); margin-left:auto; font-weight:600; }
