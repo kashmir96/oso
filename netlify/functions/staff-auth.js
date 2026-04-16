@@ -418,8 +418,9 @@ exports.handler = async (event) => {
     const targets = await targetRes.json();
     const targetName = targets && targets[0] ? targets[0].display_name || targets[0].username : `#${user_id}`;
 
-    // Clear FK dependencies first — nullify/delete activity log entries for this staff member
+    // Clear FK dependencies first
     await sbFetch(`/rest/v1/staff_activity_log?staff_id=eq.${user_id}`, { method: 'DELETE' });
+    await sbFetch(`/rest/v1/email_messages?staff_id=eq.${user_id}`, { method: 'DELETE' });
 
     // Now delete the staff record and check it actually succeeded
     const delRes = await sbFetch(`/rest/v1/staff?id=eq.${user_id}`, { method: 'DELETE' });
