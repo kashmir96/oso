@@ -418,7 +418,16 @@ exports.handler = async (event) => {
     const targets = await targetRes.json();
     const targetName = targets && targets[0] ? targets[0].display_name || targets[0].username : `#${user_id}`;
 
-    await sbFetch(`/rest/v1/staff?id=eq.${user_id}`, { method: 'DELETE' });
+    // Clear FK dependencies first — nullify/delete activity log entries for this staff member
+    await sbFetch(`/rest/v1/staff_activity_log?staff_id=eq.${user_id}`, { method: 'DELETE' });
+
+    // Now delete the staff record and check it actually succeeded
+    const delRes = await sbFetch(`/rest/v1/staff?id=eq.${user_id}`, { method: 'DELETE' });
+    if (!delRes.ok) {
+      const errBody = await delRes.text().catch(() => '');
+      console.error('[delete-user] Supabase delete failed:', delRes.status, errBody);
+      return reply(500, { error: `Failed to delete user: ${errBody || delRes.status}` });
+    }
 
     await logActivity(admin.id, admin.username, 'user_delete', `Deleted user "${targetName}"`);
 
