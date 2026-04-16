@@ -889,3 +889,20 @@
     .recovery-preview-label { font-size: 0.65rem; font-weight: 600; color: var(--dim); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.4rem; }
     .recovery-preview-pane { background: #ffffff; color: #2d2a26; border-radius: 10px; padding: 24px; border: 1px solid var(--border); min-height: 200px; max-height: 400px; overflow-y: auto; }
     textarea.recovery-field { resize: vertical; }
+
+    /* ── Loyalty panel ──────────────────────────────── */
+    .action-btn { background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 0.4rem 0.85rem; border-radius: 8px; font-size: 0.82rem; font-family: 'DM Sans', sans-serif; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+    .action-btn:hover { background: var(--border); border-color: var(--sage); color: var(--sage); }
+    .action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .loy-field { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; color: var(--muted); }
+    .loy-field input { background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 0.4rem 0.75rem; border-radius: 8px; font-size: 0.88rem; font-family: 'DM Sans', sans-serif; outline: none; }
+    .loy-field input:focus { border-color: var(--sage); }
+    .loy-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    .loy-table th { text-align: left; color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+    .loy-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid rgba(51,45,39,0.5); vertical-align: top; }
+    .loy-table tr:last-child td { border-bottom: none; }
+    .loy-pts-pos { color: var(--green); font-weight: 600; }
+    .loy-pts-neg { color: var(--red); font-weight: 600; }
+    .loy-type-pill { display: inline-block; background: rgba(140,180,122,0.1); border: 1px solid rgba(140,180,122,0.2); color: var(--sage); font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; padding: 2px 8px; border-radius: 100px; }
+    #mkt-panel-loyalty input[type="email"], #mkt-panel-loyalty input[type="text"], #mkt-panel-loyalty input[type="number"], #mkt-panel-loyalty input[type="datetime-local"], #mkt-panel-loyalty select, #mkt-panel-loyalty textarea { background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 0.4rem 0.75rem; border-radius: 8px; font-size: 0.85rem; font-family: 'DM Sans', sans-serif; outline: none; }
+    #mkt-panel-loyalty input:focus, #mkt-panel-loyalty select:focus, #mkt-panel-loyalty textarea:focus { border-color: var(--sage); }

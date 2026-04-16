@@ -112,6 +112,7 @@
     .v-meta { font-size:0.67rem; color:var(--dim); text-align:right; white-space:nowrap; }
     .v-device { font-size:0.85rem; }
     .v-ref { margin-top:2px; max-width:90px; overflow:hidden; text-overflow:ellipsis; }
+    .v-dur { font-size:0.67rem; color:var(--dim); font-weight:400; margin-left:6px; opacity:0.8; }
     .v-empty { padding:32px 16px; text-align:center; color:var(--dim); font-size:0.82rem; }
 
     /* Active pages */
@@ -277,7 +278,7 @@
       <div class="card">
         <div class="card-hd"><span class="card-title">🎯 Active Ads</span></div>
         <div class="card-body">
-          <table class="ltbl"><thead><tr><th>Campaign</th><th>Visitors</th><th>Views</th></tr></thead>
+          <table class="ltbl"><thead><tr><th>Campaign</th><th>Live</th><th>Pages</th></tr></thead>
           <tbody id="ads-body"><tr><td colspan="3" class="t-empty"><span class="spin">⟳</span></td></tr></tbody></table>
         </div>
       </div>
@@ -365,7 +366,10 @@ function renderVisitors(visitors, pages) {
   }
   el.innerHTML = visitors.slice(0,40).map(v => {
     const vPages = v.pages || [];
-    const currentPage = vPages.length ? vPages[vPages.length-1].page : '?';
+    const lastPage = vPages.length ? vPages[vPages.length-1] : null;
+    const currentPage = lastPage ? lastPage.page : '?';
+    const timeOnPage = (lastPage && lastPage.time) ? Math.round((Date.now() - new Date(lastPage.time)) / 1000) : null;
+    const durLabel = (timeOnPage != null && timeOnPage >= 0) ? fmtDur(timeOnPage) : null;
     const journey = vPages.slice(-5); // last 5 pages
     const f = flag(v.country);
     const dev = deviceIcon(v.device);
@@ -381,7 +385,7 @@ function renderVisitors(visitors, pages) {
     return '<div class="visitor">'+
       '<div class="v-flag">'+f+'</div>'+
       '<div class="v-main">'+
-        '<div class="v-page">'+esc(currentPage)+'</div>'+
+        '<div class="v-page">'+esc(currentPage)+(durLabel?'<span class="v-dur">'+durLabel+'</span>':'')+' </div>'+
         (journey.length>1 ? '<div class="v-journey">'+crumbs+'</div>' : '')+
       '</div>'+
       '<div class="v-meta">'+
@@ -465,6 +469,39 @@ function renderTopSource(visitors, pvMap) {
   tbody.innerHTML = rows.slice(0,15).map(r => {
     const pct = max > 0 ? (r.liveN/max*100).toFixed(0) : 0;
     return '<tr><td class="b tbl-bar-cell"><div class="tbl-bar" style="width:'+pct+'%"></div><span class="tbl-bar-txt">'+esc(r.src)+'</span></td><td>'+(r.liveN||'–')+'</td><td>'+(r.views?fmtN(r.views):'–')+'</td></tr>';
+  }).join('');
+}
+
+// ── Active Ads (live visitors by utm_campaign) ──
+function renderActiveAds(visitors) {
+  const camps = {};
+  visitors.forEach(v => {
+    // Try utm_campaign on the visitor object first, else parse from first page URL
+    let camp = v.utm_campaign || v.campaign || null;
+    if (!camp) {
+      const firstPg = (v.pages || [])[0];
+      if (firstPg && firstPg.page) {
+        try {
+          const u = new URL('https://x' + firstPg.page);
+          camp = u.searchParams.get('utm_campaign') || u.searchParams.get('campaign');
+        } catch(e) {}
+      }
+    }
+    if (!camp) return;
+    if (!camps[camp]) camps[camp] = { live: 0, pages: 0 };
+    camps[camp].live += 1;
+    camps[camp].pages += (v.pages || []).length;
+  });
+  const rows = Object.entries(camps).sort((a,b) => b[1].live - a[1].live);
+  const tbody = document.getElementById('ads-body');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="3" class="t-empty">No active ad traffic</td></tr>';
+    return;
+  }
+  const max = rows[0][1].live || 1;
+  tbody.innerHTML = rows.slice(0,15).map(([camp, d]) => {
+    const pct = (d.live / max * 100).toFixed(0);
+    return '<tr><td class="b tbl-bar-cell"><div class="tbl-bar" style="width:'+pct+'%"></div><span class="tbl-bar-txt">'+esc(camp)+'</span></td><td>'+d.live+'</td><td>'+(d.pages||'–')+'</td></tr>';
   }).join('');
 }
 
@@ -600,6 +637,7 @@ async function tick() {
     renderCountries(d.visitors||[]);
     renderFunnel(d.pages||[]);
     renderTopSource(d.visitors||[], window._srcPageviews||{});
+    renderActiveAds(d.visitors||[]);
     document.getElementById('last-tick').textContent = new Date().toLocaleTimeString('en-NZ',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
   } catch(e) { if(e.message!=='auth') console.warn('rt err',e); }
 }
@@ -636,18 +674,7 @@ async function stats() {
     refRows.forEach(r => { if (r.referrer_domain||r.name) window._srcPageviews[(r.referrer_domain||r.name||'').replace(/^www\./,'')] = Number(r.pageviews||0); });
   } catch(e) { if(e.message!=='auth') console.warn('ref err',e); }
 
-  try {
-    const camp = await api('analytics-dashboard',{site:SITE,from,to,metric:'campaigns',col:'utm_campaign'});
-    const rows = (Array.isArray(camp)?camp:(camp.data||[])).filter(r=>r.name).sort((a,b)=>Number(b.visitors||0)-Number(a.visitors||0));
-    const tbody = document.getElementById('ads-body');
-    if (!rows.length) { tbody.innerHTML='<tr><td colspan="3" class="t-empty">No campaign data</td></tr>'; }
-    else {
-      const max = Number(rows[0].visitors||0)||1;
-      tbody.innerHTML = rows.slice(0,15).map(r =>
-        '<tr><td class="b tbl-bar-cell"><div class="tbl-bar" style="width:'+(Number(r.visitors||0)/max*100).toFixed(0)+'%"></div><span class="tbl-bar-txt">'+esc(r.name)+'</span></td><td>'+fmtN(r.visitors)+'</td><td>'+fmtN(r.pageviews)+'</td></tr>'
-      ).join('');
-    }
-  } catch(e) { if(e.message!=='auth') console.warn('camp err',e); }
+
 }
 
 async function refresh() { await Promise.allSettled([tick(), stats()]); }
