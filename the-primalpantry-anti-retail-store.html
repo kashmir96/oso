@@ -102,6 +102,12 @@
     nav.nav-open .nav-links { display: flex; }
   }
 
+  /* IMAGE PLACEHOLDER */
+  .img-placeholder { width: 100%; aspect-ratio: 16/9; background: var(--cream-deep); border: 2px dashed var(--rule-strong); border-radius: 14px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 0.5rem; margin: 2rem 0; }
+  .img-placeholder span { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--warm-gray); text-align: center; padding: 0 1rem; }
+  .img-placeholder.square { aspect-ratio: 1/1; }
+  .img-placeholder.wide { aspect-ratio: 21/9; }
+
   /* LAYOUT */
   .hero-wrap { padding: 0 2.5rem; }
 
@@ -834,6 +840,7 @@
   <a href="#" class="nav-cta nav-cta-mobile" onclick="openModal(); return false;">Express interest</a>
   <div class="nav-links">
     <a href="the-primalpantry-anti-retail-store.html" style="font-size:0.82rem;font-weight:700;color:var(--sage);text-decoration:none;">The Mission</a>
+    <a href="the-primalpantry-anti-retail-store-locations.html" style="font-size:0.82rem;font-weight:500;color:var(--warm-gray);text-decoration:none;transition:color 0.15s;" onmouseover="this.style.color='var(--bark)'" onmouseout="this.style.color='var(--warm-gray)'">The Store</a>
     <a href="anti-retail-dashboard-pitch.html" style="font-size:0.82rem;font-weight:500;color:var(--warm-gray);text-decoration:none;transition:color 0.15s;" onmouseover="this.style.color='var(--bark)'" onmouseout="this.style.color='var(--warm-gray)'">Supplier Dashboard</a>
     <a href="the-primalpantry-anti-retail-store-consumers.html" style="font-size:0.82rem;font-weight:500;color:var(--warm-gray);text-decoration:none;transition:color 0.15s;" onmouseover="this.style.color='var(--bark)'" onmouseout="this.style.color='var(--warm-gray)'">Pitch to Consumers</a>
     <a href="#" class="nav-cta nav-cta-desktop" onclick="openModal(); return false;">Express an interest</a>
@@ -928,6 +935,8 @@
     </div>
   </div>
   <p>Now imagine putting even half of that lost revenue back into advertising too.</p>
+
+  <div class="img-placeholder"><span>Image — side-by-side: cluttered retail shelf vs clean branded store section</span></div>
 </section>
 
 <hr class="divider">
@@ -971,6 +980,8 @@
       </ul>
     </div>
   </div>
+
+  <div class="img-placeholder"><span>Image — your branded store section vs generic retail aisle</span></div>
 </section>
 
 <hr class="divider">

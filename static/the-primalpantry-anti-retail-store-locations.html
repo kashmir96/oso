@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PrimalPantry — The Store Concept</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,700;1,9..144,400&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bark: #2E1A0E; --bark-mid: #442A16; --bark-light: #6B4D38;
+  --cream: #FAF4EB; --cream-deep: #EEDED0; --off-white: #FEFCF8;
+  --sage: #6B8F5B; --sage-light: #8CB47A; --sage-pale: #E5EDDF;
+  --honey: #D4A84B; --warm-gray: #877B71;
+  --rule: rgba(139,115,85,0.12); --rule-strong: rgba(139,115,85,0.2);
+}
+html { font-size: 16px; scroll-behavior: smooth; }
+html, body { overflow-x: hidden; max-width: 100vw; }
+body { background: var(--cream); color: var(--bark); font-family: 'DM Sans', -apple-system, sans-serif; font-weight: 400; line-height: 1.65; -webkit-font-smoothing: antialiased; }
+
+/* NAV */
+nav { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 2.5rem; border-bottom: 1px solid var(--rule); background: var(--cream); }
+.logo { font-family: 'Fraunces', serif; font-size: 1.25rem; font-weight: 700; color: var(--bark); text-decoration: none; }
+.logo span { color: var(--sage); }
+.logo small { display: block; font-family: 'DM Sans', sans-serif; font-size: 0.72rem; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: var(--warm-gray); margin-top: 0.1rem; }
+.nav-links { display: flex; align-items: center; gap: 1.5rem; }
+.nav-toggle { display: none; background: none; border: none; cursor: pointer; padding: 0.25rem; color: var(--bark); flex-shrink: 0; }
+.nav-cta-mobile { display: none; }
+.nav-cta { font-family: 'DM Sans', sans-serif; font-size: 0.82rem; font-weight: 700; color: var(--cream); background: var(--bark); padding: 0.6rem 1.6rem; border-radius: 100px; text-decoration: none; transition: background 0.2s, transform 0.2s; }
+.nav-cta:hover { background: var(--bark-mid); transform: translateY(-2px); }
+.nav-link { font-size: 0.82rem; font-weight: 500; color: var(--warm-gray); text-decoration: none; transition: color 0.15s; }
+.nav-link:hover { color: var(--bark); }
+.nav-link.active { font-weight: 700; color: var(--sage); }
+
+@media (max-width: 768px) {
+  nav { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 0.75rem; padding: 1rem 1.25rem; }
+  .logo { order: 2; text-align: center; justify-self: center; }
+  .nav-toggle { display: block; order: 1; }
+  .nav-cta.nav-cta-mobile { order: 3; font-size: 0.72rem; padding: 0.5rem 1rem; }
+  .nav-links { display: none; order: 4; grid-column: 1 / -1; flex-direction: column; gap: 0; padding-top: 0.75rem; border-top: 1px solid var(--rule); }
+  .nav-links a { display: block; padding: 0.75rem 0; border-bottom: 1px solid var(--rule); font-size: 0.88rem !important; font-weight: 500 !important; color: var(--warm-gray) !important; text-decoration: none; }
+  .nav-links a:last-child { border-bottom: none; }
+  .nav-links .nav-cta-desktop { display: none; }
+  nav.nav-open .nav-links { display: flex; }
+}
+
+/* LAYOUT */
+.hero-wrap { padding: 0 2.5rem; }
+section { padding: 5rem 2.5rem; max-width: 860px; margin: 0 auto; }
+.divider { border: none; border-top: 1px solid var(--rule); max-width: 860px; margin: 0 auto; }
+
+/* HERO */
+.hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; padding-top: 3rem; padding-bottom: 4rem; max-width: 860px; margin: 0 auto; }
+.hero-eyebrow { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--sage); margin-bottom: 2rem; display: flex; align-items: center; gap: 0.75rem; }
+.hero-eyebrow::before { content: ''; display: block; width: 2rem; height: 1px; background: var(--sage); }
+.hero h1 { font-family: 'Fraunces', serif; font-size: clamp(2rem, 3.5vw, 3rem); font-weight: 400; line-height: 1.12; letter-spacing: -0.02em; color: var(--bark); margin-bottom: 1.75rem; }
+.hero h1 em { font-style: italic; color: var(--sage); }
+.hero-sub { font-size: 1.06rem; line-height: 1.7; color: var(--warm-gray); max-width: 540px; margin-bottom: 1.5rem; }
+.hero-sub strong { color: var(--bark); font-weight: 700; }
+.hero-actions { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 1rem; }
+.btn-primary { font-family: 'DM Sans', sans-serif; font-size: 0.92rem; font-weight: 700; color: var(--cream); background: var(--bark); padding: 15px 32px; border-radius: 100px; text-decoration: none; transition: background 0.2s, transform 0.2s, box-shadow 0.2s; display: inline-block; }
+.btn-primary:hover { background: var(--bark-mid); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(46,26,14,0.16); }
+.btn-ghost { font-family: 'DM Sans', sans-serif; font-size: 0.92rem; font-weight: 700; color: var(--bark); padding: 15px 32px; border-radius: 100px; text-decoration: none; border: 2px solid var(--bark); transition: background 0.2s, color 0.2s; display: inline-block; }
+.btn-ghost:hover { background: var(--bark); color: var(--cream); }
+
+/* SECTIONS */
+.section-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--sage); margin-bottom: 2.5rem; display: flex; align-items: center; gap: 0.75rem; }
+.section-label::before { content: ''; display: block; width: 1.5rem; height: 1px; background: var(--sage); }
+h2 { font-family: 'Fraunces', serif; font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 400; line-height: 1.15; letter-spacing: -0.02em; color: var(--bark); margin-bottom: 1.5rem; }
+h3 { font-family: 'Fraunces', serif; font-size: 1.15rem; font-weight: 400; margin-bottom: 0.75rem; color: var(--bark); }
+p { color: var(--warm-gray); margin-bottom: 1.25rem; }
+p strong { color: var(--bark); font-weight: 700; }
+
+/* FORMAT GRID */
+.format-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1px; background: var(--rule); margin: 2.5rem 0; border-radius: 16px; overflow: hidden; }
+.format-item { background: var(--off-white); padding: 2rem; }
+.format-icon { font-size: 1.5rem; margin-bottom: 0.75rem; }
+.format-item h3 { font-size: 1rem; margin-bottom: 0.5rem; }
+.format-item p { font-size: 0.88rem; margin: 0; line-height: 1.55; }
+
+/* FEATURE GRID */
+.feat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1.25rem; margin: 2.5rem 0; }
+.feat-card { background: var(--off-white); border: 1px solid var(--rule); border-radius: 14px; padding: 1.75rem; transition: transform 0.2s, box-shadow 0.2s; }
+.feat-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.04); }
+.feat-icon { font-size: 1.5rem; margin-bottom: 0.75rem; }
+.feat-card h3 { font-size: 1rem; margin-bottom: 0.4rem; }
+.feat-card p { font-size: 0.85rem; margin: 0; line-height: 1.55; }
+
+/* VS GRAPHIC */
+.vs-graphic { display: grid; grid-template-columns: 1fr auto 1fr; gap: 0; margin: 3rem 0; align-items: stretch; }
+.vs-side { padding: 2.5rem; border-radius: 16px; display: flex; flex-direction: column; gap: 1rem; }
+.vs-side.retail { background: var(--cream-deep); border: 1px solid var(--rule); }
+.vs-side.oso { background: var(--sage-pale); border: 1px solid rgba(107,143,91,0.25); }
+.vs-badge { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; display: inline-block; padding: 0.25rem 0.6rem; border-radius: 50px; width: fit-content; }
+.vs-side.retail .vs-badge { background: rgba(181,69,42,0.1); color: #B5452A; }
+.vs-side.oso .vs-badge { background: rgba(107,143,91,0.15); color: var(--sage); }
+.vs-side h3 { font-size: 1.1rem; margin-bottom: 0.25rem; }
+.vs-side ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.vs-side ul li { font-size: 0.85rem; color: var(--warm-gray); display: flex; align-items: flex-start; gap: 0.5rem; line-height: 1.5; }
+.vs-side ul li .icon { flex-shrink: 0; margin-top: 2px; }
+.vs-side.retail ul li .icon { color: #B5452A; }
+.vs-side.oso ul li .icon { color: var(--sage); }
+.vs-divider { display: flex; align-items: center; justify-content: center; padding: 0 1.25rem; }
+.vs-divider span { font-family: 'Fraunces', serif; font-size: 1.1rem; font-weight: 400; color: var(--warm-gray); background: var(--cream); padding: 0.5rem 0; }
+
+/* WALKTHROUGH */
+.walk-steps { display: flex; flex-direction: column; gap: 0; margin: 2.5rem 0; }
+.walk-step { display: flex; gap: 1.5rem; padding: 1.5rem 0; border-bottom: 1px solid var(--rule); align-items: flex-start; }
+.walk-step:first-child { border-top: 1px solid var(--rule); }
+.walk-num { font-family: 'Fraunces', serif; font-size: 2rem; font-weight: 400; color: var(--cream-deep); min-width: 2.5rem; line-height: 1; flex-shrink: 0; }
+.walk-body h3 { font-size: 1rem; margin-bottom: 0.4rem; }
+.walk-body p { font-size: 0.88rem; margin: 0; }
+
+/* IMAGE PLACEHOLDER */
+.img-placeholder { width: 100%; aspect-ratio: 16/9; background: var(--cream-deep); border: 2px dashed var(--rule-strong); border-radius: 14px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 0.5rem; margin: 2rem 0; }
+.img-placeholder span { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--warm-gray); }
+.img-placeholder.square { aspect-ratio: 1/1; }
+.img-placeholder.wide { aspect-ratio: 21/9; }
+.img-placeholder img { width: 100%; height: 100%; object-fit: cover; border-radius: 12px; }
+
+/* MAP */
+.map-wrap { border-radius: 14px; overflow: hidden; border: 1px solid var(--rule); margin: 2.5rem 0; height: 400px; }
+
+/* CITY CARDS */
+.city-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; margin: 2.5rem 0; }
+.city-card { background: var(--off-white); border: 1px solid var(--rule); border-radius: 14px; padding: 2rem; text-align: center; transition: transform 0.2s, box-shadow 0.2s; }
+.city-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.04); }
+.city-icon { font-size: 2rem; margin-bottom: 0.75rem; }
+.city-card h3 { font-family: 'Fraunces', serif; font-size: 1.15rem; margin-bottom: 0.4rem; }
+.city-card p { font-size: 0.82rem; margin: 0; }
+.city-badge { display: inline-block; font-size: 0.6rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; padding: 0.25rem 0.6rem; border-radius: 50px; margin-top: 0.75rem; background: rgba(107,143,91,0.12); color: var(--sage); }
+
+/* CALLOUT */
+.callout { background: var(--sage-pale); border-left: 3px solid var(--sage); border-radius: 0 12px 12px 0; padding: 1.25rem 1.5rem; margin: 1.5rem 0; font-size: 0.95rem; color: var(--bark); }
+.callout strong { color: var(--sage); }
+
+/* CTA */
+.cta-section { text-align: center; padding: 6rem 2.5rem; max-width: 700px; margin: 0 auto; }
+.cta-section h2 { margin-bottom: 1rem; }
+.cta-section p { margin-bottom: 2.5rem; }
+
+/* FOOTER */
+footer { border-top: 1px solid var(--rule); padding: 2rem 2.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; max-width: 860px; margin: 0 auto; }
+footer .logo-sm { font-family: 'Fraunces', serif; font-weight: 700; font-size: 1rem; color: var(--warm-gray); }
+footer .logo-sm span { color: var(--sage); }
+footer p { font-size: 0.78rem; color: var(--warm-gray); margin: 0; }
+
+/* ANIMATIONS */
+@keyframes fadeUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+.hero h1 { animation: fadeUp 0.7s ease forwards; }
+.hero-sub { animation: fadeUp 0.7s 0.12s ease both; }
+.hero-actions { animation: fadeUp 0.7s 0.2s ease both; }
+
+/* REVEAL */
+.reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.6s ease, transform 0.6s ease; }
+.reveal.visible { opacity: 1; transform: translateY(0); }
+
+@media (max-width: 768px) {
+  .hero-wrap { padding: 0 1.25rem; }
+  .hero { padding-top: 2rem; min-height: auto; }
+  .hero h1 { font-size: 1.8rem; }
+  section { padding: 3.5rem 1.25rem; }
+  .format-grid { grid-template-columns: 1fr; }
+  .feat-grid { grid-template-columns: 1fr; }
+  .vs-graphic { grid-template-columns: 1fr; }
+  .vs-divider { padding: 1rem 0; }
+  .city-grid { grid-template-columns: 1fr; }
+  footer { padding: 2rem 1.25rem; }
+  .cta-section { padding: 4rem 1.25rem; }
+  .btn-primary, .btn-ghost { font-size: 0.82rem; padding: 12px 24px; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav id="mainNav">
+  <button class="nav-toggle" onclick="document.getElementById('mainNav').classList.toggle('nav-open')" aria-label="Menu">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+  </button>
+  <a href="the-primalpantry-anti-retail-store.html" class="logo">Primal<span>Pantry</span><small>retail for growth</small></a>
+  <a href="the-primalpantry-anti-retail-store.html#apply" class="nav-cta nav-cta-mobile">Express interest</a>
+  <div class="nav-links">
+    <a href="the-primalpantry-anti-retail-store.html" class="nav-link">The Mission</a>
+    <a href="the-primalpantry-anti-retail-store-locations.html" class="nav-link active">The Store</a>
+    <a href="anti-retail-dashboard-pitch.html" class="nav-link">Supplier Dashboard</a>
+    <a href="the-primalpantry-anti-retail-store-consumers.html" class="nav-link">Pitch to Consumers</a>
+    <a href="the-primalpantry-anti-retail-store.html#apply" class="nav-cta nav-cta-desktop">Express an interest</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero-wrap">
+  <div class="hero">
+    <p class="hero-eyebrow">The store concept</p>
+    <h1>Small stores. Big brands. <em>No middleman.</em></h1>
+    <p class="hero-sub">These aren't supermarkets. They're curated brand destinations in the heart of the city — where every product has a story, every brand has a space, and every customer walks in on purpose.</p>
+    <p class="hero-sub"><strong>Compact. Central. Built for foot traffic and ad-driven visits.</strong></p>
+    <div class="img-placeholder wide" style="margin: 1.5rem 0;"><span>Hero image — store interior / exterior</span></div>
+    <div class="hero-actions">
+      <a href="the-primalpantry-anti-retail-store.html#apply" class="btn-primary">Express an interest</a>
+      <a href="the-primalpantry-anti-retail-store.html" class="btn-ghost">Read the full pitch</a>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- THE FORMAT -->
+<section>
+  <p class="section-label">The format</p>
+  <h2>Your own branded space inside a shared store.</h2>
+  <p>Forget aisles of competing products. Each brand gets their own area — your branding, your products, your story. Customers don't find "skincare" on a shelf. They find <em>you</em>.</p>
+
+  <div class="format-grid">
+    <div class="format-item">
+      <div class="format-icon">📐</div>
+      <h3>Small footprint</h3>
+      <p>~50sqm stores. Compact, curated, and easy to staff. Low overheads, high impact.</p>
+    </div>
+    <div class="format-item">
+      <div class="format-icon">🏷️</div>
+      <h3>Organised by brand</h3>
+      <p>Not by category. Your products sit together in your branded area — not scattered across aisles.</p>
+    </div>
+    <div class="format-item">
+      <div class="format-icon">📦</div>
+      <h3>5 SKUs per brand</h3>
+      <p>Your flagship product plus up to 4 cross-sells. Enough to tell your story and drive AOV.</p>
+    </div>
+    <div class="format-item">
+      <div class="format-icon">🎨</div>
+      <h3>Your branding</h3>
+      <p>Signage, shelf design, product displays — your area looks and feels like your brand, not a generic shelf.</p>
+    </div>
+    <div class="format-item">
+      <div class="format-icon">👋</div>
+      <h3>Staffed with an assistant</h3>
+      <p>A retail assistant in-store who knows every brand, can answer questions, and drives a great experience.</p>
+    </div>
+    <div class="format-item">
+      <div class="format-icon">🛒</div>
+      <h3>Walk in and browse</h3>
+      <p>No appointments, no barriers. Street-facing, ground floor, open to anyone walking past.</p>
+    </div>
+  </div>
+
+  <div class="img-placeholder"><span>Image — branded shelf display with signage and products</span></div>
+
+  <div class="callout">
+    <strong>Think of it like a curated market</strong> — but permanent, staffed, and in the best location in the city. Every brand benefits from every other brand's customers walking through the door.
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- WHY THIS LOCATION STRATEGY WORKS -->
+<section>
+  <p class="section-label">Why this works</p>
+  <h2>Central locations built for traffic, access, and advertising.</h2>
+  <p>We're not hiding in an industrial estate or a quiet side street. These stores go where the people already are — and where your ads can point them.</p>
+
+  <div class="feat-grid">
+    <div class="feat-card">
+      <div class="feat-icon">🚶</div>
+      <h3>High foot traffic</h3>
+      <p>CBD locations surrounded by offices, cafes, and transport hubs. Thousands of people walking past every day.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">📍</div>
+      <h3>Easy access</h3>
+      <p>Ground floor, street-facing, walkable from parking and public transport. No searching, no escalators, no maze.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">📱</div>
+      <h3>Perfect ad destination</h3>
+      <p>"Visit us at [address]" — every brand's ads point to the same place. The more brands advertising, the more traffic everyone gets.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🏙️</div>
+      <h3>Complementary neighbours</h3>
+      <p>Cafes, gyms, wellness studios, lunch spots. The people around these locations are already your target market.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">⏰</div>
+      <h3>Lunchtime & after-work</h3>
+      <p>Capture impulse buyers during peak pedestrian hours. People browse on their break, pick up on the way home.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🌍</div>
+      <h3>Tourist & visitor traffic</h3>
+      <p>Central locations get natural passing traffic from visitors who are actively looking to discover local brands.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🎪</div>
+      <h3>Event-ready</h3>
+      <p>Host sampling days, product launches, and pop-up events in a central spot people can actually get to.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🔁</div>
+      <h3>The compounding effect</h3>
+      <p>Every brand drives traffic. Every visit exposes customers to every brand. The more brands, the more foot traffic for everyone.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- THE IN-STORE EXPERIENCE -->
+<section>
+  <p class="section-label">The experience</p>
+  <h2>What it feels like to walk in.</h2>
+  <p>This isn't a warehouse with fluorescent lighting. It's a space designed for discovery — where customers engage with brands, not barcodes.</p>
+
+  <div class="img-placeholder"><span>Image — customer browsing branded sections in store</span></div>
+
+  <div class="walk-steps">
+    <div class="walk-step">
+      <div class="walk-num">01</div>
+      <div class="walk-body">
+        <h3>Walk in and see brands, not categories.</h3>
+        <p>Each brand has their own section with their signage, their products displayed together, and their story told. No aisle 9. No competing with 50 other brands for attention.</p>
+      </div>
+    </div>
+    <div class="walk-step">
+      <div class="walk-num">02</div>
+      <div class="walk-body">
+        <h3>A retail assistant who actually knows the products.</h3>
+        <p>Not a shelf-stacker — someone who can talk about your brand, recommend products, and create a real experience. They represent every brand in the store.</p>
+      </div>
+    </div>
+    <div class="walk-step">
+      <div class="walk-num">03</div>
+      <div class="walk-body">
+        <h3>Cross-sells right next to your flagship.</h3>
+        <p>In traditional retail, a customer picks up your one product and leaves. Here, your cross-sells are right there. $10 becomes $70.</p>
+      </div>
+    </div>
+    <div class="walk-step">
+      <div class="walk-num">04</div>
+      <div class="walk-body">
+        <h3>Email captured at POS.</h3>
+        <p>Every purchase captures the customer's email. You build your list from in-store sales — something no retailer gives you.</p>
+      </div>
+    </div>
+    <div class="walk-step">
+      <div class="walk-num">05</div>
+      <div class="walk-body">
+        <h3>Promo codes work in-store.</h3>
+        <p>Customers redeem codes from your ads at the register. The sale gets attributed back to the ad that drove it. Real attribution, not guesswork.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- VS COMPARISON -->
+<section>
+  <p class="section-label">The difference</p>
+  <h2>What you get vs. what a retailer gives you.</h2>
+
+  <div class="vs-graphic">
+    <div class="vs-side retail">
+      <span class="vs-badge">Traditional retail</span>
+      <h3>Your product in their store</h3>
+      <ul>
+        <li><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M12 4L4 12M4 4l8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>Buried in a category aisle with competitors</li>
+        <li><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M12 4L4 12M4 4l8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>No branding — just a price tag on a shelf</li>
+        <li><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M12 4L4 12M4 4l8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>Cross-sells scattered or not stocked at all</li>
+        <li><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M12 4L4 12M4 4l8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>Staff don't know your product</li>
+        <li><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M12 4L4 12M4 4l8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>Customer buys one item and leaves</li>
+      </ul>
+    </div>
+    <div class="vs-divider"><span>vs</span></div>
+    <div class="vs-side oso">
+      <span class="vs-badge">The anti-retail store</span>
+      <h3>Your brand in your space</h3>
+      <ul>
+        <li><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Your own branded section — your products together</li>
+        <li><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Your signage, your story, your identity</li>
+        <li><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Cross-sells right next to your flagship</li>
+        <li><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Staff trained on every brand in the store</li>
+        <li><span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Customer discovers your full range — $10 becomes $70</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- LOCATIONS -->
+<section>
+  <p class="section-label">Locations</p>
+  <h2>Three cities. Three stores. Starting now.</h2>
+  <p>We're opening in the three main centres — high-traffic CBD locations in each city. Exact sites are being finalised, but the criteria are locked in: central, street-facing, ground floor, surrounded by foot traffic.</p>
+
+  <div class="map-wrap" id="store-map"></div>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <div class="city-grid">
+    <div class="city-card">
+      <div class="city-icon">🏔️</div>
+      <h3>Christchurch</h3>
+      <p>CBD rebuild zone. High foot traffic, new developments, and a growing wellness market.</p>
+      <span class="city-badge">Store 1</span>
+    </div>
+    <div class="city-card">
+      <div class="city-icon">🌊</div>
+      <h3>Wellington</h3>
+      <p>Compact CBD with dense foot traffic. Office workers, government, students — all walkable.</p>
+      <span class="city-badge">Store 2</span>
+    </div>
+    <div class="city-card">
+      <div class="city-icon">🌇</div>
+      <h3>Auckland</h3>
+      <p>NZ's biggest market. Central location with the highest volume of potential customers in the country.</p>
+      <span class="city-badge">Store 3</span>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>Why CBD?</strong> Because that's where the people are. And when every brand in the store is running ads saying "visit us at [address]" — it needs to be somewhere people can actually get to. Central, accessible, no excuses not to visit.
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- CTA -->
+<div class="cta-section">
+  <p class="section-label" style="justify-content: center;">Join the first wave</p>
+  <h2>Want a space in the store?</h2>
+  <p>We're starting with a small group of established NZ brands. If you want your products in a space that actually works for you — not against you — let's talk.</p>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:1rem;">
+    <a href="the-primalpantry-anti-retail-store.html#apply" class="btn-primary">Express an interest</a>
+    <a href="the-primalpantry-anti-retail-store.html" class="btn-ghost">Read the full pitch</a>
+  </div>
+</div>
+
+<hr class="divider">
+<footer>
+  <div class="logo-sm">Primal<span>Pantry</span></div>
+  <p>PrimalPantry — retail for growth. New Zealand.</p>
+</footer>
+
+<script>
+// Map
+(function() {
+  var map = L.map('store-map', { scrollWheelZoom: false, zoomControl: true }).setView([-42.5, 172], 6);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OSM &amp; Carto', maxZoom: 18
+  }).addTo(map);
+  var cities = [
+    { name: 'Christchurch', lat: -43.532, lng: 172.636, label: 'Store 1' },
+    { name: 'Wellington', lat: -41.287, lng: 174.776, label: 'Store 2' },
+    { name: 'Auckland', lat: -36.848, lng: 174.763, label: 'Store 3' }
+  ];
+  cities.forEach(function(c) {
+    L.circleMarker([c.lat, c.lng], {
+      radius: 10, fillColor: '#6B8F5B', color: '#fff', weight: 2, fillOpacity: 0.85
+    }).addTo(map).bindPopup('<div style="font-family:DM Sans,sans-serif;text-align:center;"><strong>' + c.name + '</strong><br><span style="font-size:0.75rem;color:#877B71;">' + c.label + ' — CBD location</span></div>');
+  });
+})();
+
+// Scroll reveal
+var reveals = document.querySelectorAll('.format-grid, .feat-grid, .vs-graphic, .walk-steps, .city-grid, .callout');
+var observer = new IntersectionObserver(function(entries) {
+  entries.forEach(function(entry) {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('reveal', 'visible');
+      observer.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.15 });
+reveals.forEach(function(el) {
+  el.classList.add('reveal');
+  observer.observe(el);
+});
+</script>
+
+</body>
+</html>
