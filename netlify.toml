@@ -2,6 +2,13 @@
   publish = "public"
   command = "hugo --minify"
 
+# Make anti-retail store the homepage; keep Curtis's personal page at /curtis
+[[redirects]]
+  from = "/"
+  to = "/the-primalpantry-anti-retail-store.html"
+  status = 200
+  force = true
+
 [build.environment]
   NODE_VERSION = "18"
 
