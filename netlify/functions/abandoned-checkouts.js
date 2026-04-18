@@ -30,12 +30,14 @@ exports.handler = async (event) => {
     const days = parseInt(params.days) || 7;
     const createdAfter = Math.floor(Date.now() / 1000) - (days * 86400);
 
-    // Fetch expired checkout sessions from Stripe
+    // Fetch expired checkout sessions from Stripe — cap pages to avoid Netlify timeout
     const sessions = [];
     let hasMore = true;
     let startingAfter = undefined;
+    const MAX_PAGES = 5; // 500 sessions max per call (10s Netlify limit)
+    let pageCount = 0;
 
-    while (hasMore) {
+    while (hasMore && pageCount < MAX_PAGES) {
       const listParams = {
         status: 'expired',
         limit: 100,
@@ -48,6 +50,7 @@ exports.handler = async (event) => {
       sessions.push(...batch.data);
       hasMore = batch.has_more;
       if (batch.data.length) startingAfter = batch.data[batch.data.length - 1].id;
+      pageCount++;
     }
 
     // Get recovery statuses from Supabase
