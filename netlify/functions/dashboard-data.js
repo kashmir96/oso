@@ -175,8 +175,8 @@ exports.handler = async (event) => {
     if (operation === 'select' && !params.limit && !params.single) {
       let allData = [];
       const PAGE = 1000;
-      const MAX_PAGES = 5; // 5000 rows max — keeps payload under Netlify's 6MB limit
-      const MAX_PAYLOAD_BYTES = 5 * 1024 * 1024; // 5MB safe cutoff
+      const MAX_PAGES = 3; // 3000 rows max — keeps payload safely under Netlify's 6MB limit
+      const MAX_PAYLOAD_BYTES = 4 * 1024 * 1024; // 4MB safe cutoff (before the 6MB hard limit)
       const START_TIME = Date.now();
       const TIME_BUDGET_MS = 8000; // Stop after 8s — Netlify timeout is 10s
       let offset = 0;
