@@ -171,14 +171,16 @@ exports.handler = async (event) => {
 
     // For large select queries without an explicit limit, paginate to get ALL rows
     // (Supabase defaults to 1000 rows per request)
-    // Cap at MAX_PAGES to stay within Netlify's 10s function timeout
+    // Cap at MAX_PAGES AND time-based cutoff to stay within Netlify's 10s function timeout
     if (operation === 'select' && !params.limit && !params.single) {
       let allData = [];
       const PAGE = 1000;
-      const MAX_PAGES = 10; // 10,000 rows max — prevents 502 on huge tables (Netlify 10s limit)
+      const MAX_PAGES = 10;
+      const START_TIME = Date.now();
+      const TIME_BUDGET_MS = 8000; // Stop after 8s — Netlify timeout is 10s
       let offset = 0;
       let pagesFetched = 0;
-      while (pagesFetched < MAX_PAGES) {
+      while (pagesFetched < MAX_PAGES && (Date.now() - START_TIME) < TIME_BUDGET_MS) {
         let pageQuery = sb.from(table).select(params.select || '*');
         // Re-apply filters
         if (params.filters && Array.isArray(params.filters)) {
@@ -206,6 +208,8 @@ exports.handler = async (event) => {
         if (!pageData || pageData.length < PAGE) break;
         offset += PAGE;
       }
+      const elapsed = Date.now() - START_TIME;
+      console.log(`[dashboard-data] ${table}: ${allData.length} rows, ${pagesFetched} pages, ${elapsed}ms`);
       return { statusCode: 200, headers, body: JSON.stringify({ data: allData, error: null }) };
     }
 
