@@ -175,7 +175,7 @@ exports.handler = async (event) => {
     if (operation === 'select' && !params.limit && !params.single) {
       let allData = [];
       const PAGE = 1000;
-      const MAX_PAGES = 20; // 20,000 rows max — prevents 502 on huge tables
+      const MAX_PAGES = 10; // 10,000 rows max — prevents 502 on huge tables (Netlify 10s limit)
       let offset = 0;
       let pagesFetched = 0;
       while (pagesFetched < MAX_PAGES) {
