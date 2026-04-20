@@ -100,6 +100,28 @@ document.addEventListener('click', function(e) {
   setTimeout(() => { window.dispatchEvent(new Event('resize')); }, 350);
 });
 
+// Dashboard health check — paste ppDiag() in console to see what's loaded
+window.ppDiag = async function() {
+  const tok = JSON.parse(localStorage.getItem('pp_staff')||'{}').token;
+  console.log('=== PRIMAL PANTRY DASHBOARD DIAGNOSTIC ===');
+  console.log('Token present:', !!tok, tok?.slice(0,10) + '...');
+  console.log('allOrders in memory:', (window.allOrders || []).length);
+  console.log('allLineItems in memory:', (window.allLineItems || []).length);
+  console.log('allShipments in memory:', (window.allShipments || []).length);
+  console.log('currentStaff:', window.currentStaff ? { id: window.currentStaff.id, role: window.currentStaff.role } : 'NULL');
+
+  const tables = ['orders','order_line_items','product_unit_costs','customer_tags','quiz_leads','analytics_pageviews','checkout_errors'];
+  for (const t of tables) {
+    const r = await fetch('/.netlify/functions/dashboard-data', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ token: tok, table: t, operation: 'select', params: { select: 'count', limit: 1 } })
+    });
+    console.log(`  ${t}: HTTP ${r.status} ${r.status >= 500 ? '❌ SERVER ERROR' : r.ok ? '✓' : '⚠'}`);
+  }
+  console.log('=== END DIAGNOSTIC ===');
+};
+
 // Password visibility toggle
 document.querySelectorAll('.pw-toggle').forEach(btn => {
   btn.addEventListener('click', function() {
@@ -813,12 +835,16 @@ async function loadAllDataUpfront() {
   try {
     // 1. Orders + line items (core data)
     step('orders', 'active');
+    const _t0 = Date.now();
+    console.log('[DASH] Fetching orders + line_items...');
     const [ordersRes, liRes] = await Promise.all([
       db.from('orders').select('*').order('created_at', { ascending: false }),
       db.from('order_line_items').select('*'),
     ]);
     allOrders = ordersRes.data || [];
     allLineItems = liRes.data || [];
+    console.log(`[DASH] orders: ${allOrders.length} rows | line_items: ${allLineItems.length} rows | ${Date.now()-_t0}ms | ordersErr:`, ordersRes.error, '| liErr:', liRes.error);
+    if (!allOrders.length) console.error('[DASH] WARNING: 0 orders returned — check dashboard-data proxy, token, or RLS');
     step('orders', 'done');
 
     // 2. Unit costs + tags + filters
