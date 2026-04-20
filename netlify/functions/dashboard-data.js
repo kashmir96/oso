@@ -175,7 +175,8 @@ exports.handler = async (event) => {
     if (operation === 'select' && !params.limit && !params.single) {
       let allData = [];
       const PAGE = 1000;
-      const MAX_PAGES = 10;
+      const MAX_PAGES = 5; // 5000 rows max — keeps payload under Netlify's 6MB limit
+      const MAX_PAYLOAD_BYTES = 5 * 1024 * 1024; // 5MB safe cutoff
       const START_TIME = Date.now();
       const TIME_BUDGET_MS = 8000; // Stop after 8s — Netlify timeout is 10s
       let offset = 0;
@@ -206,6 +207,12 @@ exports.handler = async (event) => {
         allData = allData.concat(pageData || []);
         pagesFetched++;
         if (!pageData || pageData.length < PAGE) break;
+        // Stop if approaching payload limit — rough estimate based on avg row size
+        const estBytes = JSON.stringify(allData).length;
+        if (estBytes > MAX_PAYLOAD_BYTES) {
+          console.log(`[dashboard-data] ${table}: stopping at ${allData.length} rows (${estBytes} bytes, approaching 6MB limit)`);
+          break;
+        }
         offset += PAGE;
       }
       const elapsed = Date.now() - START_TIME;
