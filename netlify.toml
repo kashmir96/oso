@@ -2,10 +2,11 @@
   publish = "public"
   command = "hugo --minify"
 
-# Make anti-retail store the homepage; keep Curtis's personal page at /curtis
+# Coming soon cover page — hides the anti-retail store pitch until launch
+# Original homepage still accessible at /the-primalpantry-anti-retail-store.html
 [[redirects]]
   from = "/"
-  to = "/the-primalpantry-anti-retail-store.html"
+  to = "/coming-soon.html"
   status = 200
   force = true
 
