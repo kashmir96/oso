@@ -53,6 +53,7 @@ export default function Goals() {
 function NewGoalForm({ onSaved, onCancel }) {
   const [name, setName] = useState('');
   const [category, setCategory] = useState('personal');
+  const [goalType, setGoalType] = useState('numeric');
   const [unit, setUnit] = useState('');
   const [direction, setDirection] = useState('higher_better');
   const [start, setStart] = useState('');
@@ -64,13 +65,17 @@ function NewGoalForm({ onSaved, onCancel }) {
   async function submit(e) {
     e.preventDefault(); setBusy(true); setErr('');
     try {
-      await call('ckf-goals', {
-        action: 'create',
-        name, category, unit, direction,
-        start_value: start === '' ? null : Number(start),
-        current_value: current === '' ? null : Number(current),
-        target_value: target === '' ? null : Number(target),
-      });
+      const payload = { action: 'create', name, category, goal_type: goalType };
+      if (goalType === 'numeric') {
+        payload.unit = unit;
+        payload.direction = direction;
+        payload.start_value = start === '' ? null : Number(start);
+        payload.current_value = current === '' ? null : Number(current);
+        payload.target_value = target === '' ? null : Number(target);
+      } else {
+        payload.target_value = target === '' ? null : Number(target);
+      }
+      await call('ckf-goals', payload);
       onSaved();
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
   }
@@ -79,41 +84,62 @@ function NewGoalForm({ onSaved, onCancel }) {
     <form className="card" onSubmit={submit} style={{ marginBottom: 14 }}>
       <div className="field">
         <label>Name</label>
-        <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="Body fat %" />
-      </div>
-      <div className="row">
-        <div className="field">
-          <label>Category</label>
-          <select value={category} onChange={(e) => setCategory(e.target.value)}>
-            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>
-        <div className="field">
-          <label>Unit</label>
-          <input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="%, kg, $" />
-        </div>
-      </div>
-      <div className="row">
-        <div className="field">
-          <label>Start</label>
-          <input type="number" step="any" value={start} onChange={(e) => setStart(e.target.value)} />
-        </div>
-        <div className="field">
-          <label>Current</label>
-          <input type="number" step="any" value={current} onChange={(e) => setCurrent(e.target.value)} />
-        </div>
-        <div className="field">
-          <label>Target</label>
-          <input type="number" step="any" value={target} onChange={(e) => setTarget(e.target.value)} />
-        </div>
+        <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="e.g. Plunge every day" />
       </div>
       <div className="field">
-        <label>Direction</label>
-        <select value={direction} onChange={(e) => setDirection(e.target.value)}>
-          <option value="higher_better">Higher is better</option>
-          <option value="lower_better">Lower is better</option>
+        <label>Type</label>
+        <select value={goalType} onChange={(e) => setGoalType(e.target.value)}>
+          <option value="numeric">Numeric — measured value (weight, %, $)</option>
+          <option value="checkbox">Checkbox — daily yes/no, streak ticks up</option>
+          <option value="restraint">Restraint — auto-ticks daily until I fail</option>
         </select>
       </div>
+      <div className="field">
+        <label>Category</label>
+        <select value={category} onChange={(e) => setCategory(e.target.value)}>
+          {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </div>
+
+      {goalType === 'numeric' && (
+        <>
+          <div className="row">
+            <div className="field">
+              <label>Unit</label>
+              <input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="%, kg, $" />
+            </div>
+            <div className="field">
+              <label>Direction</label>
+              <select value={direction} onChange={(e) => setDirection(e.target.value)}>
+                <option value="higher_better">Higher is better</option>
+                <option value="lower_better">Lower is better</option>
+              </select>
+            </div>
+          </div>
+          <div className="row">
+            <div className="field">
+              <label>Start</label>
+              <input type="number" step="any" value={start} onChange={(e) => setStart(e.target.value)} />
+            </div>
+            <div className="field">
+              <label>Current</label>
+              <input type="number" step="any" value={current} onChange={(e) => setCurrent(e.target.value)} />
+            </div>
+            <div className="field">
+              <label>Target</label>
+              <input type="number" step="any" value={target} onChange={(e) => setTarget(e.target.value)} />
+            </div>
+          </div>
+        </>
+      )}
+
+      {(goalType === 'checkbox' || goalType === 'restraint') && (
+        <div className="field">
+          <label>Streak target (days, optional)</label>
+          <input type="number" step="1" value={target} onChange={(e) => setTarget(e.target.value)} placeholder="e.g. 30" />
+        </div>
+      )}
+
       {err && <div className="error">{err}</div>}
       <div className="row">
         <button type="button" onClick={onCancel}>Cancel</button>

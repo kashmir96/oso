@@ -149,17 +149,23 @@ const TOOLS = [
   },
   {
     name: 'create_goal',
-    description: "Create a new goal Curtis wants to track. Use when he names something concrete he wants to chase: a body comp number, a revenue target, a consistency streak. Don't create vague goals — turn fuzzy intentions into measurable ones (ask him for a target if needed before calling).",
+    description: `Create a new goal. Pick the type by what Curtis described:
+- 'numeric' (default) — a measured value with a target. E.g. body weight, body fat %, revenue. Needs target_value + unit.
+- 'checkbox' — a daily yes/no habit; the streak counts up by 1 each day he does it. E.g. "plunge every day", "lift today". current_value tracks streak in days. Tapping the card marks it done.
+- 'restraint' — auto-ticks up daily UNLESS he logs a fail. E.g. "no alcohol", "no porn", "screen-free morning". current_value tracks days clean. Tapping the card prompts a "log fail" reset.
+
+Don't create vague goals — turn fuzzy intentions into something concrete. For numeric, ask for a target if it's missing.`,
     input_schema: {
       type: 'object',
       properties: {
         name: { type: 'string' },
         category: { type: 'string', enum: ['personal','health','business','social','finance','marketing','other'] },
-        current_value: { type: 'number', description: 'starting reading; defaults to start_value' },
-        start_value: { type: 'number' },
-        target_value: { type: 'number' },
-        unit: { type: 'string', description: 'e.g. kg, %, $, sessions' },
-        direction: { type: 'string', enum: ['higher_better','lower_better'], description: 'default higher_better' },
+        goal_type: { type: 'string', enum: ['numeric','checkbox','restraint'], description: 'default numeric' },
+        current_value: { type: 'number', description: 'numeric only — starting reading; defaults to start_value' },
+        start_value: { type: 'number', description: 'numeric only' },
+        target_value: { type: 'number', description: 'numeric — target value; checkbox/restraint — optional streak target in days' },
+        unit: { type: 'string', description: 'e.g. kg, %, $, sessions. Defaults to "days" for checkbox/restraint.' },
+        direction: { type: 'string', enum: ['higher_better','lower_better'], description: 'numeric only; default higher_better' },
       },
       required: ['name', 'category'],
     },
@@ -188,6 +194,27 @@ const TOOLS = [
       type: 'object',
       properties: { id: { type: 'string' } },
       required: ['id'],
+    },
+  },
+  {
+    name: 'mark_goal_done',
+    description: "For checkbox goals only — mark today done. Increments the streak by 1 if yesterday was also done; resets to 1 otherwise. Idempotent within the same day. Use when Curtis says 'I plunged today', 'lifted today', 'did the morning routine', etc.",
+    input_schema: {
+      type: 'object',
+      properties: { goal_id: { type: 'string' } },
+      required: ['goal_id'],
+    },
+  },
+  {
+    name: 'mark_goal_fail',
+    description: "For restraint goals only — log a fail and reset the streak to 0 today. Use when Curtis says 'I drank tonight', 'I caved', 'broke the streak', etc. Be matter-of-fact about it; resetting is part of the system, not a judgement.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        goal_id: { type: 'string' },
+        note: { type: 'string', description: 'optional context — what triggered the slip' },
+      },
+      required: ['goal_id'],
     },
   },
   {
@@ -393,23 +420,77 @@ async function execute(name, input, ctx) {
     }
     case 'create_goal': {
       if (!input?.name || !input?.category) return { error: 'name and category required' };
+      const type = input.goal_type || 'numeric';
+      const today = nzToday();
+
+      if (type === 'checkbox') {
+        const goal = await sbInsert('goals', {
+          user_id: userId,
+          name: input.name, category: input.category, goal_type: 'checkbox',
+          current_value: 0, start_value: 0,
+          target_value: input.target_value ?? null,
+          unit: input.unit || 'days',
+          direction: 'higher_better',
+          last_completed_at: null,
+        });
+        return { created: true, goal };
+      }
+      if (type === 'restraint') {
+        const goal = await sbInsert('goals', {
+          user_id: userId,
+          name: input.name, category: input.category, goal_type: 'restraint',
+          current_value: 0, start_value: 0,
+          target_value: input.target_value ?? null,
+          unit: input.unit || 'days',
+          direction: 'higher_better',
+          streak_started_at: today,
+        });
+        return { created: true, goal };
+      }
       const start = input.start_value ?? input.current_value ?? null;
       const goal = await sbInsert('goals', {
         user_id: userId,
-        name: input.name,
-        category: input.category,
+        name: input.name, category: input.category, goal_type: 'numeric',
         current_value: input.current_value ?? start,
         start_value: start,
         target_value: input.target_value ?? null,
         unit: input.unit || null,
         direction: input.direction || 'higher_better',
       });
-      // Seed an initial history point if we have a value
       if (input.current_value != null || start != null) {
         const v = input.current_value ?? start;
         await sbInsert('goal_logs', { goal_id: goal.id, user_id: userId, value: v, note: 'initial' });
       }
       return { created: true, goal };
+    }
+    case 'mark_goal_done': {
+      if (!input?.goal_id) return { error: 'goal_id required' };
+      const g = (await sbSelect('goals', `id=eq.${input.goal_id}&user_id=eq.${userId}&select=*&limit=1`))?.[0];
+      if (!g) return { error: 'goal not found' };
+      if (g.goal_type !== 'checkbox') return { error: 'mark_goal_done is for checkbox goals only' };
+      const today = nzToday();
+      if (g.last_completed_at === today) return { already_done_today: true, current_value: g.current_value };
+      const fromYesterday = g.last_completed_at && (
+        new Date(today + 'T00:00:00Z') - new Date(g.last_completed_at + 'T00:00:00Z') === 86400000
+      );
+      const newStreak = fromYesterday ? (Number(g.current_value) || 0) + 1 : 1;
+      await sbUpdate('goals', `id=eq.${g.id}&user_id=eq.${userId}`, {
+        current_value: newStreak, last_completed_at: today,
+      });
+      await sbInsert('goal_logs', { goal_id: g.id, user_id: userId, value: newStreak, note: 'checkbox tick' });
+      return { marked: true, current_value: newStreak };
+    }
+    case 'mark_goal_fail': {
+      if (!input?.goal_id) return { error: 'goal_id required' };
+      const g = (await sbSelect('goals', `id=eq.${input.goal_id}&user_id=eq.${userId}&select=*&limit=1`))?.[0];
+      if (!g) return { error: 'goal not found' };
+      if (g.goal_type !== 'restraint') return { error: 'mark_goal_fail is for restraint goals only' };
+      const today = nzToday();
+      await sbUpdate('goals', `id=eq.${g.id}&user_id=eq.${userId}`, {
+        current_value: 0, streak_started_at: today,
+      });
+      await sbInsert('goal_logs', { goal_id: g.id, user_id: userId, value: 0, note: input.note || 'fail — streak reset' });
+      return { reset: true, streak_started_at: today };
     }
     case 'update_goal': {
       if (!input?.id) return { error: 'id required' };

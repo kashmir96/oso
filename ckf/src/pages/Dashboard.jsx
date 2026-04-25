@@ -10,13 +10,13 @@ export default function Dashboard() {
   const [goals, setGoals] = useState(null);
   const [err, setErr] = useState('');
 
-  useEffect(() => {
-    let alive = true;
+  function refresh() {
     call('ckf-goals', { action: 'list' })
-      .then((r) => { if (alive) setGoals(r.goals.filter((g) => g.status === 'active')); })
-      .catch((e) => { if (alive) setErr(e.message); });
-    return () => { alive = false; };
-  }, []);
+      .then((r) => setGoals(r.goals.filter((g) => g.status === 'active')))
+      .catch((e) => setErr(e.message));
+  }
+
+  useEffect(() => { refresh(); }, []);
 
   return (
     <div className="home">
@@ -34,7 +34,7 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="goal-grid home-goal-grid">
-            {goals.map((g) => <GoalCard key={g.id} goal={g} />)}
+            {goals.map((g) => <GoalCard key={g.id} goal={g} onChanged={refresh} />)}
           </div>
         )}
       </div>
