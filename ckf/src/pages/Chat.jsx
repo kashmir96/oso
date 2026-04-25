@@ -28,8 +28,10 @@ function voiceLabel(state) {
   }
 }
 
-export default function Chat() {
-  const { id } = useParams();
+export default function Chat({ embedded = false }) {
+  const { id: routeId } = useParams();
+  const [embeddedId, setEmbeddedId] = useState(null);
+  const id = embedded ? embeddedId : routeId;
   const nav = useNavigate();
   const [conversation, setConversation] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -53,7 +55,9 @@ export default function Chat() {
   const [voiceMode, setVoiceMode] = useState(false);
   const [voiceState, setVoiceState] = useState('idle');
 
-  // ── Routing logic: if no id, open today's conversation and redirect to /chat/:id ──
+  // ── Routing logic ──
+  // - Standalone /chat (no id): open today's conversation and redirect to /chat/:id
+  // - Embedded (on Home): just open today's id locally; never navigates
   useEffect(() => {
     if (id) return;
     let alive = true;
@@ -61,13 +65,17 @@ export default function Chat() {
       try {
         const r = await call('ckf-chat', { action: 'open_today' });
         if (!alive) return;
-        nav(`/chat/${r.conversation.id}`, { replace: true });
+        if (embedded) {
+          setEmbeddedId(r.conversation.id);
+        } else {
+          nav(`/chat/${r.conversation.id}`, { replace: true });
+        }
       } catch (e) {
         if (alive) setErr(e.message);
       }
     })();
     return () => { alive = false; };
-  }, [id, nav]);
+  }, [id, nav, embedded]);
 
   // ── Load conversation + messages on id change ──
   const loadConversation = useCallback(async () => {
@@ -298,15 +306,17 @@ export default function Chat() {
   const lastUsedTools = (lastAsst?.content_blocks || []).filter((b) => b?.type === 'tool_use').map((b) => b.name);
 
   return (
-    <div className="chat-shell">
-      <header className="chat-header">
-        <button onClick={() => setHistoryOpen(true)} className="chat-icon-btn" aria-label="History">☰</button>
-        <div className="chat-title">
-          <div style={{ fontWeight: 600 }}>{conversation.title || 'New chat'}</div>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{fmtShortDate(conversation.nz_date)}</div>
-        </div>
-        <button onClick={newChat} className="chat-icon-btn" aria-label="New chat">+</button>
-      </header>
+    <div className={`chat-shell ${embedded ? 'chat-embedded' : ''}`}>
+      {!embedded && (
+        <header className="chat-header">
+          <button onClick={() => setHistoryOpen(true)} className="chat-icon-btn" aria-label="History">☰</button>
+          <div className="chat-title">
+            <div style={{ fontWeight: 600 }}>{conversation.title || 'New chat'}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{fmtShortDate(conversation.nz_date)}</div>
+          </div>
+          <button onClick={newChat} className="chat-icon-btn" aria-label="New chat">+</button>
+        </header>
+      )}
 
       <div className="hat-row">
         {HATS.map((h) => (
@@ -390,7 +400,7 @@ export default function Chat() {
         <button onClick={send} className="primary" disabled={busy || recording || transcribing || voiceMode || !draft.trim()}>Send</button>
       </div>
 
-      {historyOpen && (
+      {!embedded && historyOpen && (
         <div className="drawer" onClick={() => setHistoryOpen(false)}>
           <div className="drawer-panel" onClick={(e) => e.stopPropagation()}>
             <div className="drawer-header">

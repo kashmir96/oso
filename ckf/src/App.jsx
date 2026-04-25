@@ -29,6 +29,7 @@ function Shell() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      {/* Home — goals widgets + embedded chat. Bottom nav visible. */}
       <Route path="/" element={<Gated><Dashboard /></Gated>} />
       <Route path="/goals" element={<Gated><Goals /></Gated>} />
       <Route path="/goals/:id" element={<Gated><GoalDetail /></Gated>} />

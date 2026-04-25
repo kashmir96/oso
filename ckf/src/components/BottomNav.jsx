@@ -2,15 +2,14 @@ import { NavLink } from 'react-router-dom';
 
 const items = [
   { to: '/', label: 'Home', icon: '◯' },
-  { to: '/today', label: 'Today', icon: '◐' },
-  { to: '/chat', label: 'Chat', icon: '◍' },
-  { to: '/weekly', label: 'Week', icon: '☷' },
-  { to: '/settings', label: 'More', icon: '⋯' },
+  { to: '/business', label: 'Business', icon: '◧' },
+  { to: '/today', label: 'Daily Routine', icon: '◐' },
+  { to: '/settings', label: 'Settings', icon: '⋯' },
 ];
 
 export default function BottomNav() {
   return (
-    <nav className="nav-bottom">
+    <nav className="nav-bottom nav-bottom-4">
       {items.map((it) => (
         <NavLink
           key={it.to}
