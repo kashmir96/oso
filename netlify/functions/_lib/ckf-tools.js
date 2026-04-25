@@ -130,6 +130,7 @@ const TOOLS = [
           type: 'array',
           items: { type: 'object', properties: { task: { type: 'string' } }, required: ['task'] },
         },
+        unfiltered: { type: 'string', description: "The 'anything else on your chest' catch-all from the closing question. Free-form. Save verbatim." },
       },
     },
   },
@@ -321,6 +322,7 @@ async function execute(name, input, ctx) {
         'tomorrow_personal_tasks',
         'business_wins','business_losses','business_activity','business_lessons',
         'tomorrow_business_tasks','marketing_objectives','delegation_notes','bottlenecks','change_tomorrow',
+        'unfiltered',
       ];
       const patch = {};
       for (const k of allowed) if (input[k] !== undefined) patch[k] = input[k];

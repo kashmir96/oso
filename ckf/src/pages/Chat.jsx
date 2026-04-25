@@ -3,6 +3,11 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import Header from '../components/Header.jsx';
 import { call } from '../lib/api.js';
 import { fmtRelative, fmtShortDate } from '../lib/format.js';
+import {
+  isRecordingSupported, startRecording,
+  transcribe, speak, stopPlayback,
+  isTtsOn, setTtsOn,
+} from '../lib/voice.js';
 
 const HATS = [
   { id: 'therapist', label: 'Therapist' },
@@ -25,6 +30,11 @@ export default function Chat() {
   const scrollRef = useRef(null);
   const taRef = useRef(null);
   const autoOpenedRef = useRef(new Set());
+  const recorderRef = useRef(null);
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [ttsOn, setTts] = useState(() => isTtsOn());
+  const lastSpokenRef = useRef(null);
 
   // ── Routing logic: if no id, open today's conversation and redirect to /chat/:id ──
   useEffect(() => {
@@ -116,6 +126,77 @@ export default function Chat() {
     }
   }
 
+  // ── Voice: record → transcribe → fill composer (don't auto-send so he can edit)
+  async function toggleMic() {
+    if (recording) {
+      // Stop & transcribe
+      const rec = recorderRef.current;
+      recorderRef.current = null;
+      setRecording(false);
+      if (!rec) return;
+      setTranscribing(true);
+      try {
+        const blob = await rec.stop();
+        if (!blob || blob.size < 200) { setTranscribing(false); return; } // ignore taps
+        const text = await transcribe(blob);
+        if (text) {
+          setDraft((d) => (d ? `${d} ${text}` : text));
+          setTimeout(() => taRef.current?.focus(), 0);
+        }
+      } catch (e) {
+        setErr(e.message);
+      } finally {
+        setTranscribing(false);
+      }
+      return;
+    }
+    // Start
+    if (!isRecordingSupported()) {
+      setErr('Voice not supported on this device.');
+      return;
+    }
+    stopPlayback();
+    try {
+      const rec = await startRecording();
+      recorderRef.current = rec;
+      setRecording(true);
+    } catch (e) {
+      setErr(e.message || 'Mic permission denied');
+    }
+  }
+
+  // ── TTS: when an assistant text arrives and TTS is on, speak it
+  useEffect(() => {
+    if (!ttsOn) return;
+    const handler = (e) => {
+      const text = e.detail;
+      if (!text || text === lastSpokenRef.current) return;
+      lastSpokenRef.current = text;
+      speak(text).catch(() => {});
+    };
+    window.addEventListener('ckf-assistant-text', handler);
+    return () => window.removeEventListener('ckf-assistant-text', handler);
+  }, [ttsOn]);
+
+  // Also speak the latest assistant message when TTS gets toggled on (covers
+  // auto_open replies that landed before the listener attached).
+  useEffect(() => {
+    if (!ttsOn) { stopPlayback(); return; }
+    const lastAsst = [...messages].reverse().find((m) => m.role === 'assistant' && m.content_text?.trim());
+    if (lastAsst && lastAsst.content_text !== lastSpokenRef.current) {
+      lastSpokenRef.current = lastAsst.content_text;
+      speak(lastAsst.content_text).catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ttsOn]);
+
+  function flipTts() {
+    const next = !ttsOn;
+    setTts(next);
+    setTtsOn(next);
+    if (!next) stopPlayback();
+  }
+
   async function newChat() {
     const r = await call('ckf-chat', { action: 'create_conversation' });
     nav(`/chat/${r.conversation.id}`);
@@ -158,7 +239,15 @@ export default function Chat() {
             {h.label}
           </button>
         ))}
-        <Link to="/chat/memory" className="hat-pill" style={{ marginLeft: 'auto' }}>Memory</Link>
+        <button
+          className={`hat-pill ${ttsOn ? 'active' : ''}`}
+          onClick={flipTts}
+          title="Speak replies aloud"
+          style={{ marginLeft: 'auto' }}
+        >
+          {ttsOn ? '🔊 On' : '🔈 Off'}
+        </button>
+        <Link to="/chat/memory" className="hat-pill">Memory</Link>
       </div>
 
       <div className="chat-stream" ref={scrollRef}>
@@ -188,16 +277,25 @@ export default function Chat() {
       </div>
 
       <div className="chat-composer">
+        <button
+          onClick={toggleMic}
+          className={`mic-btn ${recording ? 'recording' : ''}`}
+          disabled={transcribing || busy}
+          aria-label={recording ? 'Stop recording' : 'Record voice'}
+          title={recording ? 'Stop' : 'Hold thumb to talk'}
+        >
+          {transcribing ? '…' : recording ? '■' : '🎙'}
+        </button>
         <textarea
           ref={taRef}
           rows={1}
           value={draft}
-          placeholder="Type a message…  (Enter to send · Shift+Enter for newline)"
+          placeholder={recording ? 'Listening…' : transcribing ? 'Transcribing…' : 'Type or tap the mic'}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={onKeyDown}
-          disabled={busy}
+          disabled={busy || recording || transcribing}
         />
-        <button onClick={send} className="primary" disabled={busy || !draft.trim()}>Send</button>
+        <button onClick={send} className="primary" disabled={busy || recording || transcribing || !draft.trim()}>Send</button>
       </div>
 
       {historyOpen && (

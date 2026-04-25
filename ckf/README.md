@@ -18,6 +18,9 @@ Personal dashboard for Curtis. Lives at `/ckf` on the oso site. Single-user app,
 | `SUPABASE_URL` | Supabase project URL (already set for oso) |
 | `SUPABASE_SERVICE_KEY` | Service role key (already set) |
 | `ANTHROPIC_API_KEY` | Claude API (already set) |
+| `OPENAI_API_KEY` | OpenAI Whisper for speech-to-text |
+| `ELEVENLABS_API_KEY` | ElevenLabs text-to-speech |
+| `ELEVENLABS_VOICE_ID` | Optional. Defaults to `JBFqnCBsd6RMkjVDRZzb` (George — calm male). |
 | `TWILIO_SID` | Twilio account SID (already set) |
 | `TWILIO_API` | Twilio auth token (already set) |
 | `TWILIO_FROM_NUMBER` | Sender phone (already set) |
@@ -29,6 +32,7 @@ The diary reminder does NOT use `ALERT_PHONE_NUMBERS`. CKF uses a code-level con
 
 1. **Apply schema:** open `oso/supabase-ckf-schema.sql` and paste it into the Supabase SQL editor. Creates 12 tables, RLS, triggers.
 2. **Apply chat schema:** open `oso/supabase-ckf-chat-schema.sql` and paste it. Adds `ckf_conversations`, `ckf_messages`, `ckf_memory_facts`.
+2b. **Apply unfiltered column:** open `oso/supabase-ckf-unfiltered-column.sql` and paste it. Adds the `unfiltered TEXT` catch-all column to `diary_entries` (used by the closing chest-clearing question).
 3. **Set `APP_URL`** in Netlify env if not already set.
 4. **First sign-in** at `https://oso.nz/ckf` — log in with `cfairweather1996@gmail.com` and a chosen password (8+ chars). The user row auto-bootstraps. Any other email gets 403.
 
@@ -57,7 +61,9 @@ The diary reminder does NOT use `ALERT_PHONE_NUMBERS`. CKF uses a code-level con
 | `ckf-goals` | goals CRUD + log_value + history |
 | `ckf-tasks` | routine_tasks CRUD + today + set_status |
 | `ckf-diary` | diary CRUD (still used by tools and old form-style writes) |
-| `ckf-chat` | Chat: list/open_today/get/send + memory list/archive. Tool-use loop calls Claude with read+write tools (see `_lib/ckf-tools.js`). |
+| `ckf-chat` | Chat: list/open_today/auto_open/get/send + memory list/archive. Haiku 4.5 + prompt caching for low latency. Tool-use loop calls Claude with read+write tools (see `_lib/ckf-tools.js`). |
+| `ckf-stt` | Speech-to-text via OpenAI Whisper. Accepts `{audio_base64, mime_type}`, returns `{text}`. |
+| `ckf-tts` | Text-to-speech via ElevenLabs (Flash v2.5). Accepts `{text}`, returns `{audio_base64}`. |
 | `ckf-weekly` | list + generate weekly summary |
 | `ckf-ninety-day` | 90-day goals CRUD + AI breakdown |
 | `ckf-business` | business_tasks CRUD |
