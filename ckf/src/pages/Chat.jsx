@@ -24,6 +24,7 @@ export default function Chat() {
   const [history, setHistory] = useState([]);
   const scrollRef = useRef(null);
   const taRef = useRef(null);
+  const autoOpenedRef = useRef(new Set());
 
   // ── Routing logic: if no id, open today's conversation and redirect to /chat/:id ──
   useEffect(() => {
@@ -52,6 +53,26 @@ export default function Chat() {
   useEffect(() => {
     loadConversation().catch((e) => setErr(e.message));
   }, [loadConversation]);
+
+  // ── Auto-open: when a conversation is fresh (zero messages), the AI opens
+  // the chat with a contextual greeting / evening-reflection question. We guard
+  // against double-firing using autoOpenedRef.
+  useEffect(() => {
+    if (!id || !conversation || messages.length > 0 || busy) return;
+    if (autoOpenedRef.current.has(id)) return;
+    autoOpenedRef.current.add(id);
+    setBusy(true);
+    call('ckf-chat', { action: 'auto_open', conversation_id: id, mode_hint: modeHint })
+      .then((r) => {
+        if (r.messages) setMessages(r.messages);
+        if (r.text) window.dispatchEvent(new CustomEvent('ckf-assistant-text', { detail: r.text }));
+      })
+      .catch((e) => setErr(e.message))
+      .finally(() => setBusy(false));
+    // Intentionally not depending on modeHint — we only auto-open once per
+    // conversation, regardless of later hat changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, conversation, messages.length]);
 
   // ── Load history list when drawer opens ──
   useEffect(() => {
@@ -141,9 +162,9 @@ export default function Chat() {
       </div>
 
       <div className="chat-stream" ref={scrollRef}>
-        {visible.length === 0 && (
+        {visible.length === 0 && !busy && (
           <div className="empty" style={{ padding: '40px 16px', textAlign: 'center' }}>
-            What's on your mind tonight, Curtis?
+            Opening…
           </div>
         )}
         {visible.map((m) => (

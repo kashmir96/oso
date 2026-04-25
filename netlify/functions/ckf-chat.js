@@ -26,7 +26,7 @@ const MEMORY_LIMIT = 50;
 const RECENT_DIARY = 5;
 
 // ── System prompt ──
-function buildSystemPrompt({ memoryFacts, recentDiary, goals, todayTasks, suggestions, modeHint }) {
+function buildSystemPrompt({ memoryFacts, recentDiary, goals, todayTasks, suggestions, modeHint, todayDiary, nzTimeStr }) {
   const memBlock = memoryFacts.length
     ? memoryFacts.map((m) => `• [${m.importance}] ${m.topic ? `(${m.topic}) ` : ''}${m.fact}`).join('\n')
     : '(no facts yet — call remember() when you learn something durable)';
@@ -107,6 +107,31 @@ ${taskBlock}
 ## Pending suggestions awaiting his approval
 ${suggBlock}
 
+## Today's diary entry (so far)
+${todayDiary
+  ? Object.entries(todayDiary)
+      .filter(([k, v]) => v != null && v !== '' && !['id','user_id','date','created_at','updated_at','ai_summary','ai_actions'].includes(k))
+      .map(([k, v]) => `${k}: ${typeof v === 'string' ? v.slice(0, 200) : JSON.stringify(v).slice(0, 200)}`)
+      .join('\n') || '(nothing written yet for today)'
+  : '(nothing written yet for today)'}
+
+## NZ time right now
+${nzTimeStr || ''}
+
+# Evening reflection flow — when the chat is fresh
+If a conversation is just starting (no prior turns) AND today's diary is empty or partial AND it's evening (≥ 17:00 NZ), conduct the diary as a CONVERSATION — not a form:
+
+- Open with ONE warm, specific question. Vary wording every session — never use the same opener twice. Look at recent diary entries to pick a thread that's open (a goal he's chasing, a bottleneck he flagged yesterday, a value he's testing). Don't say "Let's begin tonight's reflection" or anything that sounds like a script. Just ask.
+- Walk gradually through the lenses, ONE at a time, in whatever order the conversation pulls toward: how the day actually went; what was good; what was bad; the 80/20; physical (energy, body, sleep, training); mental (focus, mood, load); spiritual (purpose, alignment); growth (what he avoided); business (wins, losses, bottlenecks); tomorrow's most important things (personal + business).
+- After EACH of his replies, give a brief reflection — one or two sentences max. Sometimes a question back. Sometimes a small observation. Sometimes a gentle push when he's deflecting or being abstract. Sometimes silence is fine ("Got it. What was bad?"). NEVER say "I hear you", "thank you for sharing", "that's a great point" or any therapy-cliché filler. NEVER summarise his answer back to him verbatim.
+- Persist progressively — after each meaningful answer, call \`save_diary_entry\` with just the field(s) you've learned. The schema is upsert-safe; partial fields are fine. This way nothing is lost if he closes the app.
+- Skip lenses he's already filled in — check "Today's diary entry (so far)" above. If physical_reflection is already set, don't ask about it again.
+- When you've covered the essentials and he's clearly winding down, do a final \`save_diary_entry\` to capture the last bits, give a short honest read of the day (2–3 sentences), then end naturally. Don't say "great session" or any sign-off cliché.
+- If the diary entry already covers the day OR it's not evening, skip the diary flow. Just have a normal conversation.
+
+# Mid-day or off-flow conversations
+If he opens a chat outside the evening reflection (e.g. mid-day, asking about a goal, processing something on the fly), just be present in whichever hat fits. Don't railroad him into a diary.
+
 ${modeHint ? `\n# Hat hint from UI\nHe explicitly asked you to lean ${modeHint} for this conversation. Honour it unless context clearly calls for another hat.\n` : ''}
 Reply now in your own voice. If a tool call sharpens the answer, call it.`;
 }
@@ -126,15 +151,31 @@ async function getMessages(conversationId, limit = MAX_HISTORY) {
   return rows.reverse();
 }
 
+function nzTimeString() {
+  return new Intl.DateTimeFormat('en-NZ', {
+    timeZone: 'Pacific/Auckland',
+    weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(new Date());
+}
+
 async function loadContext(userId, date) {
-  const [memoryFacts, recentDiary, goals, todayRoutine, suggestions] = await Promise.all([
+  const [memoryFacts, recentDiary, goals, todayRoutine, suggestions, todayDiaryRows] = await Promise.all([
     sbSelect('ckf_memory_facts', `user_id=eq.${userId}&archived=eq.false&order=importance.desc,created_at.desc&limit=${MEMORY_LIMIT}&select=fact,topic,importance`),
     sbSelect('diary_entries', `user_id=eq.${userId}&order=date.desc&limit=${RECENT_DIARY}&select=date,ai_summary,personal_bad,bottlenecks,growth_opportunities,physical_reflection,mental_reflection,spiritual_reflection`),
     sbSelect('goals', `user_id=eq.${userId}&status=eq.active&order=updated_at.desc&select=name,category,current_value,start_value,target_value,unit,direction`),
     execute('get_today_routine', { date }, { userId }),
     sbSelect('routine_suggestions', `user_id=eq.${userId}&status=eq.pending&order=created_at.desc&limit=10&select=suggestion,reason,created_at`),
+    sbSelect('diary_entries', `user_id=eq.${userId}&date=eq.${date}&select=*&limit=1`),
   ]);
-  return { memoryFacts, recentDiary, goals, todayTasks: todayRoutine.tasks || [], suggestions };
+  return {
+    memoryFacts,
+    recentDiary,
+    goals,
+    todayTasks: todayRoutine.tasks || [],
+    suggestions,
+    todayDiary: todayDiaryRows?.[0] || null,
+    nzTimeStr: nzTimeString(),
+  };
 }
 
 // ── Convert stored messages to Anthropic format ──
@@ -258,6 +299,78 @@ async function runChat({ userId, conversation, userMessageText, modeHint }) {
   return { text: finalText, blocks: finalBlocks, usage: totalUsage };
 }
 
+// ── Auto-open: AI greets first, no synthetic user message persisted ──
+async function runAutoOpen({ userId, conversation, modeHint }) {
+  if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+  const ctx = await loadContext(userId, nzToday());
+  const system = buildSystemPrompt({ ...ctx, modeHint });
+
+  // Build a synthetic kickoff. NOT persisted. Tells the model the situation
+  // without becoming a visible user message. The model's reply IS the opener.
+  const todayDiary = ctx.todayDiary;
+  const filledKeys = todayDiary
+    ? Object.entries(todayDiary)
+        .filter(([k, v]) => v != null && v !== '' && !['id','user_id','date','created_at','updated_at','ai_summary','ai_actions'].includes(k))
+        .map(([k]) => k)
+    : [];
+  const status = !todayDiary ? 'no entry yet'
+    : filledKeys.length === 0 ? 'entry row exists but empty'
+    : `partial — already has: ${filledKeys.join(', ')}`;
+
+  const kickoff = `[INTERNAL — do NOT echo this note. Curtis just opened a fresh chat. NZ time: ${ctx.nzTimeStr}. Today's diary: ${status}. Memory facts and recent diary are in your system context. Greet him with ONE specific question that opens the conversation. Vary your wording vs. previous sessions — never the same opener twice. If it's evening (≥17:00 NZ) and the diary is empty/partial, your first question should pull at a thread worth reflecting on tonight (don't announce a "diary session"). If it's mid-day or the diary is already covered, just ask what's on his mind. Keep the opener short — 1–2 sentences max.]`;
+
+  const messages = [{ role: 'user', content: [{ type: 'text', text: kickoff }] }];
+
+  let totalUsage = { input_tokens: 0, output_tokens: 0 };
+  let finalText = '';
+  let finalBlocks = [];
+
+  for (let turn = 0; turn < MAX_TURNS; turn++) {
+    const response = await client.messages.create({
+      model: MODEL,
+      max_tokens: 1500,
+      system,
+      tools: TOOLS,
+      messages,
+    });
+    totalUsage.input_tokens += response.usage?.input_tokens || 0;
+    totalUsage.output_tokens += response.usage?.output_tokens || 0;
+
+    if (response.stop_reason === 'tool_use') {
+      // The model wants to read context (e.g. get_recent_diary_entries). Honour it,
+      // but DON'T persist anything to ckf_messages until the final assistant reply
+      // — we don't want the synthetic kickoff to leak into stored history.
+      messages.push({ role: 'assistant', content: response.content });
+      const toolResults = [];
+      for (const block of response.content) {
+        if (block.type !== 'tool_use') continue;
+        let result;
+        try {
+          result = await execute(block.name, block.input || {}, { userId });
+        } catch (e) { result = { error: e.message }; }
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: block.id,
+          content: clip(JSON.stringify(result), 6000),
+        });
+      }
+      messages.push({ role: 'user', content: toolResults });
+      continue;
+    }
+
+    finalBlocks = response.content;
+    finalText = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
+    // Persist ONLY the assistant opener
+    await saveMessage(conversation.id, userId, 'assistant', finalText || '', finalBlocks, response.usage);
+    break;
+  }
+
+  await touchConversation(conversation.id);
+  return { text: finalText, blocks: finalBlocks, usage: totalUsage };
+}
+
 // ── Handler ──
 exports.handler = withGate(async (event, { user }) => {
   let body;
@@ -311,6 +424,33 @@ exports.handler = withGate(async (event, { user }) => {
     if (!body.id) return reply(400, { error: 'id required' });
     await sbDelete('ckf_conversations', `id=eq.${body.id}&user_id=eq.${user.id}`);
     return reply(200, { success: true });
+  }
+
+  if (action === 'auto_open') {
+    const { conversation_id, mode_hint } = body;
+    if (!conversation_id) return reply(400, { error: 'conversation_id required' });
+    const conversation = await getConversation(user.id, conversation_id);
+    if (!conversation) return reply(404, { error: 'conversation not found' });
+
+    // Only auto-open if there are no messages yet (idempotent re-open guard).
+    const existing = await sbSelect(
+      'ckf_messages',
+      `conversation_id=eq.${conversation_id}&user_id=eq.${user.id}&limit=1&select=id`
+    );
+    if (existing?.length > 0) {
+      const messages = await sbSelect(
+        'ckf_messages',
+        `conversation_id=eq.${conversation_id}&user_id=eq.${user.id}&order=created_at.asc&limit=500&select=id,role,content_text,content_blocks,created_at`
+      );
+      return reply(200, { skipped: true, reason: 'conversation already has messages', messages });
+    }
+
+    const result = await runAutoOpen({ userId: user.id, conversation, modeHint: mode_hint || null });
+    const messages = await sbSelect(
+      'ckf_messages',
+      `conversation_id=eq.${conversation_id}&user_id=eq.${user.id}&order=created_at.asc&limit=500&select=id,role,content_text,content_blocks,created_at`
+    );
+    return reply(200, { text: result.text, usage: result.usage, messages });
   }
 
   if (action === 'send') {
