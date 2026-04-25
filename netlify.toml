@@ -1,6 +1,7 @@
 [build]
   publish = "public"
-  command = "hugo --minify"
+  # Build the CKF React app first so Hugo passes its bundle through static/.
+  command = "cd ckf && npm ci && npm run build && cd .. && hugo --minify"
 
 # Coming soon cover page — hides the anti-retail store pitch until launch
 # Original homepage still accessible at /the-primalpantry-anti-retail-store.html
@@ -57,6 +58,24 @@
 [functions."website-insights"]
   schedule = "30 18 * * *"
   timeout = 60
+
+# CKF Second Brain — diary reminder.
+# UTC schedule fires twice (covers NZST UTC+12 and NZDT UTC+13).
+# The handler hard-checks Pacific/Auckland local hour and only sends at 21:00 NZ.
+[functions."ckf-diary-reminder"]
+  schedule = "0 8,9 * * *"
+
+# ── CKF SPA: any /ckf/* request that isn't a real file falls back to /ckf/index.html ──
+[[redirects]]
+  from = "/ckf/*"
+  to = "/ckf/index.html"
+  status = 200
+
+# ── CKF static asset cache ──
+[[headers]]
+  for = "/ckf/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
 
 # ── Cache headers for dashboard static assets ──
 [[headers]]
