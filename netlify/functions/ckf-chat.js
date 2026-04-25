@@ -153,7 +153,7 @@ ${todayDiary
 
 ## NZ time right now
 ${nzTimeStr || ''}
-${modeHint ? `\n## Hat hint from UI\nHe explicitly asked you to lean ${modeHint} this conversation. Honour it unless context clearly says otherwise.\n` : ''}`;
+`;
 }
 
 // Build the system field as an array for prompt caching:

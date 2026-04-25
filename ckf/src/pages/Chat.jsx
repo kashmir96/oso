@@ -10,13 +10,7 @@ import {
   createVoiceSession,
 } from '../lib/voice.js';
 
-const HATS = [
-  { id: 'therapist', label: 'Therapist' },
-  { id: 'business',  label: 'Business' },
-  { id: 'pt',        label: 'PT' },
-  { id: 'spiritual', label: 'Spiritual' },
-];
-
+// Hat selection is handled by the model from context; no manual UI for it.
 function voiceLabel(state) {
   switch (state) {
     case 'listening':  return '🎙 Listening…';
@@ -38,7 +32,6 @@ export default function Chat({ embedded = false }) {
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const [modeHint, setModeHint] = useState(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState([]);
   const scrollRef = useRef(null);
@@ -97,15 +90,13 @@ export default function Chat({ embedded = false }) {
     if (autoOpenedRef.current.has(id)) return;
     autoOpenedRef.current.add(id);
     setBusy(true);
-    call('ckf-chat', { action: 'auto_open', conversation_id: id, mode_hint: modeHint })
+    call('ckf-chat', { action: 'auto_open', conversation_id: id })
       .then((r) => {
         if (r.messages) setMessages(r.messages);
         if (r.text) window.dispatchEvent(new CustomEvent('ckf-assistant-text', { detail: r.text }));
       })
       .catch((e) => setErr(e.message))
       .finally(() => setBusy(false));
-    // Intentionally not depending on modeHint — we only auto-open once per
-    // conversation, regardless of later hat changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, conversation, messages.length]);
 
@@ -131,7 +122,7 @@ export default function Chat({ embedded = false }) {
     // Optimistic append
     setMessages((m) => [...m, { id: 'optimistic', role: 'user', content_text: text, created_at: new Date().toISOString() }]);
     try {
-      const r = await call('ckf-chat', { action: 'send', conversation_id: id, text, mode_hint: modeHint });
+      const r = await call('ckf-chat', { action: 'send', conversation_id: id, text });
       setMessages(r.messages);
       // Notify caller (Voice mode listener) about the new assistant text
       window.dispatchEvent(new CustomEvent('ckf-assistant-text', { detail: r.text }));
@@ -229,7 +220,7 @@ export default function Chat({ embedded = false }) {
     setBusy(true); setErr('');
     setMessages((m) => [...m, { id: `optimistic-${Date.now()}`, role: 'user', content_text: text, created_at: new Date().toISOString() }]);
     try {
-      const r = await call('ckf-chat', { action: 'send', conversation_id: id, text, mode_hint: modeHint });
+      const r = await call('ckf-chat', { action: 'send', conversation_id: id, text });
       setMessages(r.messages);
       return r.text;
     } catch (e) {
@@ -237,7 +228,7 @@ export default function Chat({ embedded = false }) {
     } finally {
       setBusy(false);
     }
-  }, [id, modeHint]);
+  }, [id]);
 
   function startVoiceMode() {
     // Voice mode implies TTS — turn it on if it's off.
@@ -318,21 +309,11 @@ export default function Chat({ embedded = false }) {
         </header>
       )}
 
-      <div className="hat-row">
-        {HATS.map((h) => (
-          <button
-            key={h.id}
-            className={`hat-pill ${modeHint === h.id ? 'active' : ''}`}
-            onClick={() => setModeHint(modeHint === h.id ? null : h.id)}
-          >
-            {h.label}
-          </button>
-        ))}
+      <div className="chat-controls">
         <button
           className={`hat-pill ${voiceMode ? 'active voice-active' : ''}`}
           onClick={flipVoiceMode}
           title="Hands-free voice mode — listen, reply, repeat"
-          style={{ marginLeft: 'auto' }}
         >
           {voiceMode ? voiceLabel(voiceState) : 'Hands-free'}
         </button>
@@ -344,7 +325,7 @@ export default function Chat({ embedded = false }) {
         >
           {ttsOn ? '🔊' : '🔈'}
         </button>
-        <Link to="/chat/memory" className="hat-pill">Memory</Link>
+        <Link to="/chat/memory" className="hat-pill" style={{ marginLeft: 'auto' }}>Memory</Link>
       </div>
 
       <div className="chat-stream" ref={scrollRef}>
