@@ -123,3 +123,162 @@ export function setTtsOn(on) {
 
 // Suppress unused-import warning while keeping shape for future use
 void getToken;
+
+// ── Continuous voice mode (hands-free) ──
+// Listens continuously, detects speech via Web Audio RMS, stops on silence,
+// transcribes, hands the text to onSpeech, then waits for resume() (called
+// by the chat after TTS finishes). Like ChatGPT's voice mode.
+export function createVoiceSession({ onSpeech, onState, onError }) {
+  let stream = null;
+  let audioCtx = null;
+  let analyser = null;
+  let recorder = null;
+  let chunks = [];
+  let rafId = null;
+  let state = 'idle'; // idle | listening | recording | processing | paused | stopped
+  let stopped = false;
+  let paused = false; // true while assistant is speaking / processing
+  let lastSpeechTs = 0;
+  let firstSpeechTs = 0;
+  let recordStartTs = 0;
+
+  // Tunables — tested in Safari iOS + desktop Chrome.
+  const FFT = 1024;
+  const SILENCE_THRESHOLD = 0.012; // RMS — below this is "silent"
+  const SILENCE_MS = 1400;         // how long of silence before sending
+  const MIN_SPEECH_MS = 300;       // ignore short pops / breath
+  const MAX_RECORDING_MS = 30_000; // hard cap — avoid runaway
+
+  function setState(s) {
+    state = s;
+    try { onState && onState(s); } catch {}
+  }
+
+  function pickMime() {
+    const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
+    for (const c of candidates) {
+      if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(c)) return c;
+    }
+    return '';
+  }
+
+  function startListenLoop() {
+    if (stopped || paused) return;
+    chunks = [];
+    firstSpeechTs = 0;
+    lastSpeechTs = 0;
+    recordStartTs = performance.now();
+
+    const mime = pickMime();
+    try {
+      recorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+    } catch (e) {
+      onError && onError(e);
+      return;
+    }
+    recorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunks.push(e.data); };
+    recorder.onstop = onRecordingStop;
+
+    recorder.start();
+    setState('listening');
+
+    const buf = new Float32Array(FFT);
+    const tick = () => {
+      if (!recorder || recorder.state === 'inactive' || stopped || paused) return;
+      analyser.getFloatTimeDomainData(buf);
+      let sum = 0;
+      for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+      const rms = Math.sqrt(sum / buf.length);
+      const now = performance.now();
+
+      if (rms > SILENCE_THRESHOLD) {
+        lastSpeechTs = now;
+        if (!firstSpeechTs) firstSpeechTs = now;
+        if (state === 'listening') setState('recording');
+      }
+
+      const speechDur = firstSpeechTs ? now - firstSpeechTs : 0;
+      const silenceDur = lastSpeechTs ? now - lastSpeechTs : Infinity;
+      const totalDur = now - recordStartTs;
+
+      // Silence after enough speech → stop and transcribe
+      if (firstSpeechTs && speechDur > MIN_SPEECH_MS && silenceDur > SILENCE_MS) {
+        try { recorder.stop(); } catch {}
+        return;
+      }
+      // Hard cap — too long without a pause, stop anyway
+      if (totalDur > MAX_RECORDING_MS) {
+        try { recorder.stop(); } catch {}
+        return;
+      }
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+  }
+
+  async function onRecordingStop() {
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    if (stopped) return;
+    const blob = new Blob(chunks, { type: recorder?.mimeType || 'audio/webm' });
+    const hadSpeech = firstSpeechTs > 0 && blob.size > 200;
+    if (!hadSpeech) {
+      // Empty / too-quiet capture — re-listen.
+      if (!paused) startListenLoop();
+      return;
+    }
+    setState('processing');
+    try {
+      const text = await transcribe(blob);
+      if (text && text.trim()) {
+        try { await onSpeech(text); } catch (e) { onError && onError(e); }
+      } else {
+        // Whisper returned nothing useful — re-listen.
+        if (!stopped && !paused) startListenLoop();
+      }
+    } catch (e) {
+      onError && onError(e);
+      if (!stopped && !paused) startListenLoop();
+    }
+  }
+
+  async function start() {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const source = audioCtx.createMediaStreamSource(stream);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = FFT;
+      analyser.smoothingTimeConstant = 0.2;
+      source.connect(analyser);
+      startListenLoop();
+    } catch (e) {
+      onError && onError(e);
+      stop();
+    }
+  }
+
+  function pause() {
+    paused = true;
+    setState('paused');
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    try { if (recorder && recorder.state !== 'inactive') recorder.stop(); } catch {}
+  }
+
+  function resume() {
+    if (stopped) return;
+    paused = false;
+    startListenLoop();
+  }
+
+  function stop() {
+    stopped = true;
+    paused = false;
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    try { if (recorder && recorder.state !== 'inactive') recorder.stop(); } catch {}
+    try { stream && stream.getTracks().forEach((t) => t.stop()); } catch {}
+    try { audioCtx && audioCtx.close(); } catch {}
+    setState('stopped');
+  }
+
+  return { start, pause, resume, stop, getState: () => state };
+}

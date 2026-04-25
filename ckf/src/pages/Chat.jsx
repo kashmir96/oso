@@ -7,6 +7,7 @@ import {
   isRecordingSupported, startRecording,
   transcribe, speak, stopPlayback,
   isTtsOn, setTtsOn,
+  createVoiceSession,
 } from '../lib/voice.js';
 
 const HATS = [
@@ -15,6 +16,17 @@ const HATS = [
   { id: 'pt',        label: 'PT' },
   { id: 'spiritual', label: 'Spiritual' },
 ];
+
+function voiceLabel(state) {
+  switch (state) {
+    case 'listening':  return '🎙 Listening…';
+    case 'recording':  return '🔴 Hearing you';
+    case 'processing': return '… Thinking';
+    case 'paused':     return '⏸ Paused';
+    case 'stopped':    return 'Stopped';
+    default:           return '🎙 On';
+  }
+}
 
 export default function Chat() {
   const { id } = useParams();
@@ -35,6 +47,11 @@ export default function Chat() {
   const [transcribing, setTranscribing] = useState(false);
   const [ttsOn, setTts] = useState(() => isTtsOn());
   const lastSpokenRef = useRef(null);
+
+  // Hands-free voice mode (continuous listen → silence → reply → speak → resume)
+  const voiceSessionRef = useRef(null);
+  const [voiceMode, setVoiceMode] = useState(false);
+  const [voiceState, setVoiceState] = useState('idle');
 
   // ── Routing logic: if no id, open today's conversation and redirect to /chat/:id ──
   useEffect(() => {
@@ -197,6 +214,68 @@ export default function Chat() {
     if (!next) stopPlayback();
   }
 
+  // ── Hands-free voice mode ──
+  // Reusable sender that bypasses the composer (used by voice mode + push-to-talk autosend).
+  const sendText = useCallback(async (text) => {
+    if (!text || !text.trim() || !id) return;
+    setBusy(true); setErr('');
+    setMessages((m) => [...m, { id: `optimistic-${Date.now()}`, role: 'user', content_text: text, created_at: new Date().toISOString() }]);
+    try {
+      const r = await call('ckf-chat', { action: 'send', conversation_id: id, text, mode_hint: modeHint });
+      setMessages(r.messages);
+      return r.text;
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }, [id, modeHint]);
+
+  function startVoiceMode() {
+    // Voice mode implies TTS — turn it on if it's off.
+    if (!ttsOn) { setTts(true); setTtsOn(true); }
+    stopPlayback();
+    const session = createVoiceSession({
+      onState: (s) => setVoiceState(s),
+      onError: (e) => setErr(e?.message || String(e)),
+      onSpeech: async (text) => {
+        // Pause listening while we send + speak the reply
+        session.pause();
+        const replyText = await sendText(text);
+        if (replyText) {
+          // Speak the reply, then resume listening when audio ends.
+          try { await speak(replyText); } catch {}
+        }
+        session.resume();
+      },
+    });
+    voiceSessionRef.current = session;
+    setVoiceMode(true);
+    session.start();
+  }
+
+  function stopVoiceMode() {
+    const s = voiceSessionRef.current;
+    voiceSessionRef.current = null;
+    if (s) s.stop();
+    stopPlayback();
+    setVoiceMode(false);
+    setVoiceState('idle');
+  }
+
+  function flipVoiceMode() {
+    if (voiceMode) stopVoiceMode();
+    else startVoiceMode();
+  }
+
+  // Stop voice session on unmount or conversation change.
+  useEffect(() => {
+    return () => {
+      if (voiceSessionRef.current) { voiceSessionRef.current.stop(); voiceSessionRef.current = null; }
+      stopPlayback();
+    };
+  }, [id]);
+
   async function newChat() {
     const r = await call('ckf-chat', { action: 'create_conversation' });
     nav(`/chat/${r.conversation.id}`);
@@ -240,12 +319,20 @@ export default function Chat() {
           </button>
         ))}
         <button
+          className={`hat-pill ${voiceMode ? 'active voice-active' : ''}`}
+          onClick={flipVoiceMode}
+          title="Hands-free voice mode — listen, reply, repeat"
+          style={{ marginLeft: 'auto' }}
+        >
+          {voiceMode ? voiceLabel(voiceState) : 'Hands-free'}
+        </button>
+        <button
           className={`hat-pill ${ttsOn ? 'active' : ''}`}
           onClick={flipTts}
           title="Speak replies aloud"
-          style={{ marginLeft: 'auto' }}
+          disabled={voiceMode}
         >
-          {ttsOn ? '🔊 On' : '🔈 Off'}
+          {ttsOn ? '🔊' : '🔈'}
         </button>
         <Link to="/chat/memory" className="hat-pill">Memory</Link>
       </div>
@@ -280,9 +367,9 @@ export default function Chat() {
         <button
           onClick={toggleMic}
           className={`mic-btn ${recording ? 'recording' : ''}`}
-          disabled={transcribing || busy}
+          disabled={transcribing || busy || voiceMode}
           aria-label={recording ? 'Stop recording' : 'Record voice'}
-          title={recording ? 'Stop' : 'Hold thumb to talk'}
+          title={voiceMode ? 'Disabled in hands-free mode' : recording ? 'Stop' : 'Tap to talk once'}
         >
           {transcribing ? '…' : recording ? '■' : '🎙'}
         </button>
@@ -290,12 +377,17 @@ export default function Chat() {
           ref={taRef}
           rows={1}
           value={draft}
-          placeholder={recording ? 'Listening…' : transcribing ? 'Transcribing…' : 'Type or tap the mic'}
+          placeholder={
+            voiceMode ? 'Hands-free is on — just talk. Tap to stop.'
+            : recording ? 'Listening…'
+            : transcribing ? 'Transcribing…'
+            : 'Type or tap the mic'
+          }
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={onKeyDown}
-          disabled={busy || recording || transcribing}
+          disabled={busy || recording || transcribing || voiceMode}
         />
-        <button onClick={send} className="primary" disabled={busy || recording || transcribing || !draft.trim()}>Send</button>
+        <button onClick={send} className="primary" disabled={busy || recording || transcribing || voiceMode || !draft.trim()}>Send</button>
       </div>
 
       {historyOpen && (
