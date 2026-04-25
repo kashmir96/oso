@@ -51,8 +51,8 @@ exports.handler = async () => {
       return { statusCode: 200, body: JSON.stringify({ skipped: true, reason: 'entry already exists for today' }) };
     }
 
-    const url = `${process.env.APP_URL || 'https://oso.nz'}/ckf/diary/today`;
-    const body = `Diary time, Curtis. Tonight's entry: ${url}`;
+    const url = `${process.env.APP_URL || 'https://oso.nz'}/ckf/chat`;
+    const body = `Diary time, Curtis. Tonight: ${url}`;
     await sendCkfSms(ALLOWED_NUMBER, body);
 
     return { statusCode: 200, body: JSON.stringify({ sent: true, to: ALLOWED_NUMBER, date }) };

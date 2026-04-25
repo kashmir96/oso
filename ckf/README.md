@@ -28,8 +28,9 @@ The diary reminder does NOT use `ALERT_PHONE_NUMBERS`. CKF uses a code-level con
 ## One-time setup
 
 1. **Apply schema:** open `oso/supabase-ckf-schema.sql` and paste it into the Supabase SQL editor. Creates 12 tables, RLS, triggers.
-2. **Set `APP_URL`** in Netlify env if not already set.
-3. **First sign-in** at `https://oso.nz/ckf` — log in with `cfairweather1996@gmail.com` and a chosen password (8+ chars). The user row auto-bootstraps. Any other email gets 403.
+2. **Apply chat schema:** open `oso/supabase-ckf-chat-schema.sql` and paste it. Adds `ckf_conversations`, `ckf_messages`, `ckf_memory_facts`.
+3. **Set `APP_URL`** in Netlify env if not already set.
+4. **First sign-in** at `https://oso.nz/ckf` — log in with `cfairweather1996@gmail.com` and a chosen password (8+ chars). The user row auto-bootstraps. Any other email gets 403.
 
 ## Routes
 
@@ -40,7 +41,9 @@ The diary reminder does NOT use `ALERT_PHONE_NUMBERS`. CKF uses a code-level con
 | `/ckf/goals` | Goal CRUD |
 | `/ckf/goals/:id` | Detail + log new value + history |
 | `/ckf/today` | Routine task list, check off / skip |
-| `/ckf/diary/:date` (or `/diary/today`) | Multi-step diary form |
+| `/ckf/chat` | Conversational AI — therapist / business / PT / spiritual hats |
+| `/ckf/chat/:id` | Specific conversation by id |
+| `/ckf/chat/memory` | Long-term memory facts the AI has accumulated |
 | `/ckf/weekly` | Weekly summaries (generate / list) |
 | `/ckf/ninety-day-goals` | 90-day goals + AI breakdown |
 | `/ckf/business` | Business task list |
@@ -53,7 +56,8 @@ The diary reminder does NOT use `ALERT_PHONE_NUMBERS`. CKF uses a code-level con
 | `ckf-auth` | login / logout / check / change-password |
 | `ckf-goals` | goals CRUD + log_value + history |
 | `ckf-tasks` | routine_tasks CRUD + today + set_status |
-| `ckf-diary` | diary CRUD; `save` triggers AI summary + suggestions |
+| `ckf-diary` | diary CRUD (still used by tools and old form-style writes) |
+| `ckf-chat` | Chat: list/open_today/get/send + memory list/archive. Tool-use loop calls Claude with read+write tools (see `_lib/ckf-tools.js`). |
 | `ckf-weekly` | list + generate weekly summary |
 | `ckf-ninety-day` | 90-day goals CRUD + AI breakdown |
 | `ckf-business` | business_tasks CRUD |

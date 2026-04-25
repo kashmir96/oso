@@ -80,9 +80,9 @@ export default function Dashboard() {
 
       <div className="section-title">Tonight</div>
       <div className="card">
-        <div style={{ marginBottom: 10 }}>Diary entry for today</div>
-        <Link to={`/diary/${date}`}>
-          <button className="primary" style={{ width: '100%' }}>Open diary</button>
+        <div style={{ marginBottom: 10 }}>Talk it through — therapist by default, hat switches by context.</div>
+        <Link to="/chat">
+          <button className="primary" style={{ width: '100%' }}>Open chat</button>
         </Link>
       </div>
 
