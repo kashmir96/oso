@@ -42,6 +42,8 @@ export default function Settings() {
         </div>
       </div>
 
+      <Connections />
+
       <ChangePassword />
 
       <div className="section-title">Pending suggestions</div>
@@ -98,6 +100,80 @@ function SuggestionCard({ s, onApprove, onReject }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Connections ──
+// Shows status for each integration. The "Connect" buttons hit the function
+// which returns the OAuth authorize URL; we redirect the browser there.
+// Backend functions for these aren't built yet — buttons surface a friendly
+// message until they are. The UI shape is locked in so wiring later is just
+// a function call swap.
+function Connections() {
+  const [status, setStatus] = useState({ whoop: null, google_calendar: null });
+  const [busy, setBusy] = useState(null);
+  const [info, setInfo] = useState('');
+
+  useEffect(() => {
+    call('ckf-integrations', { action: 'status' })
+      .then((r) => setStatus(r.status || { whoop: null, google_calendar: null }))
+      .catch(() => {/* function may not exist yet — leave nulls */});
+  }, []);
+
+  async function connect(provider) {
+    setBusy(provider); setInfo('');
+    try {
+      const r = await call('ckf-integrations', { action: 'connect', provider });
+      if (r.authorize_url) { window.location.href = r.authorize_url; return; }
+      setInfo(r.message || 'Not yet wired — coming soon.');
+    } catch (e) {
+      setInfo(`${provider}: not yet wired (${e.message})`);
+    } finally {
+      setBusy(null);
+    }
+  }
+  async function disconnect(provider) {
+    if (!confirm(`Disconnect ${provider}? Tokens will be revoked locally.`)) return;
+    setBusy(provider);
+    try {
+      await call('ckf-integrations', { action: 'disconnect', provider });
+      const r = await call('ckf-integrations', { action: 'status' });
+      setStatus(r.status || {});
+    } catch (e) {
+      setInfo(`${provider}: ${e.message}`);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const items = [
+    { id: 'whoop', label: 'Whoop', desc: 'Pull recovery, sleep, strain, HRV daily.' },
+    { id: 'google_calendar', label: 'Google Calendar', desc: 'Read events into the Routine view (one-way).' },
+  ];
+
+  return (
+    <div className="card" style={{ marginBottom: 12 }}>
+      <div className="section-title" style={{ margin: '0 0 8px' }}>Connections</div>
+      {items.map((it) => {
+        const s = status?.[it.id];
+        const connected = s?.connected;
+        return (
+          <div key={it.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600 }}>{it.label}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{it.desc}</div>
+              <div style={{ fontSize: 11, color: connected ? 'var(--good)' : 'var(--text-muted)', marginTop: 2 }}>
+                {connected ? `Connected${s.connected_at ? ` · since ${new Date(s.connected_at).toLocaleDateString()}` : ''}` : 'Not connected'}
+              </div>
+            </div>
+            {connected
+              ? <button onClick={() => disconnect(it.id)} disabled={busy === it.id} className="danger" style={{ padding: '6px 12px', fontSize: 12 }}>{busy === it.id ? '…' : 'Disconnect'}</button>
+              : <button onClick={() => connect(it.id)} disabled={busy === it.id} className="primary" style={{ padding: '6px 12px', fontSize: 12 }}>{busy === it.id ? '…' : 'Connect'}</button>}
+          </div>
+        );
+      })}
+      {info && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 8 }}>{info}</div>}
     </div>
   );
 }
