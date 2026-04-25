@@ -58,13 +58,17 @@ export default function GoalCard({ goal, onChanged }) {
 
   // numeric (default)
   const pct = progressPct(goal);
+  const linked = goal.data_source && goal.data_source !== 'manual';
   return (
     <Link to={`/goals/${goal.id}`} className="goal-card" style={{ color: 'inherit', textDecoration: 'none' }}>
-      <div className="name">{goal.name}</div>
+      <div className="name">
+        {goal.name}
+        {linked && <span className="src-badge" title={`auto-synced from ${goal.data_source} ${goal.data_source_field || ''}`}>↻</span>}
+      </div>
       <div className="value">{formatGoalValue(goal.current_value, goal.unit)}</div>
       <div className="target">→ {formatGoalValue(goal.target_value, goal.unit)}</div>
       <div className="bar"><div className="bar-fill" style={{ width: `${Math.round(pct * 100)}%` }} /></div>
-      <div className="updated">{fmtRelative(goal.updated_at)}</div>
+      <div className="updated">{linked ? `whoop · ${fmtRelative(goal.updated_at)}` : fmtRelative(goal.updated_at)}</div>
     </Link>
   );
 }

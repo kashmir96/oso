@@ -82,7 +82,22 @@ exports.handler = async () => {
       await sbInsert('whoop_metrics', metrics);
     }
 
-    return { statusCode: 200, body: JSON.stringify({ synced: true, date, metrics }) };
+    // ── Push values into goals that are linked to Whoop fields ──
+    const linkedGoals = await sbSelect(
+      'goals',
+      `user_id=eq.${userId}&status=eq.active&data_source=eq.whoop&select=id,name,data_source_field,current_value`
+    );
+    const updates = [];
+    for (const g of linkedGoals || []) {
+      const field = g.data_source_field;
+      if (!field || metrics[field] == null) continue;
+      const value = Number(metrics[field]);
+      await sbUpdate('goals', `id=eq.${g.id}&user_id=eq.${userId}`, { current_value: value });
+      await sbInsert('goal_logs', { goal_id: g.id, user_id: userId, value, note: `whoop ${field}` });
+      updates.push({ goal: g.name, field, value });
+    }
+
+    return { statusCode: 200, body: JSON.stringify({ synced: true, date, metrics, goal_updates: updates }) };
   } catch (e) {
     console.error('[ckf-whoop-sync]', e);
     return { statusCode: 500, body: JSON.stringify({ error: e.message }) };

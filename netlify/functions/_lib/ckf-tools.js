@@ -197,6 +197,31 @@ Don't create vague goals — turn fuzzy intentions into something concrete. For 
     },
   },
   {
+    name: 'link_goal_to_whoop',
+    description: "Link a goal so its current_value is auto-synced from Whoop daily. Use when Curtis says 'pull this from Whoop' or the goal is something Whoop measures (sleep, recovery, HRV, RHR, strain). Immediately seeds the goal with the most recent metric. After linking, manual log_goal_value calls on this goal will be refused.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        goal_id: { type: 'string' },
+        field: {
+          type: 'string',
+          enum: ['recovery_score', 'hrv_rmssd_ms', 'resting_heart_rate', 'strain', 'sleep_performance', 'sleep_hours', 'sleep_efficiency'],
+          description: 'Which Whoop metric drives this goal',
+        },
+      },
+      required: ['goal_id', 'field'],
+    },
+  },
+  {
+    name: 'unlink_goal_data_source',
+    description: "Detach a goal from its external data source. After unlinking, manual log_goal_value works again.",
+    input_schema: {
+      type: 'object',
+      properties: { goal_id: { type: 'string' } },
+      required: ['goal_id'],
+    },
+  },
+  {
     name: 'mark_goal_done',
     description: "For checkbox goals only — mark today done. Increments the streak by 1 if yesterday was also done; resets to 1 otherwise. Idempotent within the same day. Use when Curtis says 'I plunged today', 'lifted today', 'did the morning routine', etc.",
     input_schema: {
@@ -440,6 +465,12 @@ async function execute(name, input, ctx) {
     }
     case 'log_goal_value': {
       if (!input?.goal_id || input?.value == null) return { error: 'goal_id and value required' };
+      // Refuse if the goal is auto-linked to an external source — otherwise the
+      // next sync would overwrite the manual log and confuse history.
+      const g = (await sbSelect('goals', `id=eq.${input.goal_id}&user_id=eq.${userId}&select=data_source,data_source_field,name&limit=1`))?.[0];
+      if (g && g.data_source && g.data_source !== 'manual') {
+        return { error: `Goal "${g.name}" is auto-synced from ${g.data_source}${g.data_source_field ? ` (${g.data_source_field})` : ''}. Unlink first if you want to log manually.` };
+      }
       const log = await sbInsert('goal_logs', { goal_id: input.goal_id, user_id: userId, value: input.value, note: input.note || null });
       await sbUpdate('goals', `id=eq.${input.goal_id}&user_id=eq.${userId}`, { current_value: input.value });
       return { logged: true, log_id: log?.id, new_value: input.value };
@@ -532,6 +563,40 @@ async function execute(name, input, ctx) {
       if (!input?.id) return { error: 'id required' };
       const rows = await sbUpdate('goals', `id=eq.${input.id}&user_id=eq.${userId}`, { status: 'archived' });
       return { archived: true, goal: rows?.[0] };
+    }
+    case 'link_goal_to_whoop': {
+      if (!input?.goal_id || !input?.field) return { error: 'goal_id and field required' };
+      const ALLOWED = ['recovery_score','hrv_rmssd_ms','resting_heart_rate','strain','sleep_performance','sleep_hours','sleep_efficiency'];
+      if (!ALLOWED.includes(input.field)) return { error: `bad field; pick one of ${ALLOWED.join(', ')}` };
+      // Verify the goal exists and belongs to this user
+      const g = (await sbSelect('goals', `id=eq.${input.goal_id}&user_id=eq.${userId}&select=*&limit=1`))?.[0];
+      if (!g) return { error: 'goal not found' };
+      await sbUpdate('goals', `id=eq.${g.id}&user_id=eq.${userId}`, {
+        data_source: 'whoop',
+        data_source_field: input.field,
+      });
+      // Immediate seed: pull the most recent whoop_metrics row and update current_value
+      const recent = await sbSelect(
+        'whoop_metrics',
+        `user_id=eq.${userId}&order=date.desc&limit=1&select=date,${input.field}`
+      );
+      const v = recent?.[0]?.[input.field];
+      if (v != null) {
+        await sbUpdate('goals', `id=eq.${g.id}&user_id=eq.${userId}`, { current_value: Number(v) });
+        await sbInsert('goal_logs', {
+          goal_id: g.id, user_id: userId, value: Number(v),
+          note: `whoop ${input.field} (initial link)`,
+        });
+        return { linked: true, field: input.field, seeded_with: Number(v), as_of: recent[0].date };
+      }
+      return { linked: true, field: input.field, seeded_with: null, note: 'No Whoop data yet — value will populate on next sync' };
+    }
+    case 'unlink_goal_data_source': {
+      if (!input?.goal_id) return { error: 'goal_id required' };
+      const rows = await sbUpdate('goals', `id=eq.${input.goal_id}&user_id=eq.${userId}`, {
+        data_source: 'manual', data_source_field: null,
+      });
+      return { unlinked: true, goal: rows?.[0] };
     }
     case 'set_task_status': {
       if (!input?.routine_task_id || !input?.status) return { error: 'routine_task_id and status required' };

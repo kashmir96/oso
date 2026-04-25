@@ -151,6 +151,10 @@ exports.handler = withGate(async (event, { user }) => {
   if (action === 'log_value') {
     const { goal_id, value, note } = body;
     if (!goal_id || value == null) return reply(400, { error: 'goal_id and value required' });
+    const g = (await sbSelect('goals', `id=eq.${goal_id}&user_id=eq.${user.id}&select=data_source,data_source_field,name&limit=1`))?.[0];
+    if (g && g.data_source && g.data_source !== 'manual') {
+      return reply(400, { error: `"${g.name}" is auto-synced from ${g.data_source}${g.data_source_field ? ` (${g.data_source_field})` : ''}. Unlink first.` });
+    }
     const log = await sbInsert('goal_logs', { goal_id, user_id: user.id, value, note: note || null });
     await sbUpdate('goals', `id=eq.${goal_id}&user_id=eq.${user.id}`, { current_value: value });
     return reply(200, { log });
