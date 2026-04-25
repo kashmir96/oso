@@ -281,6 +281,32 @@ Don't create vague goals — turn fuzzy intentions into something concrete. For 
       required: ['id'],
     },
   },
+  {
+    name: 'get_calendar_events',
+    description: "Fetch upcoming calendar events from Curtis's connected Google Calendar. Use when he asks about his schedule, what's coming up, when he's free, or when planning tomorrow.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        from: { type: 'string', description: 'ISO timestamp (default: now)' },
+        to: { type: 'string', description: 'ISO timestamp (default: end of NZ day + 36h buffer)' },
+      },
+    },
+  },
+  {
+    name: 'get_whoop_today',
+    description: "Fetch yesterday's Whoop metrics (recovery score 0-100, HRV, resting HR, strain, sleep performance, sleep hours, sleep efficiency). Use when discussing physical state, recovery, sleep, or training readiness.",
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'get_whoop_recent',
+    description: "Fetch recent Whoop metrics for trend analysis. Use to spot patterns in recovery / sleep / strain.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        days: { type: 'integer', minimum: 1, maximum: 90, description: 'default 14' },
+      },
+    },
+  },
 ];
 
 // ── Helpers ──
@@ -563,6 +589,60 @@ async function execute(name, input, ctx) {
       if (!input?.id) return { error: 'id required' };
       await sbUpdate('ckf_memory_facts', `id=eq.${input.id}&user_id=eq.${userId}`, { archived: true });
       return { archived: true };
+    }
+
+    case 'get_calendar_events': {
+      const { getValidIntegration } = require('./ckf-oauth.js');
+      const integration = await getValidIntegration(userId, 'google_calendar');
+      if (!integration) return { not_connected: true, message: 'Google Calendar not connected' };
+      const now = new Date();
+      const from = input?.from || now.toISOString();
+      const to = input?.to || new Date(now.getTime() + 36 * 3600e3).toISOString();
+      const url = new URL('https://www.googleapis.com/calendar/v3/calendars/primary/events');
+      url.searchParams.set('timeMin', from);
+      url.searchParams.set('timeMax', to);
+      url.searchParams.set('singleEvents', 'true');
+      url.searchParams.set('orderBy', 'startTime');
+      url.searchParams.set('maxResults', '25');
+      const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${integration.access_token}` } });
+      if (!res.ok) return { error: `Google Calendar ${res.status}` };
+      const j = await res.json();
+      const events = (j.items || [])
+        .filter((e) => e.status !== 'cancelled')
+        .map((e) => ({
+          summary: e.summary || '(no title)',
+          start: e.start?.dateTime || e.start?.date,
+          end: e.end?.dateTime || e.end?.date,
+          location: e.location || null,
+          all_day: !!e.start?.date && !e.start?.dateTime,
+        }));
+      return { events, from, to };
+    }
+
+    case 'get_whoop_today': {
+      const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland' });
+      const today = fmt.format(new Date());
+      const yesterday = new Date(today + 'T00:00:00Z');
+      yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+      const yStr = yesterday.toISOString().slice(0, 10);
+      const rows = await sbSelect(
+        'whoop_metrics',
+        `user_id=eq.${userId}&date=eq.${yStr}&select=*&limit=1`
+      );
+      if (!rows?.[0]) return { not_synced_yet: true, date: yStr };
+      const m = rows[0];
+      delete m.raw;
+      return { metrics: m };
+    }
+
+    case 'get_whoop_recent': {
+      const days = Math.min(Math.max(input?.days || 14, 1), 90);
+      const since = new Date(Date.now() - days * 86400e3).toISOString().slice(0, 10);
+      const rows = await sbSelect(
+        'whoop_metrics',
+        `user_id=eq.${userId}&date=gte.${since}&order=date.desc&limit=${days}&select=date,recovery_score,hrv_rmssd_ms,resting_heart_rate,strain,sleep_performance,sleep_hours,sleep_efficiency`
+      );
+      return { days, metrics: rows };
     }
 
     default:

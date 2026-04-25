@@ -65,6 +65,10 @@
 [functions."ckf-diary-reminder"]
   schedule = "0 8,9 * * *"
 
+# CKF Whoop sync — pulls yesterday's recovery/sleep/strain. 19:00 UTC = 07/08 NZ.
+[functions."ckf-whoop-sync"]
+  schedule = "0 19 * * *"
+
 # ── CKF SPA: any /ckf/* request that isn't a real file falls back to /ckf/index.html ──
 [[redirects]]
   from = "/ckf/*"

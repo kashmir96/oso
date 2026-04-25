@@ -22,15 +22,15 @@ export default function Today() {
 
   async function load() {
     try {
-      const [todayRoutine, business, lastDiary] = await Promise.all([
+      const [todayRoutine, business, lastDiary, cal] = await Promise.all([
         call('ckf-tasks', { action: 'today', date }),
         call('ckf-business', { action: 'list' }),
         call('ckf-diary', { action: 'recent', limit: 1 }),
+        // Calendar is best-effort. If not connected or function errors, keep going.
+        call('ckf-calendar', { action: 'list_today' }).catch(() => ({ events: [] })),
       ]);
       setToday(todayRoutine.tasks);
 
-      // Build "Later" list: business tasks with due_date today/upcoming,
-      // and tomorrow_*_tasks from yesterday's/today's diary if present.
       const businessUpcoming = (business.tasks || [])
         .filter((t) => !['done','cancelled'].includes(t.status))
         .filter((t) => t.due_date && t.due_date >= date);
@@ -44,7 +44,7 @@ export default function Today() {
               category: 'personal',
               meta: 'planned for tomorrow',
               source: 'diary',
-              due_date: null,
+              when: null,
             }))),
             ...((recent.tomorrow_business_tasks || []).map((t, i) => ({
               id: `dbiz-${recent.id}-${i}`,
@@ -52,22 +52,36 @@ export default function Today() {
               category: 'business',
               meta: 'planned for tomorrow',
               source: 'diary',
-              due_date: null,
+              when: null,
             }))),
           ].filter((x) => x.title)
         : [];
 
       const businessItems = businessUpcoming.map((t) => ({
         id: `b-${t.id}`,
-        original: t,
         title: t.title,
         category: 'business',
         meta: `${t.due_date ? `due ${fmtShortDate(t.due_date)}` : ''}${t.assigned_to ? ` · ${t.assigned_to}` : ''}`,
         source: 'business',
-        due_date: t.due_date,
+        when: t.due_date ? `${t.due_date}T23:59:00` : null,
       }));
 
-      setLater([...businessItems, ...plannedTomorrow]);
+      const calendarItems = (cal?.events || []).map((e) => ({
+        id: `cal-${e.id}`,
+        title: e.summary,
+        category: 'calendar',
+        meta: e.all_day
+          ? 'all day'
+          : new Date(e.start).toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland', hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }),
+        source: 'calendar',
+        when: e.start,
+      }));
+
+      // Sort by `when` so calendar events flow chronologically alongside business deadlines.
+      const merged = [...calendarItems, ...businessItems, ...plannedTomorrow]
+        .sort((a, b) => (a.when || 'z').localeCompare(b.when || 'z'));
+
+      setLater(merged);
     } catch (e) { setErr(e.message); }
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [date]);
@@ -135,6 +149,7 @@ export default function Today() {
                   {it.category}{it.meta ? ` · ${it.meta}` : ''}
                   {it.source === 'business' && <span className="pill" style={{ marginLeft: 6 }}>business</span>}
                   {it.source === 'diary' && <span className="pill" style={{ marginLeft: 6 }}>diary</span>}
+                  {it.source === 'calendar' && <span className="pill" style={{ marginLeft: 6 }}>calendar</span>}
                 </div>
               </div>
             </div>
