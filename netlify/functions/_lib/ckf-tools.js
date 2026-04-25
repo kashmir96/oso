@@ -136,7 +136,7 @@ const TOOLS = [
   },
   {
     name: 'log_goal_value',
-    description: "Log a new value for an existing goal. Triggers an updated_at + history row for charting.",
+    description: "Log a new value for an existing goal. Updates current_value and writes a history row for charting. For counter-style goals (e.g. 'training sessions this month'), call get_goals first to read current_value, then log current+1.",
     input_schema: {
       type: 'object',
       properties: {
@@ -145,6 +145,49 @@ const TOOLS = [
         note: { type: 'string' },
       },
       required: ['goal_id', 'value'],
+    },
+  },
+  {
+    name: 'create_goal',
+    description: "Create a new goal Curtis wants to track. Use when he names something concrete he wants to chase: a body comp number, a revenue target, a consistency streak. Don't create vague goals — turn fuzzy intentions into measurable ones (ask him for a target if needed before calling).",
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        category: { type: 'string', enum: ['personal','health','business','social','finance','marketing','other'] },
+        current_value: { type: 'number', description: 'starting reading; defaults to start_value' },
+        start_value: { type: 'number' },
+        target_value: { type: 'number' },
+        unit: { type: 'string', description: 'e.g. kg, %, $, sessions' },
+        direction: { type: 'string', enum: ['higher_better','lower_better'], description: 'default higher_better' },
+      },
+      required: ['name', 'category'],
+    },
+  },
+  {
+    name: 'update_goal',
+    description: "Update fields on an existing goal — name, target, unit, direction, category. Use when Curtis re-frames a goal (raises target, narrows scope).",
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'UUID of the goal' },
+        name: { type: 'string' },
+        category: { type: 'string', enum: ['personal','health','business','social','finance','marketing','other'] },
+        target_value: { type: 'number' },
+        start_value: { type: 'number' },
+        unit: { type: 'string' },
+        direction: { type: 'string', enum: ['higher_better','lower_better'] },
+      },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'archive_goal',
+    description: "Archive a goal (status → archived). Use when Curtis says he's done with it or it's no longer relevant. Reversible from the UI.",
+    input_schema: {
+      type: 'object',
+      properties: { id: { type: 'string' } },
+      required: ['id'],
     },
   },
   {
@@ -346,7 +389,42 @@ async function execute(name, input, ctx) {
       if (!input?.goal_id || input?.value == null) return { error: 'goal_id and value required' };
       const log = await sbInsert('goal_logs', { goal_id: input.goal_id, user_id: userId, value: input.value, note: input.note || null });
       await sbUpdate('goals', `id=eq.${input.goal_id}&user_id=eq.${userId}`, { current_value: input.value });
-      return { logged: true, log_id: log?.id };
+      return { logged: true, log_id: log?.id, new_value: input.value };
+    }
+    case 'create_goal': {
+      if (!input?.name || !input?.category) return { error: 'name and category required' };
+      const start = input.start_value ?? input.current_value ?? null;
+      const goal = await sbInsert('goals', {
+        user_id: userId,
+        name: input.name,
+        category: input.category,
+        current_value: input.current_value ?? start,
+        start_value: start,
+        target_value: input.target_value ?? null,
+        unit: input.unit || null,
+        direction: input.direction || 'higher_better',
+      });
+      // Seed an initial history point if we have a value
+      if (input.current_value != null || start != null) {
+        const v = input.current_value ?? start;
+        await sbInsert('goal_logs', { goal_id: goal.id, user_id: userId, value: v, note: 'initial' });
+      }
+      return { created: true, goal };
+    }
+    case 'update_goal': {
+      if (!input?.id) return { error: 'id required' };
+      const patch = {};
+      for (const k of ['name','category','target_value','start_value','unit','direction']) {
+        if (input[k] !== undefined) patch[k] = input[k];
+      }
+      if (Object.keys(patch).length === 0) return { error: 'no fields to update' };
+      const rows = await sbUpdate('goals', `id=eq.${input.id}&user_id=eq.${userId}`, patch);
+      return { updated: true, goal: rows?.[0] };
+    }
+    case 'archive_goal': {
+      if (!input?.id) return { error: 'id required' };
+      const rows = await sbUpdate('goals', `id=eq.${input.id}&user_id=eq.${userId}`, { status: 'archived' });
+      return { archived: true, goal: rows?.[0] };
     }
     case 'set_task_status': {
       if (!input?.routine_task_id || !input?.status) return { error: 'routine_task_id and status required' };
