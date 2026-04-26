@@ -1,0 +1,101 @@
+[
+  {
+    "id": "eanz_gold",
+    "label": "Official Gold Supporter of the Eczema Association of New Zealand",
+    "details": "$70,000 committed to Kiwis with eczema. Their experts have screened our products for commonly flaring ingredients. Not a cure or endorsed fix — always patch test first.",
+    "applies_to": [
+      "all"
+    ]
+  },
+  {
+    "id": "press_seven_sharp",
+    "label": "As featured on Seven Sharp",
+    "applies_to": [
+      "all"
+    ]
+  },
+  {
+    "id": "press_stuff",
+    "label": "As featured on Stuff",
+    "applies_to": [
+      "all"
+    ]
+  },
+  {
+    "id": "press_the_press",
+    "label": "As featured on The Press",
+    "applies_to": [
+      "all"
+    ]
+  },
+  {
+    "id": "press_radio",
+    "label": "Featured on the Radio",
+    "applies_to": [
+      "all"
+    ]
+  },
+  {
+    "id": "radio_morefm",
+    "label": "Heard on More FM",
+    "applies_to": [
+      "shampoo-bar"
+    ]
+  },
+  {
+    "id": "radio_breeze",
+    "label": "Heard on The Breeze",
+    "applies_to": [
+      "shampoo-bar"
+    ]
+  },
+  {
+    "id": "radio_edge",
+    "label": "Heard on The Edge",
+    "applies_to": [
+      "shampoo-bar"
+    ]
+  },
+  {
+    "id": "made_in_chch",
+    "label": "Made in Christchurch, NZ",
+    "applies_to": [
+      "all"
+    ]
+  },
+  {
+    "id": "money_back",
+    "label": "Money back guarantee",
+    "applies_to": [
+      "all"
+    ]
+  },
+  {
+    "id": "free_shipping",
+    "label": "Free shipping on all orders $80+",
+    "applies_to": [
+      "all"
+    ]
+  },
+  {
+    "id": "customers_100k",
+    "label": "Used by 100,000+ kiwis",
+    "applies_to": [
+      "all"
+    ]
+  },
+  {
+    "id": "rating_47",
+    "label": "4.7★ average rating (PrimalCare)",
+    "applies_to": [
+      "all"
+    ]
+  },
+  {
+    "id": "billion_dollar_formulators",
+    "label": "Developed with the same cosmetic formulators trusted by billion-dollar skincare brands",
+    "applies_to": [
+      "reviana"
+    ]
+  }
+]

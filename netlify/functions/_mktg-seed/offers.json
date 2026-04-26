@@ -1,0 +1,97 @@
+[
+  {
+    "id": "evergreen",
+    "name": "Evergreen / no offer",
+    "mechanic": "No discount, brand-only",
+    "applies_to_campaigns": [
+      "all"
+    ]
+  },
+  {
+    "id": "20-off-launch",
+    "name": "20% off launch",
+    "mechanic": "Launch deal — 20% off single product",
+    "applies_to_campaigns": [
+      "reviana",
+      "tallow-balm"
+    ],
+    "example_copy": "20% Launch Deal! / Now on Sale! 20% off for a limited time!"
+  },
+  {
+    "id": "15-off",
+    "name": "15% off (single product)",
+    "mechanic": "Smaller cut, single SKU",
+    "applies_to_campaigns": [
+      "tallow-balm"
+    ]
+  },
+  {
+    "id": "bogo-3pack",
+    "name": "Buy 2, Get 1 Free",
+    "mechanic": "3-pack at 2× price (~$36.95 entry)",
+    "applies_to_campaigns": [
+      "tallow-balm"
+    ],
+    "notes": "Requires the 3-pack SKU."
+  },
+  {
+    "id": "bundle-save",
+    "name": "Bundle save",
+    "mechanic": "Multi-product bundle at discount",
+    "applies_to_campaigns": [
+      "all"
+    ],
+    "example_copy": "Golden Stack, Sensitive Skin Stack, Anti-Aging Bundle, Scalp Health Bundle"
+  },
+  {
+    "id": "free-shipping-80",
+    "name": "Free shipping $80+",
+    "mechanic": "Threshold",
+    "applies_to_campaigns": [
+      "all"
+    ],
+    "example_copy": "🚚 Free shipping on all orders $80+"
+  },
+  {
+    "id": "limited-edition-scarcity",
+    "name": "Limited edition scarcity",
+    "mechanic": "'Once they're gone, they're gone'",
+    "applies_to_campaigns": [
+      "tallow-balm"
+    ]
+  },
+  {
+    "id": "retail-pullout-narrative",
+    "name": "Retail pullout / 'going away'",
+    "mechanic": "Soft scarcity tied to founder story (NOW PAST TENSE)",
+    "applies_to_campaigns": [
+      "tallow-balm"
+    ],
+    "notes": "Pullout complete 2026-04-25. Use past tense only."
+  },
+  {
+    "id": "sold-out-social-proof",
+    "name": "Sold-out social proof",
+    "mechanic": "'First batch nearly sold out on launch'",
+    "applies_to_campaigns": [
+      "reviana"
+    ]
+  },
+  {
+    "id": "from-price-anchor",
+    "name": "From-price anchor",
+    "mechanic": "'From $17.95' / 'From $18.95' / 'From $19.95'",
+    "applies_to_campaigns": [
+      "all"
+    ]
+  },
+  {
+    "id": "mothers-day-bundle",
+    "name": "Mother's Day Bundle (seasonal)",
+    "mechanic": "Bundle save framed as Mother's Day gift",
+    "applies_to_campaigns": [
+      "all"
+    ],
+    "notes": "Mother's Day is 10 May 2026. Order-by date typically Wed 6 May."
+  }
+]

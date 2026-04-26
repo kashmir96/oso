@@ -1,0 +1,362 @@
+[
+  {
+    "id": "tallow-A-product-feature",
+    "campaign_id": "tallow-balm",
+    "type_label": "Type A",
+    "name": "Product feature + price + CTA",
+    "description": "Direct product introduction with price point and CTA. Short and clean.",
+    "status": "tested",
+    "example_body": "Unwhipped Tallow Balm! From $18.95. Now at PrimalPantry for kiwis who want a solid option to soothe their dry, itchy and irritated skin. The same tallow used by our popular whipped balms in a solid form! It's dense, nutrient rich and a little goes a long way. Grab a jar for yourself today at PrimalPantry.co.nz",
+    "pairs_with_visual_archetype_ids": [
+      "V1",
+      "V23"
+    ]
+  },
+  {
+    "id": "tallow-B-social-proof",
+    "campaign_id": "tallow-balm",
+    "type_label": "Type B",
+    "name": "Social proof + credentials",
+    "description": "Pure social proof primary text. Single paragraph, hits trust signals.",
+    "status": "tested",
+    "example_body": "Shop NZ's most popular range of affordable soothing tallow skincare, used by over 100,000+ kiwis. Official gold supporters of the Eczema association and featured on SevenSharp, Stuff, The Press and the Radio. Try it today at PrimalPantry.co.nz",
+    "pairs_with_visual_archetype_ids": [
+      "V1",
+      "V18",
+      "V23"
+    ]
+  },
+  {
+    "id": "tallow-D-emotional",
+    "campaign_id": "tallow-balm",
+    "type_label": "Type D-Emotional",
+    "name": "Founder voice / retail pullout (emotional)",
+    "description": "Original retail-pullout story. Founder grief and brand-loss arc.",
+    "status": "workhorse",
+    "structure": "Hook (overstock / sorry) → Brand-loss stakes → 'It's not their fault' → 'unheard of' decision → 'scary thing to do' → retail respect → founder sign-off",
+    "example_body": "Overstock sale! Pulling out of retail has left us with a few extra jars... Moving to retail almost sunk our business... ~ Curtis and the PrimalPantry team",
+    "pairs_with_visual_archetype_ids": [
+      "V2",
+      "V9",
+      "V10",
+      "V16",
+      "V17"
+    ],
+    "pairs_with_video_opener_ids": [
+      "VS4"
+    ],
+    "notes": "Workhorse — combined ~$22k spend across Overstock + We're sorry, $24-28 CPR. Now PAST TENSE since pullout complete."
+  },
+  {
+    "id": "tallow-D-analytical",
+    "campaign_id": "tallow-balm",
+    "type_label": "Type D-Analytical",
+    "name": "Founder voice / retail pullout (analytical)",
+    "description": "Cost-of-production reframe. Argues from ingredient lists and batch economics rather than grief.",
+    "status": "new",
+    "structure": "We tried to compete → ingredient-list comparison (water vs tallow) → batch-size economics → 'pretty unheard of' decision → CTA",
+    "example_body": "We tried to compete with the big skincare brands and retailers, and it almost sunk us. See, going into retail, they need your products to be comparable in price... For most of these companies, water is a key ingredient. But on the back of our tallow skincare, it's the same the whole way through.",
+    "pairs_with_visual_archetype_ids": [
+      "V16",
+      "V9"
+    ],
+    "notes": "From production-script #2. Use for informed shoppers + retargeting."
+  },
+  {
+    "id": "tallow-E-bundle",
+    "campaign_id": "tallow-balm",
+    "type_label": "Type E",
+    "name": "Bundle / deal-led short",
+    "description": "Short deal-led primary text. Always closes with free shipping line.",
+    "status": "efficient",
+    "example_body": "Buy 2 jars of face & body tallow and get 1 FREE. Natural, gentle, and effective skincare that soothes dry, irritated skin. 🚚 Free shipping on all orders $80+",
+    "pairs_with_visual_archetype_ids": [
+      "V5",
+      "V6",
+      "V19"
+    ]
+  },
+  {
+    "id": "tallow-F-limited-edition",
+    "campaign_id": "tallow-balm",
+    "type_label": "Type F",
+    "name": "Limited edition / scent launch",
+    "description": "New scent / limited edition launch. Emoji-led ingredient breakdowns + scarcity hook.",
+    "status": "top_revenue",
+    "structure": "New! [scent name] — tagline → emoji ingredient breakdown → trusted base → all natural / NZ made → once they're gone they're gone → CTA",
+    "example_body": "New! Two brand new limited edition Tallow Balms with Manuka Honey — once they're gone, they're gone. 🍫 Midnight Mousse — Chocolate orange antioxidants, deep in your skin...",
+    "pairs_with_visual_archetype_ids": [
+      "V3",
+      "V4"
+    ],
+    "notes": "Limited Edition Duo alone = #1 spender ($26.5k / 888 purchases)."
+  },
+  {
+    "id": "tallow-G-symptom-hook",
+    "campaign_id": "tallow-balm",
+    "type_label": "Type G",
+    "name": "Short symptom hook + social proof",
+    "description": "100-250 char primary text. 'Do you know someone…' opener with stacked trust signals.",
+    "status": "library_proven",
+    "example_body": "Do you know someone whose skincare stings? 90,000+ kiwis around the country are using our skincare to soothe dry itchy and irritated skin. Simple, gentle, effective. As seen on SevenSharp, Stuff, and The Press. Gold supporters of the Eczema Association. Grab a jar today from PrimalPantry.co.nz",
+    "pairs_with_visual_archetype_ids": [
+      "V1"
+    ],
+    "pairs_with_video_opener_ids": [
+      "VS1"
+    ]
+  },
+  {
+    "id": "tallow-H-stat-one-liner",
+    "campaign_id": "tallow-balm",
+    "type_label": "Type H",
+    "name": "Bestseller stat one-liner",
+    "description": "Single-line social proof. Very short. High trust.",
+    "status": "tested",
+    "example_body": "Kiwis buy a jar of this cream every 3 minutes. Soothing eczema, psoriasis and other dry skin conditions...",
+    "pairs_with_visual_archetype_ids": [
+      "V1",
+      "V23"
+    ]
+  },
+  {
+    "id": "tallow-I-anti-water",
+    "campaign_id": "tallow-balm",
+    "type_label": "Type I",
+    "name": "Anti-water / 'expensive jars' reframe (Eye Cream sub-archetype)",
+    "description": "Conversational kiwi-direct voice. 'Most anti-aging creams are just expensive jars of water and marketing.' Bullet-heavy long form.",
+    "status": "library_proven",
+    "example_body": "Now on Sale! 20% off for a limited time! Fine lines don't need filler. What your skin's missing isn't water—it's natural oils. Most anti-aging creams are just expensive jars of water and marketing. They sit on top of the skin, smell fancy, and do bugger all...",
+    "pairs_with_visual_archetype_ids": [
+      "V14",
+      "V26"
+    ]
+  },
+  {
+    "id": "tallow-J-customer-testimonial-series",
+    "campaign_id": "tallow-balm",
+    "type_label": "Type J",
+    "name": "Named-customer testimonial series",
+    "description": "Series format. Each ad is one named customer with the same series outro 'We asked our customers what they thought.'",
+    "status": "new",
+    "structure": "My name's [first name], I'm [age], and I suffer from [condition]. I've tried [list]. Then I found Primal Pantry [Product]. [Result 1]. [Result 2]. Thank you Primal Pantry. We asked our customers what they thought.",
+    "example_body": "My name's Jeff, I'm in my mid-50s, and I suffer from eczema on my hands. I've tried every cream I could think of and nothing seemed to work. Then I found Primal Pantry Tallow Cream...",
+    "pairs_with_visual_archetype_ids": [
+      "V9",
+      "V11"
+    ],
+    "pairs_with_video_opener_ids": [
+      "VS2"
+    ],
+    "notes": "Production-script #5. Production cadence: 1 new named customer per fortnight."
+  },
+  {
+    "id": "shampoo-A-simple-proof",
+    "campaign_id": "shampoo-bar",
+    "type_label": "Type A",
+    "name": "Simple proof + seasonal urgency",
+    "description": "~95-word awareness script. Social proof opener → mechanism → trust → seasonal urgency → CTA.",
+    "status": "tested",
+    "example_body": "Thousands of kiwis around the country are using our tallow shampoo bars every day to soothe their dry, red and itchy scalps...",
+    "pairs_with_visual_archetype_ids": [
+      "V11",
+      "V15"
+    ],
+    "pairs_with_video_opener_ids": [
+      "VS3"
+    ]
+  },
+  {
+    "id": "shampoo-B-ugc-testimonial",
+    "campaign_id": "shampoo-bar",
+    "type_label": "Type B",
+    "name": "UGC testimonial",
+    "description": "Customer-quote-led. The 'My husband had scalp problems' frame. Flagship.",
+    "status": "workhorse",
+    "structure": "Customer quote (specific, time-bounded, 'we tried other things first') → frame line ('This message landed in our inbox after someone switched to…') → price/CTA",
+    "example_body": "\"My husband had scalp problems for years. We tried different products… some made it worse. After 3 weeks using this soap, his scalp is totally clear.\" This message landed in our inbox after someone switched to our tallow shampoo bars. Try it for $17.95.",
+    "pairs_with_visual_archetype_ids": [
+      "V11",
+      "V15"
+    ],
+    "pairs_with_video_opener_ids": [
+      "VS2"
+    ],
+    "notes": "Top performer — $19.7k spend, 561 purchases, $35 CPR (video version)."
+  },
+  {
+    "id": "shampoo-launch-hard",
+    "campaign_id": "shampoo-bar",
+    "type_label": "Launch-Hard",
+    "name": "Scalp Health Bundle hard launch (deal-led)",
+    "description": "20% off Scalp Health Bundle launch. Trust bullets including radio stations.",
+    "status": "tested",
+    "example_body": "Two of our most requested products just launched. Order your bundle now to save 20% and be one of the first... ✅ Products used by 60,000+ kiwis this year 📻 Heard on More FM, The Breeze, and The Edge...",
+    "pairs_with_visual_archetype_ids": [
+      "V19"
+    ]
+  },
+  {
+    "id": "shampoo-launch-soft",
+    "campaign_id": "shampoo-bar",
+    "type_label": "Launch-Soft",
+    "name": "Scalp Health Bundle soft founder share",
+    "description": "Personal, family-anchored counterpart to the hard launch. No offer in body.",
+    "status": "new",
+    "example_body": "These are two products I've been most excited to share with you, and that's for a couple of reasons. One, we've been asked for them probably every week. And two, it's something that I know people personally in my family get a lot of value from...",
+    "pairs_with_visual_archetype_ids": [
+      "V9"
+    ],
+    "pairs_with_video_opener_ids": [
+      "VS4"
+    ],
+    "notes": "Production-script #3. Run alongside hard launch — soft warms, hard converts."
+  },
+  {
+    "id": "reviana-A-tallow-elevated",
+    "campaign_id": "reviana",
+    "type_label": "Type A",
+    "name": "Tallow Elevated / Cosmeceutical Reframe",
+    "description": "'Tallow wasn't enough on its own. So we took it further.' Flagship Reviana primary text.",
+    "status": "workhorse",
+    "example_body": "Tallow wasn't enough on its own. So we took it further. We partnered with New Zealand's top cosmetic formulators... Built on tallow. Elevated properly.",
+    "pairs_with_visual_archetype_ids": [
+      "V7",
+      "V20"
+    ]
+  },
+  {
+    "id": "reviana-B-pain-reframe",
+    "campaign_id": "reviana",
+    "type_label": "Type B",
+    "name": "Pain reframe (Fine Lines Fear)",
+    "description": "'Dark circles. Puffiness... The problem isn't effort. It's ingredients.' Symptom stack → reframe → product.",
+    "status": "library_proven",
+    "structure": "Symptom stack → 'you've tried…' → reframe (problem is ingredients, not effort) → mechanism → product → cosmeceutical credibility → social proof → CTA",
+    "example_body": "Dark circles. Puffiness. That tired look that won't quit. You've tried the creams. The serums. The eye patches. But most are loaded with synthetics your skin doesn't recognise — and they still don't work. The problem isn't effort. It's ingredients...",
+    "pairs_with_visual_archetype_ids": [
+      "V20",
+      "V24"
+    ]
+  },
+  {
+    "id": "reviana-C-feature-stack",
+    "campaign_id": "reviana",
+    "type_label": "Type C",
+    "name": "Product feature stack (sparkle bullets)",
+    "description": "Sparkle/arrow bullet feature stack per Reviana product. Pairs with V12, V23, V25.",
+    "status": "workhorse",
+    "structure": "[Symptom hook]? Don't let sensitive skin hold back your routine → Meet Reviana [Product Name] (by Primalpantry) → ✨ bullets → texture line → 'made by team behind Primalcare' → CTA",
+    "example_body": "Waking up to skin that feels tight, looks dull or flushes easily the moment you step outside? Don't let sensitive skin hold back your day. Meet Reviana Protecting Day Cream (by Primalpantry)... ✨ Ultra-purified Tallow + Squalane for bio-identical hydration...",
+    "pairs_with_visual_archetype_ids": [
+      "V12",
+      "V23",
+      "V25"
+    ],
+    "pairs_with_video_opener_ids": [
+      "VS5"
+    ]
+  },
+  {
+    "id": "reviana-D-we-improved-recipe",
+    "campaign_id": "reviana",
+    "type_label": "Type D",
+    "name": "We improved our recipe (sensory reassurance)",
+    "description": "Tackles 'tallow smells like beef' objection head-on. Top CPR ad in entire library.",
+    "status": "workhorse",
+    "example_body": "This tallow has no hint of beef, isn't lumpy, and you will be excited to put it on. Designed for sensitive skin on your face — It's silky smooth, refreshing and smells amazing...",
+    "pairs_with_visual_archetype_ids": [
+      "V7"
+    ],
+    "notes": "Top CPR in library: $23.20 (Reviana - Pic Night Cream)."
+  },
+  {
+    "id": "reviana-E-carousel-range-intro",
+    "campaign_id": "reviana",
+    "type_label": "Type E",
+    "name": "Carousel / range introduction",
+    "description": "Lower-spend awareness format. Range showcase.",
+    "status": "tested",
+    "example_body": "Don't let sensitive skin hold back your beauty routine. Meet Reviana. Natural NZ made beauty for kiwis with over-reactive skin. This premium range is more than skincare, it's skin perfection...",
+    "pairs_with_visual_archetype_ids": [
+      "V18"
+    ]
+  },
+  {
+    "id": "reviana-F-deal-led-short",
+    "campaign_id": "reviana",
+    "type_label": "Type F",
+    "name": "Deal-led short (EYE CREAM 20% OFF)",
+    "description": "Short deal-led primary text + product description + free shipping closer.",
+    "status": "tested",
+    "pairs_with_visual_archetype_ids": [
+      "V14"
+    ]
+  },
+  {
+    "id": "reviana-G-long-educational",
+    "campaign_id": "reviana",
+    "type_label": "Type G",
+    "name": "Long-educational + scientific reframe (Eye Cream signature)",
+    "description": "Counter-positioning hook → product reframe → mechanism explainer → tallow-as-skin-food → active stack → indented customer cucumber quote → sold-out social proof → bullet trust → CTA.",
+    "status": "library_proven",
+    "example_body": "Fine lines don't need filler. Brighten & tighten with a new class of eye cream like you've never seen before. What makes it so special? It replaces what's going missing, then takes it a step further with modern actives...",
+    "pairs_with_visual_archetype_ids": [
+      "V20"
+    ]
+  },
+  {
+    "id": "reviana-H-serum-long",
+    "campaign_id": "reviana",
+    "type_label": "Type H",
+    "name": "Tallow Serum long-form scientific (Smooth + Soothe)",
+    "description": "'Doesn't just sit on top — it gets in.' Active stack with WHY each was chosen. For Serum specifically.",
+    "status": "new",
+    "example_body": "Uneven skin, large pores, and dull complexion don't need more products. They need the right ones. The Reviana Tallow Serum doesn't just sit on top of your skin — it gets in...",
+    "pairs_with_visual_archetype_ids": [
+      "V22"
+    ]
+  },
+  {
+    "id": "reviana-I-day-cream-pain-reframe",
+    "campaign_id": "reviana",
+    "type_label": "Type I",
+    "name": "Day Cream pain reframe long-form",
+    "description": "Day Cream variant of pain reframe. Lipid-barrier mechanism. 'Lightweight. Fast absorbing. Barrier building.'",
+    "status": "new",
+    "pairs_with_visual_archetype_ids": [
+      "V25"
+    ]
+  },
+  {
+    "id": "reviana-J-comprehensive-long",
+    "campaign_id": "reviana",
+    "type_label": "Type J",
+    "name": "Comprehensive long-form (retargeting)",
+    "description": "Compound: VS5 + VS2 embedded + mechanism + benefits + reassurance. 250 words. Retargeting/consideration.",
+    "status": "new",
+    "example_body": "Starting to feel more dry, thin, and wrinkled? See what some people are saying about our Reviana night cream. This night cream is simply amazing...",
+    "pairs_with_visual_archetype_ids": [
+      "V7",
+      "V12"
+    ],
+    "pairs_with_video_opener_ids": [
+      "VS5",
+      "VS2"
+    ]
+  },
+  {
+    "id": "reviana-canonical-short-origin",
+    "campaign_id": "reviana",
+    "type_label": "Cornerstone",
+    "name": "Canonical short awareness opener",
+    "description": "75-word elevator pitch combining origin + Korean comparison. Use as the awareness-stage opener; longer copy expands from this trunk.",
+    "status": "new",
+    "example_body": "After selling our skincare to over 100,000 Kiwis in the last year, I stopped and thought to myself, what if our tallow skincare wasn't just good at soothing dry and itchy skin? What if we could use it as a gentle base for actual beauty products? Meet Reviana, a homegrown spin made with the same ingredients the fancy Korean skincare products use. Available now at primalpantry.co.nz.",
+    "pairs_with_visual_archetype_ids": [
+      "V7",
+      "V9"
+    ],
+    "notes": "Production-script #4."
+  }
+]

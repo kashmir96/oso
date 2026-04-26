@@ -1,0 +1,108 @@
+[
+  {
+    "id": "eczema",
+    "text": "Eczema",
+    "category": "condition",
+    "applies_to": [
+      "tallow-balm",
+      "shampoo-bar"
+    ]
+  },
+  {
+    "id": "psoriasis",
+    "text": "Psoriasis",
+    "category": "condition",
+    "applies_to": [
+      "tallow-balm",
+      "shampoo-bar"
+    ]
+  },
+  {
+    "id": "dry_flaky_skin",
+    "text": "Dry flaky skin",
+    "category": "condition",
+    "applies_to": [
+      "tallow-balm"
+    ]
+  },
+  {
+    "id": "dermatitis",
+    "text": "Dermatitis",
+    "category": "condition",
+    "applies_to": [
+      "tallow-balm"
+    ]
+  },
+  {
+    "id": "fine_lines",
+    "text": "Fine lines / appearance of aging",
+    "category": "condition",
+    "applies_to": [
+      "reviana"
+    ]
+  },
+  {
+    "id": "dark_circles",
+    "text": "Dark circles / under-eye concerns",
+    "category": "condition",
+    "applies_to": [
+      "reviana"
+    ]
+  },
+  {
+    "id": "uneven_tone",
+    "text": "Uneven tone / dullness",
+    "category": "condition",
+    "applies_to": [
+      "reviana"
+    ]
+  },
+  {
+    "id": "reactive_skin",
+    "text": "Reactive skin that flares to standard anti-aging products",
+    "category": "condition",
+    "applies_to": [
+      "reviana"
+    ]
+  },
+  {
+    "id": "itchy_scalp",
+    "text": "Dry, red, itchy scalp",
+    "category": "condition",
+    "applies_to": [
+      "shampoo-bar"
+    ]
+  },
+  {
+    "id": "dandruff",
+    "text": "Flakes / dandruff-like flaking",
+    "category": "condition",
+    "applies_to": [
+      "shampoo-bar"
+    ]
+  },
+  {
+    "id": "stings_dishes",
+    "text": "Stings doing dishes",
+    "category": "pain_point",
+    "applies_to": [
+      "tallow-balm"
+    ]
+  },
+  {
+    "id": "knuckles_crack",
+    "text": "Knuckles crack and bleed",
+    "category": "pain_point",
+    "applies_to": [
+      "tallow-balm"
+    ]
+  },
+  {
+    "id": "stings_peeling_vege",
+    "text": "Stings doing peeling vege (carrots, potatoes)",
+    "category": "pain_point",
+    "applies_to": [
+      "tallow-balm"
+    ]
+  }
+]

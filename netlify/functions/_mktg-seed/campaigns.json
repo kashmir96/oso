@@ -1,0 +1,29 @@
+[
+  {
+    "id": "tallow-balm",
+    "name": "Tallow Balm",
+    "slug": "tallow-balm",
+    "role_in_funnel": "primary acquisition + retention",
+    "description": "Whipped and unwhipped tallow face & body balms. The flagship PrimalCare line.",
+    "weekly_cadence": "1 awareness video + 1 sales video + 2 statics (legacy) | 6 ad slots (new concept-led template)",
+    "domain_default": "primalpantry.co.nz"
+  },
+  {
+    "id": "shampoo-bar",
+    "name": "Shampoo Bar / Scalp Health",
+    "slug": "shampoo-bar",
+    "role_in_funnel": "scalp-specific acquisition + cross-sell",
+    "description": "Tallow shampoo bars + the broader Scalp Health line (Liquid Shampoo + Conditioner bundle).",
+    "weekly_cadence": "6 ad slots (new concept-led template)",
+    "domain_default": "primalpantry.co.nz/scalp-health-bundle"
+  },
+  {
+    "id": "reviana",
+    "name": "Reviana",
+    "slug": "reviana",
+    "role_in_funnel": "upsell to PrimalCare customers + cold acquisition for reactive-skin anti-aging",
+    "description": "Premium tallow-based anti-aging line. Day Cream, Night Cream, Eye Cream, Serum. Tallow + cosmeceutical actives.",
+    "weekly_cadence": "6 ad slots (new concept-led template)",
+    "domain_default": "primalpantry.co.nz/reviana"
+  }
+]

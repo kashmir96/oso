@@ -1,0 +1,277 @@
+[
+  {
+    "id": "unwhipped-tallow-balm",
+    "campaign_id": "tallow-balm",
+    "name": "Unwhipped Tallow Balm",
+    "full_name": "Unwhipped Tallow Balm — Primalcare by Primalpantry",
+    "tagline": "Naturally Perfect Skin",
+    "description": "Solid tallow balm — dense, nutrient-rich, a little goes a long way.",
+    "price_from_nzd": 18.95,
+    "size": "60ml",
+    "format": "solid balm",
+    "status": "active",
+    "url_slug": "/unwhipped-tallow-balm",
+    "variants": [
+      {
+        "name": "Vanilla Rose"
+      },
+      {
+        "name": "Natural"
+      }
+    ],
+    "ingredients": [
+      {
+        "name": "Tallow",
+        "scientific_name": "grass-fed tallow",
+        "role": "base"
+      },
+      {
+        "name": "Jojoba Oil",
+        "scientific_name": "Simmondsia Chinensis Seed Oil",
+        "role": "absorption"
+      },
+      {
+        "name": "Rose Geranium Oil",
+        "scientific_name": "Pelargonium Graveolens",
+        "role": "scent (Vanilla Rose only)"
+      }
+    ]
+  },
+  {
+    "id": "whipped-tallow-balm",
+    "campaign_id": "tallow-balm",
+    "name": "Whipped Tallow Face & Body Balm",
+    "full_name": "Tallow Face & Body Balm",
+    "tagline": "Soothing tallow used by 100,000+ kiwis",
+    "price_from_nzd": 19.95,
+    "size": "120ml (also 250ml 'Really Big Jars')",
+    "format": "whipped balm",
+    "status": "active",
+    "variants": [
+      {
+        "name": "Vanilla Rose"
+      },
+      {
+        "name": "Natural"
+      },
+      {
+        "name": "Mango Mousse"
+      },
+      {
+        "name": "Sunrise Glow",
+        "description": "Ylang Ylang & Sea Buckthorn — limited edition"
+      },
+      {
+        "name": "Midnight Mousse",
+        "description": "Cacao & Blood Orange — limited edition"
+      },
+      {
+        "name": "Mango Vanilla",
+        "description": "NEW — launching week of 27 Apr 2026"
+      }
+    ]
+  },
+  {
+    "id": "tallow-shampoo-bar",
+    "campaign_id": "shampoo-bar",
+    "name": "Tallow Shampoo Bar",
+    "full_name": "Tallow Shampoo Bar — PrimalPantry",
+    "tagline": "Natural shampoo for scalp health",
+    "description": "Solid bar shampoo. Grass-fed tallow + olive + coconut + castor oils. Cleanses without stripping.",
+    "price_from_nzd": 17.95,
+    "size": "120g · 2-3 months supply",
+    "format": "bar",
+    "status": "active",
+    "url_slug": "/tallow-shampoo-bar",
+    "variants": [
+      {
+        "name": "Natural Unscented"
+      }
+    ],
+    "ingredients": [
+      {
+        "name": "Sodium Tallowate",
+        "role": "base"
+      },
+      {
+        "name": "Sodium Olivate",
+        "role": "olive oil cleanser"
+      },
+      {
+        "name": "Sodium Cocoate",
+        "role": "coconut oil cleanser"
+      },
+      {
+        "name": "Sodium Castorate",
+        "role": "castor oil cleanser"
+      },
+      {
+        "name": "Glycerin"
+      },
+      {
+        "name": "Sodium Chloride"
+      }
+    ]
+  },
+  {
+    "id": "scalp-health-bundle",
+    "campaign_id": "shampoo-bar",
+    "name": "Scalp Health Bundle",
+    "full_name": "Liquid Tallow Shampoo + Conditioner Bundle",
+    "description": "Two-pack: Liquid Tallow Shampoo + Liquid Tallow Conditioner pump bottles.",
+    "format": "liquid bundle",
+    "status": "active",
+    "url_slug": "/scalp-health-bundle"
+  },
+  {
+    "id": "tallow-conditioner",
+    "campaign_id": "shampoo-bar",
+    "name": "Tallow Conditioner",
+    "full_name": "Tallow Conditioner — Hair Repair",
+    "tagline": "Nature's answer to dull, damaged and frizzy hair",
+    "price_from_nzd": 34.95,
+    "size": "500ml",
+    "format": "liquid",
+    "status": "active"
+  },
+  {
+    "id": "reviana-day-cream",
+    "campaign_id": "reviana",
+    "name": "Reviana Day Cream",
+    "full_name": "Reviana Protecting Day Cream",
+    "tagline": "Barrier-building Tallow Day Cream",
+    "description": "Tallow-based moisturiser. Built to protect against weather, pollution, free radicals.",
+    "format": "cream",
+    "status": "active",
+    "url_slug": "/reviana-day-cream",
+    "ingredients": [
+      {
+        "name": "Ultra-purified Tallow",
+        "role": "base"
+      },
+      {
+        "name": "Squalane",
+        "role": "bio-identical hydration"
+      },
+      {
+        "name": "Niacinamide",
+        "role": "barrier + tone"
+      },
+      {
+        "name": "Tetrahexyldecyl Ascorbate",
+        "role": "oil-soluble Vitamin C — brightens without stinging"
+      },
+      {
+        "name": "Zinc Oxide",
+        "role": "calming mineral finish"
+      },
+      {
+        "name": "Kakadu Plum",
+        "role": "100x more Vitamin C than oranges"
+      }
+    ]
+  },
+  {
+    "id": "reviana-night-cream",
+    "campaign_id": "reviana",
+    "name": "Reviana Night Cream",
+    "full_name": "Reviana Repairing Night Cream",
+    "tagline": "Restorative Premium Tallow Night Cream",
+    "description": "Tallow-based night cream supporting deepest repair while you sleep.",
+    "format": "cream",
+    "status": "active",
+    "url_slug": "/reviana-night-cream",
+    "ingredients": [
+      {
+        "name": "Ultra-purified Tallow",
+        "role": "base"
+      },
+      {
+        "name": "Ceramides",
+        "scientific_name": "Ceramide NP",
+        "role": "barrier replenishment overnight"
+      },
+      {
+        "name": "Bakuchiol",
+        "role": "natural retinol alternative — cell renewal without irritation"
+      },
+      {
+        "name": "Vitamin C",
+        "role": "radiance + collagen boost"
+      },
+      {
+        "name": "Kakadu Plum",
+        "role": "Vitamin C source"
+      }
+    ]
+  },
+  {
+    "id": "reviana-eye-cream",
+    "campaign_id": "reviana",
+    "name": "Reviana Eye Cream",
+    "full_name": "Reviana Brightening Eye Cream",
+    "tagline": "Cosmetic Tallow Eye Cream",
+    "description": "Targets dark circles, puffiness, fine lines. Tallow base with cosmeceutical actives.",
+    "format": "cream",
+    "status": "active",
+    "url_slug": "/cosmetic-tallow-reviana",
+    "ingredients": [
+      {
+        "name": "Ultra-purified Tallow",
+        "role": "base — absorption + skin-identical hydration"
+      },
+      {
+        "name": "Caffeine",
+        "role": "puffiness"
+      },
+      {
+        "name": "Vitamin C",
+        "role": "dark circles"
+      },
+      {
+        "name": "Peptides",
+        "scientific_name": "Acetyl Hexapeptide-8",
+        "role": "crow's feet / expression lines"
+      },
+      {
+        "name": "Hyaluronic Acid",
+        "role": "moisture lock"
+      }
+    ]
+  },
+  {
+    "id": "reviana-serum",
+    "campaign_id": "reviana",
+    "name": "Reviana Tallow Serum",
+    "full_name": "Reviana Smooth + Soothe Tallow Serum",
+    "tagline": "Even tone. Naturally.",
+    "description": "Cooling serum that fades hyperpigmentation while it hydrates.",
+    "price_from_nzd": 47.95,
+    "format": "serum",
+    "status": "active",
+    "url_slug": "/reviana-serum",
+    "ingredients": [
+      {
+        "name": "Grass-fed Tallow",
+        "role": "base — carrier"
+      },
+      {
+        "name": "Hyaluronic Acid",
+        "role": "moisture lock"
+      },
+      {
+        "name": "Azelaic Acid",
+        "role": "fades dark spots, calms redness"
+      },
+      {
+        "name": "Niacinamide",
+        "role": "tightens pores, evens tone"
+      },
+      {
+        "name": "Cica",
+        "role": "soothe and repair"
+      }
+    ],
+    "notes": "Price normally $59.95, currently $47.95 (20% launch deal). First serum of its kind in NZ."
+  }
+]

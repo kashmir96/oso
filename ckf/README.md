@@ -32,6 +32,8 @@ The diary reminder does NOT use `ALERT_PHONE_NUMBERS`. CKF uses a code-level con
 
 1. **Apply schema:** open `oso/supabase-ckf-schema.sql` and paste it into the Supabase SQL editor. Creates 12 tables, RLS, triggers.
 2. **Apply chat schema:** open `oso/supabase-ckf-chat-schema.sql` and paste it. Adds `ckf_conversations`, `ckf_messages`, `ckf_memory_facts`.
+2a. **Apply marketing schema (optional, only needed before opening `/business/marketing`):** open `oso/supabase-mktg-schema.sql` and paste it. Adds the 18 `mktg_*` tables. Then visit `/ckf/business/marketing` and click **Seed playbook** to bulk-load the bundled JSON.
+2b. **Create the marketing storage bucket** for chat image uploads (paste / file-picker). In the Supabase dashboard → Storage → New bucket → name `mktg-uploads`, **private**, no file-size override (Netlify function caps at 8 MB). The function signs short-lived URLs server-side; nothing touches the bucket policies.
 2b. **Apply unfiltered column:** open `oso/supabase-ckf-unfiltered-column.sql` and paste it. Adds the `unfiltered TEXT` catch-all column to `diary_entries` (used by the closing chest-clearing question).
 3. **Set `APP_URL`** in Netlify env if not already set.
 4. **First sign-in** at `https://oso.nz/ckf` — log in with `cfairweather1996@gmail.com` and a chosen password (8+ chars). The user row auto-bootstraps. Any other email gets 403.
@@ -50,7 +52,18 @@ The diary reminder does NOT use `ALERT_PHONE_NUMBERS`. CKF uses a code-level con
 | `/ckf/chat/memory` | Long-term memory facts the AI has accumulated |
 | `/ckf/weekly` | Weekly summaries (generate / list) |
 | `/ckf/ninety-day-goals` | 90-day goals + AI breakdown |
-| `/ckf/business` | Business task list |
+| `/ckf/business` | Business task list — top of page links into Marketing |
+| `/ckf/business/marketing` | PrimalPantry marketing playbook (campaigns, concepts, ads, scripts, library). **Lazy-loaded** — chunk only fetched on first visit, so the diary stays fast. |
+| `/ckf/business/marketing/campaigns/:id` | Campaign drilldown |
+| `/ckf/business/marketing/concepts` / `/concepts/:id` | Concept browser + detail |
+| `/ckf/business/marketing/ads` / `/ads/:ad_id` | Ad browser + detail (sortable by spend / sales / CPR) |
+| `/ckf/business/marketing/scripts` / `/scripts/:id` | Production-script browser + detail |
+| `/ckf/business/marketing/library` | Reference tabs: copy/visual/video archetypes, offers, hooks, symptoms, trust signals, locked decisions, weekly batches |
+| `/ckf/business/marketing/chat` / `/chat/:id` | Marketing context chat — Haiku 4.5 + tool-use over the playbook + uploads. Full-screen. Composer has 🖼 (attach image to chat — vision), 📷 (capture-to-swipe-file with context prompt), and ＋ (text/link/screenshot description). |
+| `/ckf/business/marketing/memory` | Long-term marketing memory facts the AI has saved |
+| `/ckf/business/marketing/swipe` | Swipe file — every camera-captured inspiration, with caption + tags. Filterable by tag and campaign. |
+| `/ckf/business/marketing/drafts` | List of in-progress and shipped ad drafts |
+| `/ckf/business/marketing/wizard` / `/wizard/:id` | Meta Ads creator wizard — 7 steps (objective → campaign → format → concept → creative → copy → final). Generates concept recs, creative direction (video timeline + VO + B-roll, or visual brief + image prompts), and 2 primary-text variants. Final page is copy-paste-ready in Meta field order. |
 | `/ckf/settings` | Change password, sign out, approve/reject suggestions |
 
 ## Netlify Functions
@@ -69,6 +82,12 @@ The diary reminder does NOT use `ALERT_PHONE_NUMBERS`. CKF uses a code-level con
 | `ckf-business` | business_tasks CRUD |
 | `ckf-suggestions` | list / approve / reject pending routine suggestions |
 | `ckf-diary-reminder` | Scheduled. Sends daily SMS at 21:00 NZ if no entry exists. |
+| `mktg-data` | Read-only marketing entity queries (`list_*`, `get_*`, `summary`). |
+| `mktg-seed` | One-time bulk loader; reads bundled `_mktg-seed/*.json`. POST `{action:'seed', confirm:'YES'}`. |
+| `mktg-perf` | Pulls ad-level Meta insights for a date window and patches `mktg_ads.performance` by matched ad_id. Uses `FB_AD_ACCOUNT_ID` / `FB_ACCESS_TOKEN`. |
+| `mktg-chat` | Marketing chat (Haiku 4.5, prompt-cached system, tool-use loop). Tools defined in `_lib/mktg-tools.js` cover read/search across all playbook entities + write tools (`save_upload`, `tag_upload_to_entity`, `remember`, `archive_memory_fact`). |
+| `mktg-upload` | Client-side capture into `mktg_uploads`. Supports `kind` of text / link / screenshot / **image**. Image binaries land in the private `mktg-uploads` Supabase Storage bucket; the chat function expands stored `image_ref` blocks to Claude vision blocks per turn (base64 fetched on demand, never persisted). Action `signed_url` mints 5-minute display URLs. |
+| `mktg-ads` | Meta Ads creator wizard backend. Manages `mktg_drafts` rows (CRUD + archive) and runs Sonnet 4.6 generation: `generate_concepts` (3 recs from playbook + top ads), `generate_creative` (video timeline + VO + B-roll, or visual brief + image prompts), `generate_copy` (2 primary-text variants + headline + description + CTA + naming). `regenerate_step` accepts optional `feedback` for in-step refinements. |
 
 Shared helpers in `netlify/functions/_lib/` (Netlify ignores `_`-prefixed dirs):
 - `ckf-sb.js` — Supabase REST helpers

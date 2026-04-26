@@ -43,7 +43,12 @@ button.danger { color: var(--bad); border-color: rgba(217,106,106,.4); }
 button:disabled { opacity: .5; cursor: not-allowed; }
 
 input, textarea, select {
-  font: inherit;
+  font-family: inherit;
+  font-weight: inherit;
+  /* iOS Safari auto-zooms when an input's font-size is < 16px. Lock to 16px
+     globally so tapping any field on mobile never triggers the zoom-jump.
+     The viewport stays user-scalable for accessibility. */
+  font-size: 16px;
   background: var(--bg-elev-2);
   color: var(--text);
   border: 1px solid var(--border);
@@ -60,16 +65,16 @@ textarea { min-height: 110px; resize: vertical; }
 .app {
   max-width: 760px;
   margin: 0 auto;
-  padding: 20px 16px 96px;
+  padding: 14px 14px 96px;
 }
 .app-header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 0 18px;
+  padding: 6px 0 12px;
 }
 .app-header h1 {
-  font-size: 18px; font-weight: 600; margin: 0;
+  font-size: 17px; font-weight: 600; margin: 0;
 }
-.app-header .crumb { color: var(--text-dim); font-size: 13px; }
+.app-header .crumb { color: var(--text-dim); font-size: 12px; }
 
 /* ── Bottom nav ── */
 .nav-bottom {
@@ -93,69 +98,74 @@ textarea { min-height: 110px; resize: vertical; }
 .card {
   background: var(--bg-elev);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 14px 14px 12px;
+  border-radius: 10px;
+  padding: 10px 12px 10px;
 }
 
 .section-title {
-  font-size: 13px; text-transform: uppercase; letter-spacing: .08em;
-  color: var(--text-dim); margin: 22px 0 10px;
+  font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--text-dim); margin: 14px 0 6px;
 }
 
-/* ── Goal grid: ~3 per row on mobile ── */
+/* ── Goal grid: dense widget grid ── */
 .goal-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
 }
 @media (min-width: 540px) {
-  .goal-grid { grid-template-columns: repeat(4, 1fr); }
+  .goal-grid { grid-template-columns: repeat(5, 1fr); }
 }
 @media (min-width: 760px) {
-  .goal-grid { grid-template-columns: repeat(5, 1fr); }
+  .goal-grid { grid-template-columns: repeat(7, 1fr); }
 }
 
 .goal-card {
   background: var(--bg-elev);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 10px 10px 8px;
+  border-radius: 8px;
+  padding: 7px 8px 6px;
   cursor: pointer;
   transition: border-color .12s, transform .08s;
 }
 .goal-card:hover { border-color: var(--accent-dim); }
 .goal-card:active { transform: scale(.98); }
-.goal-card .name { font-size: 12px; color: var(--text-dim); margin-bottom: 4px; line-height: 1.2; }
-.goal-card .value { font-size: 18px; font-weight: 600; }
-.goal-card .target { font-size: 11px; color: var(--text-muted); }
+.goal-card .name {
+  font-size: 10px; color: var(--text-dim);
+  line-height: 1.15;
+  /* keep name to one line so cards stay uniform height */
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+.goal-card .value { font-size: 14px; font-weight: 600; line-height: 1.1; }
+.goal-card .target { font-size: 10px; color: var(--text-muted); margin-top: 1px; }
 .goal-card .bar {
-  height: 4px; background: var(--bg-elev-2); border-radius: 2px; margin-top: 6px; overflow: hidden;
+  height: 2px; background: var(--bg-elev-2); border-radius: 1px; margin-top: 5px; overflow: hidden;
 }
 .goal-card .bar-fill {
   height: 100%; background: var(--accent); transition: width .25s ease;
 }
-.goal-card .updated { font-size: 10px; color: var(--text-muted); margin-top: 4px; }
 
 /* ── Today list ── */
 .today-task {
-  display: flex; align-items: center; gap: 10px;
-  padding: 12px 0;
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 0;
   border-bottom: 1px solid var(--border);
 }
 .today-task:last-child { border-bottom: none; }
 .today-task .checkbox {
-  width: 22px; height: 22px; border-radius: 50%;
+  width: 18px; height: 18px; border-radius: 50%;
   border: 2px solid var(--border); flex-shrink: 0; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  font-size: 12px;
+  font-size: 10px;
 }
 .today-task .checkbox.done { background: var(--accent); border-color: var(--accent); color: #06130c; }
 .today-task .checkbox.skipped { background: var(--bg-elev-2); border-color: var(--text-muted); color: var(--text-muted); }
 .today-task .body { flex: 1; min-width: 0; }
-.today-task .title { font-weight: 500; }
+.today-task .title { font-weight: 500; font-size: 14px; line-height: 1.25; }
 .today-task.done .title { text-decoration: line-through; color: var(--text-muted); }
-.today-task .meta { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
-.today-task .skip { color: var(--text-muted); font-size: 12px; padding: 4px 8px; }
+.today-task .meta { font-size: 10px; color: var(--text-dim); margin-top: 1px; }
+.today-task .skip { color: var(--text-muted); font-size: 11px; padding: 4px 8px; }
 
 /* ── Forms ── */
 .field { margin-bottom: 14px; }
@@ -214,12 +224,13 @@ textarea { min-height: 110px; resize: vertical; }
 /* ── Suggestions ── */
 .suggestion {
   border: 1px dashed var(--border);
-  border-radius: var(--radius-sm); padding: 12px;
-  margin-bottom: 8px;
+  border-radius: 8px; padding: 8px 10px;
+  margin-bottom: 6px;
+  font-size: 13px;
 }
-.suggestion .why { font-size: 12px; color: var(--text-dim); margin: 4px 0 8px; }
-.suggestion .actions { display: flex; gap: 8px; }
-.suggestion .actions button { padding: 6px 12px; font-size: 12px; }
+.suggestion .why { font-size: 11px; color: var(--text-dim); margin: 3px 0 6px; }
+.suggestion .actions { display: flex; gap: 6px; }
+.suggestion .actions button { padding: 5px 10px; font-size: 12px; }
 
 /* ── Loading ── */
 .loading { color: var(--text-dim); padding: 20px 0; text-align: center; }
@@ -359,6 +370,188 @@ textarea { min-height: 110px; resize: vertical; }
   70%  { box-shadow: 0 0 0 12px rgba(217,106,106,0); }
   100% { box-shadow: 0 0 0 0 rgba(217,106,106,0); }
 }
+
+/* ── Floating action button (sits above bottom nav) ── */
+.fab {
+  position: fixed;
+  right: 16px;
+  /* clear the bottom nav (~58px iOS, taller with safe area). 80px gives room
+     even when main's nav grows or new bars stack on top. */
+  bottom: calc(80px + env(safe-area-inset-bottom));
+  z-index: 100;
+  padding: 12px 18px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: .01em;
+  box-shadow:
+    0 8px 24px rgba(0,0,0,.55),
+    0 2px 6px rgba(0,0,0,.3),
+    0 0 0 1px rgba(255,255,255,.06) inset;
+}
+.fab:active { transform: scale(.97); }
+.fab-pulse {
+  animation: fabPulse 2.4s ease-in-out infinite;
+}
+@keyframes fabPulse {
+  0%   { box-shadow: 0 8px 24px rgba(0,0,0,.55), 0 0 0 0 rgba(126,200,164,.50); }
+  60%  { box-shadow: 0 8px 24px rgba(0,0,0,.55), 0 0 0 14px rgba(126,200,164,0); }
+  100% { box-shadow: 0 8px 24px rgba(0,0,0,.55), 0 0 0 0 rgba(126,200,164,0); }
+}
+
+/* Second FAB — stacked above the Marketing one. Different colour so they
+   read as two distinct modes at a glance. */
+.fab-website {
+  bottom: calc(150px + env(safe-area-inset-bottom));
+  background: var(--bg-elev-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.fab-website:hover { background: var(--border); }
+
+/* ── Marketing module (lazy-loaded under /business/marketing) ── */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+@media (min-width: 540px) { .stat-grid { grid-template-columns: repeat(4, 1fr); } }
+.stat {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+.stat .label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .04em; }
+.stat .value { font-size: 20px; font-weight: 600; margin-top: 2px; }
+.stat .sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+.campaign-card {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  cursor: pointer;
+  transition: border-color .12s, transform .08s;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+.campaign-card:hover { border-color: var(--accent-dim); text-decoration: none; }
+.campaign-card .name { font-size: 16px; font-weight: 600; }
+.campaign-card .role { color: var(--text-dim); font-size: 12px; margin-top: 2px; }
+.campaign-card .stats {
+  display: flex; gap: 12px; flex-wrap: wrap;
+  margin-top: 10px; font-size: 12px; color: var(--text-dim);
+}
+.campaign-card .stats span strong { color: var(--text); font-weight: 600; }
+.campaign-card .stats .muted { color: var(--text-muted); }
+
+.row-list { display: flex; flex-direction: column; gap: 8px; }
+.row-item {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+.row-item:hover { border-color: var(--accent-dim); text-decoration: none; }
+.row-item .name { font-weight: 600; font-size: 14px; }
+.row-item .meta { color: var(--text-dim); font-size: 12px; margin-top: 4px; display: flex; gap: 12px; flex-wrap: wrap; }
+.row-item .meta strong { color: var(--text); font-weight: 600; }
+.row-item .body { color: var(--text-dim); font-size: 13px; margin-top: 8px; white-space: pre-wrap; }
+.row-item .body.clip {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.filterbar {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.filterbar select {
+  width: auto; min-width: 140px;
+  padding: 8px 10px;
+  /* font-size stays at the global 16px so iOS doesn't zoom on focus. */
+}
+.filterbar .spacer { flex: 1; }
+
+.detail-block { margin-top: 20px; }
+.detail-block h2 {
+  font-size: 12px; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--text-dim); margin: 0 0 8px;
+}
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: 8px 14px; }
+.kv dt { color: var(--text-dim); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; align-self: center; }
+.kv dd { margin: 0; font-size: 14px; word-break: break-word; }
+
+.script-body, .ad-body {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  white-space: pre-wrap;
+}
+.script-body { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; line-height: 1.55; }
+.ad-body { font-size: 14px; line-height: 1.5; }
+
+.setup-banner {
+  background: rgba(126,200,164,.06);
+  border: 1px solid rgba(126,200,164,.22);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 18px;
+}
+.setup-banner h3 { margin: 0 0 6px; font-size: 14px; }
+.setup-banner p { margin: 0 0 10px; color: var(--text-dim); font-size: 13px; }
+
+.dim   { color: var(--text-dim); }
+.muted { color: var(--text-muted); }
+
+/* Section title with right-side action (used inside marketing pages too) */
+.section-title { display: flex; align-items: center; justify-content: space-between; }
+
+/* ── Swipe-file grid ── */
+.swipe-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+@media (min-width: 540px) { .swipe-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 760px) { .swipe-grid { grid-template-columns: repeat(4, 1fr); } }
+.swipe-card {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.swipe-card-img {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  background: var(--bg-elev-2);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+}
+.swipe-card-img img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.swipe-card-caption { font-size: 12px; line-height: 1.4; color: var(--text); }
+.swipe-card-meta {
+  display: flex; flex-wrap: wrap; gap: 4px;
+}
+.swipe-card-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: auto;
+}
+
+/* ── End marketing ── */
 
 /* Drawer for conversation history */
 .drawer {

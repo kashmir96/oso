@@ -1,0 +1,251 @@
+[
+  {
+    "id": "V1",
+    "name": "Product hero on natural surface (clean / minimal)",
+    "description": "Stacked or single jars on wood slice / stone with eucalyptus, beige cream background. Bold black headline, side-stack price.",
+    "vibe": "clean, gift-shop, pretty",
+    "pairs_with_copy_archetype_ids": [
+      "tallow-D-emotional",
+      "tallow-E-bundle"
+    ]
+  },
+  {
+    "id": "V2",
+    "name": "Lid-off whipped texture macro",
+    "description": "Real photo of single jar with whipped texture visible at top. White text overlay. EANZ badge bottom-left. Garden backdrop.",
+    "vibe": "emotional, founder-voice, raw",
+    "pairs_with_copy_archetype_ids": [
+      "tallow-D-emotional"
+    ],
+    "notes": "Used in 'We're sorry' static — flagship combo with retail-pullout copy."
+  },
+  {
+    "id": "V3",
+    "name": "Limited edition split-scene composite",
+    "description": "Two jars side by side, background split between sunset and night-with-crescent-moon. Bold display headline.",
+    "vibe": "premium, designed, treat-yourself",
+    "pairs_with_copy_archetype_ids": [
+      "tallow-F-limited-edition"
+    ]
+  },
+  {
+    "id": "V4",
+    "name": "Tropical / lifestyle ingredient flatlay",
+    "description": "Tallow jar surrounded by ingredient props (mango, vanilla pods, etc.). Warm orange-yellow lighting.",
+    "vibe": "food-photography, sensory, fresh-launch",
+    "pairs_with_copy_archetype_ids": [
+      "tallow-F-limited-edition"
+    ]
+  },
+  {
+    "id": "V5",
+    "name": "Bullet-annotated product hero",
+    "description": "Three jars stacked, mint/cream background, lines pointing to feature callouts. Designed-feel.",
+    "vibe": "feature-led infographic",
+    "pairs_with_copy_archetype_ids": [
+      "tallow-E-bundle"
+    ],
+    "notes": "Buy 2 Jars V1 visual ships with 20,000+ Kiwis stat — outdated, needs update."
+  },
+  {
+    "id": "V6",
+    "name": "Clean product pedestal (deal variant)",
+    "description": "Three different scent jars on white pedestal with palm leaf and beige background.",
+    "vibe": "minimal premium, no number stat (sidesteps customer-count inconsistency)",
+    "pairs_with_copy_archetype_ids": [
+      "tallow-E-bundle"
+    ]
+  },
+  {
+    "id": "V7",
+    "name": "Premium dark hero (Reviana signature)",
+    "description": "Magazine-quality black-and-gold composition. Reviana jar on dark moody background, rays of light, reflection at base, gold lettering. Caption tagline overlay.",
+    "vibe": "cosmeceutical premium",
+    "pairs_with_copy_archetype_ids": [
+      "reviana-D-we-improved-recipe",
+      "reviana-A-tallow-elevated"
+    ],
+    "notes": "Top converter — $23.20 CPR."
+  },
+  {
+    "id": "V8",
+    "name": "Cinematic / heroic landscape",
+    "description": "Single tallow jar on mountain peak silhouette with city lights at sunset. Dramatic.",
+    "vibe": "epic, format-launch, heroic",
+    "pairs_with_copy_archetype_ids": [
+      "tallow-A-product-feature"
+    ]
+  },
+  {
+    "id": "V9",
+    "name": "Founder talking-head video thumbnail",
+    "description": "Curtis or staff outdoors, casual, holding/gesturing toward product. Play button overlay. Real environment.",
+    "vibe": "authentic, founder-led, human",
+    "pairs_with_copy_archetype_ids": [
+      "tallow-D-emotional",
+      "tallow-D-analytical",
+      "shampoo-launch-soft",
+      "reviana-canonical-short-origin"
+    ]
+  },
+  {
+    "id": "V10",
+    "name": "POV character + website composite",
+    "description": "Customer character photo overlaid on PrimalPantry website screenshot. 'POV: …' overlay caption. Lo-fi.",
+    "vibe": "meme-format, character-driven",
+    "pairs_with_copy_archetype_ids": [
+      "tallow-D-emotional"
+    ]
+  },
+  {
+    "id": "V11",
+    "name": "Social-proof screenshot collage",
+    "description": "Three Scalp Shampoo bars in front of leafy plants. 4 actual customer review messages stacked overhead.",
+    "vibe": "high-credibility, 'real people are saying'",
+    "pairs_with_copy_archetype_ids": [
+      "shampoo-B-ugc-testimonial"
+    ]
+  },
+  {
+    "id": "V12",
+    "name": "Hand-holding-product (garden/organic)",
+    "description": "Hand from frame holding the Reviana jar in front of greenery. Video play button overlay.",
+    "vibe": "organic, natural, demonstration",
+    "pairs_with_copy_archetype_ids": [
+      "reviana-C-feature-stack"
+    ]
+  },
+  {
+    "id": "V13",
+    "name": "UGC unboxing in fulfilment space",
+    "description": "Young person in actual warehouse/fulfilment area holding up a jar. Video format.",
+    "vibe": "authentic, behind-the-scenes",
+    "pairs_with_copy_archetype_ids": [
+      "tallow-A-product-feature"
+    ]
+  },
+  {
+    "id": "V14",
+    "name": "Inventory tile / abundance shot",
+    "description": "Tiled stacks of branded product boxes with one open jar in centre. Video format.",
+    "vibe": "scarcity-as-abundance",
+    "pairs_with_copy_archetype_ids": [
+      "tallow-I-anti-water"
+    ]
+  },
+  {
+    "id": "V15",
+    "name": "Problem-question text overlay on clean product",
+    "description": "Single product on textured beige surface. Bold headline overlay framing prospect's pain as a question.",
+    "vibe": "clean editorial, leads with the problem",
+    "pairs_with_copy_archetype_ids": [
+      "shampoo-B-ugc-testimonial"
+    ]
+  },
+  {
+    "id": "V16",
+    "name": "Comparison / villain split",
+    "description": "Side-by-side. Left: PrimalCare jar with '98% Tallow / 2% Oils' callouts. Right: 'Big Name moisturiser' tube with damning callouts.",
+    "vibe": "villain-frame, proof-of-difference",
+    "pairs_with_copy_archetype_ids": [
+      "tallow-D-emotional",
+      "tallow-D-analytical"
+    ]
+  },
+  {
+    "id": "V17",
+    "name": "Christchurch hometown landmark backdrop",
+    "description": "Tallow jar (lid off) on stone foreground with Christchurch Cathedral in soft-focus background. Snow/winter atmosphere.",
+    "vibe": "hometown, civic, NZ heritage",
+    "pairs_with_copy_archetype_ids": [
+      "tallow-D-emotional"
+    ]
+  },
+  {
+    "id": "V18",
+    "name": "Multi-product carousel (themed colour per scent)",
+    "description": "Carousel format — each card a different product on a colour-themed editorial background.",
+    "vibe": "range showcase, scent → mood",
+    "pairs_with_copy_archetype_ids": [
+      "tallow-B-social-proof",
+      "reviana-E-carousel-range-intro"
+    ]
+  },
+  {
+    "id": "V19",
+    "name": "Product launch poster (deal header)",
+    "description": "Twin pump bottles centre-stage, 'Product Launch Deal: 20% Off [Bundle]' red bold headline, 'New Product' starburst.",
+    "vibe": "launch-day, sale-poster",
+    "pairs_with_copy_archetype_ids": [
+      "shampoo-launch-hard"
+    ]
+  },
+  {
+    "id": "V20",
+    "name": "Premium dark hero with text-tagline overlay (Reviana Eye Cream signature)",
+    "description": "V7 family with bold serif tagline overlay above the jar. Eye Cream Brightening (gold/black) on grey gradient.",
+    "vibe": "cosmeceutical premium, taglined",
+    "pairs_with_copy_archetype_ids": [
+      "reviana-G-long-educational",
+      "reviana-B-pain-reframe"
+    ]
+  },
+  {
+    "id": "V21",
+    "name": "Picture-in-picture video (reaction format)",
+    "description": "Two stacked frames — small inset top-right (creator/influencer reveal), larger main frame of person reacting.",
+    "vibe": "reaction / commentary, social-feed-native",
+    "pairs_with_copy_archetype_ids": []
+  },
+  {
+    "id": "V22",
+    "name": "Premium DTC e-commerce poster (Reviana Tallow Serum signature)",
+    "description": "REVIANA dropper bottle in dramatic forest-light scene. Full poster lock-up: header, display headline, subhead, icon trust pills, strikethrough price + CTA pill.",
+    "vibe": "high-spec DTC magazine-quality",
+    "pairs_with_copy_archetype_ids": [
+      "reviana-H-serum-long"
+    ]
+  },
+  {
+    "id": "V23",
+    "name": "Texture / usage demonstration (finger-in-jar) — RANGE WORKHORSE",
+    "description": "Finger reaching into open jar pulling product out. Used across the entire range. Most reused visual treatment in the library.",
+    "vibe": "tactile, sensory, simple, demonstrative",
+    "pairs_with_copy_archetype_ids": [
+      "tallow-A-product-feature",
+      "tallow-B-social-proof",
+      "reviana-C-feature-stack",
+      "reviana-G-long-educational"
+    ],
+    "notes": "Production note: shoot on a tonal background that matches the product's label colour."
+  },
+  {
+    "id": "V24",
+    "name": "Lifestyle beauty model (sunlit, daisies, palm)",
+    "description": "Lifestyle photo of woman holding Reviana jar to her eye, daisies in foreground, blurred palm leaves. Sun-kissed warm tones.",
+    "vibe": "aspirational, fresh, beauty-mag",
+    "pairs_with_copy_archetype_ids": [
+      "reviana-B-pain-reframe"
+    ],
+    "notes": "Tagline 'Fresh. De-puffed. Cucumber-cool.' lifted from customer quote in Type G."
+  },
+  {
+    "id": "V25",
+    "name": "Editorial testimonial collage",
+    "description": "Designed lifestyle composition titled 'What others are saying' with customer quote block, side icon list of benefits, product hero, tagline lock-up.",
+    "vibe": "editorial magazine, social-proof-led",
+    "pairs_with_copy_archetype_ids": [
+      "reviana-C-feature-stack",
+      "reviana-I-day-cream-pain-reframe"
+    ]
+  },
+  {
+    "id": "V26",
+    "name": "Duo product hero with finger-in-jar (cross-sell variant)",
+    "description": "Two jars side by side. Background jar (closed) sits behind a foreground jar (lid off) with V23 finger-in-jar treatment.",
+    "vibe": "cross-sell / range demonstration",
+    "pairs_with_copy_archetype_ids": [
+      "tallow-I-anti-water"
+    ]
+  }
+]

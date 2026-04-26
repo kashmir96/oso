@@ -63,28 +63,24 @@ export default function Dashboard() {
         <div className="empty">No routine tasks for today. <Link to="/today">Add one</Link>.</div>
       ) : (
         <div className="card">
-          {today.slice(0, 6).map((t) => (
+          {today.slice(0, 4).map((t) => (
             <div key={t.id} className={`today-task ${t.log?.status === 'done' ? 'done' : ''}`}>
               <div className={`checkbox ${t.log?.status || ''}`}>{t.log?.status === 'done' ? '✓' : ''}</div>
               <div className="body">
                 <div className="title">{t.title}</div>
-                <div className="meta">{t.category}{t.estimated_minutes ? ` · ${t.estimated_minutes}m` : ''}</div>
+                {(t.category || t.estimated_minutes) && (
+                  <div className="meta">{t.category}{t.estimated_minutes ? ` · ${t.estimated_minutes}m` : ''}</div>
+                )}
               </div>
             </div>
           ))}
-          <div style={{ textAlign: 'right', marginTop: 8 }}>
-            <Link to="/today" style={{ fontSize: 13 }}>Open routine →</Link>
-          </div>
+          {today.length > 4 && (
+            <div style={{ textAlign: 'right', marginTop: 6 }}>
+              <Link to="/today" style={{ fontSize: 12 }}>+{today.length - 4} more →</Link>
+            </div>
+          )}
         </div>
       )}
-
-      <div className="section-title">Tonight</div>
-      <div className="card">
-        <div style={{ marginBottom: 10 }}>Talk it through — therapist by default, hat switches by context.</div>
-        <Link to="/chat">
-          <button className="primary" style={{ width: '100%' }}>Open chat</button>
-        </Link>
-      </div>
 
       {pending.length > 0 && (
         <>

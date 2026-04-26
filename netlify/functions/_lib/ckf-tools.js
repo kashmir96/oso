@@ -218,7 +218,7 @@ const TOOLS = [
   },
   {
     name: 'create_business_task',
-    description: 'Create a new business task. Use when Curtis decides during the conversation that something needs to happen.',
+    description: "Default tool for capturing anything Curtis says he needs to do for the business. Take whatever he says and save it immediately — DO NOT ask follow-up questions. The title can just be his words verbatim. Description, objective, priority, due_date are optional — leave them blank if he didn't volunteer them. Use this UNLESS he uses the word \"project\" — then use create_business_project instead.",
     input_schema: {
       type: 'object',
       properties: {
@@ -228,6 +228,32 @@ const TOOLS = [
         assigned_to: { type: 'string' },
         priority: { type: 'integer', minimum: 1, maximum: 5 },
         due_date: { type: 'string', description: 'YYYY-MM-DD' },
+      },
+      required: ['title'],
+    },
+  },
+  {
+    name: 'create_business_project',
+    description: "Use this INSTEAD OF create_business_task whenever Curtis uses the word \"project\" in his message. A project is a multi-step bundle of work with progress toward a big outcome (it gets its own tasks underneath). Take what he says and create it immediately — no follow-up questions. Title can be his words verbatim. Target_date and description are optional.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        description: { type: 'string' },
+        target_date: { type: 'string', description: 'YYYY-MM-DD' },
+      },
+      required: ['title'],
+    },
+  },
+  {
+    name: 'queue_website_improvement',
+    description: "Use this INSTEAD OF the task/project tools when Curtis is queuing work for Claude Code (the dev assistant) to do when he's back at his PC. Triggers: he uses the words \"website\", \"claude code\", \"the app\", \"fix the\", \"add to the dashboard\", \"in the chat\", or otherwise describes a code change to the oso/ckf web app. Capture immediately, don't ask questions. Title can be his words verbatim. Description is optional but useful for capturing the why or any constraint he mentioned.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'short imperative — "fix dashboard layout on iOS"' },
+        description: { type: 'string', description: 'optional context, why, constraints' },
+        priority: { type: 'integer', minimum: 1, maximum: 5, description: 'default 3' },
       },
       required: ['title'],
     },
@@ -465,7 +491,60 @@ async function execute(name, input, ctx) {
         priority: input.priority ?? 3,
         due_date: input.due_date || null,
       });
-      return { created: true, id: row?.id };
+      return { created: true, id: row?.id, kind: 'task' };
+    }
+    case 'create_business_project': {
+      if (!input?.title) return { error: 'title required' };
+      // Try the projects table; if the column or table is missing (migration
+      // not applied yet), fall back to a regular business_task so nothing is lost.
+      try {
+        const row = await sbInsert('business_projects', {
+          user_id: userId,
+          title: input.title,
+          description: input.description || null,
+          target_date: input.target_date || null,
+        });
+        return { created: true, id: row?.id, kind: 'project' };
+      } catch (e) {
+        const fallback = await sbInsert('business_tasks', {
+          user_id: userId,
+          title: input.title,
+          description: input.description || null,
+        });
+        return {
+          created: true,
+          id: fallback?.id,
+          kind: 'task',
+          fallback_reason: 'business_projects table missing — saved as task instead. Apply supabase-business-projects.sql to enable projects.',
+        };
+      }
+    }
+    case 'queue_website_improvement': {
+      if (!input?.title) return { error: 'title required' };
+      try {
+        const row = await sbInsert('website_tasks', {
+          user_id: userId,
+          title: input.title,
+          description: input.description || null,
+          priority: input.priority ?? 3,
+          status: 'queued',
+        });
+        return { queued: true, id: row?.id, kind: 'website_task' };
+      } catch (e) {
+        // Fall back to business_tasks so nothing is lost if the migration isn't applied.
+        const fallback = await sbInsert('business_tasks', {
+          user_id: userId,
+          title: `[website] ${input.title}`,
+          description: input.description || null,
+          priority: input.priority ?? 3,
+        });
+        return {
+          queued: true,
+          id: fallback?.id,
+          kind: 'task',
+          fallback_reason: 'website_tasks table missing — saved as task instead. Apply supabase-website-tasks.sql to enable the queue.',
+        };
+      }
     }
     case 'remember': {
       if (!input?.fact) return { error: 'fact required' };

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import Header from '../components/Header.jsx';
 import { call } from '../lib/api.js';
 import { fmtRelative, fmtShortDate } from '../lib/format.js';
@@ -31,12 +31,16 @@ function voiceLabel(state) {
 export default function Chat() {
   const { id } = useParams();
   const nav = useNavigate();
+  const [searchParams] = useSearchParams();
+  // ?mode=website_capture from the Business page Website-mode FAB. The hint is
+  // passed through to ckf-chat on every send so the AI keeps capturing.
+  const urlMode = searchParams.get('mode');
   const [conversation, setConversation] = useState(null);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const [modeHint, setModeHint] = useState(null);
+  const [modeHint, setModeHint] = useState(urlMode || null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState([]);
   const scrollRef = useRef(null);

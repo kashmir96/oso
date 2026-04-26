@@ -1,0 +1,493 @@
+[
+  {
+    "id": "tallow-retail-pullout-founder",
+    "campaign_id": "tallow-balm",
+    "name": "Tallow-Retail-Pullout-Founder",
+    "copy_archetype_id": "tallow-D-emotional",
+    "visual_archetype_ids": [
+      "V2",
+      "V9",
+      "V10",
+      "V16",
+      "V17"
+    ],
+    "video_opener_ids": [
+      "VS4"
+    ],
+    "status": "workhorse",
+    "performance": {
+      "spend_nzd": 22000,
+      "results": 811,
+      "cpr_nzd": 27,
+      "notes": "Combined Overstock Sale + We're sorry"
+    },
+    "ad_name_examples": [
+      "Overstock Sale",
+      "We're sorry",
+      "Justin"
+    ]
+  },
+  {
+    "id": "tallow-limited-edition-scent",
+    "campaign_id": "tallow-balm",
+    "name": "Tallow-Limited-Edition-Scent",
+    "copy_archetype_id": "tallow-F-limited-edition",
+    "visual_archetype_ids": [
+      "V3",
+      "V4"
+    ],
+    "status": "top_revenue",
+    "performance": {
+      "spend_nzd": 26545,
+      "results": 888,
+      "cpr_nzd": 29.89,
+      "notes": "Limited Edition Duo alone — #1 spender"
+    },
+    "ad_name_examples": [
+      "Limited Edition Duo",
+      "Jaffa - Easter",
+      "Jaffa Jar - Static",
+      "New Scent",
+      "Duo Video"
+    ]
+  },
+  {
+    "id": "tallow-bogo-bundle",
+    "campaign_id": "tallow-balm",
+    "name": "Tallow-BOGO-Bundle",
+    "copy_archetype_id": "tallow-E-bundle",
+    "visual_archetype_ids": [
+      "V5",
+      "V6"
+    ],
+    "status": "efficient",
+    "performance": {
+      "spend_nzd": 10609,
+      "results": 429,
+      "cpr_nzd": 24.7,
+      "notes": "Buy 2 Get 1 Free Copy + V2 combined"
+    },
+    "ad_name_examples": [
+      "Buy 2 Jars, Get 1 Free - Static – Copy",
+      "Buy 2 Jars, Get 1 Free - Static – V2"
+    ]
+  },
+  {
+    "id": "tallow-format-launch",
+    "campaign_id": "tallow-balm",
+    "name": "Tallow-Format-Launch",
+    "copy_archetype_id": "tallow-A-product-feature",
+    "visual_archetype_ids": [
+      "V8",
+      "V13"
+    ],
+    "status": "tested",
+    "performance": {
+      "spend_nzd": 14615,
+      "results": 511,
+      "cpr_nzd": 28.6,
+      "notes": "Really Big Jars — original + Trixy + Video"
+    },
+    "ad_name_examples": [
+      "Really big jars",
+      "Really big jars - Trixy cut video",
+      "Really big jars - Video"
+    ]
+  },
+  {
+    "id": "tallow-stadium-social-proof",
+    "campaign_id": "tallow-balm",
+    "name": "Tallow-Stadium-Social-Proof",
+    "copy_archetype_id": "tallow-G-symptom-hook",
+    "visual_archetype_ids": [
+      "V1",
+      "V18"
+    ],
+    "video_opener_ids": [
+      "VS3"
+    ],
+    "status": "tested",
+    "ad_name_examples": [
+      "Slides - Range Finger"
+    ]
+  },
+  {
+    "id": "tallow-symptom-hook",
+    "campaign_id": "tallow-balm",
+    "name": "Tallow-Symptom-Hook",
+    "copy_archetype_id": "tallow-G-symptom-hook",
+    "visual_archetype_ids": [
+      "V1"
+    ],
+    "video_opener_ids": [
+      "VS1"
+    ],
+    "status": "tested",
+    "ad_name_examples": [
+      "That's not normal",
+      "Before and after",
+      "Baby butter"
+    ]
+  },
+  {
+    "id": "tallow-stat-one-liner",
+    "campaign_id": "tallow-balm",
+    "name": "Tallow-Stat-One-Liner",
+    "copy_archetype_id": "tallow-H-stat-one-liner",
+    "visual_archetype_ids": [],
+    "status": "tested",
+    "ad_name_examples": [
+      "2get1main"
+    ]
+  },
+  {
+    "id": "tallow-korean-comparison",
+    "campaign_id": "tallow-balm",
+    "name": "Tallow-Korean-Comparison",
+    "copy_archetype_id": "reviana-A-tallow-elevated",
+    "visual_archetype_ids": [
+      "V21"
+    ],
+    "status": "efficient",
+    "performance": {
+      "spend_nzd": 576,
+      "results": 23,
+      "cpr_nzd": 25.04,
+      "notes": "Room to scale"
+    },
+    "ad_name_examples": [
+      "This korean skincare"
+    ]
+  },
+  {
+    "id": "tallow-anti-water-reframe",
+    "campaign_id": "tallow-balm",
+    "name": "Tallow-Anti-Water-Reframe",
+    "copy_archetype_id": "tallow-I-anti-water",
+    "visual_archetype_ids": [
+      "V14",
+      "V26"
+    ],
+    "status": "workhorse",
+    "performance": {
+      "spend_nzd": 4060,
+      "results": 159,
+      "cpr_nzd": 25.53
+    },
+    "ad_name_examples": [
+      "EYE CREAM - 20% OFF - Zoom"
+    ]
+  },
+  {
+    "id": "tallow-range-carousel",
+    "campaign_id": "tallow-balm",
+    "name": "Tallow-Range-Carousel",
+    "copy_archetype_id": "tallow-B-social-proof",
+    "visual_archetype_ids": [
+      "V18",
+      "V23"
+    ],
+    "status": "efficient",
+    "performance": {
+      "spend_nzd": 648,
+      "results": 39,
+      "cpr_nzd": 16.6,
+      "notes": "Highly efficient — 'Slides - Range Finger'"
+    },
+    "ad_name_examples": [
+      "Slides - Range Finger"
+    ]
+  },
+  {
+    "id": "tallow-customer-testimonial-series",
+    "campaign_id": "tallow-balm",
+    "name": "Tallow-Customer-Testimonial-Series",
+    "copy_archetype_id": "tallow-J-customer-testimonial-series",
+    "visual_archetype_ids": [
+      "V9"
+    ],
+    "video_opener_ids": [
+      "VS2"
+    ],
+    "status": "new",
+    "notes": "Production-script #5 (Jeff). Cadence: 1 named customer per fortnight."
+  },
+  {
+    "id": "tallow-permission-frame-port",
+    "campaign_id": "tallow-balm",
+    "name": "Tallow-Permission-Frame (PORT)",
+    "copy_archetype_id": "reviana-C-feature-stack",
+    "visual_archetype_ids": [
+      "V23"
+    ],
+    "video_opener_ids": [
+      "VS5"
+    ],
+    "status": "gap",
+    "notes": "Untested port — VS5 'Don't let sensitive skin hold back your day' for tallow audience."
+  },
+  {
+    "id": "shampoo-ugc-husband-scalp",
+    "campaign_id": "shampoo-bar",
+    "name": "Shampoo-UGC-Husband-Scalp",
+    "copy_archetype_id": "shampoo-B-ugc-testimonial",
+    "visual_archetype_ids": [
+      "V11",
+      "V15"
+    ],
+    "video_opener_ids": [
+      "VS2"
+    ],
+    "status": "workhorse",
+    "performance": {
+      "spend_nzd": 23125,
+      "results": 679,
+      "cpr_nzd": 34.0,
+      "notes": "Combined Video Shampoo Bars + Shampoo bar reviews static"
+    },
+    "ad_name_examples": [
+      "Video - Shampoo Bars",
+      "Video - Shampoo Bars 2",
+      "Shampoo bar reviews - static"
+    ]
+  },
+  {
+    "id": "scalp-health-bundle-launch-hard",
+    "campaign_id": "shampoo-bar",
+    "name": "Scalp-Health-Bundle-Launch-Hard",
+    "copy_archetype_id": "shampoo-launch-hard",
+    "visual_archetype_ids": [
+      "V19"
+    ],
+    "status": "new"
+  },
+  {
+    "id": "scalp-health-bundle-launch-soft",
+    "campaign_id": "shampoo-bar",
+    "name": "Scalp-Health-Bundle-Launch-Soft",
+    "copy_archetype_id": "shampoo-launch-soft",
+    "visual_archetype_ids": [
+      "V9"
+    ],
+    "video_opener_ids": [
+      "VS4"
+    ],
+    "status": "new",
+    "notes": "Production-script #3."
+  },
+  {
+    "id": "shampoo-sustainability-reframe",
+    "campaign_id": "shampoo-bar",
+    "name": "Shampoo-Sustainability-Reframe",
+    "copy_archetype_id": "shampoo-A-simple-proof",
+    "visual_archetype_ids": [
+      "V15"
+    ],
+    "status": "gap",
+    "notes": "Strong product page material, never tested in ads. 'Ditch the bottle' angle."
+  },
+  {
+    "id": "shampoo-sulphate-villain",
+    "campaign_id": "shampoo-bar",
+    "name": "Shampoo-Sulphate-Villain",
+    "copy_archetype_id": "shampoo-A-simple-proof",
+    "visual_archetype_ids": [],
+    "status": "gap",
+    "notes": "Anti-villain reframe ('That foamy lather comes at a cost'), never tested."
+  },
+  {
+    "id": "shampoo-customer-testimonial-series-port",
+    "campaign_id": "shampoo-bar",
+    "name": "Shampoo-Customer-Testimonial-Series (PORT)",
+    "copy_archetype_id": "tallow-J-customer-testimonial-series",
+    "visual_archetype_ids": [
+      "V9"
+    ],
+    "video_opener_ids": [
+      "VS2"
+    ],
+    "status": "gap",
+    "notes": "Port of Tallow Type J — named customer with dandruff/scalp story."
+  },
+  {
+    "id": "reviana-we-improved-recipe",
+    "campaign_id": "reviana",
+    "name": "Reviana-We-Improved-Recipe",
+    "copy_archetype_id": "reviana-D-we-improved-recipe",
+    "visual_archetype_ids": [
+      "V7"
+    ],
+    "status": "efficient",
+    "performance": {
+      "spend_nzd": 7817,
+      "results": 275,
+      "cpr_nzd": 28.4,
+      "notes": "Pic Night Cream best-CPR ad in entire library at $23.20"
+    },
+    "ad_name_examples": [
+      "Reviana - Pic Night Cream",
+      "Reviana - Pic Night Cream - Vid"
+    ]
+  },
+  {
+    "id": "reviana-tallow-elevated",
+    "campaign_id": "reviana",
+    "name": "Reviana-Tallow-Elevated",
+    "copy_archetype_id": "reviana-A-tallow-elevated",
+    "visual_archetype_ids": [
+      "V7",
+      "V9"
+    ],
+    "status": "tested",
+    "performance": {
+      "spend_nzd": 4760,
+      "results": 137,
+      "cpr_nzd": 34.7
+    },
+    "ad_name_examples": [
+      "Reviana - video",
+      "Reviana - video - trixy vid",
+      "NOT: Reviana Intro - Copy"
+    ]
+  },
+  {
+    "id": "reviana-pain-reframe-eye",
+    "campaign_id": "reviana",
+    "name": "Reviana-Pain-Reframe-Eye",
+    "copy_archetype_id": "reviana-B-pain-reframe",
+    "visual_archetype_ids": [
+      "V20",
+      "V24"
+    ],
+    "status": "library_proven",
+    "performance": {
+      "spend_nzd": 889,
+      "results": 27,
+      "cpr_nzd": 32.94
+    },
+    "ad_name_examples": [
+      "Fine lines Fear",
+      "Fine lines Fear - Day"
+    ]
+  },
+  {
+    "id": "reviana-cucumber-cool",
+    "campaign_id": "reviana",
+    "name": "Reviana-Cucumber-Cool",
+    "copy_archetype_id": "reviana-B-pain-reframe",
+    "visual_archetype_ids": [
+      "V24"
+    ],
+    "status": "new",
+    "notes": "Customer-quote-as-tagline: 'Fresh. De-puffed. Cucumber-cool.'"
+  },
+  {
+    "id": "reviana-feature-stack",
+    "campaign_id": "reviana",
+    "name": "Reviana-Feature-Stack",
+    "copy_archetype_id": "reviana-C-feature-stack",
+    "visual_archetype_ids": [
+      "V12",
+      "V23",
+      "V25"
+    ],
+    "video_opener_ids": [
+      "VS5"
+    ],
+    "status": "workhorse",
+    "performance": {
+      "spend_nzd": 4143,
+      "results": 153,
+      "cpr_nzd": 27.1
+    },
+    "ad_name_examples": [
+      "Reviana Day Cream",
+      "Reviana -2- Vid Night Cream - Primal",
+      "Reviana -2- Eye Cream - Texture"
+    ]
+  },
+  {
+    "id": "reviana-long-educational-eye",
+    "campaign_id": "reviana",
+    "name": "Reviana-Long-Educational-Eye",
+    "copy_archetype_id": "reviana-G-long-educational",
+    "visual_archetype_ids": [
+      "V20"
+    ],
+    "status": "new"
+  },
+  {
+    "id": "reviana-day-cream-pain-reframe",
+    "campaign_id": "reviana",
+    "name": "Reviana-Day-Cream-Pain-Reframe",
+    "copy_archetype_id": "reviana-I-day-cream-pain-reframe",
+    "visual_archetype_ids": [
+      "V25"
+    ],
+    "status": "new"
+  },
+  {
+    "id": "reviana-tallow-serum-launch",
+    "campaign_id": "reviana",
+    "name": "Reviana-Tallow-Serum-Launch",
+    "copy_archetype_id": "reviana-H-serum-long",
+    "visual_archetype_ids": [
+      "V22"
+    ],
+    "status": "new",
+    "notes": "Highest-design poster, Azelaic + Cica + Niacinamide stack. NEW product."
+  },
+  {
+    "id": "reviana-carousel-range-intro",
+    "campaign_id": "reviana",
+    "name": "Reviana-Carousel-Range-Intro",
+    "copy_archetype_id": "reviana-E-carousel-range-intro",
+    "visual_archetype_ids": [
+      "V18"
+    ],
+    "status": "tested",
+    "ad_name_examples": [
+      "Reviana -1- Meet Reviana - Carousel"
+    ]
+  },
+  {
+    "id": "reviana-stat-led-port",
+    "campaign_id": "reviana",
+    "name": "Reviana-Stat-Led-Awareness (PORT VS3)",
+    "copy_archetype_id": "reviana-A-tallow-elevated",
+    "visual_archetype_ids": [
+      "V7"
+    ],
+    "video_opener_ids": [
+      "VS3"
+    ],
+    "status": "gap",
+    "notes": "High-leverage port — VS3 stat-led opener absent from Reviana ads."
+  },
+  {
+    "id": "reviana-customer-testimonial-series-port",
+    "campaign_id": "reviana",
+    "name": "Reviana-Customer-Testimonial-Series (PORT)",
+    "copy_archetype_id": "tallow-J-customer-testimonial-series",
+    "visual_archetype_ids": [
+      "V9"
+    ],
+    "video_opener_ids": [
+      "VS2"
+    ],
+    "status": "gap",
+    "notes": "Port of Jeff template into Reviana."
+  },
+  {
+    "id": "reviana-canonical-short-origin",
+    "campaign_id": "reviana",
+    "name": "Reviana-Canonical-Short-Origin",
+    "copy_archetype_id": "reviana-canonical-short-origin",
+    "visual_archetype_ids": [
+      "V7",
+      "V9"
+    ],
+    "status": "new",
+    "notes": "Production-script #4. Awareness-stage opener for the entire Reviana brand."
+  }
+]

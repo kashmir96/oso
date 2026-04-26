@@ -1,0 +1,38 @@
+{
+  "brand": {
+    "name": "PrimalPantry",
+    "umbrella": "PrimalCare",
+    "domain": "primalpantry.co.nz",
+    "country": "NZ",
+    "city": "Christchurch",
+    "founder": "Curtis"
+  },
+  "locked_decisions": [
+    {
+      "key": "customer_count",
+      "value": "100,000+ kiwis",
+      "resolved_date": "2026-04-25",
+      "notes": "Use across all new copy. Older ads at 20k/60k/85k/90k/95k are stale."
+    },
+    {
+      "key": "retail_status",
+      "value": "online_only",
+      "resolved_date": "2026-04-25",
+      "notes": "Pullout from 120 retailers complete. Rewrite retail-pullout copy in past tense; retire the 'about to go away' scarcity hook."
+    },
+    {
+      "key": "reviana_naming",
+      "value": "Reviana",
+      "resolved_date": "2026-04-25",
+      "notes": "Confirmed not Reviora. The reviora repo at Websites/reviora is alternate/old spelling."
+    },
+    {
+      "key": "reviana_framing",
+      "value": "tallow_plus_cosmeceutical_actives",
+      "resolved_date": "2026-04-25",
+      "notes": "Per ads-data: Reviana converts as 'tallow elevated with actives' — NOT as a separate anti-aging brand."
+    }
+  ],
+  "exported_at": "2026-04-25",
+  "source_session_id": "fbc6ac77-083d-49b5-8d6e-3fef9fd2d7e5"
+}

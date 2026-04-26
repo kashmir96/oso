@@ -1,4 +1,5 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth, AuthProvider } from './lib/auth.jsx';
 import Login from './pages/Login.jsx';
 import Dashboard from './pages/Dashboard.jsx';
@@ -10,17 +11,31 @@ import Memory from './pages/Memory.jsx';
 import Weekly from './pages/Weekly.jsx';
 import NinetyDayGoals from './pages/NinetyDayGoals.jsx';
 import Business from './pages/Business.jsx';
+import ProjectDetail from './pages/ProjectDetail.jsx';
 import Settings from './pages/Settings.jsx';
 import BottomNav from './components/BottomNav.jsx';
 
+// Lazy chunk — the marketing playbook (campaigns, ads, concepts, scripts, etc.)
+// only loads when you actually open /business/marketing/*. Keeps the diary fast.
+const Marketing = lazy(() => import('./pages/marketing/Marketing.jsx'));
+
+// Routes that should render full-screen (no BottomNav). Anything matching these
+// patterns hides the nav even when wrapped without an explicit hideNav prop —
+// useful for nested routes inside lazy modules that can't pass props in.
+const FULLSCREEN_PATTERNS = [
+  /^\/business\/marketing\/chat(\/|$)/,
+];
+
 function Gated({ children, hideNav }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) return <div className="loading">Loading…</div>;
   if (!user) return <Navigate to="/login" replace />;
+  const fullscreen = hideNav || FULLSCREEN_PATTERNS.some((re) => re.test(location.pathname));
   return (
     <>
       {children}
-      {!hideNav && <BottomNav />}
+      {!fullscreen && <BottomNav />}
     </>
   );
 }
@@ -44,6 +59,17 @@ function Shell() {
       <Route path="/weekly" element={<Gated><Weekly /></Gated>} />
       <Route path="/ninety-day-goals" element={<Gated><NinetyDayGoals /></Gated>} />
       <Route path="/business" element={<Gated><Business /></Gated>} />
+      <Route path="/business/projects/:id" element={<Gated><ProjectDetail /></Gated>} />
+      <Route
+        path="/business/marketing/*"
+        element={
+          <Gated>
+            <Suspense fallback={<div className="app"><div className="loading">Loading marketing…</div></div>}>
+              <Marketing />
+            </Suspense>
+          </Gated>
+        }
+      />
       <Route path="/settings" element={<Gated><Settings /></Gated>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -1,0 +1,120 @@
+[
+  {
+    "id": "VS1",
+    "name": "Do you know someone…",
+    "description": "Empathy-led cold-acquisition opener. Speaker addresses viewer about a third party they know.",
+    "structure": "empathy hook → social proof (often stadium/numbers stat) → why it works (mechanism) → trust signal → seasonal urgency → soft CTA",
+    "examples_by_campaign": {
+      "tallow-balm": "Do you know someone with eczema, psoriasis or dry skin?",
+      "shampoo-bar": "Do you know someone whose scalp itches no matter what they try?",
+      "reviana": "Do you know someone whose skin overreacts to every anti-aging product they try?"
+    },
+    "best_for": [
+      "cold prospecting",
+      "broad audience targeting"
+    ],
+    "length_words_range": [
+      60,
+      120
+    ],
+    "best_formats": [
+      "founder talking-head video",
+      "vertical Reel"
+    ]
+  },
+  {
+    "id": "VS2",
+    "name": "Review prompt",
+    "description": "Customer-quote-led video. Real or staged message read aloud, screenshot-overlaid, or paraphrased over product b-roll.",
+    "structure": "customer quote (specific, time-bounded, 'we tried other things first') → frame line ('This message landed in our inbox after someone switched to…') → price/CTA",
+    "examples_by_campaign": {
+      "tallow-balm": "I'm Jeff, I'm in my mid-50s, and I suffer from eczema on my hands…",
+      "shampoo-bar": "My husband had scalp problems for years…",
+      "reviana": "I'm Sarah, in my 40s. Dark circles never went away — until Reviana."
+    },
+    "best_for": [
+      "trust-building",
+      "mid-funnel",
+      "retargeting"
+    ],
+    "length_words_range": [
+      30,
+      80
+    ],
+    "best_formats": [
+      "UGC vertical",
+      "customer-message overlay"
+    ]
+  },
+  {
+    "id": "VS3",
+    "name": "Thousands of kiwis…",
+    "description": "Stat-led / social-proof opener. Leads with a quantified social proof number rather than empathy.",
+    "structure": "stat hook → product reveal → why popular (mechanism) → trust → seasonal urgency → CTA",
+    "examples_by_campaign": {
+      "tallow-balm": "More kiwis are using Primalcare tallow than can fit in Christchurch's rugby stadium…",
+      "shampoo-bar": "Thousands of kiwis are using our tallow shampoo bars every day…",
+      "reviana": "Thousands of kiwis with sensitive skin are now using Reviana to do the anti-aging their skin used to fight off."
+    },
+    "best_for": [
+      "conversion-focused awareness",
+      "mid-funnel"
+    ],
+    "length_words_range": [
+      40,
+      120
+    ],
+    "best_formats": [
+      "founder talking-head",
+      "animated stat video"
+    ]
+  },
+  {
+    "id": "VS4",
+    "name": "This one [product]…",
+    "description": "Single-product hero videos. Demonstrate one SKU, build the case for the format/size/scent, close with CTA.",
+    "structure": "product reveal → format/scent/size justification → ingredient or feature stack → trust → CTA",
+    "examples_by_campaign": {
+      "tallow-balm": "Meet our new 250ml jars of Primalcare Tallow…",
+      "shampoo-bar": "These are two products I've been most excited to share with you…",
+      "reviana": "This one cream replaces your serum, moisturiser, and brightener — Reviana Day Cream."
+    },
+    "best_for": [
+      "product launches",
+      "scent/format introductions"
+    ],
+    "length_words_range": [
+      40,
+      80
+    ],
+    "best_formats": [
+      "product hero video",
+      "demo",
+      "UGC unbox"
+    ]
+  },
+  {
+    "id": "VS5",
+    "name": "Don't let sensitive skin hold back…",
+    "description": "Reviana-specific empathy opener that frames the prospect's hesitation as a problem the product solves.",
+    "structure": "empathy/permission hook → 'Meet Reviana [Product]' → feature bullets → texture sensory line → social proof anchor → CTA",
+    "examples_by_campaign": {
+      "tallow-balm": "Don't let dry, itchy skin hold back your day. (port — gap)",
+      "shampoo-bar": "Don't let a flaky scalp hold back your hair routine. (port — gap)",
+      "reviana": "Don't let sensitive skin hold back your anti-wrinkle routine."
+    },
+    "best_for": [
+      "warm audience upsell",
+      "Reviana product focus"
+    ],
+    "length_words_range": [
+      80,
+      150
+    ],
+    "best_formats": [
+      "lifestyle model",
+      "hand-holding-product",
+      "Reels"
+    ]
+  }
+]

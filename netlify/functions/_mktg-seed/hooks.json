@@ -1,0 +1,259 @@
+[
+  {
+    "id": "h-do-you-know-eczema",
+    "text": "Do you know someone with eczema, psoriasis or dry skin?",
+    "campaign_ids": [
+      "tallow-balm"
+    ],
+    "opener_style": "VS1",
+    "use": "opener"
+  },
+  {
+    "id": "h-do-you-know-rashy",
+    "text": "Do you know someone with red rashy skin?",
+    "campaign_ids": [
+      "tallow-balm"
+    ],
+    "opener_style": "VS1",
+    "use": "opener"
+  },
+  {
+    "id": "h-do-you-know-stings",
+    "text": "Do you know someone whose skincare stings?",
+    "campaign_ids": [
+      "tallow-balm"
+    ],
+    "opener_style": "VS1",
+    "use": "opener"
+  },
+  {
+    "id": "h-do-you-know-mum",
+    "text": "Do you know a mum who's tried everything?",
+    "campaign_ids": [
+      "tallow-balm"
+    ],
+    "opener_style": "VS1",
+    "use": "opener"
+  },
+  {
+    "id": "h-stadium",
+    "text": "More kiwis are using Primalcare tallow than can fit in Christchurch's rugby stadium for a game of footy.",
+    "campaign_ids": [
+      "tallow-balm"
+    ],
+    "opener_style": "VS3",
+    "use": "stat"
+  },
+  {
+    "id": "h-every-3-min",
+    "text": "Kiwis buy a jar of this cream every 3 minutes.",
+    "campaign_ids": [
+      "tallow-balm"
+    ],
+    "opener_style": "VS3",
+    "use": "stat"
+  },
+  {
+    "id": "h-overstock",
+    "text": "Overstock sale!",
+    "campaign_ids": [
+      "tallow-balm"
+    ],
+    "use": "opener"
+  },
+  {
+    "id": "h-moving-retail-sunk",
+    "text": "Moving to retail almost sunk our business.",
+    "campaign_ids": [
+      "tallow-balm"
+    ],
+    "use": "reframe"
+  },
+  {
+    "id": "h-not-just-moisturiser",
+    "text": "It's not just a moisturiser, it's a skin food.",
+    "campaign_ids": [
+      "tallow-balm"
+    ],
+    "use": "reframe"
+  },
+  {
+    "id": "h-no-need-water",
+    "text": "Fine lines don't need filler. What your skin's missing isn't water—it's natural oils.",
+    "campaign_ids": [
+      "tallow-balm"
+    ],
+    "use": "reframe"
+  },
+  {
+    "id": "h-jars-of-water",
+    "text": "Most anti-aging creams are just expensive jars of water and marketing.",
+    "campaign_ids": [
+      "tallow-balm"
+    ],
+    "use": "reframe"
+  },
+  {
+    "id": "h-bugger-all",
+    "text": "They sit on top of the skin, smell fancy, and do bugger all.",
+    "campaign_ids": [
+      "tallow-balm"
+    ],
+    "use": "reframe"
+  },
+  {
+    "id": "h-husband-scalp",
+    "text": "My husband had scalp problems for years. We tried different products… some made it worse. After 3 weeks using this soap, his scalp is totally clear.",
+    "campaign_ids": [
+      "shampoo-bar"
+    ],
+    "opener_style": "VS2",
+    "use": "social_proof"
+  },
+  {
+    "id": "h-still-scratching",
+    "text": "Still scratching your scalp?",
+    "campaign_ids": [
+      "shampoo-bar"
+    ],
+    "use": "opener"
+  },
+  {
+    "id": "h-thousands-shampoo",
+    "text": "Thousands of kiwis around the country are using our tallow shampoo bars every day.",
+    "campaign_ids": [
+      "shampoo-bar"
+    ],
+    "opener_style": "VS3",
+    "use": "stat"
+  },
+  {
+    "id": "h-ditch-bottles",
+    "text": "Ditch the plastic bottles and synthetic detergents.",
+    "campaign_ids": [
+      "shampoo-bar"
+    ],
+    "use": "reframe"
+  },
+  {
+    "id": "h-foamy-cost",
+    "text": "That foamy lather comes at a cost. It strips your hair's natural oils, leaving your scalp dry and your hair dull.",
+    "campaign_ids": [
+      "shampoo-bar"
+    ],
+    "use": "reframe"
+  },
+  {
+    "id": "h-fat-free",
+    "text": "It's so good you'll swear it's fat free.",
+    "campaign_ids": [
+      "shampoo-bar"
+    ],
+    "use": "tagline"
+  },
+  {
+    "id": "h-tallow-elevated",
+    "text": "Tallow wasn't enough on its own. So we took it further.",
+    "campaign_ids": [
+      "reviana"
+    ],
+    "use": "reframe"
+  },
+  {
+    "id": "h-built-on-tallow",
+    "text": "Built on tallow. Elevated properly.",
+    "campaign_ids": [
+      "reviana"
+    ],
+    "use": "reframe"
+  },
+  {
+    "id": "h-cosmeceutical-grade",
+    "text": "Cosmeceutical-grade. No extras you don't need.",
+    "campaign_ids": [
+      "reviana"
+    ],
+    "use": "reframe"
+  },
+  {
+    "id": "h-no-beef",
+    "text": "This tallow has no hint of beef, isn't lumpy, and you will be excited to put it on.",
+    "campaign_ids": [
+      "reviana"
+    ],
+    "use": "reframe"
+  },
+  {
+    "id": "h-dark-circles",
+    "text": "Dark circles. Puffiness. That tired look that won't quit.",
+    "campaign_ids": [
+      "reviana"
+    ],
+    "use": "opener"
+  },
+  {
+    "id": "h-problem-ingredients",
+    "text": "The problem isn't effort. It's ingredients.",
+    "campaign_ids": [
+      "reviana"
+    ],
+    "use": "reframe"
+  },
+  {
+    "id": "h-thinnest-skin",
+    "text": "Your under-eye skin is the thinnest on your body.",
+    "campaign_ids": [
+      "reviana"
+    ],
+    "use": "reframe"
+  },
+  {
+    "id": "h-cucumber-cool",
+    "text": "Fresh. De-puffed. Cucumber-cool.",
+    "campaign_ids": [
+      "reviana"
+    ],
+    "use": "tagline"
+  },
+  {
+    "id": "h-dont-let-sensitive",
+    "text": "Don't let sensitive skin hold back your beauty routine.",
+    "campaign_ids": [
+      "reviana"
+    ],
+    "opener_style": "VS5",
+    "use": "opener"
+  },
+  {
+    "id": "h-cta-try-today",
+    "text": "Try it today at PrimalPantry.co.nz",
+    "campaign_ids": [
+      "all"
+    ],
+    "use": "cta"
+  },
+  {
+    "id": "h-cta-grab-a-jar",
+    "text": "Grab a jar for yourself today at PrimalPantry.co.nz",
+    "campaign_ids": [
+      "all"
+    ],
+    "use": "cta"
+  },
+  {
+    "id": "h-cta-this-is-your-sign",
+    "text": "This is your sign.",
+    "campaign_ids": [
+      "all"
+    ],
+    "use": "cta"
+  },
+  {
+    "id": "h-cta-now-on-the-fence",
+    "text": "If you've been on the fence, now's the time to give it a try.",
+    "campaign_ids": [
+      "all"
+    ],
+    "use": "cta"
+  }
+]

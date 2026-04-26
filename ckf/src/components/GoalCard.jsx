@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { progressPct, formatGoalValue, fmtRelative } from '../lib/format.js';
+import { progressPct, formatGoalValue } from '../lib/format.js';
 
 export default function GoalCard({ goal }) {
   const pct = progressPct(goal);
@@ -9,7 +9,6 @@ export default function GoalCard({ goal }) {
       <div className="value">{formatGoalValue(goal.current_value, goal.unit)}</div>
       <div className="target">→ {formatGoalValue(goal.target_value, goal.unit)}</div>
       <div className="bar"><div className="bar-fill" style={{ width: `${Math.round(pct * 100)}%` }} /></div>
-      <div className="updated">{fmtRelative(goal.updated_at)}</div>
     </Link>
   );
 }
