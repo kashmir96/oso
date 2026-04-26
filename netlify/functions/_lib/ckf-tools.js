@@ -436,6 +436,29 @@ Don't create vague goals. For numeric, ask one question if target is missing.`,
     },
   },
   {
+    name: 'search_everything',
+    description: "Search across Curtis's whole CKF dataset (diary entries, memory facts, swipefile, goals, errands, meals, business tasks, prior chat messages). Use this whenever he asks to find / look up / search for something — 'what did I write about X', 'find that note about Y', 'pull up the diary where I mentioned Z'. Returns grouped hits per source.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        q:         { type: 'string', description: 'search query — case-insensitive substring match' },
+        limit_per: { type: 'integer', minimum: 1, maximum: 25, description: 'default 8, max 25 hits per source' },
+      },
+      required: ['q'],
+    },
+  },
+  {
+    name: 'get_recent_meals',
+    description: "Fetch Curtis's recent meals (with AI calorie/macro estimates). Use when he asks to 'show meals', 'what did I eat', 'pull up my meals', or wants a calorie summary. Default: last 7 days.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        days:  { type: 'integer', minimum: 1, maximum: 90, description: 'default 7' },
+        limit: { type: 'integer', minimum: 1, maximum: 100, description: 'default 30' },
+      },
+    },
+  },
+  {
     name: 'add_swipefile_note',
     description: "Save a note to Curtis's swipefile (his trusted-source knowledge base — books, frameworks, taglines, observations he wants the AI to reference later). ONLY call this in swipefile-capture mode (triggered by 'go into swipefile mode' / 'swipefile mode'). In capture mode, EVERY user message gets one call to this tool with the message verbatim as source_text — no triage, no filtering. Outside capture mode, only call when the user explicitly asks to save something to the swipefile.",
     input_schema: {
@@ -853,6 +876,58 @@ async function execute(name, input, ctx) {
           kind: 'task',
           fallback_reason: 'business_projects table missing — saved as task instead. Apply supabase-business-projects.sql to enable projects.',
         };
+      }
+    }
+    case 'search_everything': {
+      const q = (input?.q || '').trim();
+      if (!q) return { error: 'q required' };
+      const limit = Math.min(input?.limit_per || 8, 25);
+      const safe = encodeURIComponent(`*${q.replace(/[%*]/g, '')}*`);
+      const f = `user_id=eq.${userId}`;
+      const safe2 = (cols) => cols.split(',').map((c) => `${c}.ilike.${safe}`).join(',');
+      const [diary, memory, swipe, goals, errands, meals, biz, messages] = await Promise.all([
+        sbSelect('diary_entries',
+          `${f}&or=(${safe2('personal_good,personal_bad,eighty_twenty,growth_opportunities,bottlenecks,unfiltered,ai_summary')})&order=date.desc&limit=${limit}&select=date,ai_summary,personal_bad,bottlenecks,unfiltered`
+        ).catch(() => []),
+        sbSelect('ckf_memory_facts',
+          `${f}&archived=eq.false&fact.ilike.${safe}&order=importance.desc,created_at.desc&limit=${limit}&select=id,fact,topic,importance`
+        ).catch(() => []),
+        sbSelect('ckf_swipefile_items',
+          `${f}&archived=eq.false&or=(${safe2('title,source_text,why_it_matters,author')})&order=importance.desc,created_at.desc&limit=${limit}&select=id,kind,title,why_it_matters,author,source_url,category`
+        ).catch(() => []),
+        sbSelect('goals',
+          `${f}&name.ilike.${safe}&order=created_at.desc&limit=${limit}&select=id,name,category,goal_type,current_value,target_value,unit,status`
+        ).catch(() => []),
+        sbSelect('ckf_errands',
+          `${f}&or=(${safe2('title,description')})&order=status.asc,created_at.desc&limit=${limit}&select=id,title,description,status,due_date`
+        ).catch(() => []),
+        sbSelect('ckf_meals',
+          `${f}&or=(${safe2('ai_label,manual_label,notes')})&order=meal_date.desc&limit=${limit}&select=meal_date,ai_label,manual_label,ai_calories,manual_calories`
+        ).catch(() => []),
+        sbSelect('business_tasks',
+          `${f}&or=(${safe2('title,description,objective')})&order=created_at.desc&limit=${limit}&select=id,title,description,status,due_date,priority`
+        ).catch(() => []),
+        sbSelect('ckf_messages',
+          `${f}&content_text.ilike.${safe}&order=created_at.desc&limit=${limit}&select=id,conversation_id,role,content_text,created_at`
+        ).catch(() => []),
+      ]);
+      return {
+        q,
+        results: { diary, memory, swipefile: swipe, goals, errands, meals, business_tasks: biz, messages },
+      };
+    }
+    case 'get_recent_meals': {
+      const days = Math.min(input?.days || 7, 90);
+      const limit = Math.min(input?.limit || 30, 100);
+      const since = new Date(Date.now() - days * 86400e3).toISOString().slice(0, 10);
+      try {
+        const rows = await sbSelect(
+          'ckf_meals',
+          `user_id=eq.${userId}&meal_date=gte.${since}&order=meal_date.desc,created_at.desc&limit=${limit}&select=id,meal_date,ai_label,manual_label,ai_calories,manual_calories,notes,image_url`
+        );
+        return { days, meals: rows };
+      } catch (e) {
+        return { error: `meals query failed: ${e.message}` };
       }
     }
     case 'add_swipefile_note': {

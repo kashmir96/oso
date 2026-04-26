@@ -83,6 +83,12 @@
 [functions."ckf-streak-nudge"]
   schedule = "0 7,8 * * *"
 
+# CKF 90-day-goal review nudge — 09:00 NZ on the day a 90-day goal ends
+# (with a 7-day catch-up window). Sends SMS + auto-creates a business_task
+# so the review surfaces in the Today/Jobs strip on the morning view.
+[functions."ckf-ninety-day-nudge"]
+  schedule = "0 20,21 * * *"
+
 # ── CKF SPA: any /ckf/* request that isn't a real file falls back to /ckf/index.html ──
 [[redirects]]
   from = "/ckf/*"

@@ -15,6 +15,9 @@
 const { sbFetch, sbSelect } = require('./_lib/ckf-sb.js');
 const { withGate, reply } = require('./_lib/ckf-guard.js');
 
+// Exposed so mktg-data.js can lazy-auto-seed on first read without going
+// through the gated handler. See `runSeed` export at the bottom.
+
 // esbuild bundles these JSON files into the function output.
 const META               = require('./_mktg-seed/meta.json');
 const CAMPAIGNS          = require('./_mktg-seed/campaigns.json');
@@ -271,3 +274,17 @@ exports.handler = withGate(async (event) => {
     return reply(500, { error: e.message || 'Server error' });
   }
 });
+
+// Direct programmatic entry (no auth wrapper) for lazy auto-seed from
+// mktg-data.js. Caller is responsible for ensuring this only fires from a
+// trusted server-side path (it's not exposed via HTTP).
+exports.runSeed = async function runSeed(only) {
+  const keys = Array.isArray(only) && only.length > 0 ? only : ORDER;
+  const results = {};
+  for (const key of ORDER) {
+    if (!keys.includes(key)) continue;
+    try { results[key] = await SEEDERS[key](); }
+    catch (e) { results[key] = { error: e.message }; }
+  }
+  return results;
+};

@@ -37,14 +37,15 @@ export default function Settings() {
         <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Signed in</div>
         <div style={{ fontWeight: 600 }}>{user?.email}</div>
         <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
-          <Link to="/ninety-day-goals"><button>90-day goals</button></Link>
-          <Link to="/business"><button>Business</button></Link>
-          <Link to="/search"><button>🔍 Search</button></Link>
-          <Link to="/meals"><button>Meals</button></Link>
-          {/* Swipefile is now a chat mode ("go into swipefile mode") rather
-              than a separate page. The /swipefile route still exists for
-              browsing what's been captured, but it's no longer surfaced
-              as a quick link here. */}
+          {/* Quick-link row removed — every page reachable via the chat:
+              - Business    → bottom nav, no need for a Settings shortcut
+              - Meals       → ask chat "show my recent meals"
+              - Swipefile   → chat mode ("go into swipefile mode")
+              - Search      → ask chat "search for X" / "find what I wrote about X"
+              - 90-day goals→ ckf-ninety-day-nudge cron sends SMS + creates
+                              a business_task on the day so Curtis is
+                              prompted at the right time, not buried in Settings.
+              The pages still exist at their URLs for direct browsing. */}
           <button onClick={() => { logout(); nav('/login'); }} className="danger">Sign out</button>
         </div>
       </div>
@@ -61,7 +62,8 @@ export default function Settings() {
 
       <ChangePassword />
 
-      <MarketingPlaybookAdmin />
+      {/* Marketing playbook auto-seeds on first read in mktg-data.
+          No manual button needed — the data is just there. */}
 
       <div className="section-title">Pending suggestions</div>
       {!pending ? <div className="loading">Loading…</div> :
@@ -121,86 +123,10 @@ function SuggestionCard({ s, onApprove, onReject }) {
   );
 }
 
-// Lives in CKF Settings (not in the Marketing module) so the marketing chunk
-// stays small. Hits the same mktg-data + mktg-seed functions as the marketing
-// home banner; this surface is here for re-seeds and the rare diagnostic.
-function MarketingPlaybookAdmin() {
-  const [summary, setSummary] = useState(null);
-  const [err, setErr] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState('');
-
-  async function load() {
-    setErr('');
-    try {
-      const r = await call('mktg-data', { action: 'summary' });
-      setSummary(r);
-    } catch (e) {
-      setErr(e.message);
-    }
-  }
-  useEffect(() => { load(); }, []);
-
-  async function reseed() {
-    if (!confirm('Re-seed the marketing playbook from the bundled JSON? Idempotent — upserts by primary key, safe to re-run.')) return;
-    setBusy(true); setErr(''); setMsg('');
-    try {
-      const r = await call('mktg-seed', { action: 'seed', confirm: 'YES' });
-      const total = r?.status?.counts ? Object.values(r.status.counts).reduce((a, b) => a + b, 0) : 0;
-      setMsg(`Seeded. ${total} rows across the playbook.`);
-      load();
-    } catch (e) {
-      setErr(e.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const totalRows = summary?.counts ? Object.values(summary.counts).reduce((a, b) => a + b, 0) : 0;
-
-  return (
-    <div className="card" style={{ marginBottom: 12 }}>
-      <div className="section-title" style={{ margin: '0 0 8px' }}>Marketing playbook</div>
-      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>
-        Loads PrimalPantry's full playbook (86 ads, 30 concepts, 25 copy archetypes,
-        26 visual archetypes, 7 production scripts, hooks, offers, locked decisions)
-        from bundled JSON into your DB. Re-runs are safe — it upserts by id, no duplicates.
-      </div>
-
-      {err && <div className="error">{err}</div>}
-      {!summary && !err && <div className="loading" style={{ padding: '8px 0', textAlign: 'left' }}>Loading…</div>}
-
-      {summary && (
-        <>
-          <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 8 }}>
-            {totalRows === 0
-              ? '⚠ Nothing loaded yet. Hit "Load PrimalPantry playbook" below to populate.'
-              : `✓ ${totalRows} rows loaded across ${Object.keys(summary.counts).length} playbook tables.`}
-          </div>
-          {totalRows > 0 && (
-            <details style={{ marginBottom: 8 }}>
-              <summary className="dim" style={{ fontSize: 12, cursor: 'pointer' }}>Row counts per table</summary>
-              <ul style={{ margin: '6px 0 0 18px', padding: 0, fontSize: 12, color: 'var(--text-dim)' }}>
-                {Object.entries(summary.counts).sort().map(([k, v]) => (
-                  <li key={k}>{k.replace('mktg_', '')}: <strong style={{ color: 'var(--text)' }}>{v}</strong></li>
-                ))}
-              </ul>
-            </details>
-          )}
-        </>
-      )}
-
-      {msg && <div style={{ color: 'var(--good)', fontSize: 13, marginBottom: 8 }}>{msg}</div>}
-
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <button onClick={reseed} className="primary" disabled={busy}>
-          {busy ? 'Loading…' : (totalRows === 0 ? 'Load PrimalPantry playbook' : 'Re-import playbook (refresh)')}
-        </button>
-        <Link to="/business/marketing"><button>Open marketing →</button></Link>
-      </div>
-    </div>
-  );
-}
+// MarketingPlaybookAdmin removed — mktg-data now auto-seeds on first read.
+// The playbook (86 ads, 30 concepts, 25 copy archetypes, 26 visual
+// archetypes, 7 production scripts, hooks, offers, locked decisions) is
+// just there. No button required.
 
 function Backup() {
   const [busy, setBusy] = useState(false);

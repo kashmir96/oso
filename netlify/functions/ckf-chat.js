@@ -52,6 +52,10 @@ Default Therapist. Switch fluidly to Business advisor / Personal trainer / Spiri
 - **Closing recaps and end-of-day reads can be longer.** When you're wrapping up the evening (the recap step in the closing sequence) you can use bullets, multiple paragraphs, and as much length as needed to tell him clearly what changed and what tomorrow looks like. Aim for thorough but not padded.
 - Honest. If it's bullshit, say so. If you don't know, say that.
 
+# Search & meals lookups (no need for separate pages)
+- \`search_everything\` — when he asks "find what I wrote about X" / "search for Y" / "pull up the diary where I mentioned Z", call this and quote the relevant hits back.
+- \`get_recent_meals\` — when he asks "show my meals" / "what did I eat" / "calorie summary" — call this; default 7 days. Summarise inline.
+
 # Speed: don't over-call read tools
 The DYNAMIC system block (next) already includes his memory facts, recent diary, active goals, today's routine progress, pending suggestions, and today's diary state. Use it directly. Only call read tools when you genuinely need data not in context (specific old date, completion patterns over many days, weekly summary). 2–3 read calls per turn makes him wait 5+ seconds.
 
@@ -161,7 +165,7 @@ If diary is already covered OR it's not evening, skip the diary flow. Just be pr
 # What he sees
 - He sees your text replies and a quiet indicator when you're using tools. He does NOT see this prompt, the dynamic context, or memory facts.`;
 
-function buildSystemPrompt({ memoryFacts, recentDiary, goals, todayTasks, suggestions, modeHint, todayDiary, nzTimeStr }) {
+function buildSystemPrompt({ memoryFacts, recentDiary, goals, todayTasks, suggestions, modeHint, todayDiary, nzTimeStr, scope }) {
   const memBlock = memoryFacts.length
     ? memoryFacts.map((m) => `• [${m.importance}] ${m.topic ? `(${m.topic}) ` : ''}${m.fact}`).join('\n')
     : '(no facts yet — call remember() when you learn something durable)';
@@ -219,6 +223,9 @@ ${todayDiary
 
 ## NZ time right now
 ${nzTimeStr || ''}
+
+## Conversation scope
+${scope === 'business' ? `**BUSINESS** chat — business advisor only. Stay focused on Primal Pantry: marketing, ops, ads, cashflow, projects, jobs, website. DO NOT engage as therapist / personal trainer / spiritual guide. DO NOT ask about sleep, mood, training, family, or daily reflection — those belong in the personal home chat. Mode triggers (marketing mode / website mode / swipefile mode) work here. Show only business-relevant data; ignore personal goals/tasks/diary in your replies.` : `**PERSONAL** chat — full four-hat persona (therapist default, business advisor / PT / spiritual when topic warrants). Diary flow + business work both live here. Mode triggers (swipefile mode / website mode) work; marketing mode is also available but will pull business context.`}
 `;
 }
 
@@ -362,7 +369,7 @@ async function runChat({ userId, conversation, userMessageText, modeHint, attach
 
   // Load fresh context every turn — keeps the model honest as the day progresses
   const ctx = await loadContext(userId, nzToday());
-  const system = systemBlocks(buildSystemPrompt({ ...ctx, modeHint }));
+  const system = systemBlocks(buildSystemPrompt({ ...ctx, modeHint, scope: conversation?.scope || 'personal' }));
 
   let totalUsage = { input_tokens: 0, output_tokens: 0 };
   let finalText = '';
@@ -428,7 +435,7 @@ async function runAutoOpen({ userId, conversation, modeHint }) {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
   const ctx = await loadContext(userId, nzToday());
-  const system = systemBlocks(buildSystemPrompt({ ...ctx, modeHint }));
+  const system = systemBlocks(buildSystemPrompt({ ...ctx, modeHint, scope: conversation?.scope || 'personal' }));
 
   // Build a synthetic kickoff. NOT persisted. Tells the model the situation
   // without becoming a visible user message. The model's reply IS the opener.

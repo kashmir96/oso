@@ -28,6 +28,30 @@ function asArray(json) {
   return Array.isArray(json) ? json : [];
 }
 
+// Lazy auto-seed: if mktg_campaigns is empty on first read, run the bundled
+// seed once. Avoids the "Load PrimalPantry playbook" button — the playbook
+// is just there. Idempotent (seed itself uses upsert), and we only attempt
+// once per cold-start, so the cost is zero on the hot path.
+let _seedAttempted = false;
+async function ensureSeeded() {
+  if (_seedAttempted) return;
+  _seedAttempted = true;
+  try {
+    const rows = await sbSelect('mktg_campaigns', 'select=id&limit=1');
+    if (Array.isArray(rows) && rows.length > 0) return; // already seeded
+    console.log('[mktg-data] mktg tables empty — running auto-seed from bundled JSON');
+    const { runSeed } = require('./mktg-seed.js');
+    const results = await runSeed();
+    const totalInserted = Object.values(results)
+      .reduce((s, r) => s + (r?.inserted || 0), 0);
+    console.log(`[mktg-data] auto-seed inserted ${totalInserted} rows across ${Object.keys(results).length} tables`);
+  } catch (e) {
+    // Don't break reads if seeding errors out — the playbook is just empty
+    // until the user applies the schema or manually re-seeds.
+    console.warn('[mktg-data] auto-seed failed (continuing with empty playbook):', e.message);
+  }
+}
+
 async function listCampaigns() {
   const [campaigns, products, concepts, ads] = await Promise.all([
     sbSelect('mktg_campaigns', 'select=*&order=name.asc'),
@@ -178,6 +202,8 @@ async function summary() {
 }
 
 exports.handler = withGate(async (event) => {
+  // Fire-and-await: cheap when already seeded (one SELECT + early return).
+  await ensureSeeded();
   if (event.httpMethod !== 'POST') return reply(405, { error: 'Method not allowed' });
   let body;
   try { body = JSON.parse(event.body || '{}'); } catch { return reply(400, { error: 'Invalid JSON' }); }
