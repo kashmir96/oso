@@ -144,10 +144,20 @@ export default function Today() {
   }
   useEffect(() => {
     load();
-    const handler = () => load();
-    window.addEventListener('ckf-data-changed', handler);
-    return () => window.removeEventListener('ckf-data-changed', handler);
-    /* eslint-disable-next-line */
+    // Refresh whenever any mutation fires the global event (chat tools,
+    // quick-add, errand complete, goal log, etc.) — keeps /today in sync
+    // without needing a manual reload.
+    const onChanged = () => load();
+    window.addEventListener('ckf-data-changed', onChanged);
+    // Also refresh when the tab regains focus (covers SMS reminders or chat
+    // edits made on another device).
+    const onVisible = () => { if (document.visibilityState === 'visible') load(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('ckf-data-changed', onChanged);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date]);
 
   async function setStatus(routineTaskId, status) {
@@ -172,8 +182,15 @@ export default function Today() {
       {calStatus === 'error' && (
         <div className="error">Calendar fetch failed. Try reconnecting from Settings.</div>
       )}
-      {adding && <TaskForm onSaved={() => { setAdding(false); load(); }} onCancel={() => setAdding(false)} />}
-      {editing && <TaskForm task={editing} onSaved={() => { setEditing(null); load(); }} onCancel={() => setEditing(null)} />}
+      {adding && <TaskForm onSaved={() => { setAdding(false); notifyChanged(); load(); }} onCancel={() => setAdding(false)} />}
+      {editing && (
+        <TaskForm
+          key={editing.id}
+          task={editing}
+          onSaved={() => { setEditing(null); notifyChanged(); load(); }}
+          onCancel={() => setEditing(null)}
+        />
+      )}
 
       <div className="section-title">Today · {fmtShortDate(date)}</div>
       {today.length === 0 ? (

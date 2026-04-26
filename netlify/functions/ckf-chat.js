@@ -454,7 +454,7 @@ async function runChat({ userId, conversation, userMessageText, modeHint, attach
         if (block.type !== 'tool_use') continue;
         let result;
         try {
-          result = await execute(block.name, block.input || {}, { userId, messageId: asstSaved?.id });
+          result = await execute(block.name, block.input || {}, { userId, messageId: asstSaved?.id, scope: conversation.scope });
         } catch (e) {
           result = { error: e.message };
         }
@@ -545,7 +545,7 @@ ${openJobs}]`;
         if (block.type !== 'tool_use') continue;
         let result;
         try {
-          result = await execute(block.name, block.input || {}, { userId });
+          result = await execute(block.name, block.input || {}, { userId, scope: conversation.scope });
         } catch (e) { result = { error: e.message }; }
         toolResults.push({
           type: 'tool_result',
