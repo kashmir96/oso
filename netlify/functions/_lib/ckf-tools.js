@@ -443,6 +443,16 @@ Don't create vague goals. For numeric, ask one question if target is missing.`,
     },
   },
   {
+    name: 'get_meals',
+    description: "Fetch Curtis's recent meal log entries (image + AI calorie/macro estimate, with manual overrides if he edited them). Use to discuss eating patterns, total day calories, what he ate around a workout, or to compare against his calorie goal.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        days: { type: 'integer', minimum: 1, maximum: 30, description: 'how many days back; default 3' },
+      },
+    },
+  },
+  {
     name: 'get_whoop_today',
     description: "Fetch yesterday's Whoop metrics (recovery score 0-100, HRV, resting HR, strain, sleep performance, sleep hours, sleep efficiency). Use when discussing physical state, recovery, sleep, or training readiness.",
     input_schema: { type: 'object', properties: {} },
@@ -890,6 +900,26 @@ async function execute(name, input, ctx) {
       return { events, from, to };
     }
 
+    case 'get_meals': {
+      const days = Math.min(Math.max(input?.days || 3, 1), 30);
+      const since = new Date(Date.now() - days * 86400e3).toISOString().slice(0, 10);
+      const rows = await sbSelect(
+        'ckf_meals',
+        `user_id=eq.${userId}&meal_date=gte.${since}&order=meal_date.desc,created_at.desc&limit=50&select=id,meal_date,meal_type,ai_label,ai_calories,ai_protein_g,ai_carbs_g,ai_fat_g,manual_label,manual_calories,manual_protein_g,manual_carbs_g,manual_fat_g,notes,source`
+      );
+      // Resolve manual-overrides client-side for the model
+      const meals = (rows || []).map((m) => ({
+        id: m.id, meal_date: m.meal_date, meal_type: m.meal_type,
+        label: m.manual_label ?? m.ai_label,
+        calories: m.manual_calories ?? m.ai_calories,
+        protein_g: m.manual_protein_g ?? m.ai_protein_g,
+        carbs_g: m.manual_carbs_g ?? m.ai_carbs_g,
+        fat_g: m.manual_fat_g ?? m.ai_fat_g,
+        notes: m.notes,
+        source: m.source,
+      }));
+      return { days, meals };
+    }
     case 'get_whoop_today': {
       const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland' });
       const today = fmt.format(new Date());

@@ -152,9 +152,10 @@ function TrainerShare() {
     <div className="card" style={{ marginBottom: 12 }}>
       <div className="section-title" style={{ margin: '0 0 8px' }}>Meals · trainer share link</div>
       <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>
-        Generate a link your trainer can use to upload meal photos. Calories are estimated by AI; you can edit anything.
-        The link only allows uploading + viewing meals — nothing else in the app is exposed.
-        <Link to="/meals" style={{ marginLeft: 6 }}>Open Meals →</Link>
+        Generate a read+edit link for your trainer. They see meals you've logged
+        (from the chat or the Meals page) with AI calorie/macro estimates. They
+        can correct any field. They cannot upload, delete, or see anything else
+        in the app. <Link to="/meals" style={{ marginLeft: 6 }}>Open Meals →</Link>
       </div>
 
       {!shares ? <div className="loading">Loading…</div> :

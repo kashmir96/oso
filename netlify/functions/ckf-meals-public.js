@@ -4,22 +4,23 @@
  * Auth: the share_token in the URL/body acts as the credential. We verify it
  * exists, isn't revoked, and isn't expired, then look up the owning user_id.
  *
- * Actions:
- *   info      — { share_token } → { label, owner_email, expired }
- *   list      — { share_token } → recent meals (read-only)
- *   upload    — { share_token, image_base64, mime_type, notes, meal_type, meal_date }
- *               → uploads to Storage, runs AI estimate, writes a meal row
- *               source = 'share', share_id linked back so Curtis sees what
- *               the trainer logged.
+ * Trainer permissions: READ + EDIT existing meals only. Cannot create or
+ * delete. The owner uploads via the in-app /meals page or the chat composer;
+ * the trainer corrects what the AI got wrong (portion size, label, macros).
  *
- * Strict scope: this function ONLY accepts image uploads + reads the meal
- * list. It does NOT expose the diary, goals, conversations, or anything else.
+ * Actions:
+ *   info      — { share_token } → { label, expires_at }
+ *   list      — { share_token } → recent meals (read)
+ *   update    — { share_token, id, manual_label, manual_calories,
+ *                manual_protein_g, manual_carbs_g, manual_fat_g, notes }
+ *               Patches manual_* + notes only. Cannot delete, cannot
+ *               touch image_url, cannot create.
+ *
+ * Strict scope: this function ONLY reads + edits a fixed set of meal fields.
+ * It never exposes diary, goals, conversations, or anything else. Public
+ * access points stop here.
  */
-const { sbSelect, sbInsert } = require('./_lib/ckf-sb.js');
-const { uploadObject } = require('./_lib/ckf-storage.js');
-const { estimateMealFromImage } = require('./_lib/ckf-meals-ai.js');
-
-const BUCKET = 'ckf-meals';
+const { sbSelect, sbUpdate } = require('./_lib/ckf-sb.js');
 
 const HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -67,42 +68,35 @@ exports.handler = async (event) => {
     return reply(200, { meals: rows });
   }
 
-  if (action === 'upload') {
-    const { image_base64, mime_type, notes, meal_type, meal_date } = body;
-    if (!image_base64) return reply(400, { error: 'image_base64 required' });
-    const buf = Buffer.from(image_base64, 'base64');
-    if (buf.length === 0) return reply(400, { error: 'Empty image' });
-    if (buf.length > 5 * 1024 * 1024) return reply(413, { error: 'Image too large (5MB max)' });
+  if (action === 'whoop_recent') {
+    const days = Math.min(Math.max(Number(body.days) || 14, 1), 60);
+    const since = new Date(Date.now() - days * 86400e3).toISOString().slice(0, 10);
+    const rows = await sbSelect(
+      'whoop_metrics',
+      `user_id=eq.${share.user_id}&date=gte.${since}&order=date.desc&limit=${days}&select=date,recovery_score,hrv_rmssd_ms,resting_heart_rate,strain,sleep_performance,sleep_hours,sleep_efficiency`
+    );
+    return reply(200, { days, metrics: rows });
+  }
 
-    const ext = (mime_type || '').includes('png') ? 'png' : (mime_type || '').includes('webp') ? 'webp' : 'jpg';
-    const path = `${share.user_id}/share-${share.id.slice(0, 8)}-${Date.now()}.${ext}`;
-    const { public_url } = await uploadObject({ bucket: BUCKET, path, buffer: buf, contentType: mime_type || 'image/jpeg' });
+  if (action === 'update') {
+    const { id } = body;
+    if (!id) return reply(400, { error: 'id required' });
+    // Verify the meal belongs to the share owner before patching.
+    const meal = (await sbSelect(
+      'ckf_meals',
+      `id=eq.${id}&user_id=eq.${share.user_id}&select=id&limit=1`
+    ))?.[0];
+    if (!meal) return reply(404, { error: 'meal not found' });
 
-    let ai = null;
-    try {
-      ai = await estimateMealFromImage({ imageBase64: image_base64, mimeType: mime_type, hint: notes });
-    } catch (e) { console.error('[ckf-meals-public] AI failed', e.message); }
+    // Only manual_* fields + notes are editable by the trainer. Everything
+    // else (image, AI estimates, source, owner) is locked.
+    const allowed = ['manual_label','manual_calories','manual_protein_g','manual_carbs_g','manual_fat_g','manual_ingredients','notes','meal_type'];
+    const patch = {};
+    for (const k of allowed) if (body[k] !== undefined) patch[k] = body[k];
+    if (Object.keys(patch).length === 0) return reply(400, { error: 'no editable fields supplied' });
 
-    const row = await sbInsert('ckf_meals', {
-      user_id: share.user_id,
-      meal_date: meal_date || nzToday(),
-      meal_type: meal_type || null,
-      image_url: public_url,
-      storage_path: path,
-      notes: notes || null,
-      ai_label: ai?.label || null,
-      ai_calories: ai?.calories ?? null,
-      ai_protein_g: ai?.protein_g ?? null,
-      ai_carbs_g: ai?.carbs_g ?? null,
-      ai_fat_g: ai?.fat_g ?? null,
-      ai_ingredients: ai?.ingredients || [],
-      ai_confidence: ai?.confidence || null,
-      ai_raw: ai?.raw || null,
-      source: 'share',
-      share_id: share.id,
-    });
-
-    return reply(200, { meal: row });
+    const rows = await sbUpdate('ckf_meals', `id=eq.${meal.id}`, patch);
+    return reply(200, { meal: rows?.[0] });
   }
 
   return reply(400, { error: 'Unknown action' });

@@ -16,6 +16,7 @@ export default function Today() {
   const [today, setToday] = useState(null);
   const [todayBlendItems, setTodayBlendItems] = useState([]);
   const [later, setLater] = useState(null);
+  const [calStatus, setCalStatus] = useState('unknown'); // 'unknown' | 'ok' | 'not_connected' | 'error'
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState(null);
   const [err, setErr] = useState('');
@@ -23,28 +24,72 @@ export default function Today() {
 
   async function load() {
     try {
-      const [todayRoutine, business, lastDiary, cal] = await Promise.all([
+      // Calendar fetch tracks its own status separately so we can show whether
+      // it's "not connected" vs "errored" vs "no events" — the previous silent
+      // fallback hid the difference.
+      let calRange = { events: [], from: null, to: null };
+      try {
+        const tomorrow = new Date(date + 'T00:00:00Z');
+        tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+        const from = new Date().toISOString();
+        const to = new Date(tomorrow.getTime() + 7 * 86400e3).toISOString();
+        calRange = await call('ckf-calendar', { action: 'list_range', from, to });
+        setCalStatus('ok');
+      } catch (e) {
+        if (/not connected/i.test(e.message)) setCalStatus('not_connected');
+        else setCalStatus('error');
+      }
+
+      const [todayRoutine, business, lastDiary, errands] = await Promise.all([
         call('ckf-tasks', { action: 'today', date }),
         call('ckf-business', { action: 'list' }),
         call('ckf-diary', { action: 'recent', limit: 1 }),
-        // Calendar is best-effort. If not connected or function errors, keep going.
-        call('ckf-calendar', { action: 'list_today' }).catch(() => ({ events: [] })),
+        call('ckf-errands', { action: 'list', status: 'open' }),
       ]);
       setToday(todayRoutine.tasks);
 
       const todayCalendar = [];
       const futureCalendar = [];
-      for (const e of (cal?.events || [])) {
+      for (const e of (calRange?.events || [])) {
         const day = (e.start || '').slice(0, 10);
         if (day === date) todayCalendar.push(e);
         else futureCalendar.push(e);
       }
 
-      // Today blend: calendar today + business deadlines today (routine tasks
-      // remain a separate interactive list; merging them all into one would
-      // hurt the tap-to-tick feel).
       const businessTasks = (business.tasks || [])
         .filter((t) => !['done','cancelled'].includes(t.status));
+
+      // Errands split — both personal + business categories merge in. Errands
+      // with a remind_at or due_date today land in Today; rest in Later.
+      const errandsList = (errands.errands || []).filter((e) => e.status === 'open');
+      function errandWhen(e) {
+        if (e.remind_at) return e.remind_at;
+        if (e.due_date) return `${e.due_date}T23:59:00`;
+        return null;
+      }
+      function errandDay(e) {
+        if (e.remind_at) return e.remind_at.slice(0, 10);
+        if (e.due_date) return e.due_date;
+        return null;
+      }
+      const errandsToday = errandsList
+        .filter((e) => errandDay(e) === date)
+        .map((e) => ({
+          id: `er-${e.id}`, title: e.title,
+          category: e.category, meta: e.category + (e.remind_at ? ' · ⏰' : (e.due_date ? ' · due today' : '')),
+          source: 'errand', when: errandWhen(e),
+        }));
+      const errandsLater = errandsList
+        .filter((e) => {
+          const d = errandDay(e);
+          return d == null || d > date;
+        })
+        .map((e) => ({
+          id: `er-${e.id}`, title: e.title,
+          category: e.category,
+          meta: e.due_date ? `${e.category} · due ${fmtShortDate(e.due_date)}` : (e.remind_at ? `${e.category} · ⏰` : e.category),
+          source: 'errand', when: errandWhen(e),
+        }));
 
       const businessToday = businessTasks
         .filter((t) => t.due_date === date)
@@ -58,10 +103,9 @@ export default function Today() {
         meta: e.all_day ? 'all day' : new Date(e.start).toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland', hour: '2-digit', minute: '2-digit' }),
         source: 'calendar', when: e.start, all_day: e.all_day,
       }));
-      const todayBlend = [...calToday, ...businessToday]
+      const todayBlend = [...calToday, ...businessToday, ...errandsToday]
         .sort((a, b) => (a.when || 'z').localeCompare(b.when || 'z'));
 
-      // Later: future business deadlines + future calendar + planned tomorrow's diary tasks.
       const businessLater = businessTasks
         .filter((t) => t.due_date && t.due_date > date)
         .map((t) => ({
@@ -91,12 +135,10 @@ export default function Today() {
           ].filter((x) => x.title)
         : [];
 
-      const merged = [...calLater, ...businessLater, ...plannedTomorrow]
+      const merged = [...calLater, ...businessLater, ...errandsLater, ...plannedTomorrow]
         .sort((a, b) => (a.when || 'z').localeCompare(b.when || 'z'));
 
       setLater(merged);
-      // Stash today blend on the same state via the array order: routine tasks render first,
-      // todayBlend renders below as a sub-list.
       setTodayBlendItems(todayBlend);
     } catch (e) { setErr(e.message); }
   }
@@ -115,6 +157,14 @@ export default function Today() {
   return (
     <div className="app">
       <Header title="Routine" right={<button onClick={() => setAdding(true)}>+ Add</button>} />
+      {calStatus === 'not_connected' && (
+        <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: '6px 10px', background: 'var(--bg-elev)', border: '1px dashed var(--border)', borderRadius: 'var(--radius-sm)', marginBottom: 10 }}>
+          Calendar not connected — events won't show here. Connect it in <a href="/ckf/settings">Settings → Connections</a>.
+        </div>
+      )}
+      {calStatus === 'error' && (
+        <div className="error">Calendar fetch failed. Try reconnecting from Settings.</div>
+      )}
       {adding && <TaskForm onSaved={() => { setAdding(false); load(); }} onCancel={() => setAdding(false)} />}
       {editing && <TaskForm task={editing} onSaved={() => { setEditing(null); load(); }} onCancel={() => setEditing(null)} />}
 
@@ -162,6 +212,7 @@ export default function Today() {
                   {it.meta}
                   {it.source === 'business' && <span className="pill" style={{ marginLeft: 6 }}>business</span>}
                   {it.source === 'calendar' && <span className="pill" style={{ marginLeft: 6 }}>calendar</span>}
+                  {it.source === 'errand' && <span className="pill" style={{ marginLeft: 6 }}>errand</span>}
                 </div>
               </div>
             </div>
@@ -184,6 +235,7 @@ export default function Today() {
                   {it.source === 'business' && <span className="pill" style={{ marginLeft: 6 }}>business</span>}
                   {it.source === 'diary' && <span className="pill" style={{ marginLeft: 6 }}>diary</span>}
                   {it.source === 'calendar' && <span className="pill" style={{ marginLeft: 6 }}>calendar</span>}
+                  {it.source === 'errand' && <span className="pill" style={{ marginLeft: 6 }}>errand</span>}
                 </div>
               </div>
             </div>

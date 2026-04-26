@@ -58,6 +58,8 @@ export default function Chat({ embedded = false }) {
   // "+" fan-out for camera / file / TTS. Closes when an option is picked or
   // the user taps outside.
   const [plusOpen, setPlusOpen] = useState(false);
+  const mealInputRef = useRef(null);
+  const [logMealBusy, setLogMealBusy] = useState(false);
 
   // ── Routing logic ──
   // - Standalone /chat (no id): open today's conversation and redirect to /chat/:id
@@ -171,6 +173,34 @@ export default function Chat({ embedded = false }) {
       revokePreview(a[i]);
       return a.filter((_, idx) => idx !== i);
     });
+  }
+
+  // Log a meal directly via /meals API — image goes to Storage + AI scan,
+  // visible to the trainer share, NOT pushed into the chat conversation.
+  async function logMealFromCamera(files) {
+    const file = files?.[0];
+    if (!file) return;
+    setErr(''); setLogMealBusy(true);
+    try {
+      const att = await processFile(file);
+      const logTo = localStorage.getItem('ckf_meals_log_goal') || null;
+      await call('ckf-meals', {
+        action: 'create',
+        image_base64: att.data_base64,
+        mime_type: att.media_type,
+        log_to_goal_id: logTo,
+      });
+      revokePreview(att);
+      // Inject a friendly "logged" message into the assistant stream so the
+      // user gets feedback inside chat without re-running auto_open.
+      setMessages((m) => [...m, {
+        id: `meal-${Date.now()}`,
+        role: 'assistant',
+        content_text: `Meal logged. The AI estimate is in your Meals page${logTo ? ' and counted toward your linked calorie goal' : ''}.`,
+        created_at: new Date().toISOString(),
+      }]);
+    } catch (e) { setErr(e.message); }
+    finally { setLogMealBusy(false); }
   }
 
   function onKeyDown(e) {
@@ -421,6 +451,14 @@ export default function Chat({ embedded = false }) {
         style={{ display: 'none' }}
         onChange={(e) => { onPickFiles(e.target.files, false); e.target.value = ''; }}
       />
+      <input
+        ref={mealInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        style={{ display: 'none' }}
+        onChange={(e) => { logMealFromCamera(e.target.files); e.target.value = ''; }}
+      />
 
       <div className="chat-composer">
         {plusOpen && (
@@ -443,6 +481,12 @@ export default function Chat({ embedded = false }) {
               disabled={voiceMode || busy}
               title="Attach an image or PDF"
             >📎</button>
+            <button
+              onClick={() => { mealInputRef.current?.click(); setPlusOpen(false); }}
+              className="meal-btn"
+              disabled={voiceMode || busy || logMealBusy}
+              title="Log a meal (saves to /meals + trainer share)"
+            >🍽</button>
           </div>
         )}
         <button
