@@ -39,6 +39,7 @@ export default function Settings() {
         <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
           <Link to="/ninety-day-goals"><button>90-day goals</button></Link>
           <Link to="/business"><button>Business</button></Link>
+          <Link to="/search"><button>🔍 Search</button></Link>
           <Link to="/swipefile"><button>Swipefile</button></Link>
           <Link to="/meals"><button>Meals</button></Link>
           <button onClick={() => { logout(); nav('/login'); }} className="danger">Sign out</button>

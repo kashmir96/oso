@@ -1,0 +1,15 @@
+{
+  "name": "CKF Second Brain",
+  "short_name": "CKF",
+  "description": "Curtis's private goal + journal + chat second brain",
+  "start_url": "/ckf/",
+  "scope": "/ckf/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0e0f12",
+  "theme_color": "#0e0f12",
+  "icons": [
+    { "src": "/ckf-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/ckf-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

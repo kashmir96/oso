@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { call, notifyChanged } from '../lib/api.js';
+import { call, callCached, notifyChanged } from '../lib/api.js';
 import { nzToday, fmtShortDate } from '../lib/format.js';
 
 // One mixed horizontal pill strip — combines:
@@ -28,13 +28,13 @@ export default function TodayStrip({ title = 'Today', scope = 'all', defaultCate
     const today = nzToday();
     const errandFilter = scope === 'business' ? 'business' : 'not_business';
     const [errR, calR, bizR, routR] = await Promise.all([
-      call('ckf-errands', { action: 'list', status: 'open', category: errandFilter }).catch(() => ({ errands: [] })),
+      callCached('ckf-errands', { action: 'list', status: 'open', category: errandFilter }).catch(() => ({ errands: [] })),
       scope === 'all'
-        ? call('ckf-calendar', { action: 'list_today' }).catch(() => ({ events: [] }))
+        ? callCached('ckf-calendar', { action: 'list_today' }, 60_000).catch(() => ({ events: [] }))
         : Promise.resolve({ events: [] }),
-      call('ckf-business', { action: 'list' }).catch(() => ({ tasks: [] })),
+      callCached('ckf-business', { action: 'list' }).catch(() => ({ tasks: [] })),
       scope === 'all'
-        ? call('ckf-tasks', { action: 'today', date: today }).catch(() => ({ tasks: [] }))
+        ? callCached('ckf-tasks', { action: 'today', date: today }).catch(() => ({ tasks: [] }))
         : Promise.resolve({ tasks: [] }),
     ]);
 

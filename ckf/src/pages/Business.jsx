@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import GoalCard from '../components/GoalCard.jsx';
 import TodayStrip from '../components/TodayStrip.jsx';
-import { call } from '../lib/api.js';
+import { callCached } from '../lib/api.js';
 import Chat from './Chat.jsx';
 
 const BUSINESS_CATEGORIES = new Set(['business', 'marketing', 'finance']);
@@ -16,8 +16,8 @@ export default function Business() {
 
   function refresh() {
     Promise.all([
-      call('ckf-goals', { action: 'list' }),
-      call('ckf-business', { action: 'list' }).catch(() => ({ tasks: [] })),
+      callCached('ckf-goals', { action: 'list' }),
+      callCached('ckf-business', { action: 'list' }).catch(() => ({ tasks: [] })),
     ])
       .then(([g, b]) => {
         const filtered = g.goals.filter((x) =>

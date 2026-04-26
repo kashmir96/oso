@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import GoalCard from '../components/GoalCard.jsx';
 import TodayStrip from '../components/TodayStrip.jsx';
-import { call } from '../lib/api.js';
+import { callCached } from '../lib/api.js';
 import Chat from './Chat.jsx';
 
 // Home: goals strip → mixed Today strip (errands + calendar + biz + routine) → chat.
@@ -11,7 +11,7 @@ export default function Dashboard() {
   const [err, setErr] = useState('');
 
   function refresh() {
-    call('ckf-goals', { action: 'list' })
+    callCached('ckf-goals', { action: 'list' })
       .then((r) => setGoals(r.goals.filter((g) => g.status === 'active')))
       .catch((e) => setErr(e.message));
   }

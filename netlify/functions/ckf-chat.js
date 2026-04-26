@@ -562,3 +562,6 @@ exports.handler = withGate(async (event, { user }) => {
 
   return reply(400, { error: 'Unknown action' });
 });
+
+// Exposed for ckf-quick.js (the Siri/Shortcut single-shot endpoint).
+module.exports.runChat = runChat;

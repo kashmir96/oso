@@ -289,15 +289,15 @@ textarea { min-height: 110px; resize: vertical; }
 .home-goal-grid::-webkit-scrollbar { height: 0; }
 .home-goal-grid .goal-card {
   flex: 0 0 auto;
-  width: 92px;
-  padding: 6px 8px 5px;
+  width: 78px;
+  padding: 5px 7px 4px;
   scroll-snap-align: start;
 }
-.home-goal-grid .goal-card .name { font-size: 10px; line-height: 1.15; }
-.home-goal-grid .goal-card .value { font-size: 14px; }
+.home-goal-grid .goal-card .name { font-size: 10px; line-height: 1.1; }
+.home-goal-grid .goal-card .value { font-size: 13px; line-height: 1.15; }
 .home-goal-grid .goal-card .target { font-size: 9px; }
 .home-goal-grid .goal-card .updated { font-size: 8px; }
-.home-goal-grid .goal-card .bar { margin-top: 3px; height: 3px; }
+.home-goal-grid .goal-card .bar { margin-top: 2px; height: 2px; }
 
 .src-badge {
   display: inline-block;
@@ -370,16 +370,16 @@ textarea { min-height: 110px; resize: vertical; }
 
 .action-pill {
   flex: 0 0 auto;
-  display: inline-flex; align-items: center; gap: 5px;
+  display: inline-flex; align-items: center; gap: 4px;
   background: var(--bg-elev);
   border: 1px solid var(--border);
   border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 11px;
+  padding: 3px 9px;
+  font-size: 10.5px;
   color: var(--text);
   text-decoration: none;
   scroll-snap-align: start;
-  max-width: 200px;
+  max-width: 180px;
   cursor: pointer;
 }
 .action-pill:hover { border-color: var(--accent-dim); }
@@ -435,6 +435,34 @@ textarea { min-height: 110px; resize: vertical; }
 .meal-title { font-weight: 600; }
 .meal-meta { color: var(--text-dim); font-size: 12px; margin-top: 2px; }
 .meal-cal { color: var(--accent); font-size: 13px; margin-top: 4px; }
+
+/* ── Goal reorder rows ── */
+.reorder-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.reorder-row:last-child { border-bottom: none; }
+.reorder-btn {
+  width: 36px; height: 36px; padding: 0;
+  border-radius: 8px; font-size: 16px;
+  flex: 0 0 auto;
+}
+.reorder-btn:disabled { opacity: .3; }
+
+/* ── Search results ── */
+.search-row {
+  display: block;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  text-decoration: none;
+  color: inherit;
+}
+.search-row:last-child { border-bottom: none; }
+.search-row:hover { background: var(--bg-elev-2); }
+.search-meta { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .04em; }
+.search-title { font-size: 14px; margin-top: 2px; }
+.search-sub { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
 
 /* ── Reminder modal (overlay) ── */
 .reminder-modal {

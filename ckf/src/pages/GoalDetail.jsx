@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Header from '../components/Header.jsx';
+import Sparkline from '../components/Sparkline.jsx';
 import { call } from '../lib/api.js';
 import { progressPct, formatGoalValue, fmtRelative } from '../lib/format.js';
 
@@ -107,6 +108,23 @@ export default function GoalDetail() {
           Backdating is fine — set "For date" to the day this measurement was for.
         </div>
       </form>
+
+      {logs.length >= 2 && (
+        <div className="card" style={{ marginBottom: 12 }}>
+          <Sparkline
+            width={320}
+            height={90}
+            direction={goal.direction}
+            points={logs.slice().reverse().map((l) => ({
+              x: new Date(l.for_date || l.created_at).getTime(),
+              y: Number(l.value),
+            }))}
+          />
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+            {logs.length} log{logs.length === 1 ? '' : 's'} · oldest {fmtRelative(logs[logs.length - 1].created_at)}
+          </div>
+        </div>
+      )}
 
       <div className="section-title">History</div>
       {logs.length === 0 ? <div className="empty">No logs yet.</div> : (

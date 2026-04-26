@@ -21,6 +21,7 @@ const Settings = lazy(() => import('./pages/Settings.jsx'));
 const Errands = lazy(() => import('./pages/Errands.jsx'));
 const Meals = lazy(() => import('./pages/Meals.jsx'));
 const Swipefile = lazy(() => import('./pages/Swipefile.jsx'));
+const SearchPage = lazy(() => import('./pages/Search.jsx'));
 
 function Gated({ children, hideNav }) {
   const { user, loading } = useAuth();
@@ -35,28 +36,51 @@ function Gated({ children, hideNav }) {
   );
 }
 
-const Fallback = () => <div className="loading">Loading…</div>;
+// Empty fallback — pages render instantly because most chunks are pre-warmed
+// in the idle prefetch below. A blank flash is less jarring than "Loading…".
+const Fallback = () => null;
 
 function Shell() {
-  // Once the app has paint, idle-prefetch the other route bundles + warm up
-  // common API calls so tab switches feel instant.
+  // Once the app has paint, idle-prefetch every route bundle + warm common
+  // API calls so tab switches feel instant. The cache layer in lib/api.js
+  // means second visits to a page paint immediately from cached data.
   useEffect(() => {
     const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 250));
-    const handle = idle(() => {
-      // Code chunks
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland' }).format(new Date());
+    // Stagger prefetch across two idle frames so we don't congest the network
+    // right after first paint.
+    const h1 = idle(() => {
       import('./pages/Today.jsx').catch(() => {});
       import('./pages/Errands.jsx').catch(() => {});
       import('./pages/Settings.jsx').catch(() => {});
       import('./pages/Business.jsx').catch(() => {});
       import('./pages/Goals.jsx').catch(() => {});
-      // Routine / errand data — warms the API + Netlify function instances
-      import('./lib/api.js').then(({ call }) => {
-        call('ckf-tasks', { action: 'today', date: new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland' }).format(new Date()) }).catch(() => {});
-        call('ckf-errands', { action: 'list', status: 'open' }).catch(() => {});
+      import('./pages/Meals.jsx').catch(() => {});
+      // Warm API + cache common reads
+      import('./lib/api.js').then(({ callCached }) => {
+        callCached('ckf-tasks', { action: 'today', date: today }).catch(() => {});
+        callCached('ckf-errands', { action: 'list', status: 'open' }).catch(() => {});
+        callCached('ckf-goals', { action: 'list' }).catch(() => {});
+        callCached('ckf-business', { action: 'list' }).catch(() => {});
+      });
+    });
+    const h2 = idle(() => {
+      import('./pages/GoalDetail.jsx').catch(() => {});
+      import('./pages/NinetyDayGoals.jsx').catch(() => {});
+      import('./pages/Weekly.jsx').catch(() => {});
+      import('./pages/Memory.jsx').catch(() => {});
+      import('./pages/BusinessTasks.jsx').catch(() => {});
+      import('./pages/Swipefile.jsx').catch(() => {});
+      import('./lib/api.js').then(({ callCached }) => {
+        callCached('ckf-meals', { action: 'list', limit: 30 }).catch(() => {});
+        callCached('ckf-swipefile', { action: 'list', archived: false }).catch(() => {});
       });
     });
     return () => {
-      if (window.cancelIdleCallback && typeof handle === 'number') window.cancelIdleCallback(handle);
+      if (window.cancelIdleCallback) {
+        if (typeof h1 === 'number') window.cancelIdleCallback(h1);
+        if (typeof h2 === 'number') window.cancelIdleCallback(h2);
+      }
     };
   }, []);
 
@@ -81,6 +105,7 @@ function Shell() {
         <Route path="/errands" element={<Gated><Errands /></Gated>} />
         <Route path="/meals" element={<Gated><Meals /></Gated>} />
         <Route path="/swipefile" element={<Gated><Swipefile /></Gated>} />
+        <Route path="/search" element={<Gated><SearchPage /></Gated>} />
         <Route path="/settings" element={<Gated><Settings /></Gated>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

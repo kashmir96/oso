@@ -73,6 +73,12 @@
 [functions."ckf-reminder-sms"]
   schedule = "*/5 * * * *"
 
+# CKF weekly summary auto-generate — Sunday 17:00 NZ.
+# Cron fires on UTC 04:00 + 05:00 to cover NZST (UTC+12) and NZDT (UTC+13);
+# the handler hard-checks Pacific/Auckland weekday + hour.
+[functions."ckf-weekly-cron"]
+  schedule = "0 4,5 * * 0"
+
 # ── CKF SPA: any /ckf/* request that isn't a real file falls back to /ckf/index.html ──
 [[redirects]]
   from = "/ckf/*"

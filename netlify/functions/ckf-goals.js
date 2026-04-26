@@ -78,7 +78,7 @@ exports.handler = withGate(async (event, { user }) => {
   if (action === 'list') {
     const rows = await sbSelect(
       'goals',
-      `user_id=eq.${user.id}&order=created_at.desc&select=*`
+      `user_id=eq.${user.id}&order=sort_order.asc.nullslast,created_at.desc&select=*`
     );
     for (const g of rows) {
       // Restraint streaks tick automatically.
@@ -194,6 +194,19 @@ exports.handler = withGate(async (event, { user }) => {
     if (!body.id) return reply(400, { error: 'id required' });
     const rows = await sbUpdate('goals', `id=eq.${body.id}&user_id=eq.${user.id}`, { status: 'archived' });
     return reply(200, { goal: rows[0] });
+  }
+
+  if (action === 'reorder') {
+    // Accepts { ordered_ids: [id, id, id, ...] } and assigns sort_order = index.
+    // Atomic enough for a single user — if a stale client lags, last write wins.
+    const ids = Array.isArray(body.ordered_ids) ? body.ordered_ids : null;
+    if (!ids || ids.length === 0) return reply(400, { error: 'ordered_ids[] required' });
+    let i = 0;
+    for (const id of ids) {
+      i += 1;
+      await sbUpdate('goals', `id=eq.${id}&user_id=eq.${user.id}`, { sort_order: i });
+    }
+    return reply(200, { reordered: ids.length });
   }
 
   if (action === 'delete') {
