@@ -158,6 +158,11 @@ function MarketingPlaybookAdmin() {
   return (
     <div className="card" style={{ marginBottom: 12 }}>
       <div className="section-title" style={{ margin: '0 0 8px' }}>Marketing playbook</div>
+      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>
+        Loads PrimalPantry's full playbook (86 ads, 30 concepts, 25 copy archetypes,
+        26 visual archetypes, 7 production scripts, hooks, offers, locked decisions)
+        from bundled JSON into your DB. Re-runs are safe — it upserts by id, no duplicates.
+      </div>
 
       {err && <div className="error">{err}</div>}
       {!summary && !err && <div className="loading" style={{ padding: '8px 0', textAlign: 'left' }}>Loading…</div>}
@@ -166,8 +171,8 @@ function MarketingPlaybookAdmin() {
         <>
           <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 8 }}>
             {totalRows === 0
-              ? 'No data loaded yet. Hit "Re-seed" to populate from the bundled JSON.'
-              : `${totalRows} rows across ${Object.keys(summary.counts).length} tables.`}
+              ? '⚠ Nothing loaded yet. Hit "Load PrimalPantry playbook" below to populate.'
+              : `✓ ${totalRows} rows loaded across ${Object.keys(summary.counts).length} playbook tables.`}
           </div>
           {totalRows > 0 && (
             <details style={{ marginBottom: 8 }}>
@@ -184,9 +189,9 @@ function MarketingPlaybookAdmin() {
 
       {msg && <div style={{ color: 'var(--good)', fontSize: 13, marginBottom: 8 }}>{msg}</div>}
 
-      <div style={{ display: 'flex', gap: 8 }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button onClick={reseed} className="primary" disabled={busy}>
-          {busy ? 'Seeding…' : (totalRows === 0 ? 'Seed playbook' : 'Re-seed playbook')}
+          {busy ? 'Loading…' : (totalRows === 0 ? 'Load PrimalPantry playbook' : 'Re-import playbook (refresh)')}
         </button>
         <Link to="/business/marketing"><button>Open marketing →</button></Link>
       </div>
