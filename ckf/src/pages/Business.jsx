@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import GoalCard from '../components/GoalCard.jsx';
 import ErrandsCard from '../components/ErrandsCard.jsx';
+import ComingUpStrip from '../components/ComingUpStrip.jsx';
 import { call } from '../lib/api.js';
 import Chat from './Chat.jsx';
 
@@ -55,6 +56,8 @@ export default function Business() {
           </div>
         )}
       </div>
+
+      <ComingUpStrip />
 
       <ErrandsCard
         title="Jobs"

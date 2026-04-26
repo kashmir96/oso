@@ -3,21 +3,20 @@ import { Link } from 'react-router-dom';
 import { call } from '../lib/api.js';
 import { fmtShortDate } from '../lib/format.js';
 
-// Reusable: shows top open items + quick add. Used on Home (Errands,
-// non-business filter) and on Business (Jobs, business filter).
+// Horizontal pill strip — same shape as the Goals strip. Quick-add via "+"
+// pill, tap a pill once to mark done, tap title to view all.
 //
 // Props:
-//   title       — heading (e.g. "Errands" / "Jobs")
-//   filter      — 'not_business' | 'business' | undefined
-//   defaultCategory — what to assign newly-created items via this card
-//   moreHref    — link target for "all"
-//   limit       — how many to render before "see all"
-export default function ErrandsCard({ title, filter, defaultCategory = 'personal', moreHref = '/errands', limit = 4 }) {
+//   title           — heading (e.g. "Errands" / "Jobs")
+//   filter          — 'not_business' | 'business' | undefined
+//   defaultCategory — what to assign newly-created items
+//   moreHref        — link target for "all"
+export default function ErrandsCard({ title, filter, defaultCategory = 'personal', moreHref = '/errands' }) {
   const [items, setItems] = useState(null);
   const [adding, setAdding] = useState(false);
-  const [err, setErr] = useState('');
-  const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
 
   function refresh() {
     const payload = { action: 'list', status: 'open' };
@@ -39,21 +38,17 @@ export default function ErrandsCard({ title, filter, defaultCategory = 'personal
   }
 
   async function complete(id) {
-    setBusy(true);
-    try {
-      await call('ckf-errands', { action: 'complete', id });
-      refresh();
-    } finally { setBusy(false); }
+    try { await call('ckf-errands', { action: 'complete', id }); refresh(); } catch {}
   }
 
   return (
-    <div className="errands-card">
-      <div className="errands-head">
-        <div className="home-title">{title}</div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
-          <button className="errands-quick-add" onClick={() => setAdding((v) => !v)}>{adding ? 'cancel' : '+ add'}</button>
-          <Link to={moreHref} className="home-manage">all</Link>
-        </div>
+    <div className="strip">
+      <div className="strip-head">
+        <Link to={moreHref} className="strip-title-link">
+          <span className="home-title">{title}</span>
+          {items && items.length > 0 && <span className="strip-count">{items.length}</span>}
+        </Link>
+        <Link to={moreHref} className="home-manage">all</Link>
       </div>
 
       {adding && (
@@ -65,34 +60,43 @@ export default function ErrandsCard({ title, filter, defaultCategory = 'personal
             placeholder={defaultCategory === 'business' ? 'Add a job…' : 'Add an errand…'}
           />
           <button className="primary" type="submit" disabled={busy || !draft.trim()}>Add</button>
+          <button type="button" onClick={() => { setAdding(false); setDraft(''); }}>×</button>
         </form>
       )}
 
       {err && <div className="error">{err}</div>}
-      {!items ? (
-        <div className="loading" style={{ padding: '6px 0' }}>Loading…</div>
-      ) : items.length === 0 ? (
-        <div className="empty" style={{ padding: '6px 0', textAlign: 'left', fontSize: 12 }}>
-          Nothing open. Add one above or ask the chat.
-        </div>
-      ) : (
-        <ul className="errands-list">
-          {items.slice(0, limit).map((it) => (
-            <li key={it.id} className="errands-item">
-              <button className="errands-tick" onClick={() => complete(it.id)} aria-label="Mark done">○</button>
-              <span className="errands-title">{it.title}</span>
-              {it.due_date && <span className="errands-due">{fmtShortDate(it.due_date)}</span>}
-              {it.remind_at && <span className="errands-remind" title={new Date(it.remind_at).toLocaleString()}>⏰</span>}
-              {it.sms_remind && <span className="errands-sms" title="SMS at remind">✉</span>}
-            </li>
-          ))}
-          {items.length > limit && (
-            <li className="errands-more">
-              <Link to={moreHref}>+ {items.length - limit} more</Link>
-            </li>
-          )}
-        </ul>
-      )}
+
+      <div className="pill-strip">
+        <button
+          className="pill-add"
+          onClick={() => setAdding((v) => !v)}
+          aria-label="Add"
+          title={defaultCategory === 'business' ? 'Add a job' : 'Add an errand'}
+        >+</button>
+
+        {!items ? (
+          <div className="pill-skeleton" />
+        ) : items.length === 0 ? (
+          <div className="pill-empty">Nothing open. Add one or ask the chat.</div>
+        ) : items.map((it) => (
+          <button
+            key={it.id}
+            className="action-pill"
+            onClick={() => complete(it.id)}
+            title={`Mark "${it.title}" done`}
+          >
+            <span className="pill-tick">○</span>
+            <span className="pill-title">{it.title}</span>
+            {(it.due_date || it.remind_at) && (
+              <span className="pill-meta">
+                {it.due_date && fmtShortDate(it.due_date)}
+                {it.remind_at && ' ⏰'}
+                {it.sms_remind && ' ✉'}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

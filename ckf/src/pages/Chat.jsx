@@ -9,6 +9,7 @@ import {
   isTtsOn, setTtsOn,
   createVoiceSession,
 } from '../lib/voice.js';
+import { processFile, revokePreview } from '../lib/upload.js';
 
 // Hat selection is handled by the model from context; no manual UI for it.
 function voiceLabel(state) {
@@ -47,6 +48,12 @@ export default function Chat({ embedded = false }) {
   const voiceSessionRef = useRef(null);
   const [voiceMode, setVoiceMode] = useState(false);
   const [voiceState, setVoiceState] = useState('idle');
+
+  // Attachments staged for the next message (image / document blobs encoded
+  // base64 — sent inline to Claude vision/document, not yet stored in Storage).
+  const cameraInputRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const [attachments, setAttachments] = useState([]);
 
   // ── Routing logic ──
   // - Standalone /chat (no id): open today's conversation and redirect to /chat/:id
@@ -116,15 +123,23 @@ export default function Chat({ embedded = false }) {
 
   async function send() {
     const text = draft.trim();
-    if (!text || busy || !id) return;
+    if ((!text && attachments.length === 0) || busy || !id) return;
     setDraft('');
     setBusy(true); setErr('');
+    const payloadAttachments = attachments.map(({ kind, media_type, data_base64, filename }) => ({
+      kind, media_type, data_base64, filename,
+    }));
+    // Clear staged attachments + revoke object URLs
+    attachments.forEach(revokePreview);
+    setAttachments([]);
     // Optimistic append
-    setMessages((m) => [...m, { id: 'optimistic', role: 'user', content_text: text, created_at: new Date().toISOString() }]);
+    setMessages((m) => [...m, { id: 'optimistic', role: 'user', content_text: text || '(attachment)', created_at: new Date().toISOString() }]);
     try {
-      const r = await call('ckf-chat', { action: 'send', conversation_id: id, text });
+      const r = await call('ckf-chat', {
+        action: 'send', conversation_id: id, text: text || '',
+        attachments: payloadAttachments,
+      });
       setMessages(r.messages);
-      // Notify caller (Voice mode listener) about the new assistant text
       window.dispatchEvent(new CustomEvent('ckf-assistant-text', { detail: r.text }));
     } catch (e) {
       setErr(e.message);
@@ -132,6 +147,26 @@ export default function Chat({ embedded = false }) {
       setBusy(false);
       taRef.current?.focus();
     }
+  }
+
+  async function onPickFiles(files, fromCamera) {
+    if (!files || files.length === 0) return;
+    setErr('');
+    for (const f of files) {
+      try {
+        const att = await processFile(f);
+        att.from_camera = !!fromCamera;
+        setAttachments((a) => [...a, att]);
+      } catch (e) {
+        setErr(e.message);
+      }
+    }
+  }
+  function removeAttachment(i) {
+    setAttachments((a) => {
+      revokePreview(a[i]);
+      return a.filter((_, idx) => idx !== i);
+    });
   }
 
   function onKeyDown(e) {
@@ -343,6 +378,38 @@ export default function Chat({ embedded = false }) {
         )}
       </div>
 
+      {attachments.length > 0 && (
+        <div className="attachment-tray">
+          {attachments.map((a, i) => (
+            <div key={i} className="attachment-chip" title={a.filename}>
+              {a.kind === 'image'
+                ? <img src={a.preview_url} alt="" />
+                : <span style={{ fontSize: 18 }}>📄</span>}
+              <span className="attachment-name">{a.filename}</span>
+              <button onClick={() => removeAttachment(i)} aria-label="Remove" className="attachment-x">✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Hidden file inputs — triggered by the composer buttons. */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        style={{ display: 'none' }}
+        onChange={(e) => { onPickFiles(e.target.files, true); e.target.value = ''; }}
+      />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,application/pdf"
+        multiple
+        style={{ display: 'none' }}
+        onChange={(e) => { onPickFiles(e.target.files, false); e.target.value = ''; }}
+      />
+
       <div className="chat-composer">
         <button
           onClick={flipTts}
@@ -354,7 +421,7 @@ export default function Chat({ embedded = false }) {
           {ttsOn ? '🔊' : '🔈'}
         </button>
         <button
-          onClick={voiceMode ? flipVoiceMode : flipVoiceMode}
+          onClick={flipVoiceMode}
           className={`mic-btn convo-btn ${voiceMode ? 'recording' : ''}`}
           disabled={busy && !voiceMode}
           aria-label={voiceMode ? 'Stop hands-free' : 'Start hands-free conversation'}
@@ -362,6 +429,20 @@ export default function Chat({ embedded = false }) {
         >
           {voiceMode ? '■' : '🗨'}
         </button>
+        <button
+          onClick={() => cameraInputRef.current?.click()}
+          className="cam-btn"
+          disabled={voiceMode || busy}
+          aria-label="Take photo"
+          title="Take a photo"
+        >📷</button>
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="file-btn"
+          disabled={voiceMode || busy}
+          aria-label="Attach file"
+          title="Attach an image or PDF"
+        >📎</button>
         <textarea
           ref={taRef}
           rows={1}
@@ -374,7 +455,7 @@ export default function Chat({ embedded = false }) {
           onKeyDown={onKeyDown}
           disabled={busy || voiceMode}
         />
-        <button onClick={send} className="primary" disabled={busy || voiceMode || !draft.trim()}>Send</button>
+        <button onClick={send} className="primary" disabled={busy || voiceMode || (!draft.trim() && attachments.length === 0)}>Send</button>
       </div>
 
       {!embedded && historyOpen && (

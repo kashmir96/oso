@@ -255,13 +255,39 @@ function makeTitle(text) {
   return t || 'New chat';
 }
 
+// Convert frontend-shaped attachments into Anthropic content blocks.
+function attachmentsToBlocks(attachments) {
+  if (!Array.isArray(attachments)) return [];
+  const out = [];
+  for (const a of attachments) {
+    if (!a?.data_base64) continue;
+    if (a.kind === 'image') {
+      out.push({
+        type: 'image',
+        source: { type: 'base64', media_type: a.media_type || 'image/jpeg', data: a.data_base64 },
+      });
+    } else if (a.kind === 'document') {
+      out.push({
+        type: 'document',
+        source: { type: 'base64', media_type: a.media_type || 'application/pdf', data: a.data_base64 },
+      });
+    }
+  }
+  return out;
+}
+
 // ── Main send loop ──
-async function runChat({ userId, conversation, userMessageText, modeHint }) {
+async function runChat({ userId, conversation, userMessageText, modeHint, attachments }) {
   if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-  // Persist the user message first
-  const userBlocks = [{ type: 'text', text: userMessageText }];
+  // Persist the user message — attachments go into content_blocks so they
+  // replay back to the model on subsequent turns within the conversation.
+  const attBlocks = attachmentsToBlocks(attachments);
+  const userBlocks = [];
+  if (attBlocks.length > 0) userBlocks.push(...attBlocks);
+  if (userMessageText && userMessageText.trim()) userBlocks.push({ type: 'text', text: userMessageText });
+  if (userBlocks.length === 0) userBlocks.push({ type: 'text', text: '(empty message)' });
   await saveMessage(conversation.id, userId, 'user', userMessageText, userBlocks);
 
   // If conversation has no title yet, set one from the first user message
@@ -490,15 +516,18 @@ exports.handler = withGate(async (event, { user }) => {
   }
 
   if (action === 'send') {
-    const { conversation_id, text, mode_hint } = body;
-    if (!conversation_id || !text || !text.trim()) return reply(400, { error: 'conversation_id and text required' });
+    const { conversation_id, text, mode_hint, attachments } = body;
+    const hasText = text && text.trim();
+    const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
+    if (!conversation_id || (!hasText && !hasAttachments)) return reply(400, { error: 'conversation_id and (text or attachments) required' });
     const conversation = await getConversation(user.id, conversation_id);
     if (!conversation) return reply(404, { error: 'conversation not found' });
     const result = await runChat({
       userId: user.id,
       conversation,
-      userMessageText: text.trim(),
+      userMessageText: hasText ? text.trim() : '',
       modeHint: mode_hint || null,
+      attachments,
     });
     // Re-load messages so the client renders the full final state including any tool turns
     const messages = await sbSelect(
