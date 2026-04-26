@@ -28,6 +28,35 @@ const MODEL = 'claude-sonnet-4-6';
 const MAX_TOKENS_CONCEPTS = 1200;
 const MAX_TOKENS_CREATIVE = 2000;
 const MAX_TOKENS_COPY     = 1500;
+const MAX_TOKENS_CRITIQUE = 1200;
+const MAX_TOKENS_FEEDBACK = 800;
+
+// Register-level anti-patterns. Inserted into every generator's system prompt
+// after the locked-decisions reminder, before the JSON output shape. These
+// expand "kiwi-coded, peer-to-peer, warm but plain-spoken" — they don't
+// replace it. Keep this verbatim across generators so the model sees the same
+// guardrail every call (and the prompt cache stays warm).
+const REGISTER_ANTIPATTERNS = `Register anti-patterns — DO NOT:
+- Don't use vague hyperbole: "this is the one", "say goodbye to ___", "transform your skin", "the secret to", "game-changer", "holy grail".
+- Don't use luxury/pamper register: "indulge", "treat yourself", "pamper", "luxe", "ritual", "spa-like".
+- Don't use clean-beauty/wellness register: "clean ingredients", "non-toxic", "wellness journey", "self-care moment", "actives", "regimens", "skincare routine".
+- Don't frame the brand as a small struggling startup ("just a tiny family business trying to make it"). We're 23 people shipping ~50,000 units/year — past that.
+- Don't frame the brand as a polished mega-brand either. DTC, direct, plainspoken.
+- Don't open with "Hey guys", "What's up", "Welcome back" or generic creator openers.
+- Don't hide what tallow is — it's rendered beef fat. Say so plainly when the moment calls for it.
+- Don't make medical claims (cure, treat, heal, fix eczema). EANZ Gold Supporter relationship depends on this.
+- Don't use scarcity around retail availability — pull-out is complete and past tense.`;
+
+// Trust priority context block. Placed in the user message of generateCreative
+// + generateCopy so the model knows when to lead with explicit trust levers
+// (cold + reactive audience) vs. skip them (retargeting / existing customers).
+function trustPriorityBlock(level) {
+  const lvl = level || 'medium';
+  return `Trust priority: ${lvl}
+- high: lead with at least one specific trust lever (EANZ Gold Supporter, NZ-made in Christchurch, 100,000+ kiwis served, "patch test first", or founder voice). Don't lead with offer or discount.
+- medium: include a trust lever casually if it fits — don't force it.
+- low: existing customers / retargeting — skip the trust setup, lead with offer, new product, or new angle.`;
+}
 
 // ── Helpers ──
 async function getDraft(userId, id) {
@@ -138,7 +167,13 @@ async function generateConcepts(draft) {
   const sys = [
     {
       type: 'text',
-      text: `You recommend ad concepts for PrimalPantry — a NZ tallow-skincare brand. You will get an objective, a campaign and a format, plus the campaign's existing concept library and top-performing ads. Recommend 3 concepts that fit the objective. Prefer concepts with status 'workhorse' or 'efficient' when available; otherwise propose new concepts that build on patterns the top-performing ads exhibit. Respond ONLY with JSON of the form: [{"id":"<existing-concept-id-or-null>","name":"<short concept name>","why":"<2-3 sentences why this fits the objective + format>"}]. If recommending a brand-new concept set id to null.`,
+      text: `You recommend ad concepts for PrimalPantry — a NZ tallow-skincare brand. You will get an objective, a campaign and a format, plus the campaign's existing concept library and top-performing ads. Recommend 3 concepts that fit the objective. Prefer concepts with status 'workhorse' or 'efficient' when available; otherwise propose new concepts that build on patterns the top-performing ads exhibit.
+
+Honour the locked brand decisions (especially: PrimalPantry pulled out of retail — past tense, no scarcity hook around availability; customer count is "100,000+ kiwis"; Reviana — not Reviora; Reviana frames as "tallow + cosmeceutical actives", NOT a separate anti-aging brand).
+
+${REGISTER_ANTIPATTERNS}
+
+Respond ONLY with JSON of the form: [{"id":"<existing-concept-id-or-null>","name":"<short concept name>","why":"<2-3 sentences why this fits the objective + format>"}]. If recommending a brand-new concept set id to null.`,
       cache_control: { type: 'ephemeral' },
     },
   ];
@@ -193,7 +228,13 @@ async function generateCreative(draft) {
   const sys = [
     {
       type: 'text',
-      text: `You produce creative direction for PrimalPantry Meta ads. Tone: NZ kiwi-coded, peer-to-peer, warm but plain-spoken. Honour the locked brand decisions (especially: PrimalPantry pulled out of retail — past tense, no scarcity hook; customer count is "100,000+ kiwis"; Reviana not Reviora; Reviana frames as "tallow + cosmeceutical actives" NOT a separate anti-aging brand). Respond ONLY with JSON of the requested shape — no prose around it.`,
+      text: `You produce creative direction for PrimalPantry Meta ads. Tone: NZ kiwi-coded, peer-to-peer, warm but plain-spoken.
+
+Honour the locked brand decisions (especially: PrimalPantry pulled out of retail — past tense, no scarcity hook; customer count is "100,000+ kiwis"; Reviana not Reviora; Reviana frames as "tallow + cosmeceutical actives" NOT a separate anti-aging brand).
+
+${REGISTER_ANTIPATTERNS}
+
+Respond ONLY with JSON of the requested shape — no prose around it.`,
       cache_control: { type: 'ephemeral' },
     },
   ];
@@ -209,6 +250,9 @@ ${draft.format || '(not set)'}
 
 # Audience
 ${draft.audience_type || '(not specified — assume cold)'}
+
+# Trust priority (gates explicit trust levers)
+${trustPriorityBlock(draft.trust_priority)}
 
 # Selected concept
 ${concept ? `${concept.id} — ${concept.name}\nStatus: ${concept.status}\nNotes: ${concept.notes || '—'}` : '(no existing concept selected — invent one that fits the objective)'}
@@ -244,7 +288,11 @@ async function generateCopy(draft, opts = {}) {
   const sys = [
     {
       type: 'text',
-      text: `You write Meta ad copy for PrimalPantry. Tone: NZ kiwi-coded, peer-to-peer, warm but plain-spoken. Specific over generic. Honour the locked brand decisions. Do NOT use scarcity around retail — pull-out is complete and past-tense. Customer count is "100,000+ kiwis" (don't say 20k/60k/85k/95k — those are stale).
+      text: `You write Meta ad copy for PrimalPantry. Tone: NZ kiwi-coded, peer-to-peer, warm but plain-spoken. Specific over generic.
+
+Honour the locked brand decisions. Do NOT use scarcity around retail — pull-out is complete and past-tense. Customer count is "100,000+ kiwis" (don't say 20k/60k/85k/95k — those are stale).
+
+${REGISTER_ANTIPATTERNS}
 
 Output JSON ONLY:
 {
@@ -269,6 +317,9 @@ ${ctx.campaign ? `${ctx.campaign.id} — ${ctx.campaign.name}` : '(not set)'}
 Format: ${draft.format || '?'}
 Audience: ${draft.audience_type || 'cold (assume)'}
 Landing URL: ${draft.landing_url || '(not provided — use {{landing}})'}
+
+# Trust priority (gates explicit trust levers)
+${trustPriorityBlock(draft.trust_priority)}
 
 # Selected concept
 ${concept ? `${concept.id} — ${concept.name}` : '(brand-new — invent)'}
@@ -296,6 +347,142 @@ Output JSON only.`;
   return parseJSON(text);
 }
 
+// ── Critique & feedback ──
+// generateCritique runs once both copy variants exist, before finalize, and
+// returns { scores, rationale, verdict, repair_instructions }. The wizard
+// uses verdict to gate finalize: ship → continue, repair → regenerate copy
+// with the instructions, replace → start the concept step over.
+async function generateCritique(draft) {
+  const ctx = await loadDraftContext(draft);
+  const c = client();
+
+  const sys = [
+    {
+      type: 'text',
+      text: `You critique a PrimalPantry ad draft before it ships. You see the full draft (creative + both copy variants + headline/cta) and grade it against brand voice, register, locked decisions, concept alignment, and hook strength. Be blunt and specific — Curtis wants you to catch register slips, locked-decision violations, weak hooks. You give exactly one verdict.
+
+Honour the locked brand decisions and the register anti-patterns below.
+
+${REGISTER_ANTIPATTERNS}
+
+Output JSON ONLY:
+{
+  "scores": {
+    "brand_voice": 0-10,
+    "register": 0-10,
+    "locked_decisions": 0-10,
+    "concept_alignment": 0-10,
+    "hook_strength": 0-10
+  },
+  "rationale": "<2-3 sentences: what's working, what's weak. Specific, not generic.>",
+  "verdict": "ship" | "repair" | "replace",
+  "repair_instructions": "<if verdict=repair: 1-3 specific changes to make to copy. If ship or replace: empty string.>"
+}
+
+Verdict rules:
+- ship: scores mostly ≥7, no register or locked-decision violation. Ready as-is.
+- repair: scores 5-7, one targeted rewrite of the copy will fix it. Provide repair_instructions.
+- replace: any register-level violation, any locked-decision violation, OR scores mostly <5. The concept itself is wrong — start over.`,
+      cache_control: { type: 'ephemeral' },
+    },
+  ];
+
+  const user = `# Draft under review
+Objective: ${draft.objective || '(not set)'}
+Format: ${draft.format || '?'}
+Audience: ${draft.audience_type || 'cold'}
+Trust priority: ${draft.trust_priority || 'medium'}
+Selected concept: ${draft.selected_concept_id || '(none)'}
+
+# Creative direction
+${draft.creative ? clamp(JSON.stringify(draft.creative), 2000) : '(none)'}
+
+# Copy v1
+${draft.primary_text_v1 || '(none)'}
+
+# Copy v2
+${draft.primary_text_v2 || '(none)'}
+
+Headline: ${draft.headline || '(none)'}
+Description: ${draft.description || '(none)'}
+CTA: ${draft.cta || '(none)'}
+
+# Locked brand decisions
+${lockedDecisionsBlock(ctx.lockedDecisions)}
+
+Critique. JSON only.`;
+
+  const resp = await c.messages.create({
+    model: MODEL,
+    max_tokens: MAX_TOKENS_CRITIQUE,
+    system: sys,
+    messages: [{ role: 'user', content: user }],
+  });
+  const text = resp.content.find((b) => b.type === 'text')?.text || '';
+  return parseJSON(text);
+}
+
+// generateFeedback runs at finalize, given Curtis's pick (v1 vs v2) and any
+// free-form summary of edits he made. Returns a structured analysis the
+// wizard persists into mktg_drafts.feedback_analysis. High-confidence
+// recurring patterns get bridged into mktg_memory_facts by the wizard
+// executor — this function does NOT touch the DB.
+async function generateFeedback(draft, choice) {
+  const ctx = await loadDraftContext(draft);
+  const c = client();
+
+  const sys = [
+    {
+      type: 'text',
+      text: `You analyse Curtis's pick between v1 and v2 of a PrimalPantry ad draft, plus any free-form notes he wrote about edits he made to the chosen one. You output a short, structured signal that helps the system learn his preferences over time. Specific, not generic. This is not a marketing report.
+
+Output JSON ONLY:
+{
+  "preference_signals": ["<short bullet — what made the chosen variant win>", "..."],
+  "rejected_signals": ["<what he passed on in the other variant>", "..."],
+  "edit_themes": ["<category of edit he made: tone-down, more-specific, cut-jargon, swap-trust-lever, etc.>", "..."],
+  "confidence": 0-10,
+  "recurring_pattern_hint": "<2 sentences: a guess at a recurring preference worth remembering. Empty string if signal is too weak.>"
+}
+
+confidence guide:
+- 9-10: very clear signal (one variant chosen with no edits, and the variants differed on one obvious axis like founder-voice vs benefit-list).
+- 5-8: moderate (chosen with edits, or variants differed on multiple axes).
+- 0-4: noisy — both variants similar, or no edits to interpret.`,
+      cache_control: { type: 'ephemeral' },
+    },
+  ];
+
+  const user = `# Draft context
+Campaign: ${ctx.campaign?.name || draft.campaign_id || '?'}
+Objective: ${draft.objective || '?'}
+Audience: ${draft.audience_type || 'cold'}
+Trust priority: ${draft.trust_priority || 'medium'}
+
+# Variant v1 (${choice.chosen_variant === 'v1' ? 'CHOSEN' : 'rejected'})
+${draft.primary_text_v1 || ''}
+
+# Variant v2 (${choice.chosen_variant === 'v2' ? 'CHOSEN' : 'rejected'})
+${draft.primary_text_v2 || ''}
+
+# Final shipped text (after Curtis's edits)
+${draft.primary_text_final || '(no edits — chosen variant shipped as-is)'}
+
+# Curtis's free-form note on what he changed
+${choice.user_edits_diff || '(none)'}
+
+Analyse. JSON only.`;
+
+  const resp = await c.messages.create({
+    model: MODEL,
+    max_tokens: MAX_TOKENS_FEEDBACK,
+    system: sys,
+    messages: [{ role: 'user', content: user }],
+  });
+  const text = resp.content.find((b) => b.type === 'text')?.text || '';
+  return parseJSON(text);
+}
+
 // ── Handler ──
 // Expose internals so the marketing chat's wizard tools can drive the same
 // generators without re-implementing them. Order matters — these must be
@@ -303,6 +490,8 @@ Output JSON only.`;
 exports.generateConcepts = generateConcepts;
 exports.generateCreative = generateCreative;
 exports.generateCopy     = generateCopy;
+exports.generateCritique = generateCritique;
+exports.generateFeedback = generateFeedback;
 exports.getDraft         = getDraft;
 exports.patchDraft       = patchDraft;
 
@@ -350,6 +539,8 @@ exports.handler = withGate(async (event, { user }) => {
         'selected_concept_id','recommended_concepts','creative',
         'primary_text_v1','primary_text_v2','primary_text_final',
         'headline','description','cta','naming','notes','current_step','status',
+        'trust_priority',
+        'feedback_analysis','chosen_variant','rejected_variant','user_edits_diff',
       ];
       const patch = {};
       for (const k of allowed) if (body[k] !== undefined) patch[k] = body[k];

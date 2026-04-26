@@ -226,16 +226,17 @@ const TOOLS = [
   // the relevant data so the AI can immediately summarise it for the user.
   {
     name: 'wizard_set',
-    description: "Save what you've learned about the ad so far. Pass only the fields you've confirmed with Curtis. Call this every time he tells you the objective, picks a campaign, picks a format, names the audience, or gives the landing URL — don't batch.",
+    description: "Save what you've learned about the ad so far. Pass only the fields you've confirmed with Curtis. Call this every time he tells you the objective, picks a campaign, picks a format, names the audience, or gives the landing URL — don't batch. ALSO set trust_priority once audience + campaign are known: 'high' for cold + reactive-skin / first-touch eczema audiences (lead with explicit trust levers); 'medium' for warm or familiar audiences; 'low' for retargeting / existing customers (skip trust setup, lead with offer).",
     input_schema: {
       type: 'object',
       properties: {
-        objective:     { type: 'string' },
-        campaign_id:   { type: 'string', enum: ['tallow-balm','shampoo-bar','reviana'] },
-        format:        { type: 'string', enum: ['static','video','carousel','reel'] },
-        audience_type: { type: 'string', description: "free text: 'cold NZ women 25-55', 'lapsed customers', 'lookalike from purchases', etc." },
-        landing_url:   { type: 'string' },
-        notes:         { type: 'string', description: 'extra context Curtis volunteered (mood, urgency, constraints) that should ride with the draft' },
+        objective:      { type: 'string' },
+        campaign_id:    { type: 'string', enum: ['tallow-balm','shampoo-bar','reviana'] },
+        format:         { type: 'string', enum: ['static','video','carousel','reel'] },
+        audience_type:  { type: 'string', description: "free text: 'cold NZ women 25-55', 'lapsed customers', 'lookalike from purchases', etc." },
+        landing_url:    { type: 'string' },
+        trust_priority: { type: 'string', enum: ['high','medium','low'], description: 'Auto-infer from audience + campaign. high = cold + reactive-skin or first-touch eczema; medium = warm/familiar; low = retargeting/existing customers.' },
+        notes:          { type: 'string', description: 'extra context Curtis volunteered (mood, urgency, constraints) that should ride with the draft' },
       },
     },
   },
@@ -271,14 +272,21 @@ const TOOLS = [
     },
   },
   {
+    name: 'wizard_critique',
+    description: "Run an internal critique pass on the current draft (creative + both copy variants). Call this AFTER wizard_generate_copy and BEFORE asking Curtis which variant he prefers. Returns scores + verdict (ship/repair/replace) + repair_instructions. If verdict='repair', call wizard_generate_copy again with the repair_instructions as feedback. If verdict='replace', go back to wizard_recommend_concepts. If verdict='ship', proceed to ask Curtis for his pick. Don't read the verdict aloud word-for-word — just act on it conversationally (\"Quick gut-check on this — I want to tighten the hook before you pick.\" rather than \"My critique scored this 6/10.\").",
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
     name: 'wizard_finalize',
-    description: "When Curtis approves the copy, call this with the chosen primary_text. Marks the draft as approved and returns the full ready-to-paste payload (which the chat UI will render as a final card).",
+    description: "When Curtis approves the copy, call this with the chosen primary_text PLUS which variant he picked (v1 or v2) and a short summary of any edits he made. Marks the draft as approved, runs a feedback-analysis pass on his pick, persists the analysis, and returns the ready-to-paste payload.",
     input_schema: {
       type: 'object',
       properties: {
         primary_text_final: { type: 'string', description: "the final primary text Curtis approved (either v1, v2, or his edit)" },
+        chosen_variant:     { type: 'string', enum: ['v1','v2'], description: "which generated variant he picked as the base. Required so the system can learn his preferences." },
+        user_edits_diff:    { type: 'string', description: "short plain-English summary of what he changed from the chosen variant (e.g. 'cut the second paragraph', 'swapped the EANZ line in', 'tightened opener'). Empty string if shipped as-is." },
       },
-      required: ['primary_text_final'],
+      required: ['primary_text_final','chosen_variant'],
     },
   },
   {
@@ -510,9 +518,12 @@ async function execute(name, input, ctx) {
       return { draft };
     }
     case 'wizard_set': {
-      const allowed = ['objective','campaign_id','format','audience_type','landing_url','notes'];
+      const allowed = ['objective','campaign_id','format','audience_type','landing_url','trust_priority','notes'];
       const patch = {};
       for (const k of allowed) if (input[k] !== undefined && input[k] !== null && input[k] !== '') patch[k] = input[k];
+      if (patch.trust_priority && !['high','medium','low'].includes(patch.trust_priority)) {
+        return { error: 'trust_priority must be high|medium|low' };
+      }
       if (Object.keys(patch).length === 0) return { error: 'nothing to set' };
       const draft = await ensureDraftForConversation(userId, ctx.conversationId);
       const after = { ...draft, ...patch };
@@ -568,30 +579,89 @@ async function execute(name, input, ctx) {
       });
       return { ...out, draft: updated };
     }
+    case 'wizard_critique': {
+      const mktgAds = require('../mktg-ads.js');
+      const draft = await ensureDraftForConversation(userId, ctx.conversationId);
+      if (!draft.primary_text_v1 || !draft.primary_text_v2) {
+        return { error: 'need both primary_text_v1 and primary_text_v2 — call wizard_generate_copy first' };
+      }
+      const critique = await mktgAds.generateCritique(draft);
+      return { critique };
+    }
     case 'wizard_finalize': {
       if (!input?.primary_text_final) return { error: 'primary_text_final required' };
+      if (!input?.chosen_variant || !['v1','v2'].includes(input.chosen_variant)) {
+        return { error: "chosen_variant required (must be 'v1' or 'v2')" };
+      }
+      const mktgAds = require('../mktg-ads.js');
       const draft = await ensureDraftForConversation(userId, ctx.conversationId);
-      const updated = await sbUpdate(
+
+      // Stamp the final text + variant pick + edits diff first so generateFeedback
+      // sees the full picture (chosen variant + final shipped text + diff note).
+      const stamped = await sbUpdate(
         'mktg_drafts',
         `id=eq.${encodeURIComponent(draft.id)}&user_id=eq.${userId}`,
         {
           primary_text_final: input.primary_text_final,
-          status: 'approved',
-          current_step: 'final',
-          updated_at: new Date().toISOString(),
+          chosen_variant:     input.chosen_variant,
+          rejected_variant:   input.chosen_variant === 'v1' ? 'v2' : 'v1',
+          user_edits_diff:    input.user_edits_diff || null,
+          status:             'approved',
+          current_step:       'final',
+          updated_at:         new Date().toISOString(),
         }
       );
-      const finalDraft = Array.isArray(updated) ? updated[0] : updated;
+      const stampedDraft = Array.isArray(stamped) ? stamped[0] : stamped;
+
+      // Run feedback analysis. Don't fail finalize if this errors — feedback
+      // capture is best-effort, the ad still ships.
+      let feedback = null;
+      try {
+        feedback = await mktgAds.generateFeedback(stampedDraft, {
+          chosen_variant:  input.chosen_variant,
+          user_edits_diff: input.user_edits_diff || '',
+        });
+        await sbUpdate(
+          'mktg_drafts',
+          `id=eq.${encodeURIComponent(draft.id)}&user_id=eq.${userId}`,
+          { feedback_analysis: feedback, updated_at: new Date().toISOString() }
+        );
+      } catch (e) {
+        console.error('[wizard_finalize] feedback analysis failed:', e?.message || e);
+      }
+
+      // Bridge high-confidence recurring patterns into mktg_memory_facts so
+      // future generations learn from them. Threshold: confidence ≥ 8 AND a
+      // non-empty recurring_pattern_hint.
+      let bridged_fact_id = null;
+      if (feedback?.confidence >= 8 && feedback?.recurring_pattern_hint?.trim()) {
+        try {
+          const fact = await sbInsert('mktg_memory_facts', {
+            user_id:    userId,
+            fact:       feedback.recurring_pattern_hint.trim(),
+            topic:      'copy_voice',
+            importance: 4,
+            source_message_id: ctx.messageId || null,
+          });
+          bridged_fact_id = fact?.id || null;
+        } catch (e) {
+          console.error('[wizard_finalize] memory bridge failed:', e?.message || e);
+        }
+      }
+
+      const finalDraft = stampedDraft;
       return {
         finalized: true,
         ready_to_paste: {
           ad_name:        finalDraft.naming || null,
-          primary_text:   finalDraft.primary_text_final,
+          primary_text:   input.primary_text_final,
           headline:       finalDraft.headline || null,
           description:    finalDraft.description || null,
           cta:            finalDraft.cta || null,
           website_url:    finalDraft.landing_url || null,
         },
+        feedback_analysis: feedback,
+        bridged_fact_id,
         draft: finalDraft,
       };
     }
