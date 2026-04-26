@@ -436,6 +436,23 @@ Don't create vague goals. For numeric, ask one question if target is missing.`,
     },
   },
   {
+    name: 'add_swipefile_note',
+    description: "Save a note to Curtis's swipefile (his trusted-source knowledge base — books, frameworks, taglines, observations he wants the AI to reference later). ONLY call this in swipefile-capture mode (triggered by 'go into swipefile mode' / 'swipefile mode'). In capture mode, EVERY user message gets one call to this tool with the message verbatim as source_text — no triage, no filtering. Outside capture mode, only call when the user explicitly asks to save something to the swipefile.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        source_text:    { type: 'string', description: "Curtis's message verbatim, or the snippet he wants saved" },
+        title:          { type: 'string', description: "optional short title; if absent, derive from the first ~60 chars of source_text" },
+        why_it_matters: { type: 'string', description: "optional — only if Curtis volunteered why" },
+        author:         { type: 'string', description: "optional — original source's author if Curtis named one" },
+        category:       { type: 'string', enum: ['personal','health','business','social','finance','marketing','other'], description: "default depends on chat scope (personal/business)" },
+        tags:           { type: 'array', items: { type: 'string' }, description: "optional — any tags he mentioned" },
+        importance:     { type: 'integer', minimum: 1, maximum: 5, description: 'default 3' },
+      },
+      required: ['source_text'],
+    },
+  },
+  {
     name: 'remember',
     description: "Save a long-term memory fact about Curtis. Call this when you learn something durable that should persist across future conversations: a value, a relationship, a recurring pattern, a meaningful preference, an ongoing struggle, an aspiration. Don't store ephemeral one-day moods. Examples of GOOD facts: 'trains 4x/week, prefers morning lifts', 'wife is Linda, runs PP ops with him', 'has chronically poor sleep when stressed about cashflow'. Examples of BAD facts (do not store): 'felt tired today', 'had a stressful meeting'.",
     input_schema: {
@@ -836,6 +853,31 @@ async function execute(name, input, ctx) {
           kind: 'task',
           fallback_reason: 'business_projects table missing — saved as task instead. Apply supabase-business-projects.sql to enable projects.',
         };
+      }
+    }
+    case 'add_swipefile_note': {
+      if (!input?.source_text) return { error: 'source_text required' };
+      const title = input.title
+        || input.source_text.split('\n')[0].slice(0, 60)
+        || 'Note';
+      const tags = Array.isArray(input.tags) ? input.tags : [];
+      // Tag everything captured this way so it's filterable later.
+      if (!tags.includes('captured-from-chat')) tags.push('captured-from-chat');
+      try {
+        const row = await sbInsert('ckf_swipefile_items', {
+          user_id:        userId,
+          kind:           'note',
+          title,
+          source_text:    input.source_text,
+          why_it_matters: input.why_it_matters || null,
+          author:         input.author || null,
+          category:       input.category || 'personal',
+          tags,
+          importance:     input.importance ?? 3,
+        });
+        return { saved: true, id: row?.id, kind: 'swipefile_note' };
+      } catch (e) {
+        return { error: `swipefile insert failed: ${e.message}` };
       }
     }
     case 'queue_website_improvement': {

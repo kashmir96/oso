@@ -40,8 +40,11 @@ export default function Settings() {
           <Link to="/ninety-day-goals"><button>90-day goals</button></Link>
           <Link to="/business"><button>Business</button></Link>
           <Link to="/search"><button>🔍 Search</button></Link>
-          <Link to="/swipefile"><button>Swipefile</button></Link>
           <Link to="/meals"><button>Meals</button></Link>
+          {/* Swipefile is now a chat mode ("go into swipefile mode") rather
+              than a separate page. The /swipefile route still exists for
+              browsing what's been captured, but it's no longer surfaced
+              as a quick link here. */}
           <button onClick={() => { logout(); nav('/login'); }} className="danger">Sign out</button>
         </div>
       </div>
