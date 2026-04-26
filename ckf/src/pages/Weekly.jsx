@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import Header from '../components/Header.jsx';
-import { call } from '../lib/api.js';
+import { call, callCached, notifyChanged } from '../lib/api.js';
 import { fmtShortDate } from '../lib/format.js';
 
 export default function Weekly() {
@@ -9,14 +9,19 @@ export default function Weekly() {
   const [err, setErr] = useState('');
 
   async function load() {
-    const r = await call('ckf-weekly', { action: 'list' });
+    const r = await callCached('ckf-weekly', { action: 'list' });
     setSummaries(r.summaries);
   }
-  useEffect(() => { load().catch((e) => setErr(e.message)); }, []);
+  useEffect(() => {
+    load().catch((e) => setErr(e.message));
+    const handler = () => load().catch(() => {});
+    window.addEventListener('ckf-data-changed', handler);
+    return () => window.removeEventListener('ckf-data-changed', handler);
+  }, []);
 
   async function generate() {
     setBusy(true); setErr('');
-    try { await call('ckf-weekly', { action: 'generate' }); await load(); }
+    try { await call('ckf-weekly', { action: 'generate' }); notifyChanged(); await load(); }
     catch (e) { setErr(e.message); } finally { setBusy(false); }
   }
 

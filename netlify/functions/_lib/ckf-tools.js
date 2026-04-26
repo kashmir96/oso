@@ -424,11 +424,24 @@ Don't create vague goals. For numeric, ask one question if target is missing.`,
   },
   {
     name: 'queue_website_improvement',
-    description: "Use this INSTEAD OF the task/project tools when Curtis is queuing work for Claude Code (the dev assistant) to do when he's back at his PC. Triggers: he uses the words \"website\", \"claude code\", \"the app\", \"fix the\", \"add to the dashboard\", \"in the chat\", or otherwise describes a code change to the oso/ckf web app. Capture immediately, don't ask questions. Title can be his words verbatim. Description is optional but useful for capturing the why or any constraint he mentioned.",
+    description: "Queue a code change for the **PrimalPantry website** (primebroth repo) — the e-commerce site at primalpantry.co.nz. Use this when Curtis describes a change to the storefront, product pages, checkout, marketing pages, blog, etc. Triggers: 'website', 'primebroth', 'the storefront', 'product page', 'checkout', 'fix the homepage'. NOT for changes to this app (oso/ckf) — those use queue_system_update. Capture immediately, no questions. Title verbatim is fine.",
     input_schema: {
       type: 'object',
       properties: {
-        title: { type: 'string', description: 'short imperative — "fix dashboard layout on iOS"' },
+        title: { type: 'string', description: 'short imperative — "fix product variant selector on mobile"' },
+        description: { type: 'string', description: 'optional context, why, constraints' },
+        priority: { type: 'integer', minimum: 1, maximum: 5, description: 'default 3' },
+      },
+      required: ['title'],
+    },
+  },
+  {
+    name: 'queue_system_update',
+    description: "Queue a code change for the **CKF / Second Brain app** (oso/ckf repo) — this very app Curtis is talking to. Use when he describes a change to the chat, dashboard, business page, settings, a tool the AI uses, etc. Triggers: 'system update', 'fix the chat', 'in the dashboard', 'in this app', 'claude code update', 'the second brain', 'the ckf app'. NOT for storefront changes — those use queue_website_improvement. Capture immediately, no questions.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'short imperative — "make the business chat scroll properly"' },
         description: { type: 'string', description: 'optional context, why, constraints' },
         priority: { type: 'integer', minimum: 1, maximum: 5, description: 'default 3' },
       },
@@ -957,30 +970,11 @@ async function execute(name, input, ctx) {
     }
     case 'queue_website_improvement': {
       if (!input?.title) return { error: 'title required' };
-      try {
-        const row = await sbInsert('website_tasks', {
-          user_id: userId,
-          title: input.title,
-          description: input.description || null,
-          priority: input.priority ?? 3,
-          status: 'queued',
-        });
-        return { queued: true, id: row?.id, kind: 'website_task' };
-      } catch (e) {
-        // Fall back to business_tasks so nothing is lost if the migration isn't applied.
-        const fallback = await sbInsert('business_tasks', {
-          user_id: userId,
-          title: `[website] ${input.title}`,
-          description: input.description || null,
-          priority: input.priority ?? 3,
-        });
-        return {
-          queued: true,
-          id: fallback?.id,
-          kind: 'task',
-          fallback_reason: 'website_tasks table missing — saved as task instead. Apply supabase-website-tasks.sql to enable the queue.',
-        };
-      }
+      return queueRepoTask(userId, input, 'primebroth', 'website');
+    }
+    case 'queue_system_update': {
+      if (!input?.title) return { error: 'title required' };
+      return queueRepoTask(userId, input, 'oso-ckf', 'system');
     }
     case 'create_errand': {
       if (!input?.title) return { error: 'title required' };
@@ -1172,6 +1166,36 @@ async function execute(name, input, ctx) {
 
     default:
       return { error: `unknown tool ${name}` };
+  }
+}
+
+// Shared insert path for the two repo-targeted queue tools. Falls back to
+// business_tasks if the website_tasks table or repo column is missing so
+// nothing is lost mid-migration.
+async function queueRepoTask(userId, input, repo, label) {
+  try {
+    const row = await sbInsert('website_tasks', {
+      user_id: userId,
+      title: input.title,
+      description: input.description || null,
+      priority: input.priority ?? 3,
+      status: 'queued',
+      repo,
+    });
+    return { queued: true, id: row?.id, kind: `${label}_task`, repo };
+  } catch (e) {
+    const fallback = await sbInsert('business_tasks', {
+      user_id: userId,
+      title: `[${label}] ${input.title}`,
+      description: input.description || null,
+      priority: input.priority ?? 3,
+    });
+    return {
+      queued: true,
+      id: fallback?.id,
+      kind: 'task',
+      fallback_reason: `website_tasks table or repo column missing — saved as business_task instead. Apply supabase-website-tasks.sql to enable the ${repo} queue.`,
+    };
   }
 }
 

@@ -15,10 +15,23 @@ CREATE TABLE IF NOT EXISTS website_tasks (
   priority     INT  NOT NULL DEFAULT 3 CHECK (priority BETWEEN 1 AND 5),
   notes        TEXT,                  -- Claude Code annotations during work
   pr_url       TEXT,                  -- link to resulting PR
+  -- 'primebroth' = the PrimalPantry e-commerce site (website mode in chat).
+  -- 'oso-ckf'    = this app (system update mode in chat).
+  repo         TEXT NOT NULL DEFAULT 'oso-ckf'
+                 CHECK (repo IN ('primebroth','oso-ckf')),
   completed_at TIMESTAMPTZ,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Existing-DB migration (safe re-run). For deployments that already have
+-- website_tasks without the repo column.
+ALTER TABLE website_tasks
+  ADD COLUMN IF NOT EXISTS repo TEXT NOT NULL DEFAULT 'oso-ckf';
+ALTER TABLE website_tasks
+  DROP CONSTRAINT IF EXISTS website_tasks_repo_check;
+ALTER TABLE website_tasks
+  ADD CONSTRAINT website_tasks_repo_check CHECK (repo IN ('primebroth','oso-ckf'));
 
 CREATE INDEX IF NOT EXISTS idx_website_tasks_user_status
   ON website_tasks(user_id, status, priority);

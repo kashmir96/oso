@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import Header from '../components/Header.jsx';
-import { call } from '../lib/api.js';
+import { call, callCached, notifyChanged } from '../lib/api.js';
 import { processFile, revokePreview } from '../lib/upload.js';
 import { fmtRelative } from '../lib/format.js';
 
@@ -16,20 +16,27 @@ export default function Swipefile() {
 
   async function load() {
     try {
-      const r = await call('ckf-swipefile', { action: 'list', archived: false });
+      const r = await callCached('ckf-swipefile', { action: 'list', archived: false });
       setItems(r.items || []);
     } catch (e) { setErr(e.message); }
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    const handler = () => load();
+    window.addEventListener('ckf-data-changed', handler);
+    return () => window.removeEventListener('ckf-data-changed', handler);
+  }, []);
 
   async function archive(id) {
     if (!confirm('Archive this item?')) return;
     await call('ckf-swipefile', { action: 'archive', id });
+    notifyChanged();
     load();
   }
   async function del(id) {
     if (!confirm('Delete permanently?')) return;
     await call('ckf-swipefile', { action: 'delete', id });
+    notifyChanged();
     load();
   }
 

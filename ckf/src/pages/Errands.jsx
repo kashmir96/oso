@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import Header from '../components/Header.jsx';
-import { call } from '../lib/api.js';
+import { call, callCached, notifyChanged } from '../lib/api.js';
 import { fmtShortDate } from '../lib/format.js';
 
 const CATEGORIES = ['personal','health','business','social','finance','marketing','other'];
@@ -14,17 +14,22 @@ export default function Errands() {
 
   async function load() {
     try {
-      const r = await call('ckf-errands', { action: 'list' });
+      const r = await callCached('ckf-errands', { action: 'list' });
       setItems(r.errands || []);
     } catch (e) { setErr(e.message); }
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    const handler = () => load();
+    window.addEventListener('ckf-data-changed', handler);
+    return () => window.removeEventListener('ckf-data-changed', handler);
+  }, []);
 
-  async function complete(id) { await call('ckf-errands', { action: 'complete', id }); load(); }
-  async function reopen(id) { await call('ckf-errands', { action: 'reopen', id }); load(); }
+  async function complete(id) { await call('ckf-errands', { action: 'complete', id }); notifyChanged(); load(); }
+  async function reopen(id) { await call('ckf-errands', { action: 'reopen', id }); notifyChanged(); load(); }
   async function del(id) {
     if (!confirm('Delete this errand?')) return;
-    await call('ckf-errands', { action: 'delete', id }); load();
+    await call('ckf-errands', { action: 'delete', id }); notifyChanged(); load();
   }
 
   if (err) return <div className="app"><div className="error">{err}</div></div>;
@@ -132,6 +137,7 @@ function Form({ item, onSaved, onCancel }) {
   async function onDelete() {
     if (!confirm('Delete this errand?')) return;
     await call('ckf-errands', { action: 'delete', id: item.id });
+    notifyChanged();
     onSaved();
   }
 

@@ -149,29 +149,31 @@ exports.handler = withGate(async (event, { user }) => {
 
   // ── Website tasks (Claude Code queue) ──
   if (action === 'list_website') {
-    const filter = body.status ? `&status=eq.${encodeURIComponent(body.status)}` : '';
-    const rows = await sbSelect(
-      'website_tasks',
-      `user_id=eq.${user.id}${filter}&order=status.asc,priority.asc,created_at.desc&select=*`
-    );
+    const filters = [`user_id=eq.${user.id}`, 'select=*', 'order=status.asc,priority.asc,created_at.desc'];
+    if (body.status) filters.push(`status=eq.${encodeURIComponent(body.status)}`);
+    if (body.repo)   filters.push(`repo=eq.${encodeURIComponent(body.repo)}`);
+    const rows = await sbSelect('website_tasks', filters.join('&'));
     return reply(200, { website_tasks: rows });
   }
 
   if (action === 'create_website') {
     if (!body.title) return reply(400, { error: 'title required' });
-    const row = await sbInsert('website_tasks', {
+    const insert = {
       user_id:     user.id,
       title:       body.title,
       description: body.description || null,
       priority:    body.priority ?? 3,
       status:      body.status || 'queued',
-    });
+    };
+    // Default to oso-ckf for backwards compat with existing manual entries.
+    if (body.repo) insert.repo = body.repo;
+    const row = await sbInsert('website_tasks', insert);
     return reply(200, { website_task: row });
   }
 
   if (action === 'update_website') {
     if (!body.id) return reply(400, { error: 'id required' });
-    const allowed = ['title','description','status','priority','notes','pr_url','completed_at'];
+    const allowed = ['title','description','status','priority','notes','pr_url','completed_at','repo'];
     const patch = {};
     for (const k of allowed) if (body[k] !== undefined) patch[k] = body[k];
     // Auto-set completed_at when transitioning to done.

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Header from '../components/Header.jsx';
 import Sparkline from '../components/Sparkline.jsx';
-import { call } from '../lib/api.js';
+import { call, callCached, notifyChanged } from '../lib/api.js';
 import { progressPct, formatGoalValue, fmtRelative } from '../lib/format.js';
 
 export default function GoalDetail() {
@@ -21,13 +21,18 @@ export default function GoalDetail() {
 
   async function load() {
     const [g, h] = await Promise.all([
-      call('ckf-goals', { action: 'list' }),
-      call('ckf-goals', { action: 'history', goal_id: id, limit: 60 }),
+      callCached('ckf-goals', { action: 'list' }),
+      callCached('ckf-goals', { action: 'history', goal_id: id, limit: 60 }),
     ]);
     setGoal(g.goals.find((x) => x.id === id) || null);
     setLogs(h.logs);
   }
-  useEffect(() => { load().catch((e) => setErr(e.message)); }, [id]);
+  useEffect(() => {
+    load().catch((e) => setErr(e.message));
+    const handler = () => load().catch(() => {});
+    window.addEventListener('ckf-data-changed', handler);
+    return () => window.removeEventListener('ckf-data-changed', handler);
+  }, [id]);
 
   async function logValue(e) {
     e.preventDefault(); setBusy(true); setErr('');
@@ -37,6 +42,7 @@ export default function GoalDetail() {
         for_date: forDate || undefined,
       });
       setVal(''); setNote('');
+      notifyChanged();
       await load();
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
   }
@@ -44,6 +50,7 @@ export default function GoalDetail() {
   async function archive() {
     if (!confirm('Archive this goal?')) return;
     await call('ckf-goals', { action: 'archive', id });
+    notifyChanged();
     nav('/goals');
   }
 

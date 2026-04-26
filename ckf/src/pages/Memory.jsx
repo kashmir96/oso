@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import Header from '../components/Header.jsx';
-import { call } from '../lib/api.js';
+import { call, callCached, notifyChanged } from '../lib/api.js';
 import { fmtRelative } from '../lib/format.js';
 
 // Read-only view of long-term memory facts the AI has accumulated. You can
@@ -11,14 +11,21 @@ export default function Memory() {
   const [err, setErr] = useState('');
 
   async function load() {
-    const r = await call('ckf-chat', { action: 'list_memory', topic: topic || undefined });
+    const r = await callCached('ckf-chat', { action: 'list_memory', topic: topic || undefined });
     setFacts(r.facts);
   }
-  useEffect(() => { load().catch((e) => setErr(e.message)); /* eslint-disable-next-line */ }, [topic]);
+  useEffect(() => {
+    load().catch((e) => setErr(e.message));
+    const handler = () => load().catch(() => {});
+    window.addEventListener('ckf-data-changed', handler);
+    return () => window.removeEventListener('ckf-data-changed', handler);
+    /* eslint-disable-next-line */
+  }, [topic]);
 
   async function archive(id) {
     if (!confirm('Archive this memory?')) return;
     await call('ckf-chat', { action: 'archive_memory', id });
+    notifyChanged();
     load();
   }
 

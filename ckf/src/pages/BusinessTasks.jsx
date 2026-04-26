@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import Header from '../components/Header.jsx';
-import { call } from '../lib/api.js';
+import { call, callCached, notifyChanged } from '../lib/api.js';
 import { fmtShortDate } from '../lib/format.js';
 
 const STATUSES = ['pending','in_progress','done','blocked','cancelled'];
@@ -11,18 +11,27 @@ export default function BusinessTasks() {
   const [err, setErr] = useState('');
 
   async function load() {
-    const r = await call('ckf-business', { action: 'list' });
+    // callCached: paint instantly from cache on tab return, refresh in bg.
+    const r = await callCached('ckf-business', { action: 'list' });
     setTasks(r.tasks);
   }
-  useEffect(() => { load().catch((e) => setErr(e.message)); }, []);
+  useEffect(() => {
+    load().catch((e) => setErr(e.message));
+    // Refresh when other components mutate (chat creates a task, etc).
+    const handler = () => load().catch(() => {});
+    window.addEventListener('ckf-data-changed', handler);
+    return () => window.removeEventListener('ckf-data-changed', handler);
+  }, []);
 
   async function setStatus(id, status) {
     await call('ckf-business', { action: 'update', id, status });
+    notifyChanged();
     load();
   }
   async function del(id) {
     if (!confirm('Delete?')) return;
     await call('ckf-business', { action: 'delete', id });
+    notifyChanged();
     load();
   }
 
@@ -92,6 +101,7 @@ function NewForm({ onSaved, onCancel }) {
         priority: Number(priority),
         due_date: due || null,
       });
+      notifyChanged();
       onSaved();
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
   }

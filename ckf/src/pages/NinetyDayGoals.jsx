@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import Header from '../components/Header.jsx';
-import { call } from '../lib/api.js';
+import { call, callCached, notifyChanged } from '../lib/api.js';
 import { fmtShortDate } from '../lib/format.js';
 
 const CATEGORIES = ['personal','health','business','social','finance','marketing','other'];
@@ -12,13 +12,18 @@ export default function NinetyDayGoals() {
   const [err, setErr] = useState('');
 
   async function load() {
-    const r = await call('ckf-ninety-day', { action: 'list' });
+    const r = await callCached('ckf-ninety-day', { action: 'list' });
     setGoals(r.goals);
   }
-  useEffect(() => { load().catch((e) => setErr(e.message)); }, []);
+  useEffect(() => {
+    load().catch((e) => setErr(e.message));
+    const handler = () => load().catch(() => {});
+    window.addEventListener('ckf-data-changed', handler);
+    return () => window.removeEventListener('ckf-data-changed', handler);
+  }, []);
 
   async function openGoal(g) {
-    const r = await call('ckf-ninety-day', { action: 'get', id: g.id });
+    const r = await callCached('ckf-ninety-day', { action: 'get', id: g.id });
     setOpen(r);
   }
 

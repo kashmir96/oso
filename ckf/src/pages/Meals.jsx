@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Header from '../components/Header.jsx';
-import { call } from '../lib/api.js';
+import { call, callCached, notifyChanged } from '../lib/api.js';
 import { processFile, revokePreview } from '../lib/upload.js';
 import { fmtShortDate } from '../lib/format.js';
 
@@ -18,8 +18,8 @@ export default function Meals() {
   async function load() {
     try {
       const [m, g] = await Promise.all([
-        call('ckf-meals', { action: 'list', limit: 60 }),
-        call('ckf-goals', { action: 'list' }).catch(() => ({ goals: [] })),
+        callCached('ckf-meals', { action: 'list', limit: 60 }),
+        callCached('ckf-goals', { action: 'list' }).catch(() => ({ goals: [] })),
       ]);
       setMeals(m.meals || []);
       // Calorie-style daily-sum goals are eligible auto-log targets
@@ -241,6 +241,7 @@ function EditMealForm({ meal, onSaved, onCancel }) {
   async function del() {
     if (!confirm('Delete this meal?')) return;
     await call('ckf-meals', { action: 'delete', id: meal.id });
+    notifyChanged();
     onSaved();
   }
 

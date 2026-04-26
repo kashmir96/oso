@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import Header from '../components/Header.jsx';
-import { call } from '../lib/api.js';
+import { call, callCached, notifyChanged } from '../lib/api.js';
 import { nzToday, fmtShortDate } from '../lib/format.js';
 
 const CATEGORIES = ['personal','health','business','social','finance','marketing','other'];
@@ -33,7 +33,7 @@ export default function Today() {
         tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
         const from = new Date().toISOString();
         const to = new Date(tomorrow.getTime() + 7 * 86400e3).toISOString();
-        calRange = await call('ckf-calendar', { action: 'list_range', from, to });
+        calRange = await callCached('ckf-calendar', { action: 'list_range', from, to }, 60_000);
         setCalStatus('ok');
       } catch (e) {
         if (/not connected/i.test(e.message)) setCalStatus('not_connected');
@@ -41,10 +41,10 @@ export default function Today() {
       }
 
       const [todayRoutine, business, lastDiary, errands] = await Promise.all([
-        call('ckf-tasks', { action: 'today', date }),
-        call('ckf-business', { action: 'list' }),
-        call('ckf-diary', { action: 'recent', limit: 1 }),
-        call('ckf-errands', { action: 'list', status: 'open' }),
+        callCached('ckf-tasks', { action: 'today', date }),
+        callCached('ckf-business', { action: 'list' }),
+        callCached('ckf-diary', { action: 'recent', limit: 1 }),
+        callCached('ckf-errands', { action: 'list', status: 'open' }),
       ]);
       setToday(todayRoutine.tasks);
 
@@ -142,11 +142,18 @@ export default function Today() {
       setTodayBlendItems(todayBlend);
     } catch (e) { setErr(e.message); }
   }
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [date]);
+  useEffect(() => {
+    load();
+    const handler = () => load();
+    window.addEventListener('ckf-data-changed', handler);
+    return () => window.removeEventListener('ckf-data-changed', handler);
+    /* eslint-disable-next-line */
+  }, [date]);
 
   async function setStatus(routineTaskId, status) {
     try {
       await call('ckf-tasks', { action: 'set_status', routine_task_id: routineTaskId, date, status });
+      notifyChanged();
       load();
     } catch (e) { setErr(e.message); }
   }
@@ -268,6 +275,7 @@ function TaskForm({ task, onSaved, onCancel }) {
         estimated_minutes: estimated === '' ? null : Number(estimated),
         assigned_to: assignedTo || null,
       });
+      notifyChanged();
       onSaved();
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
   }
@@ -275,6 +283,7 @@ function TaskForm({ task, onSaved, onCancel }) {
   async function onDelete() {
     if (!confirm('Delete this task?')) return;
     await call('ckf-tasks', { action: 'delete', id: task.id });
+    notifyChanged();
     onSaved();
   }
 
