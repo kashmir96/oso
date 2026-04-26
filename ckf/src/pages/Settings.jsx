@@ -50,6 +50,8 @@ export default function Settings() {
 
       <ApiSpend />
 
+      <Backup />
+
       <TrainerShare />
 
       <Connections />
@@ -110,6 +112,37 @@ function SuggestionCard({ s, onApprove, onReject }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function Backup() {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  async function download() {
+    setBusy(true); setErr('');
+    try {
+      const data = await call('ckf-export', {});
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ckf-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) { setErr(e.message); } finally { setBusy(false); }
+  }
+  return (
+    <div className="card" style={{ marginBottom: 12 }}>
+      <div className="section-title" style={{ margin: '0 0 8px' }}>Backup</div>
+      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
+        Download every CKF table as a JSON file. Sensitive fields (passwords,
+        OAuth tokens) are stripped.
+      </div>
+      <button onClick={download} disabled={busy}>{busy ? 'Building…' : 'Download backup'}</button>
+      {err && <div className="error" style={{ marginTop: 6 }}>{err}</div>}
     </div>
   );
 }

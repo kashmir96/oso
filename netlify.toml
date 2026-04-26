@@ -79,6 +79,10 @@
 [functions."ckf-weekly-cron"]
   schedule = "0 4,5 * * 0"
 
+# CKF streak nudge — 20:00 NZ. SMS if any checkbox goal hasn't been ticked today.
+[functions."ckf-streak-nudge"]
+  schedule = "0 7,8 * * *"
+
 # ── CKF SPA: any /ckf/* request that isn't a real file falls back to /ckf/index.html ──
 [[redirects]]
   from = "/ckf/*"
