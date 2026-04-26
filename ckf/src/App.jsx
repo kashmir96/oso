@@ -20,6 +20,7 @@ const BusinessTasks = lazy(() => import('./pages/BusinessTasks.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
 const Errands = lazy(() => import('./pages/Errands.jsx'));
 const Meals = lazy(() => import('./pages/Meals.jsx'));
+const Swipefile = lazy(() => import('./pages/Swipefile.jsx'));
 
 function Gated({ children, hideNav }) {
   const { user, loading } = useAuth();
@@ -79,6 +80,7 @@ function Shell() {
         <Route path="/business/tasks" element={<Gated><BusinessTasks /></Gated>} />
         <Route path="/errands" element={<Gated><Errands /></Gated>} />
         <Route path="/meals" element={<Gated><Meals /></Gated>} />
+        <Route path="/swipefile" element={<Gated><Swipefile /></Gated>} />
         <Route path="/settings" element={<Gated><Settings /></Gated>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -18,6 +18,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const { sbSelect, sbInsert, sbUpdate, sbDelete } = require('./_lib/ckf-sb.js');
 const { withGate, reply } = require('./_lib/ckf-guard.js');
 const { TOOLS, execute, clip, nzToday } = require('./_lib/ckf-tools.js');
+const { logAnthropicUsage } = require('./_lib/ckf-usage.js');
 
 // Use Haiku for chat — short conversational replies don't need Sonnet's depth,
 // and Haiku is ~3x faster. Heavier reasoning (diary AI summary, weekly summary,
@@ -319,6 +320,7 @@ async function runChat({ userId, conversation, userMessageText, modeHint, attach
 
     totalUsage.input_tokens += response.usage?.input_tokens || 0;
     totalUsage.output_tokens += response.usage?.output_tokens || 0;
+    logAnthropicUsage({ user_id: userId, action: 'chat', model: MODEL, usage: response.usage });
 
     if (response.stop_reason === 'tool_use') {
       // Persist the assistant turn (with its tool_use blocks) so the conversation is replayable later
@@ -399,6 +401,7 @@ async function runAutoOpen({ userId, conversation, modeHint }) {
     });
     totalUsage.input_tokens += response.usage?.input_tokens || 0;
     totalUsage.output_tokens += response.usage?.output_tokens || 0;
+    logAnthropicUsage({ user_id: userId, action: 'chat', model: MODEL, usage: response.usage });
 
     if (response.stop_reason === 'tool_use') {
       // The model wants to read context (e.g. get_recent_diary_entries). Honour it,
@@ -440,31 +443,36 @@ exports.handler = withGate(async (event, { user }) => {
   const { action } = body;
 
   if (action === 'list_conversations') {
+    const scope = body.scope; // optional 'personal' | 'business'
+    const filter = scope ? `&scope=eq.${encodeURIComponent(scope)}` : '';
     const rows = await sbSelect(
       'ckf_conversations',
-      `user_id=eq.${user.id}&order=last_message_at.desc&limit=50&select=id,title,primary_mode,nz_date,started_at,last_message_at`
+      `user_id=eq.${user.id}${filter}&order=last_message_at.desc&limit=50&select=id,title,primary_mode,scope,nz_date,started_at,last_message_at`
     );
     return reply(200, { conversations: rows });
   }
 
   if (action === 'open_today') {
     const date = nzToday();
+    const scope = body.scope === 'business' ? 'business' : 'personal';
     let rows = await sbSelect(
       'ckf_conversations',
-      `user_id=eq.${user.id}&nz_date=eq.${date}&order=started_at.desc&limit=1&select=*`
+      `user_id=eq.${user.id}&scope=eq.${scope}&nz_date=eq.${date}&order=started_at.desc&limit=1&select=*`
     );
     if (rows?.[0]) return reply(200, { conversation: rows[0] });
     const created = await sbInsert('ckf_conversations', {
-      user_id: user.id, nz_date: date, primary_mode: 'therapist',
+      user_id: user.id, nz_date: date, primary_mode: 'therapist', scope,
     });
     return reply(200, { conversation: created });
   }
 
   if (action === 'create_conversation') {
+    const scope = body.scope === 'business' ? 'business' : 'personal';
     const created = await sbInsert('ckf_conversations', {
       user_id: user.id,
       nz_date: nzToday(),
       primary_mode: body.mode || 'therapist',
+      scope,
       title: body.title || null,
     });
     return reply(200, { conversation: created });

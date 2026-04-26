@@ -39,11 +39,15 @@ export default function Settings() {
         <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
           <Link to="/ninety-day-goals"><button>90-day goals</button></Link>
           <Link to="/business"><button>Business</button></Link>
+          <Link to="/swipefile"><button>Swipefile</button></Link>
+          <Link to="/meals"><button>Meals</button></Link>
           <button onClick={() => { logout(); nav('/login'); }} className="danger">Sign out</button>
         </div>
       </div>
 
       <Appearance />
+
+      <ApiSpend />
 
       <TrainerShare />
 
@@ -105,6 +109,60 @@ function SuggestionCard({ s, onApprove, onReject }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function ApiSpend() {
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState('');
+  useEffect(() => {
+    call('ckf-usage', { action: 'summary' })
+      .then((r) => setData(r))
+      .catch((e) => setErr(e.message));
+  }, []);
+
+  if (err) return <div className="card" style={{ marginBottom: 12 }}><div className="error">{err}</div></div>;
+  if (!data) return <div className="card" style={{ marginBottom: 12 }}><div className="loading">Loading API spend…</div></div>;
+
+  const fmt = (n) => `$${(Number(n) || 0).toFixed(n < 0.01 ? 4 : 2)}`;
+  const labels = { anthropic: 'Claude', openai: 'OpenAI Whisper', elevenlabs: 'ElevenLabs' };
+
+  function row(b, key) {
+    return (
+      <div key={key} style={{ marginBottom: 10 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>
+          <span>{key === 'today' ? 'Today' : key === 'this_month' ? 'This month' : 'Last 30 days'}</span>
+          <span style={{ color: 'var(--text)' }}>{fmt(b.total)}</span>
+        </div>
+        {Object.keys(b.by_provider).length === 0 ? (
+          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>No usage yet.</div>
+        ) : Object.entries(b.by_provider).map(([p, v]) => (
+          <div key={p} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2px 0' }}>
+            <span style={{ color: 'var(--text-dim)' }}>
+              {labels[p] || p}
+              <span style={{ color: 'var(--text-muted)', marginLeft: 6 }}>
+                {p === 'anthropic' ? `${(v.input_tokens / 1000 || 0).toFixed(0)}k in · ${(v.output_tokens / 1000 || 0).toFixed(0)}k out` :
+                 p === 'openai' ? `${Math.round((v.audio_seconds || 0) / 60)} min audio` :
+                 p === 'elevenlabs' ? `${(v.chars / 1000 || 0).toFixed(1)}k chars` : ''}
+              </span>
+            </span>
+            <span>{fmt(v.cost)}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="card" style={{ marginBottom: 12 }}>
+      <div className="section-title" style={{ margin: '0 0 8px' }}>API spend</div>
+      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 10 }}>
+        Approx — based on list prices. Updates live as the app makes API calls.
+      </div>
+      {row(data.today, 'today')}
+      {row(data.this_month, 'this_month')}
+      {row(data.last_30d, 'last_30d')}
     </div>
   );
 }

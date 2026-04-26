@@ -46,7 +46,7 @@ export default function Dashboard() {
       />
 
       <div className="home-chat">
-        <Chat embedded />
+        <Chat embedded scope="personal" />
       </div>
     </div>
   );

@@ -1,6 +1,12 @@
 // Thin fetch wrapper that injects the CKF session token.
 const STORAGE_KEY = 'ckf_token';
 
+// Cross-component pub/sub: any mutating action fires this so live strips
+// (Today, Errands, Coming up) refresh without a manual reload.
+export function notifyChanged() {
+  try { window.dispatchEvent(new CustomEvent('ckf-data-changed')); } catch {}
+}
+
 export function getToken() {
   return localStorage.getItem(STORAGE_KEY);
 }

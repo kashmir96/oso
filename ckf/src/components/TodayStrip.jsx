@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { call } from '../lib/api.js';
+import { call, notifyChanged } from '../lib/api.js';
 import { nzToday, fmtShortDate } from '../lib/format.js';
 
 // One mixed horizontal pill strip — combines:
@@ -84,7 +84,19 @@ export default function TodayStrip({ title = 'Today', scope = 'all', defaultCate
     setPills(out);
   }
 
-  useEffect(() => { load().catch((e) => setErr(e.message)); /* eslint-disable-next-line */ }, [scope]);
+  useEffect(() => {
+    load().catch((e) => setErr(e.message));
+    const handler = () => load().catch(() => {});
+    window.addEventListener('ckf-data-changed', handler);
+    // Refresh when the tab regains focus (covers SMS reminders firing in background, etc.)
+    const onVisible = () => { if (document.visibilityState === 'visible') load().catch(() => {}); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('ckf-data-changed', handler);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scope]);
 
   async function quickAdd(e) {
     e.preventDefault();
@@ -92,12 +104,12 @@ export default function TodayStrip({ title = 'Today', scope = 'all', defaultCate
     setBusy(true);
     try {
       await call('ckf-errands', { action: 'create', title: draft.trim(), category: defaultCategory });
-      setDraft(''); setAdding(false); load();
+      setDraft(''); setAdding(false); notifyChanged(); load();
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
   }
 
   async function completeErrand(errandId) {
-    try { await call('ckf-errands', { action: 'complete', id: errandId }); load(); } catch {}
+    try { await call('ckf-errands', { action: 'complete', id: errandId }); notifyChanged(); load(); } catch {}
   }
 
   return (

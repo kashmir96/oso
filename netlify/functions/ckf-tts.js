@@ -11,12 +11,13 @@
  * read-throughs if needed.
  */
 const { withGate, reply } = require('./_lib/ckf-guard.js');
+const { logUsage } = require('./_lib/ckf-usage.js');
 
 const DEFAULT_VOICE = 'JBFqnCBsd6RMkjVDRZzb'; // "George" — calm, mellow male
 const MODEL_ID = 'eleven_flash_v2_5';
 const MAX_CHARS = 4000; // hard cap to stop runaway costs from a malformed reply
 
-exports.handler = withGate(async (event) => {
+exports.handler = withGate(async (event, { user }) => {
   if (!process.env.ELEVENLABS_API_KEY) {
     return reply(500, { error: 'ELEVENLABS_API_KEY not configured' });
   }
@@ -56,6 +57,7 @@ exports.handler = withGate(async (event) => {
     }
     const arrayBuf = await res.arrayBuffer();
     const audio_base64 = Buffer.from(arrayBuf).toString('base64');
+    logUsage({ user_id: user.id, provider: 'elevenlabs', action: 'tts', model: MODEL_ID, chars: text.length });
     return reply(200, { audio_base64, mime_type: 'audio/mpeg' });
   } catch (e) {
     console.error('[ckf-tts]', e);

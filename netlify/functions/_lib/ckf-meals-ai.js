@@ -1,6 +1,7 @@
 // Vision-based meal analysis: feed an image (already uploaded to Storage) to
 // Claude Sonnet 4 and get a calorie + ingredient estimate as JSON.
 const Anthropic = require('@anthropic-ai/sdk');
+const { logAnthropicUsage } = require('./ckf-usage.js');
 
 const MODEL = 'claude-sonnet-4-20250514';
 
@@ -57,6 +58,7 @@ async function estimateMealFromImage({ imageBase64, mimeType, hint }) {
       ],
     }],
   });
+  logAnthropicUsage({ action: 'meal_vision', model: MODEL, usage: res.usage });
   const text = res.content?.filter((b) => b.type === 'text').map((b) => b.text).join('\n') || '';
   const parsed = extractJson(text) || {};
   return {

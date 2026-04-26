@@ -432,6 +432,18 @@ Don't create vague goals. For numeric, ask one question if target is missing.`,
     },
   },
   {
+    name: 'search_swipefile',
+    description: "Search Curtis's curated knowledge base (books, articles, talks, notes, images he's saved). Use this PROACTIVELY whenever a question maps to ideas he might have already saved — e.g. mentions of an author or framework, business strategy questions, training principles, philosophical themes. Reference the source title + author when you cite from it. Prefer his swipefile over generic knowledge.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        q: { type: 'string', description: 'keywords, names, or phrases' },
+        limit: { type: 'integer', minimum: 1, maximum: 30 },
+      },
+      required: ['q'],
+    },
+  },
+  {
     name: 'get_calendar_events',
     description: "Fetch upcoming calendar events from Curtis's connected Google Calendar. Use when he asks about his schedule, what's coming up, when he's free, or when planning tomorrow.",
     input_schema: {
@@ -872,6 +884,22 @@ async function execute(name, input, ctx) {
       return { archived: true };
     }
 
+    case 'search_swipefile': {
+      const q = (input?.q || '').trim();
+      if (!q) return { items: [] };
+      const limit = Math.min(input?.limit || 8, 30);
+      const safe = encodeURIComponent(`*${q.replace(/[%*]/g, '')}*`);
+      const rows = await sbSelect(
+        'ckf_swipefile_items',
+        `user_id=eq.${userId}&archived=eq.false&or=(title.ilike.${safe},source_text.ilike.${safe},why_it_matters.ilike.${safe})&order=importance.desc,created_at.desc&limit=${limit}&select=id,kind,title,source_url,why_it_matters,author,tags,importance,source_text`
+      );
+      return {
+        items: (rows || []).map((r) => ({
+          ...r,
+          source_text: r.source_text ? r.source_text.slice(0, 800) : null,
+        })),
+      };
+    }
     case 'get_calendar_events': {
       const { getValidIntegration } = require('./ckf-oauth.js');
       const integration = await getValidIntegration(userId, 'google_calendar');

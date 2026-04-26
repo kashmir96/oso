@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import Header from '../components/Header.jsx';
-import { call } from '../lib/api.js';
+import { call, notifyChanged } from '../lib/api.js';
 import { fmtRelative, fmtShortDate } from '../lib/format.js';
 import {
   isRecordingSupported, startRecording,
@@ -23,7 +23,7 @@ function voiceLabel(state) {
   }
 }
 
-export default function Chat({ embedded = false }) {
+export default function Chat({ embedded = false, scope = 'personal' }) {
   const { id: routeId } = useParams();
   const [embeddedId, setEmbeddedId] = useState(null);
   const id = embedded ? embeddedId : routeId;
@@ -67,9 +67,11 @@ export default function Chat({ embedded = false }) {
   useEffect(() => {
     if (id) return;
     let alive = true;
+    // Reset embedded id when scope changes — Home and Business hold separate threads.
+    if (embedded) setEmbeddedId(null);
     (async () => {
       try {
-        const r = await call('ckf-chat', { action: 'open_today' });
+        const r = await call('ckf-chat', { action: 'open_today', scope });
         if (!alive) return;
         if (embedded) {
           setEmbeddedId(r.conversation.id);
@@ -81,7 +83,7 @@ export default function Chat({ embedded = false }) {
       }
     })();
     return () => { alive = false; };
-  }, [id, nav, embedded]);
+  }, [id, nav, embedded, scope]);
 
   // ── Load conversation + messages on id change ──
   const loadConversation = useCallback(async () => {
@@ -116,7 +118,7 @@ export default function Chat({ embedded = false }) {
   // ── Load history list when drawer opens ──
   useEffect(() => {
     if (!historyOpen) return;
-    call('ckf-chat', { action: 'list_conversations' })
+    call('ckf-chat', { action: 'list_conversations', scope })
       .then((r) => setHistory(r.conversations))
       .catch((e) => setErr(e.message));
   }, [historyOpen]);
@@ -147,6 +149,9 @@ export default function Chat({ embedded = false }) {
       });
       setMessages(r.messages);
       window.dispatchEvent(new CustomEvent('ckf-assistant-text', { detail: r.text }));
+      // Many chat tools mutate data (create_errand, log_goal_value, etc.).
+      // Tell the strips to refresh.
+      notifyChanged();
     } catch (e) {
       setErr(e.message);
     } finally {
@@ -291,6 +296,7 @@ export default function Chat({ embedded = false }) {
     try {
       const r = await call('ckf-chat', { action: 'send', conversation_id: id, text });
       setMessages(r.messages);
+      notifyChanged();
       return r.text;
     } catch (e) {
       setErr(e.message);
@@ -345,7 +351,7 @@ export default function Chat({ embedded = false }) {
   }, [id]);
 
   async function newChat() {
-    const r = await call('ckf-chat', { action: 'create_conversation' });
+    const r = await call('ckf-chat', { action: 'create_conversation', scope });
     nav(`/chat/${r.conversation.id}`);
     setHistoryOpen(false);
   }

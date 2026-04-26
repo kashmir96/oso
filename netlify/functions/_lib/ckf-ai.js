@@ -1,6 +1,7 @@
 // CKF AI helper — wraps Anthropic SDK (already a dep at the repo root).
 // Used for diary summary, weekly summary, and 90-day breakdowns.
 const Anthropic = require('@anthropic-ai/sdk');
+const { logAnthropicUsage } = require('./ckf-usage.js');
 
 const MODEL = 'claude-sonnet-4-20250514';
 
@@ -97,6 +98,7 @@ Rules: 3–5 items per actions array (physical/mental/spiritual may be 1–3); r
     system: SYSTEM_BASE,
     messages: [{ role: 'user', content: prompt }],
   });
+  logAnthropicUsage({ action: 'diary_summary', model: MODEL, usage: res.usage });
   const text = res.content?.[0]?.text || '';
   const json = extractJson(text);
   if (!json) throw new Error('AI did not return valid JSON for diary summary');
