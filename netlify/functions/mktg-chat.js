@@ -1,8 +1,9 @@
 /**
  * mktg-chat.js — conversational interface to the PrimalPantry marketing playbook.
  *
- * Mirrors ckf-chat structure (Haiku 4.5, prompt caching, tool-use loop) but
- * with marketing-domain tools and system prompt.
+ * Mirrors ckf-chat structure (prompt caching, tool-use loop) but with
+ * marketing-domain tools and system prompt. Uses Sonnet 4.6 — the wizard
+ * flow is dense enough that Haiku 4.5 fumbles the orchestration.
  *
  * Actions:
  *   list_conversations
@@ -18,7 +19,13 @@ const { sbSelect, sbInsert, sbUpdate, sbDelete } = require('./_lib/ckf-sb.js');
 const { withGate, reply } = require('./_lib/ckf-guard.js');
 const { TOOLS, execute, clip } = require('./_lib/mktg-tools.js');
 
-const MODEL = 'claude-haiku-4-5-20251001';
+// Sonnet 4.6 across the board. Haiku 4.5 was fine for early-step orchestration
+// but fumbled the dense 7-step wizard flow once we added the critique pass +
+// trust_priority inference + structured finalize. The model switch is across
+// the whole chat (not just late steps) — simpler routing, no cache thrash from
+// mid-conversation model swaps, and the per-turn cost difference is marginal
+// at our volume.
+const MODEL = 'claude-sonnet-4-6';
 const MAX_TURNS = 5;
 const MAX_HISTORY = 30;
 const MEMORY_LIMIT = 60;
@@ -46,11 +53,15 @@ Trigger: he says he wants to make an ad, OR an internal kickoff message tells yo
 
 1. **Objective** — "What's this ad for?" Once he answers, call \`wizard_set({ objective })\`.
 2. **Campaign** — infer from the objective if obvious ("Reviana day cream" → reviana). Confirm or ask. \`wizard_set({ campaign_id })\`.
-3. **Format / audience / landing URL** — ask what format (static/video/carousel/reel), the audience (cold/warm/lookalike/lapsed), and landing URL. Batch these into one or two questions, don't ask them one by one. \`wizard_set({ format, audience_type, landing_url })\`.
+3. **Format / audience / landing URL** — ask what format (static/video/carousel/reel), the audience (cold/warm/lookalike/lapsed), and landing URL. Batch these into one or two questions, don't ask them one by one. Once you have the audience + campaign, also infer a \`trust_priority\` (\`high\` for cold + reactive-skin / first-touch eczema audiences; \`medium\` for warm or familiar; \`low\` for retargeting / existing customers) and pass it in the same \`wizard_set\` call. \`wizard_set({ format, audience_type, landing_url, trust_priority })\`. Don't ask him about trust priority — infer it silently and move on.
 4. **Concept** — call \`wizard_recommend_concepts\`, then present 3 options to him in 1–2 sentences each. He picks. \`wizard_select_concept({ concept_id })\` (or \`new_name\` if he wants to invent one).
 5. **Creative** — call \`wizard_generate_creative\`. Summarise the output in his words (don't dump the JSON). For video: tell him the timeline beats + what B-roll he needs. For static: tell him the visual brief + that you've got 3 image-gen prompts ready. Ask if he wants to regenerate or move on.
-6. **Copy** — call \`wizard_generate_copy\`. Show him both primary-text variants. He picks one (or asks for changes — pass the change as \`feedback\` to \`wizard_generate_copy\`).
-7. **Finalize** — once he approves the copy, call \`wizard_finalize({ primary_text_final })\`. The chat UI will render the ready-to-paste card automatically; you don't need to repeat the fields in your reply, just tell him "Done. Ready to paste into Meta."
+6. **Copy** — call \`wizard_generate_copy\`. Then BEFORE showing the variants to Curtis, call \`wizard_critique\`. Read the verdict and act:
+   - \`ship\` → show both variants to him and ask which he prefers. Don't read the critique aloud.
+   - \`repair\` → don't show him the original. Quietly call \`wizard_generate_copy({ feedback: <repair_instructions from the critique> })\` again, then re-critique. Cap at 2 repair loops — if the second still isn't ship, surface the second attempt to him with a one-line "I had to tighten this — let me know if it lands" rather than another loop.
+   - \`replace\` → tell him plainly the angle isn't working ("This concept isn't landing — let me pull different ones") and go back to \`wizard_recommend_concepts\`.
+   When you do show him the variants, present them as v1 / v2. He picks one OR asks for changes (pass the change as \`feedback\` to \`wizard_generate_copy\` and re-critique).
+7. **Finalize** — once he approves the copy, call \`wizard_finalize({ primary_text_final, chosen_variant: 'v1'|'v2', user_edits_diff })\`. \`chosen_variant\` is which generated variant he based the final on (required). \`user_edits_diff\` is a SHORT plain-English summary of what he changed from that variant — e.g. "cut the second paragraph", "swapped the EANZ line in", "tightened opener" — empty string if shipped as-is. The chat UI renders the ready-to-paste card automatically; just tell him "Done. Ready to paste into Meta."
 
 If he opens the chat fresh and the kickoff hint says he just wants to start an ad, your FIRST message should be a single specific question — usually "What's this ad for?" — vary the wording. Don't announce the steps. Don't ask "ready to start?".
 
