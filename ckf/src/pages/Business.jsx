@@ -125,7 +125,10 @@ export default function Business() {
       </div>
 
       {/* ─────── Marketing + projects + website queue (added on this branch) ─────── */}
-      <div className="app" style={{ paddingTop: 8, paddingBottom: 16 }}>
+      {/* Bottom padding clears the two stacked FABs so content can scroll past
+          them without being permanently covered. ~210px = website FAB height
+          (150px bottom offset) + a little breathing room. */}
+      <div className="app" style={{ paddingTop: 8, paddingBottom: 220 }}>
         <Link to="/business/marketing" className="card" style={{ marginBottom: 14, display: 'block', textDecoration: 'none', color: 'inherit' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>

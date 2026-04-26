@@ -6,13 +6,21 @@
 // for simplicity we cache by URL and let stale-while-revalidate keep things
 // fresh.
 
-const SHELL = 'ckf-shell-v2';
+const SHELL = 'ckf-shell-v3';
 const SHELL_URLS = [
   '/ckf/',
   '/ckf/index.html',
   '/ckf-icon.svg',
   '/ckf-manifest.webmanifest',
 ];
+
+// Paths whose responses should always come from the network when available
+// (with cache fallback for offline). The SPA shell HTML is in here because
+// stale shell HTML still references the previous deploy's bundle filenames,
+// which causes "I deployed but mobile still sees the old UI" bugs.
+function isNetworkFirst(url) {
+  return url.pathname === '/ckf/' || url.pathname === '/ckf/index.html';
+}
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -36,18 +44,37 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(req.url);
 
-  // Same-origin /ckf/ and built assets: stale-while-revalidate.
+  // Same-origin /ckf/ and built assets.
+  // - SPA shell HTML (/ckf/, /ckf/index.html): NETWORK-FIRST so a deploy is
+  //   immediately visible to the user. Falls back to cache if offline.
+  // - Everything else (hashed bundle assets, icon, manifest): stale-while-
+  //   revalidate. Hashed filenames mean cache hits are always correct for
+  //   that build — refresh in background for the next visit.
   if (url.origin === self.location.origin && (url.pathname.startsWith('/ckf/') || url.pathname === '/ckf-icon.svg' || url.pathname === '/ckf-manifest.webmanifest')) {
     event.respondWith((async () => {
       const cache = await caches.open(SHELL);
+
+      if (isNetworkFirst(url)) {
+        try {
+          const fresh = await fetch(req);
+          if (fresh && fresh.ok) cache.put(req, fresh.clone()).catch(() => {});
+          return fresh;
+        } catch {
+          const cached = await cache.match(req);
+          if (cached) return cached;
+          const shell = await cache.match('/ckf/index.html');
+          if (shell) return shell;
+          return new Response('Offline', { status: 503, statusText: 'Offline' });
+        }
+      }
+
+      // stale-while-revalidate for everything else
       const cached = await cache.match(req);
       const network = fetch(req).then((res) => {
         if (res && res.ok) cache.put(req, res.clone()).catch(() => {});
         return res;
       }).catch(() => null);
-      // Return cache immediately if we have one; let network refresh in background.
       if (cached) return cached;
-      // Otherwise wait for network — and if that fails, fall back to /ckf/index.html (SPA shell).
       const fresh = await network;
       if (fresh) return fresh;
       const shell = await cache.match('/ckf/index.html');
