@@ -309,24 +309,13 @@ export default function Chat({ embedded = false }) {
         </header>
       )}
 
-      <div className="chat-controls">
-        <button
-          className={`hat-pill ${voiceMode ? 'active voice-active' : ''}`}
-          onClick={flipVoiceMode}
-          title="Hands-free voice mode — listen, reply, repeat"
-        >
-          {voiceMode ? voiceLabel(voiceState) : 'Hands-free'}
-        </button>
-        <button
-          className={`hat-pill ${ttsOn ? 'active' : ''}`}
-          onClick={flipTts}
-          title="Speak replies aloud"
-          disabled={voiceMode}
-        >
-          {ttsOn ? '🔊' : '🔈'}
-        </button>
-        <Link to="/chat/memory" className="hat-pill" style={{ marginLeft: 'auto' }}>Memory</Link>
-      </div>
+      {/* Voice-mode status pill — only when active, very subtle */}
+      {voiceMode && (
+        <div className="voice-status">
+          <span className="dot" /> {voiceLabel(voiceState)}
+          <button onClick={flipVoiceMode} className="voice-stop">stop</button>
+        </div>
+      )}
 
       <div className="chat-stream" ref={scrollRef}>
         {visible.length === 0 && !busy && (
@@ -356,29 +345,36 @@ export default function Chat({ embedded = false }) {
 
       <div className="chat-composer">
         <button
-          onClick={toggleMic}
-          className={`mic-btn ${recording ? 'recording' : ''}`}
-          disabled={transcribing || busy || voiceMode}
-          aria-label={recording ? 'Stop recording' : 'Record voice'}
-          title={voiceMode ? 'Disabled in hands-free mode' : recording ? 'Stop' : 'Tap to talk once'}
+          onClick={flipTts}
+          className={`tts-btn ${ttsOn ? 'on' : ''}`}
+          disabled={voiceMode}
+          aria-label={ttsOn ? 'Turn off read-aloud' : 'Turn on read-aloud'}
+          title={ttsOn ? 'Read replies aloud — on' : 'Read replies aloud — off'}
         >
-          {transcribing ? '…' : recording ? '■' : '🎙'}
+          {ttsOn ? '🔊' : '🔈'}
+        </button>
+        <button
+          onClick={voiceMode ? flipVoiceMode : flipVoiceMode}
+          className={`mic-btn convo-btn ${voiceMode ? 'recording' : ''}`}
+          disabled={busy && !voiceMode}
+          aria-label={voiceMode ? 'Stop hands-free' : 'Start hands-free conversation'}
+          title={voiceMode ? 'Stop hands-free' : 'Hands-free conversation — talk and listen'}
+        >
+          {voiceMode ? '■' : '🗨'}
         </button>
         <textarea
           ref={taRef}
           rows={1}
           value={draft}
           placeholder={
-            voiceMode ? 'Hands-free is on — just talk. Tap to stop.'
-            : recording ? 'Listening…'
-            : transcribing ? 'Transcribing…'
-            : 'Type or tap the mic'
+            voiceMode ? 'Hands-free is on — just talk.'
+            : 'Type a message…'
           }
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={onKeyDown}
-          disabled={busy || recording || transcribing || voiceMode}
+          disabled={busy || voiceMode}
         />
-        <button onClick={send} className="primary" disabled={busy || recording || transcribing || voiceMode || !draft.trim()}>Send</button>
+        <button onClick={send} className="primary" disabled={busy || voiceMode || !draft.trim()}>Send</button>
       </div>
 
       {!embedded && historyOpen && (
@@ -388,7 +384,14 @@ export default function Chat({ embedded = false }) {
               <div style={{ fontWeight: 600 }}>Conversations</div>
               <button onClick={() => setHistoryOpen(false)} className="chat-icon-btn">✕</button>
             </div>
-            <button className="primary" style={{ margin: '0 12px 12px', width: 'calc(100% - 24px)' }} onClick={newChat}>+ New chat</button>
+            <button className="primary" style={{ margin: '0 12px 8px', width: 'calc(100% - 24px)' }} onClick={newChat}>+ New chat</button>
+            <Link
+              to="/chat/memory"
+              onClick={() => setHistoryOpen(false)}
+              style={{ display: 'block', margin: '0 12px 12px', textAlign: 'center', fontSize: 13 }}
+            >
+              View long-term memory →
+            </Link>
             {history.length === 0 ? <div className="empty">No history yet.</div> :
               history.map((c) => (
                 <Link

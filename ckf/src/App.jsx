@@ -10,6 +10,7 @@ import Memory from './pages/Memory.jsx';
 import Weekly from './pages/Weekly.jsx';
 import NinetyDayGoals from './pages/NinetyDayGoals.jsx';
 import Business from './pages/Business.jsx';
+import BusinessTasks from './pages/BusinessTasks.jsx';
 import Settings from './pages/Settings.jsx';
 import BottomNav from './components/BottomNav.jsx';
 
@@ -45,6 +46,7 @@ function Shell() {
       <Route path="/weekly" element={<Gated><Weekly /></Gated>} />
       <Route path="/ninety-day-goals" element={<Gated><NinetyDayGoals /></Gated>} />
       <Route path="/business" element={<Gated><Business /></Gated>} />
+      <Route path="/business/tasks" element={<Gated><BusinessTasks /></Gated>} />
       <Route path="/settings" element={<Gated><Settings /></Gated>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

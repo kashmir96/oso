@@ -17,6 +17,46 @@ function daysBetween(fromDateStr, toDateStr) {
   return Math.round((b - a) / 86400000);
 }
 
+// Window start for a timeframe, in NZ-relative dates (YYYY-MM-DD strings).
+function windowStart(timeframe, today = nzToday()) {
+  if (timeframe === 'daily') return today;
+  if (timeframe === 'weekly') {
+    const d = new Date(today + 'T00:00:00Z');
+    const dow = d.getUTCDay();              // 0=Sun, 1=Mon
+    const offset = dow === 0 ? -6 : 1 - dow; // back to Monday
+    d.setUTCDate(d.getUTCDate() + offset);
+    return d.toISOString().slice(0, 10);
+  }
+  if (timeframe === 'monthly') return today.slice(0, 8) + '01';
+  return null; // lifetime: no window
+}
+
+// Recompute current_value for a numeric-style goal based on its timeframe + aggregate.
+// Returns the new value (number or null), without persisting.
+async function deriveCurrentValue(goal) {
+  if (goal.goal_type && goal.goal_type !== 'numeric') return goal.current_value;
+  if (goal.data_source && goal.data_source !== 'manual') return goal.current_value; // owned by sync
+
+  const tf = goal.timeframe || 'lifetime';
+  const ag = goal.aggregate || 'last';
+  const start = windowStart(tf);
+
+  let filter = `goal_id=eq.${goal.id}`;
+  if (start) filter += `&for_date=gte.${start}`;
+  // Order so 'last' takes the freshest reading regardless of insert order.
+  const rows = await sbSelect('goal_logs', `${filter}&order=for_date.desc.nullslast,created_at.desc&select=value,for_date,created_at`);
+  if (!rows || rows.length === 0) {
+    return tf === 'lifetime' ? goal.current_value : 0;
+  }
+  if (ag === 'last') return Number(rows[0].value);
+  if (ag === 'count') return rows.length;
+  const nums = rows.map((r) => Number(r.value)).filter((n) => Number.isFinite(n));
+  if (nums.length === 0) return 0;
+  if (ag === 'sum') return nums.reduce((s, v) => s + v, 0);
+  if (ag === 'avg') return nums.reduce((s, v) => s + v, 0) / nums.length;
+  return Number(rows[0].value);
+}
+
 // For restraint goals, recompute current_value on read so the streak ticks up
 // automatically. Persists the new value if it changed.
 async function refreshRestraintValue(goal) {
@@ -40,13 +80,23 @@ exports.handler = withGate(async (event, { user }) => {
       'goals',
       `user_id=eq.${user.id}&order=created_at.desc&select=*`
     );
-    // Auto-tick restraint goals so the streak count reflects today.
-    for (const g of rows) await refreshRestraintValue(g);
+    for (const g of rows) {
+      // Restraint streaks tick automatically.
+      await refreshRestraintValue(g);
+      // Numeric goals with a window/aggregate compute their value from logs.
+      if ((!g.goal_type || g.goal_type === 'numeric') && (g.timeframe && g.timeframe !== 'lifetime' || (g.aggregate && g.aggregate !== 'last'))) {
+        const derived = await deriveCurrentValue(g);
+        if (derived != null && Number(g.current_value) !== Number(derived)) {
+          await sbUpdate('goals', `id=eq.${g.id}`, { current_value: derived });
+          g.current_value = derived;
+        }
+      }
+    }
     return reply(200, { goals: rows });
   }
 
   if (action === 'create') {
-    const { name, category, current_value, start_value, target_value, unit, direction, goal_type } = body;
+    const { name, category, current_value, start_value, target_value, unit, direction, goal_type, timeframe, aggregate } = body;
     if (!name || !category) return reply(400, { error: 'name and category required' });
     const type = goal_type || 'numeric';
     const today = nzToday();
@@ -81,9 +131,13 @@ exports.handler = withGate(async (event, { user }) => {
         target_value: target_value ?? null,
         unit: unit || null,
         direction: direction || 'higher_better',
+        timeframe: timeframe || 'lifetime',
+        aggregate: aggregate || 'last',
       });
       if (current_value != null) {
-        await sbInsert('goal_logs', { goal_id: row.id, user_id: user.id, value: current_value, note: 'initial' });
+        await sbInsert('goal_logs', {
+          goal_id: row.id, user_id: user.id, value: current_value, note: 'initial', for_date: today,
+        });
       }
     }
     return reply(200, { goal: row });
@@ -149,15 +203,24 @@ exports.handler = withGate(async (event, { user }) => {
   }
 
   if (action === 'log_value') {
-    const { goal_id, value, note } = body;
+    const { goal_id, value, note, for_date } = body;
     if (!goal_id || value == null) return reply(400, { error: 'goal_id and value required' });
-    const g = (await sbSelect('goals', `id=eq.${goal_id}&user_id=eq.${user.id}&select=data_source,data_source_field,name&limit=1`))?.[0];
-    if (g && g.data_source && g.data_source !== 'manual') {
+    const g = (await sbSelect('goals', `id=eq.${goal_id}&user_id=eq.${user.id}&select=*&limit=1`))?.[0];
+    if (!g) return reply(404, { error: 'goal not found' });
+    if (g.data_source && g.data_source !== 'manual') {
       return reply(400, { error: `"${g.name}" is auto-synced from ${g.data_source}${g.data_source_field ? ` (${g.data_source_field})` : ''}. Unlink first.` });
     }
-    const log = await sbInsert('goal_logs', { goal_id, user_id: user.id, value, note: note || null });
-    await sbUpdate('goals', `id=eq.${goal_id}&user_id=eq.${user.id}`, { current_value: value });
-    return reply(200, { log });
+    const logFor = for_date || nzToday();
+    const log = await sbInsert('goal_logs', {
+      goal_id, user_id: user.id, value, note: note || null, for_date: logFor,
+    });
+    // Re-derive current_value rather than blindly overwriting — backdated logs
+    // should NOT clobber a newer reading just because they were entered last.
+    const derived = await deriveCurrentValue(g);
+    if (derived != null) {
+      await sbUpdate('goals', `id=eq.${goal_id}&user_id=eq.${user.id}`, { current_value: derived });
+    }
+    return reply(200, { log, current_value: derived });
   }
 
   if (action === 'history') {

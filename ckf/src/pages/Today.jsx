@@ -14,6 +14,7 @@ const CATEGORIES = ['personal','health','business','social','finance','marketing
 // later is one map() call.
 export default function Today() {
   const [today, setToday] = useState(null);
+  const [todayBlendItems, setTodayBlendItems] = useState([]);
   const [later, setLater] = useState(null);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -31,57 +32,72 @@ export default function Today() {
       ]);
       setToday(todayRoutine.tasks);
 
-      const businessUpcoming = (business.tasks || [])
-        .filter((t) => !['done','cancelled'].includes(t.status))
-        .filter((t) => t.due_date && t.due_date >= date);
+      const todayCalendar = [];
+      const futureCalendar = [];
+      for (const e of (cal?.events || [])) {
+        const day = (e.start || '').slice(0, 10);
+        if (day === date) todayCalendar.push(e);
+        else futureCalendar.push(e);
+      }
+
+      // Today blend: calendar today + business deadlines today (routine tasks
+      // remain a separate interactive list; merging them all into one would
+      // hurt the tap-to-tick feel).
+      const businessTasks = (business.tasks || [])
+        .filter((t) => !['done','cancelled'].includes(t.status));
+
+      const businessToday = businessTasks
+        .filter((t) => t.due_date === date)
+        .map((t) => ({
+          id: `b-${t.id}`, title: t.title, category: 'business',
+          meta: `${t.assigned_to ? `${t.assigned_to} · ` : ''}P${t.priority || 3}`,
+          source: 'business', when: `${t.due_date}T23:59:00`,
+        }));
+      const calToday = todayCalendar.map((e) => ({
+        id: `cal-${e.id}`, title: e.summary, category: 'calendar',
+        meta: e.all_day ? 'all day' : new Date(e.start).toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland', hour: '2-digit', minute: '2-digit' }),
+        source: 'calendar', when: e.start, all_day: e.all_day,
+      }));
+      const todayBlend = [...calToday, ...businessToday]
+        .sort((a, b) => (a.when || 'z').localeCompare(b.when || 'z'));
+
+      // Later: future business deadlines + future calendar + planned tomorrow's diary tasks.
+      const businessLater = businessTasks
+        .filter((t) => t.due_date && t.due_date > date)
+        .map((t) => ({
+          id: `b-${t.id}`, title: t.title, category: 'business',
+          meta: `due ${fmtShortDate(t.due_date)}${t.assigned_to ? ` · ${t.assigned_to}` : ''}`,
+          source: 'business', when: `${t.due_date}T23:59:00`,
+        }));
+      const calLater = futureCalendar.map((e) => ({
+        id: `cal-${e.id}`, title: e.summary, category: 'calendar',
+        meta: e.all_day
+          ? `${fmtShortDate((e.start || '').slice(0, 10))} · all day`
+          : new Date(e.start).toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland', hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }),
+        source: 'calendar', when: e.start, all_day: e.all_day,
+      }));
 
       const recent = (lastDiary.entries || [])[0];
       const plannedTomorrow = recent
         ? [
             ...((recent.tomorrow_personal_tasks || []).map((t, i) => ({
-              id: `dpers-${recent.id}-${i}`,
-              title: t.task || t.title || '',
-              category: 'personal',
-              meta: 'planned for tomorrow',
-              source: 'diary',
-              when: null,
+              id: `dpers-${recent.id}-${i}`, title: t.task || t.title || '',
+              category: 'personal', meta: 'planned for tomorrow', source: 'diary', when: null,
             }))),
             ...((recent.tomorrow_business_tasks || []).map((t, i) => ({
-              id: `dbiz-${recent.id}-${i}`,
-              title: t.task || t.title || '',
-              category: 'business',
-              meta: 'planned for tomorrow',
-              source: 'diary',
-              when: null,
+              id: `dbiz-${recent.id}-${i}`, title: t.task || t.title || '',
+              category: 'business', meta: 'planned for tomorrow', source: 'diary', when: null,
             }))),
           ].filter((x) => x.title)
         : [];
 
-      const businessItems = businessUpcoming.map((t) => ({
-        id: `b-${t.id}`,
-        title: t.title,
-        category: 'business',
-        meta: `${t.due_date ? `due ${fmtShortDate(t.due_date)}` : ''}${t.assigned_to ? ` · ${t.assigned_to}` : ''}`,
-        source: 'business',
-        when: t.due_date ? `${t.due_date}T23:59:00` : null,
-      }));
-
-      const calendarItems = (cal?.events || []).map((e) => ({
-        id: `cal-${e.id}`,
-        title: e.summary,
-        category: 'calendar',
-        meta: e.all_day
-          ? 'all day'
-          : new Date(e.start).toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland', hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }),
-        source: 'calendar',
-        when: e.start,
-      }));
-
-      // Sort by `when` so calendar events flow chronologically alongside business deadlines.
-      const merged = [...calendarItems, ...businessItems, ...plannedTomorrow]
+      const merged = [...calLater, ...businessLater, ...plannedTomorrow]
         .sort((a, b) => (a.when || 'z').localeCompare(b.when || 'z'));
 
       setLater(merged);
+      // Stash today blend on the same state via the array order: routine tasks render first,
+      // todayBlend renders below as a sub-list.
+      setTodayBlendItems(todayBlend);
     } catch (e) { setErr(e.message); }
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [date]);
@@ -132,6 +148,24 @@ export default function Today() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {todayBlendItems.length > 0 && (
+        <div className="card" style={{ marginTop: 8 }}>
+          {todayBlendItems.map((it) => (
+            <div key={it.id} className="today-task">
+              <div className="checkbox" style={{ borderStyle: 'dashed' }} aria-hidden="true" />
+              <div className="body">
+                <div className="title">{it.title}</div>
+                <div className="meta">
+                  {it.meta}
+                  {it.source === 'business' && <span className="pill" style={{ marginLeft: 6 }}>business</span>}
+                  {it.source === 'calendar' && <span className="pill" style={{ marginLeft: 6 }}>calendar</span>}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

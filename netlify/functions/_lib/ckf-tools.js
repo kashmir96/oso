@@ -136,35 +136,57 @@ const TOOLS = [
   },
   {
     name: 'log_goal_value',
-    description: "Log a new value for an existing goal. Updates current_value and writes a history row for charting. For counter-style goals (e.g. 'training sessions this month'), call get_goals first to read current_value, then log current+1.",
+    description: "Log a value for a goal. Pass for_date to backdate (default today NZ). For daily/weekly/monthly goals with sum/count aggregate, multiple logs accumulate within the window — log each meal's calories separately, not a manual running total.",
     input_schema: {
       type: 'object',
       properties: {
         goal_id: { type: 'string', description: 'UUID of the goal' },
         value: { type: 'number' },
         note: { type: 'string' },
+        for_date: { type: 'string', description: 'YYYY-MM-DD; the day this measurement is FOR. Defaults to today NZ.' },
       },
       required: ['goal_id', 'value'],
     },
   },
   {
     name: 'create_goal',
-    description: `Create a new goal. Pick the type by what Curtis described:
-- 'numeric' (default) — a measured value with a target. E.g. body weight, body fat %, revenue. Needs target_value + unit.
-- 'checkbox' — a daily yes/no habit; the streak counts up by 1 each day he does it. E.g. "plunge every day", "lift today". current_value tracks streak in days. Tapping the card marks it done.
-- 'restraint' — auto-ticks up daily UNLESS he logs a fail. E.g. "no alcohol", "no porn", "screen-free morning". current_value tracks days clean. Tapping the card prompts a "log fail" reset.
+    description: `Create a new goal. Pick the type AND timeframe by what Curtis described.
 
-Don't create vague goals — turn fuzzy intentions into something concrete. For numeric, ask for a target if it's missing.`,
+TYPE:
+- 'numeric' (default) — measured value (body weight, calories, revenue).
+- 'checkbox' — daily yes/no habit; streak counts up. Tap-to-tick.
+- 'restraint' — auto-ticks daily until a fail is logged.
+
+TIMEFRAME (numeric only — when running value resets):
+- 'lifetime' (default) — never resets (body weight, savings).
+- 'daily' — resets at midnight NZ. Calories, water, screen time.
+- 'weekly' — resets Monday NZ.
+- 'monthly' — resets on the 1st NZ.
+
+AGGREGATE (numeric only — how multiple logs combine in window):
+- 'last' (default) — most recent log wins (body weight).
+- 'sum' — adds values (calories per day).
+- 'count' — number of logs (lifts per week).
+- 'avg' — average.
+
+Examples:
+- "Track calories, target 2200/day": type=numeric, timeframe=daily, aggregate=sum, target_value=2200, unit='cal', direction=lower_better.
+- "Body weight, target 80kg": timeframe=lifetime, aggregate=last, unit='kg'.
+- "4 lifts per week": timeframe=weekly, aggregate=count, target_value=4.
+
+Don't create vague goals. For numeric, ask one question if target is missing.`,
     input_schema: {
       type: 'object',
       properties: {
         name: { type: 'string' },
         category: { type: 'string', enum: ['personal','health','business','social','finance','marketing','other'] },
         goal_type: { type: 'string', enum: ['numeric','checkbox','restraint'], description: 'default numeric' },
+        timeframe: { type: 'string', enum: ['lifetime','daily','weekly','monthly'], description: 'numeric only; default lifetime' },
+        aggregate: { type: 'string', enum: ['last','sum','count','avg'], description: 'numeric only; default last' },
         current_value: { type: 'number', description: 'numeric only — starting reading; defaults to start_value' },
         start_value: { type: 'number', description: 'numeric only' },
         target_value: { type: 'number', description: 'numeric — target value; checkbox/restraint — optional streak target in days' },
-        unit: { type: 'string', description: 'e.g. kg, %, $, sessions. Defaults to "days" for checkbox/restraint.' },
+        unit: { type: 'string', description: 'e.g. kg, %, $, cal, sessions' },
         direction: { type: 'string', enum: ['higher_better','lower_better'], description: 'numeric only; default higher_better' },
       },
       required: ['name', 'category'],
@@ -266,6 +288,53 @@ Don't create vague goals — turn fuzzy intentions into something concrete. For 
         reason: { type: 'string', description: 'why, citing what was discussed' },
       },
       required: ['suggestion'],
+    },
+  },
+  {
+    name: 'create_routine_task',
+    description: "Create a new recurring routine task that shows up on the Today list. Use when Curtis adds a new habit or daily action to his routine. Recurrence: 'daily' (default), 'weekly', or a CSV of weekday codes like 'mon,wed,fri'.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        description: { type: 'string' },
+        category: { type: 'string', enum: ['personal','health','business','social','finance','marketing','other'] },
+        recurrence_rule: { type: 'string', description: "default 'daily'" },
+        priority: { type: 'integer', minimum: 1, maximum: 5, description: 'default 3' },
+        estimated_minutes: { type: 'integer' },
+        linked_goal_id: { type: 'string', description: 'optional UUID of a goal this task supports' },
+        assigned_to: { type: 'string' },
+      },
+      required: ['title'],
+    },
+  },
+  {
+    name: 'update_routine_task',
+    description: "Update fields on a routine task — title, recurrence, priority, estimated_minutes, active. Use when Curtis tweaks a habit (different days, different priority).",
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        title: { type: 'string' },
+        description: { type: 'string' },
+        category: { type: 'string', enum: ['personal','health','business','social','finance','marketing','other'] },
+        recurrence_rule: { type: 'string' },
+        priority: { type: 'integer' },
+        estimated_minutes: { type: 'integer' },
+        linked_goal_id: { type: 'string' },
+        assigned_to: { type: 'string' },
+        active: { type: 'boolean' },
+      },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'delete_routine_task',
+    description: "Permanently delete a routine task. Use when Curtis has clearly retired a habit. Prefer setting active=false via update_routine_task if he might restart.",
+    input_schema: {
+      type: 'object',
+      properties: { id: { type: 'string' } },
+      required: ['id'],
     },
   },
   {
@@ -638,6 +707,37 @@ async function execute(name, input, ctx) {
         due_date: input.due_date || null,
       });
       return { created: true, id: row?.id };
+    }
+    case 'create_routine_task': {
+      if (!input?.title) return { error: 'title required' };
+      const row = await sbInsert('routine_tasks', {
+        user_id: userId,
+        title: input.title,
+        description: input.description || null,
+        category: input.category || 'personal',
+        linked_goal_id: input.linked_goal_id || null,
+        recurrence_rule: input.recurrence_rule || 'daily',
+        priority: input.priority ?? 3,
+        estimated_minutes: input.estimated_minutes ?? null,
+        assigned_to: input.assigned_to || null,
+      });
+      return { created: true, task: row };
+    }
+    case 'update_routine_task': {
+      if (!input?.id) return { error: 'id required' };
+      const patch = {};
+      for (const k of ['title','description','category','recurrence_rule','priority','estimated_minutes','linked_goal_id','assigned_to','active']) {
+        if (input[k] !== undefined) patch[k] = input[k];
+      }
+      if (Object.keys(patch).length === 0) return { error: 'no fields to update' };
+      const rows = await sbUpdate('routine_tasks', `id=eq.${input.id}&user_id=eq.${userId}`, patch);
+      return { updated: true, task: rows?.[0] };
+    }
+    case 'delete_routine_task': {
+      if (!input?.id) return { error: 'id required' };
+      const { sbDelete } = require('./ckf-sb.js');
+      await sbDelete('routine_tasks', `id=eq.${input.id}&user_id=eq.${userId}`);
+      return { deleted: true };
     }
     case 'remember': {
       if (!input?.fact) return { error: 'fact required' };

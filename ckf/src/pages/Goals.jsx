@@ -54,6 +54,8 @@ function NewGoalForm({ onSaved, onCancel }) {
   const [name, setName] = useState('');
   const [category, setCategory] = useState('personal');
   const [goalType, setGoalType] = useState('numeric');
+  const [timeframe, setTimeframe] = useState('lifetime');
+  const [aggregate, setAggregate] = useState('last');
   const [unit, setUnit] = useState('');
   const [direction, setDirection] = useState('higher_better');
   const [start, setStart] = useState('');
@@ -69,6 +71,8 @@ function NewGoalForm({ onSaved, onCancel }) {
       if (goalType === 'numeric') {
         payload.unit = unit;
         payload.direction = direction;
+        payload.timeframe = timeframe;
+        payload.aggregate = aggregate;
         payload.start_value = start === '' ? null : Number(start);
         payload.current_value = current === '' ? null : Number(current);
         payload.target_value = target === '' ? null : Number(target);
@@ -105,8 +109,28 @@ function NewGoalForm({ onSaved, onCancel }) {
         <>
           <div className="row">
             <div className="field">
+              <label>Timeframe</label>
+              <select value={timeframe} onChange={(e) => setTimeframe(e.target.value)}>
+                <option value="lifetime">Lifetime — never resets</option>
+                <option value="daily">Daily — resets at midnight</option>
+                <option value="weekly">Weekly — resets Monday</option>
+                <option value="monthly">Monthly — resets 1st</option>
+              </select>
+            </div>
+            <div className="field">
+              <label>How values combine</label>
+              <select value={aggregate} onChange={(e) => setAggregate(e.target.value)}>
+                <option value="last">Last (most recent log)</option>
+                <option value="sum">Sum (e.g. calories)</option>
+                <option value="count">Count (e.g. sessions)</option>
+                <option value="avg">Average</option>
+              </select>
+            </div>
+          </div>
+          <div className="row">
+            <div className="field">
               <label>Unit</label>
-              <input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="%, kg, $" />
+              <input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="%, kg, $, cal" />
             </div>
             <div className="field">
               <label>Direction</label>

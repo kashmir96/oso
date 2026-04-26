@@ -285,6 +285,51 @@ textarea { min-height: 110px; resize: vertical; }
   color: var(--accent);
   vertical-align: middle;
 }
+
+/* ── Coming up (Home one-liner) ── */
+.coming-up {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px;
+  margin: 6px 12px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elev);
+  text-decoration: none; color: inherit;
+}
+.coming-up:hover { border-color: var(--accent-dim); }
+.coming-up-label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--text-dim);
+  flex: 0 0 auto;
+}
+.coming-up-body { flex: 1; min-width: 0; display: flex; gap: 8px; align-items: baseline; overflow: hidden; }
+.coming-up-title {
+  font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+}
+.coming-up-meta { font-size: 11px; color: var(--text-dim); flex: 0 0 auto; }
+.coming-up-empty { color: var(--text-muted); font-style: italic; font-weight: 400; }
+.coming-up-arrow { color: var(--text-dim); font-size: 18px; flex: 0 0 auto; }
+
+/* ── Voice status (only visible when hands-free is on) ── */
+.voice-status {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 14px;
+  background: rgba(126,200,164,.06);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.voice-status .dot {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--accent);
+  animation: pulse 1.6s infinite;
+}
+.voice-status .voice-stop {
+  margin-left: auto;
+  background: transparent; border: 1px solid var(--border);
+  padding: 3px 10px; font-size: 11px; border-radius: 999px;
+  color: var(--text-dim);
+}
 .home-chat {
   flex: 1; min-height: 0;
   display: flex; flex-direction: column;
@@ -423,12 +468,16 @@ textarea { min-height: 110px; resize: vertical; }
   border-radius: 22px;
   height: 44px;
 }
-.mic-btn {
+.mic-btn, .tts-btn {
   width: 44px; height: 44px; padding: 0 !important;
   border-radius: 50% !important;
   display: inline-flex; align-items: center; justify-content: center;
   font-size: 16px;
+  flex: 0 0 auto;
 }
+.tts-btn { width: 36px; height: 36px; font-size: 14px; }
+.tts-btn.on { background: var(--accent-dim); color: #06130c; border-color: var(--accent-dim); }
+.convo-btn { font-size: 18px; }
 .mic-btn.recording {
   background: var(--bad);
   color: #1a0606;

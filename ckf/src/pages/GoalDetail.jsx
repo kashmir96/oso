@@ -11,6 +11,9 @@ export default function GoalDetail() {
   const [logs, setLogs] = useState([]);
   const [val, setVal] = useState('');
   const [note, setNote] = useState('');
+  const [forDate, setForDate] = useState(() =>
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland' }).format(new Date())
+  );
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -27,7 +30,10 @@ export default function GoalDetail() {
   async function logValue(e) {
     e.preventDefault(); setBusy(true); setErr('');
     try {
-      await call('ckf-goals', { action: 'log_value', goal_id: id, value: Number(val), note });
+      await call('ckf-goals', {
+        action: 'log_value', goal_id: id, value: Number(val), note,
+        for_date: forDate || undefined,
+      });
       setVal(''); setNote('');
       await load();
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
@@ -64,15 +70,24 @@ export default function GoalDetail() {
       </div>
 
       <form className="card" onSubmit={logValue} style={{ marginBottom: 12 }}>
-        <div className="field">
-          <label>Log new value</label>
-          <input type="number" step="any" value={val} onChange={(e) => setVal(e.target.value)} required />
+        <div className="row">
+          <div className="field">
+            <label>Value</label>
+            <input type="number" step="any" value={val} onChange={(e) => setVal(e.target.value)} required />
+          </div>
+          <div className="field">
+            <label>For date</label>
+            <input type="date" value={forDate} onChange={(e) => setForDate(e.target.value)} />
+          </div>
         </div>
         <div className="field">
           <label>Note (optional)</label>
           <input value={note} onChange={(e) => setNote(e.target.value)} />
         </div>
-        <button className="primary" disabled={busy} type="submit">{busy ? 'Saving…' : 'Save'}</button>
+        <button className="primary" disabled={busy} type="submit">{busy ? 'Saving…' : 'Log value'}</button>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
+          Backdating is fine — set "For date" to the day this measurement was for.
+        </div>
       </form>
 
       <div className="section-title">History</div>
