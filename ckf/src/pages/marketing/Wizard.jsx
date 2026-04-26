@@ -94,7 +94,7 @@ export default function Wizard() {
       {stepKey === 'campaign'  && <CampaignStep  draft={draft} busy={busy} onBack={() => patch({ current_step: 'objective' })} onNext={(campaign_id) => patch({ campaign_id, current_step: 'format' })} />}
       {stepKey === 'format'    && <FormatStep    draft={draft} busy={busy} onBack={() => patch({ current_step: 'campaign' })} onNext={(p) => patch({ ...p, current_step: 'concept' })} />}
       {stepKey === 'concept'   && <ConceptStep   draft={draft} busy={busy} onBack={() => patch({ current_step: 'format' })} onPick={(selected_concept_id) => patch({ selected_concept_id, current_step: 'creative' })} onRegenerate={() => regenerate('generate_concepts')} onGenerate={() => regenerate('generate_concepts')} />}
-      {stepKey === 'creative'  && <CreativeStep  draft={draft} busy={busy} onBack={() => patch({ current_step: 'concept' })} onAccept={() => patch({ current_step: 'copy' })} onGenerate={() => regenerate('generate_creative')} onRegenerate={() => regenerate('regenerate_step', { step: 'creative' })} />}
+      {stepKey === 'creative'  && <CreativeStep  draft={draft} busy={busy} onBack={() => patch({ current_step: 'concept' })} onAccept={() => patch({ current_step: 'copy' })} onGenerate={() => regenerate('generate_creative')} onRegenerate={() => regenerate('regenerate_step', { step: 'creative' })} onRefresh={load} />}
       {stepKey === 'copy'      && <CopyStep      draft={draft} busy={busy} onBack={() => patch({ current_step: 'creative' })} onApprove={(primary_text_final) => patch({ primary_text_final, current_step: 'final' })} onGenerate={() => regenerate('generate_copy')} onRegenerate={(feedback) => regenerate('regenerate_step', { step: 'copy', feedback })} />}
       {stepKey === 'final'     && <FinalStep     draft={draft} busy={busy} onBack={() => patch({ current_step: 'copy' })} onPatch={patch} onTransition={(action, extras) => regenerate(action, extras)} />}
     </div>
@@ -294,7 +294,7 @@ function ConceptStep({ draft, busy, onBack, onPick, onGenerate, onRegenerate }) 
 }
 
 // ── Step 5: Creative ──
-function CreativeStep({ draft, busy, onBack, onAccept, onGenerate, onRegenerate }) {
+function CreativeStep({ draft, busy, onBack, onAccept, onGenerate, onRegenerate, onRefresh }) {
   const c = draft.creative;
   const isVideo = draft.format === 'video' || draft.format === 'reel';
 
@@ -321,7 +321,7 @@ function CreativeStep({ draft, busy, onBack, onAccept, onGenerate, onRegenerate 
         <button onClick={onRegenerate} disabled={busy} style={{ fontSize: 11, padding: '4px 10px' }}>{busy ? '…' : 'Regenerate'}</button>
       </div>
 
-      {isVideo ? <VideoCreative c={c} /> : <ImageCreative c={c} />}
+      {isVideo ? <VideoCreative c={c} draft={draft} onChange={onRefresh} /> : <ImageCreative c={c} />}
 
       <div className="row" style={{ marginTop: 14 }}>
         <button onClick={onBack} disabled={busy}>← Back</button>
@@ -331,7 +331,7 @@ function CreativeStep({ draft, busy, onBack, onAccept, onGenerate, onRegenerate 
   );
 }
 
-function VideoCreative({ c }) {
+function VideoCreative({ c, draft, onChange }) {
   return (
     <>
       {Array.isArray(c.timeline) && c.timeline.length > 0 && (
@@ -349,7 +349,11 @@ function VideoCreative({ c }) {
       )}
       {c.vo_script && (
         <div className="detail-block">
-          <h2>Continuous voiceover script <CopyBtn text={c.vo_script} /></h2>
+          <h2>
+            Continuous voiceover script
+            <CopyBtn text={c.vo_script} />
+            <VoiceoverInline draft={draft} onChange={onChange} />
+          </h2>
           <div className="script-body">{c.vo_script}</div>
         </div>
       )}
@@ -370,6 +374,50 @@ function VideoCreative({ c }) {
         </div>
       )}
     </>
+  );
+}
+
+// Inline voiceover trigger shown next to the vo_script header. Generates the
+// MP3 via mktg-vo, uploads to the public mktg-vo bucket, then surfaces a
+// Download VO link. Regenerate replaces the previous file.
+function VoiceoverInline({ draft, onChange }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  async function generate() {
+    setBusy(true); setErr('');
+    try {
+      await call('mktg-vo', { action: 'generate', draft_id: draft.id });
+      onChange?.();
+    } catch (e) { setErr(e.message); } finally { setBusy(false); }
+  }
+
+  if (draft.voiceover_url) {
+    return (
+      <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', marginLeft: 8 }}>
+        <a
+          href={draft.voiceover_url}
+          target="_blank"
+          rel="noreferrer"
+          style={{ fontSize: 11, padding: '3px 8px', textDecoration: 'none', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)' }}
+        >
+          ▶ Download MP3
+        </a>
+        <button onClick={generate} disabled={busy} style={{ fontSize: 11, padding: '3px 8px' }} title="Regenerate">
+          {busy ? '…' : '↻'}
+        </button>
+        {err && <span className="error" style={{ fontSize: 11 }}>{err}</span>}
+      </span>
+    );
+  }
+
+  return (
+    <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', marginLeft: 8 }}>
+      <button onClick={generate} disabled={busy} className="primary" style={{ fontSize: 11, padding: '3px 10px' }}>
+        {busy ? 'Generating…' : 'Generate voiceover'}
+      </button>
+      {err && <span className="error" style={{ fontSize: 11 }}>{err}</span>}
+    </span>
   );
 }
 
