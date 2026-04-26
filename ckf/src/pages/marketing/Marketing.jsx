@@ -1,4 +1,6 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { call } from '../../lib/api.js';
 import Home from './Home.jsx';
 import CampaignDetail from './CampaignDetail.jsx';
 import Concepts from './Concepts.jsx';
@@ -35,9 +37,36 @@ export default function Marketing() {
       <Route path="swipe" element={<SwipeFile />} />
       <Route path="drafts" element={<Drafts />} />
       <Route path="assistant" element={<Assistant />} />
-      <Route path="wizard" element={<Wizard />} />
+      {/* New ad creation is a chat, not a form. /wizard (no id) spawns a
+          fresh marketing chat in ad-creation mode. /wizard/:id stays as the
+          editable review surface for an existing draft (used by the chat's
+          ready-to-paste card's "Edit & submit" link). */}
+      <Route path="wizard" element={<NewAdRedirect />} />
       <Route path="wizard/:id" element={<Wizard />} />
       <Route path="*" element={<Navigate to="" replace />} />
     </Routes>
   );
+}
+
+// Spawns a fresh marketing chat in create_ad mode and replaces the URL
+// with the chat. The AI's first message is the wizard's first question.
+function NewAdRedirect() {
+  const nav = useNavigate();
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const conv = await call('mktg-chat', { action: 'create_conversation', kind: 'context' });
+        const cid = conv.conversation.id;
+        // Fire-and-forget the kickoff so the greeting is ready when the chat paints.
+        call('mktg-chat', { action: 'auto_open', conversation_id: cid, mode_hint: 'create_ad' })
+          .catch(() => {});
+        if (alive) nav(`/business/marketing/chat/${cid}`, { replace: true });
+      } catch {
+        if (alive) nav('/business/marketing', { replace: true });
+      }
+    })();
+    return () => { alive = false; };
+  }, [nav]);
+  return <div className="app"><div className="loading">Starting ad chat…</div></div>;
 }

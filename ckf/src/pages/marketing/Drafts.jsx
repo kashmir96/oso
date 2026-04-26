@@ -33,9 +33,16 @@ export default function Drafts() {
   }
   useEffect(() => { load(); }, [filter]);
 
+  // "+ New draft" used to create a draft + open the form-based wizard.
+  // Now it spawns a marketing chat in ad-creation mode — the AI walks the
+  // user through it conversationally; the draft is created on first
+  // wizard_set tool call and linked to the conversation.
   async function newDraft() {
-    const r = await call('mktg-ads', { action: 'create_draft' });
-    nav(`/business/marketing/wizard/${r.draft.id}`);
+    const conv = await call('mktg-chat', { action: 'create_conversation', kind: 'context' });
+    const cid = conv.conversation.id;
+    call('mktg-chat', { action: 'auto_open', conversation_id: cid, mode_hint: 'create_ad' })
+      .catch(() => {});
+    nav(`/business/marketing/chat/${cid}`);
   }
 
   async function del(id, e) {

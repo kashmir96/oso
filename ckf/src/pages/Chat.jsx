@@ -314,10 +314,43 @@ export default function Chat({ embedded = false, scope = 'personal' }) {
     }
   }, [id, modeHint]);
 
-  function startVoiceMode() {
+  async function startVoiceMode() {
     // Voice mode implies TTS — turn it on if it's off.
     if (!ttsOn) { setTts(true); setTtsOn(true); }
     stopPlayback();
+    setVoiceMode(true);
+    setVoiceState('processing');
+
+    // Speak a prompt FIRST so the AI starts the conversation, not the user.
+    // - Empty conversation: auto_open generates a contextual greeting.
+    // - Existing conversation: short re-engagement prompt so the user knows
+    //   the mic is live without re-running the whole opener.
+    let opener = null;
+    try {
+      if (!messages.length && id) {
+        const r = await call('ckf-chat', {
+          action: 'auto_open',
+          conversation_id: id,
+          mode_hint: modeHint,
+        });
+        if (r.messages) setMessages(r.messages);
+        opener = r.text;
+      } else {
+        opener = modeHint === 'website_capture'
+          ? "Ready — what's the first one?"
+          : "What's on your mind?";
+      }
+    } catch (e) {
+      setErr(e.message);
+      opener = "Listening.";
+    }
+
+    if (opener) {
+      try { await speak(opener); } catch {}
+    }
+
+    // Now start listening. getUserMedia prompt happens here on first run; user
+    // has already heard the AI greet, so the prompt-context makes sense.
     const session = createVoiceSession({
       onState: (s) => setVoiceState(s),
       onError: (e) => setErr(e?.message || String(e)),
@@ -333,7 +366,6 @@ export default function Chat({ embedded = false, scope = 'personal' }) {
       },
     });
     voiceSessionRef.current = session;
-    setVoiceMode(true);
     session.start();
   }
 
