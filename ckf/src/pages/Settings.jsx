@@ -58,6 +58,8 @@ export default function Settings() {
 
       <TrainerShare />
 
+      <MarketingVoiceovers />
+
       <Connections />
 
       <ChangePassword />
@@ -296,6 +298,76 @@ function TrainerShare() {
           {revoked.length} revoked link{revoked.length === 1 ? '' : 's'}.
         </div>
       )}
+      {err && <div className="error">{err}</div>}
+    </div>
+  );
+}
+
+// Library of generated voiceover MP3s. Each row shows the public URL — copyable
+// like the trainer-share link, openable in browser by anyone (the bucket is
+// public). Rendered newest-first; delete here drops the file from storage too.
+function MarketingVoiceovers() {
+  const [items, setItems] = useState(null);
+  const [err, setErr] = useState('');
+  const [copiedId, setCopiedId] = useState(null);
+
+  async function load() {
+    try {
+      const r = await call('mktg-vo', { action: 'list' });
+      setItems(r.voiceovers || []);
+    } catch (e) { setErr(e.message); }
+  }
+  useEffect(() => { load(); }, []);
+
+  function copyUrl(url, id) {
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedId(id);
+      setTimeout(() => setCopiedId((v) => v === id ? null : v), 1500);
+    });
+  }
+
+  async function del(id) {
+    if (!confirm('Delete this voiceover MP3? The link will stop working.')) return;
+    try {
+      await call('mktg-vo', { action: 'delete', draft_id: id });
+      load();
+    } catch (e) { setErr(e.message); }
+  }
+
+  return (
+    <div className="card" style={{ marginBottom: 12 }}>
+      <div className="section-title" style={{ margin: '0 0 8px' }}>Marketing voiceovers</div>
+      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>
+        MP3s generated from ad briefs (ElevenLabs). The link is public — your
+        editor opens it in a browser to download. Generate from a brief in the{' '}
+        <Link to="/business/marketing/assistant">Marketing assistant</Link>.
+      </div>
+      {!items ? <div className="loading">Loading…</div> :
+        items.length === 0 ? (
+          <div className="empty" style={{ fontSize: 12 }}>
+            No voiceovers yet. Generate one from a brief.
+          </div>
+        ) : (
+          <>
+            {items.map((v) => (
+              <div key={v.draft_id} style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 2 }}>{v.label}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>
+                  {v.campaign_id || '?'} · {v.format || '?'} · {v.status || '?'}
+                  {v.generated_at ? ` · ${fmtRelative(v.generated_at)}` : ''}
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input value={v.public_url} readOnly onClick={(e) => e.target.select()} style={{ flex: 1, fontSize: 12 }} />
+                  <button onClick={() => copyUrl(v.public_url, v.draft_id)} className="primary" style={{ padding: '6px 12px', fontSize: 12 }}>
+                    {copiedId === v.draft_id ? 'Copied' : 'Copy'}
+                  </button>
+                  <a href={v.public_url} target="_blank" rel="noreferrer" style={{ padding: '6px 10px', fontSize: 12, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)' }}>Open</a>
+                  <button onClick={() => del(v.draft_id)} className="danger" style={{ padding: '6px 10px', fontSize: 12 }}>Del</button>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
       {err && <div className="error">{err}</div>}
     </div>
   );

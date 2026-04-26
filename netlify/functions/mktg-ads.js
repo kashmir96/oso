@@ -347,6 +347,92 @@ Output JSON only.`;
   return parseJSON(text);
 }
 
+// ── Graduation: live drafts → mktg_ads + memory fact ──
+// When a draft flips to status='live', insert a corresponding mktg_ads row so
+// loadDraftContext() can pull it as voice reference for future generations.
+// Also drop a memory fact noting what shipped (high-importance — these are
+// the strongest learning signals we get). Both are best-effort: failures log
+// but don't break the live transition.
+async function graduateLiveDraftToAds(userId, draft, beforeDraft) {
+  const out = { graduated_ad_id: null, memory_fact_id: null, skipped: null };
+
+  // Skip if there's no real concept (e.g. brand-new "__new:..." synthetic ids)
+  // — mktg_ads.concept_id needs to point at a real concept row.
+  let conceptId = draft.selected_concept_id || null;
+  if (conceptId && conceptId.startsWith('__new:')) conceptId = null;
+
+  // Skip if the draft has no shippable copy at all.
+  const finalText = draft.primary_text_final || draft.primary_text_v1 || null;
+  if (!finalText) {
+    out.skipped = 'no primary text';
+    return out;
+  }
+
+  // Idempotency: if this exact draft already graduated (we stamp ad_id back
+  // onto the draft.notes JSON or via a naming convention), don't double up.
+  // Cheapest check — same naming + same campaign + recently created.
+  const adName = draft.naming || `draft-${draft.id.slice(0, 8)}`;
+  try {
+    const dupes = await sbSelect(
+      'mktg_ads',
+      `ad_name=eq.${encodeURIComponent(adName)}&select=ad_id&limit=1`
+    );
+    if (dupes?.length) {
+      out.skipped = 'already graduated';
+      out.graduated_ad_id = dupes[0].ad_id;
+      return out;
+    }
+  } catch (_) { /* fall through and try insert */ }
+
+  // Format must match the mktg_ads check constraint.
+  const validFormats = new Set(['static','video','carousel','reel','unknown']);
+  const format = validFormats.has(draft.format) ? draft.format : 'unknown';
+
+  try {
+    const inserted = await sbInsert('mktg_ads', {
+      ad_id:               `gradd_${draft.id.slice(0, 8)}_${Date.now()}`,
+      ad_name:             adName,
+      campaign_id:         draft.campaign_id,
+      concept_id:          conceptId,
+      format,
+      creative_type:       'graduated_from_draft',
+      title:               draft.headline || null,
+      body:                finalText,
+      call_to_action:      draft.cta || null,
+      call_to_action_link: draft.landing_url || null,
+      // Performance starts empty — the regular Meta sync (or a future
+      // ad-spend backfill) populates it. The ad still serves as voice
+      // reference even with zero spend.
+      performance:         {},
+    });
+    out.graduated_ad_id = inserted?.ad_id || null;
+  } catch (e) {
+    console.error('[graduateLiveDraftToAds] insert failed:', e?.message || e);
+  }
+
+  // Memory fact — short, high-importance, includes the durable signal of why
+  // it shipped (audience + trust + which variant won + any feedback themes).
+  try {
+    const fb = draft.feedback_analysis || {};
+    const themes = Array.isArray(fb.preference_signals) ? fb.preference_signals.slice(0, 2) : [];
+    const themeNote = themes.length ? ` Wins: ${themes.join('; ')}.` : '';
+    const variantNote = draft.chosen_variant ? ` (chose ${draft.chosen_variant})` : '';
+    const fact = `Shipped: "${(adName).slice(0, 60)}" — ${draft.campaign_id || '?'} / ${draft.format || '?'} / ${draft.audience_type || 'audience ?'} / trust=${draft.trust_priority || 'medium'}${variantNote}.${themeNote}`;
+    const factRow = await sbInsert('mktg_memory_facts', {
+      user_id:    userId,
+      fact:       fact.slice(0, 600),
+      topic:      'shipped_ad',
+      importance: 5,
+      source_message_id: null,
+    });
+    out.memory_fact_id = factRow?.id || null;
+  } catch (e) {
+    console.error('[graduateLiveDraftToAds] memory insert failed:', e?.message || e);
+  }
+
+  return out;
+}
+
 // ── Critique & feedback ──
 // generateCritique runs once both copy variants exist, before finalize, and
 // returns { scores, rationale, verdict, repair_instructions }. The wizard
@@ -507,16 +593,25 @@ exports.handler = withGate(async (event, { user }) => {
       const filter = status ? `&status=eq.${encodeURIComponent(status)}` : '';
       const rows = await sbSelect(
         'mktg_drafts',
-        `user_id=eq.${user.id}${filter}&order=updated_at.desc&limit=80&select=id,status,current_step,objective,campaign_id,format,selected_concept_id,updated_at,created_at`
+        `user_id=eq.${user.id}${filter}&order=updated_at.desc&limit=80&select=id,status,current_step,objective,campaign_id,format,selected_concept_id,updated_at,created_at,voiceover_storage_path,voiceover_label,voiceover_generated_at,voiceover_voice_id,production_notes,production_asset_url,approval_notes,submitted_at`
       );
-      return reply(200, { drafts: rows });
+      // Stamp on the public VO URL so the client doesn't need SUPABASE_URL.
+      const enriched = rows.map((r) => r.voiceover_storage_path ? {
+        ...r,
+        voiceover_url: `${process.env.SUPABASE_URL}/storage/v1/object/public/mktg-vo/${r.voiceover_storage_path}`,
+      } : r);
+      return reply(200, { drafts: enriched });
     }
 
     if (action === 'get_draft') {
       if (!body.id) return reply(400, { error: 'id required' });
       const draft = await getDraft(user.id, body.id);
       if (!draft) return reply(404, { error: 'not found' });
-      return reply(200, { draft });
+      const enriched = draft.voiceover_storage_path ? {
+        ...draft,
+        voiceover_url: `${process.env.SUPABASE_URL}/storage/v1/object/public/mktg-vo/${draft.voiceover_storage_path}`,
+      } : draft;
+      return reply(200, { draft: enriched });
     }
 
     if (action === 'create_draft') {
@@ -617,8 +712,14 @@ exports.handler = withGate(async (event, { user }) => {
 
     if (action === 'mark_live') {
       if (!body.id) return reply(400, { error: 'id required' });
+      const before = await getDraft(user.id, body.id);
+      if (!before) return reply(404, { error: 'draft not found' });
       const draft = await patchDraft(user.id, body.id, { status: 'live' });
-      return reply(200, { draft });
+      // Graduate into mktg_ads + drop a memory fact so future generations
+      // cite this ad as voice reference. Best-effort — the live status flip
+      // is the source of truth, the learning loop is downstream of it.
+      const learning = await graduateLiveDraftToAds(user.id, draft, before);
+      return reply(200, { draft, ...learning });
     }
 
     if (action === 'generate_concepts') {

@@ -15,13 +15,19 @@ const QUEUES = [
 export default function Assistant() {
   const [queue, setQueue] = useState('submitted');
   const [drafts, setDrafts] = useState(null);
+  const [liveDrafts, setLiveDrafts] = useState(null);
   const [err, setErr] = useState('');
 
   async function load() {
     setErr('');
     try {
-      const r = await call('mktg-ads', { action: 'list_drafts', status: queue });
+      const [r, live] = await Promise.all([
+        call('mktg-ads', { action: 'list_drafts', status: queue }),
+        // The reference rail at the bottom — recent shipped ads, capped to 8.
+        call('mktg-ads', { action: 'list_drafts', status: 'live' }),
+      ]);
       setDrafts(r.drafts);
+      setLiveDrafts((live.drafts || []).slice(0, 8));
     } catch (e) { setErr(e.message); }
   }
   useEffect(() => { load(); }, [queue]);
@@ -55,7 +61,109 @@ export default function Assistant() {
       <div className="row-list">
         {drafts && drafts.map((d) => <AssistantRow key={d.id} draft={d} onChange={load} />)}
       </div>
+
+      {liveDrafts && liveDrafts.length > 0 && (
+        <>
+          <div className="section-title" style={{ marginTop: 20 }}>Recent live ads (reference)</div>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
+            Shipped briefs — past work the system also pulls in as voice
+            reference for new generations. Voiceovers re-downloadable here.
+          </div>
+          <div className="row-list">
+            {liveDrafts.map((d) => <LiveRow key={d.id} draft={d} onChange={load} />)}
+          </div>
+        </>
+      )}
     </div>
+  );
+}
+
+// Compact row for the reference rail. Single line + voiceover access.
+function LiveRow({ draft, onChange }) {
+  return (
+    <div className="row-item" style={{ padding: 10 }}>
+      <div className="name" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+        <Link to={`/business/marketing/wizard/${draft.id}`} style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: 'none', color: 'var(--text)' }}>
+          {draft.objective ? draft.objective.slice(0, 80) : '(no objective)'}
+        </Link>
+        <span className={statusPillClass(draft.status)}>{STATUS_LABEL[draft.status] || draft.status}</span>
+      </div>
+      <div className="meta">
+        {draft.campaign_id && <span>{draft.campaign_id}</span>}
+        {draft.format && <span>{draft.format}</span>}
+        {draft.audience_type && <span>aud: {draft.audience_type}</span>}
+      </div>
+      <div className="row" style={{ marginTop: 6 }}>
+        <VoiceoverButton draft={draft} onChange={onChange} compact />
+      </div>
+    </div>
+  );
+}
+
+// Generate / Re-generate / Download voiceover. Shows "Generate" if no MP3
+// yet, "Download MP3" + "↻" (regenerate) if one exists. Hidden for non-video
+// formats since there's no vo_script to read.
+function VoiceoverButton({ draft, onChange, compact }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const supports = draft.format === 'video' || draft.format === 'reel';
+  if (!supports) return null;
+
+  async function generate() {
+    setBusy(true); setErr('');
+    try {
+      await call('mktg-vo', { action: 'generate', draft_id: draft.id });
+      onChange?.();
+    } catch (e) { setErr(e.message); } finally { setBusy(false); }
+  }
+
+  if (draft.voiceover_url) {
+    return (
+      <>
+        <a
+          href={draft.voiceover_url}
+          target="_blank"
+          rel="noreferrer"
+          style={{
+            padding: compact ? '4px 10px' : '6px 12px',
+            fontSize: 12,
+            textDecoration: 'none',
+            border: '1px solid var(--border)',
+            borderRadius: 6,
+            color: 'var(--text)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+          }}
+          title={`Voice: ${draft.voiceover_voice_id || 'default'} · ${draft.voiceover_generated_at ? fmtRelative(draft.voiceover_generated_at) : ''}`}
+        >
+          ▶ Download VO
+        </a>
+        <button
+          onClick={generate}
+          disabled={busy}
+          style={{ padding: compact ? '4px 8px' : '6px 10px', fontSize: 11 }}
+          title="Regenerate the voiceover"
+        >
+          {busy ? '…' : '↻'}
+        </button>
+        {err && <span className="error" style={{ fontSize: 11 }}>{err}</span>}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <button
+        onClick={generate}
+        disabled={busy}
+        className="primary"
+        style={{ padding: compact ? '4px 10px' : '6px 12px', fontSize: 12 }}
+      >
+        {busy ? 'Generating…' : 'Generate voiceover'}
+      </button>
+      {err && <span className="error" style={{ fontSize: 11 }}>{err}</span>}
+    </>
   );
 }
 
@@ -100,7 +208,7 @@ function AssistantRow({ draft, onChange }) {
       </div>
 
       {!open && (
-        <div className="row" style={{ marginTop: 8 }}>
+        <div className="row" style={{ marginTop: 8, flexWrap: 'wrap' }}>
           <Link to={`/business/marketing/wizard/${draft.id}`}><button>Open draft</button></Link>
           {draft.status === 'submitted' && (
             <button className="primary" onClick={claim} disabled={busy}>{busy ? '…' : 'Claim'}</button>
@@ -111,6 +219,7 @@ function AssistantRow({ draft, onChange }) {
           {draft.status === 'needs_approval' && (
             <span className="pill warn" style={{ alignSelf: 'center' }}>Waiting for Curtis to approve</span>
           )}
+          <VoiceoverButton draft={draft} onChange={onChange} />
         </div>
       )}
 
