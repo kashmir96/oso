@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import Header from '../components/Header.jsx';
-import { call } from '../lib/api.js';
+import { call, notifyChanged } from '../lib/api.js';
 import { nzToday, fmtShortDate } from '../lib/format.js';
 
 const CATEGORIES = ['personal','health','business','social','finance','marketing','other'];
@@ -147,6 +147,7 @@ export default function Today() {
   async function setStatus(routineTaskId, status) {
     try {
       await call('ckf-tasks', { action: 'set_status', routine_task_id: routineTaskId, date, status });
+      notifyChanged();
       load();
     } catch (e) { setErr(e.message); }
   }
@@ -165,8 +166,15 @@ export default function Today() {
       {calStatus === 'error' && (
         <div className="error">Calendar fetch failed. Try reconnecting from Settings.</div>
       )}
-      {adding && <TaskForm onSaved={() => { setAdding(false); load(); }} onCancel={() => setAdding(false)} />}
-      {editing && <TaskForm task={editing} onSaved={() => { setEditing(null); load(); }} onCancel={() => setEditing(null)} />}
+      {adding && <TaskForm onSaved={() => { setAdding(false); notifyChanged(); load(); }} onCancel={() => setAdding(false)} />}
+      {editing && (
+        <TaskForm
+          key={editing.id}
+          task={editing}
+          onSaved={() => { setEditing(null); notifyChanged(); load(); }}
+          onCancel={() => setEditing(null)}
+        />
+      )}
 
       <div className="section-title">Today · {fmtShortDate(date)}</div>
       {today.length === 0 ? (

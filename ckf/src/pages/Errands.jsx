@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import Header from '../components/Header.jsx';
-import { call } from '../lib/api.js';
+import { call, notifyChanged } from '../lib/api.js';
 import { fmtShortDate } from '../lib/format.js';
 
 const CATEGORIES = ['personal','health','business','social','finance','marketing','other'];
@@ -38,8 +38,9 @@ export default function Errands() {
       <Header title="Errands" right={<button onClick={() => { setEditing(null); setAdding(true); }}>+ Add</button>} />
       {(adding || editing) && (
         <Form
+          key={editing?.id || 'new'}
           item={editing}
-          onSaved={() => { setAdding(false); setEditing(null); load(); }}
+          onSaved={() => { setAdding(false); setEditing(null); notifyChanged(); load(); }}
           onCancel={() => { setAdding(false); setEditing(null); }}
         />
       )}
