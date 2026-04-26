@@ -55,12 +55,22 @@ export default function TodayStrip({ title = 'Today', scope = 'all', defaultCate
     }
     for (const t of (bizR.tasks || [])) {
       if (['done','cancelled'].includes(t.status)) continue;
-      if (!t.due_date || t.due_date < today) continue;
+      // Business scope = "Jobs" strip: show ALL open business tasks (this
+      // strip IS the same as the Tasks page in business scope, just inline).
+      // All-scope ("Today" on Home): only ones due today or later — keeps
+      // the personal Today strip from being polluted with backlog.
+      if (scope !== 'business') {
+        if (!t.due_date || t.due_date < today) continue;
+      }
       out.push({
         kind: 'biz', id: 'b-' + t.id,
         title: t.title,
-        meta: t.due_date === today ? 'due today' : `due ${fmtShortDate(t.due_date)}`,
-        when: `${t.due_date}T23:59:00`,
+        meta: t.due_date
+          ? (t.due_date === today ? 'due today' : `due ${fmtShortDate(t.due_date)}`)
+          : (t.priority ? `P${t.priority}` : 'no due date'),
+        when: t.due_date
+          ? `${t.due_date}T23:59:00`
+          : `9999-${String(t.priority || 3).padStart(2,'0')}`,  // sort no-date items by priority
       });
     }
     for (const e of (errR.errands || [])) {

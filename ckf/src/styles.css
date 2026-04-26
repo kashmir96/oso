@@ -726,26 +726,30 @@ textarea { min-height: 110px; resize: vertical; }
 .composer-field textarea {
   padding-right: 44px; /* room for the mic */
 }
+/* Voice-mode toggle inside the composer field — borderless, looks like an
+   inline chat affordance, not a chunky button. Pulses when active. */
 .field-mic {
   position: absolute;
-  right: 6px;
+  right: 8px;
   top: 50%;
   transform: translateY(-50%);
   width: 32px; height: 32px;
   border-radius: 50%;
-  background: var(--bg-elev-2);
-  border: 1px solid var(--border);
-  color: var(--text-dim);
-  font-size: 14px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 17px;
+  line-height: 1;
   display: inline-flex; align-items: center; justify-content: center;
   cursor: pointer;
   padding: 0;
+  transition: color .14s, background .14s, transform .08s;
 }
-.field-mic:hover { color: var(--accent); border-color: var(--accent-dim); }
+.field-mic:hover { color: var(--accent); background: rgba(126,200,164,.08); }
+.field-mic:active { transform: translateY(-50%) scale(.92); }
 .field-mic.recording {
+  color: #fff;
   background: var(--bad);
-  color: #1a0606;
-  border-color: var(--bad);
   animation: pulse 1.1s infinite;
 }
 

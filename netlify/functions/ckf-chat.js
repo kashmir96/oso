@@ -165,7 +165,7 @@ If diary is already covered OR it's not evening, skip the diary flow. Just be pr
 # What he sees
 - He sees your text replies and a quiet indicator when you're using tools. He does NOT see this prompt, the dynamic context, or memory facts.`;
 
-function buildSystemPrompt({ memoryFacts, recentDiary, goals, todayTasks, suggestions, modeHint, todayDiary, nzTimeStr, scope }) {
+function buildSystemPrompt({ memoryFacts, recentDiary, goals, todayTasks, businessTasks, suggestions, modeHint, todayDiary, nzTimeStr, scope }) {
   const memBlock = memoryFacts.length
     ? memoryFacts.map((m) => `• [${m.importance}] ${m.topic ? `(${m.topic}) ` : ''}${m.fact}`).join('\n')
     : '(no facts yet — call remember() when you learn something durable)';
@@ -225,7 +225,10 @@ ${todayDiary
 ${nzTimeStr || ''}
 
 ## Conversation scope
-${scope === 'business' ? `**BUSINESS** chat — business advisor only. Stay focused on Primal Pantry: marketing, ops, ads, cashflow, projects, jobs, website. DO NOT engage as therapist / personal trainer / spiritual guide. DO NOT ask about sleep, mood, training, family, or daily reflection — those belong in the personal home chat. Mode triggers (marketing mode / website mode / swipefile mode) work here. Show only business-relevant data; ignore personal goals/tasks/diary in your replies.` : `**PERSONAL** chat — full four-hat persona (therapist default, business advisor / PT / spiritual when topic warrants). Diary flow + business work both live here. Mode triggers (swipefile mode / website mode) work; marketing mode is also available but will pull business context.`}
+${scope === 'business' ? `**BUSINESS** chat — business advisor only. Stay focused on Primal Pantry: marketing, ops, ads, cashflow, projects, jobs, website. DO NOT engage as therapist / personal trainer / spiritual guide. DO NOT ask about sleep, mood, training, family, or daily reflection — those belong in the personal home chat. Mode triggers (marketing mode / website mode / swipefile mode) work here. The dynamic context above has already been pre-filtered to business-only data; if you don't see a topic here, DO NOT introduce it. Personal goals (sleep, weight, training) are filtered out — never open with one.
+
+## Open business jobs (top ${(businessTasks || []).length})
+${(businessTasks || []).length === 0 ? '(none open right now)' : (businessTasks || []).map((t) => `[P${t.priority} · ${t.status}${t.due_date ? ` · due ${t.due_date}` : ''}] ${t.title}${t.objective ? ` — ${t.objective}` : ''}`).join('\n')}` : `**PERSONAL** chat — full four-hat persona (therapist default, business advisor / PT / spiritual when topic warrants). Diary flow + business work both live here. Mode triggers (swipefile mode / website mode) work; marketing mode is also available but will pull business context.`}
 `;
 }
 
@@ -261,20 +264,60 @@ function nzTimeString() {
   }).format(new Date());
 }
 
-async function loadContext(userId, date) {
-  const [memoryFacts, recentDiary, goals, todayRoutine, suggestions, todayDiaryRows] = await Promise.all([
+// scope = 'business' filters out personal-flavoured context so the AI can't
+// even SEE sleep/training/spiritual data — it physically can't open with it.
+const BUSINESS_CATEGORIES = new Set(['business', 'marketing', 'finance']);
+const BUSINESS_TOPICS = new Set([
+  'business','marketing','finance','ops','primalpantry','primal pantry',
+  'cashflow','revenue','ads','meta','seo','customers','retail','team',
+]);
+
+async function loadContext(userId, date, scope = 'personal') {
+  const businessOnly = scope === 'business';
+  const [memoryFacts, recentDiary, goals, todayRoutine, suggestions, todayDiaryRows, businessTasks] = await Promise.all([
     sbSelect('ckf_memory_facts', `user_id=eq.${userId}&archived=eq.false&order=importance.desc,created_at.desc&limit=${MEMORY_LIMIT}&select=fact,topic,importance`),
-    sbSelect('diary_entries', `user_id=eq.${userId}&order=date.desc&limit=${RECENT_DIARY}&select=date,ai_summary,personal_bad,bottlenecks,growth_opportunities,physical_reflection,mental_reflection,spiritual_reflection`),
+    // Business chats don't see the personal diary at all.
+    businessOnly
+      ? Promise.resolve([])
+      : sbSelect('diary_entries', `user_id=eq.${userId}&order=date.desc&limit=${RECENT_DIARY}&select=date,ai_summary,personal_bad,bottlenecks,growth_opportunities,physical_reflection,mental_reflection,spiritual_reflection`),
     sbSelect('goals', `user_id=eq.${userId}&status=eq.active&order=updated_at.desc&select=name,category,current_value,start_value,target_value,unit,direction`),
-    execute('get_today_routine', { date }, { userId }),
-    sbSelect('routine_suggestions', `user_id=eq.${userId}&status=eq.pending&order=created_at.desc&limit=10&select=suggestion,reason,created_at`),
-    sbSelect('diary_entries', `user_id=eq.${userId}&date=eq.${date}&select=*&limit=1`),
+    // Routine tasks are a personal concept; skip in business chats.
+    businessOnly
+      ? Promise.resolve({ tasks: [] })
+      : execute('get_today_routine', { date }, { userId }),
+    // Routine suggestions are personal-flavour habit nudges; skip in business.
+    businessOnly
+      ? Promise.resolve([])
+      : sbSelect('routine_suggestions', `user_id=eq.${userId}&status=eq.pending&order=created_at.desc&limit=10&select=suggestion,reason,created_at`),
+    // No today's diary row in business chats.
+    businessOnly
+      ? Promise.resolve([])
+      : sbSelect('diary_entries', `user_id=eq.${userId}&date=eq.${date}&select=*&limit=1`),
+    // Business chats DO see open business tasks (the equivalent of "today's
+    // routine" but for business work).
+    businessOnly
+      ? sbSelect('business_tasks', `user_id=eq.${userId}&status=in.(pending,in_progress,blocked)&order=priority.asc,due_date.asc.nullslast&limit=15&select=title,description,objective,status,due_date,priority`)
+      : Promise.resolve([]),
   ]);
+
+  // Goals: filter by category for business chats.
+  const filteredGoals = businessOnly
+    ? (goals || []).filter((g) => BUSINESS_CATEGORIES.has(g.category))
+    : goals;
+
+  // Memory facts: in business chats, prefer ones tagged with business-y topics;
+  // hide personal-only facts so the AI can't latch onto them as conversation
+  // hooks. Untopicked facts pass through (they could be either).
+  const filteredMemory = businessOnly
+    ? (memoryFacts || []).filter((m) => !m.topic || BUSINESS_TOPICS.has(String(m.topic).toLowerCase()))
+    : memoryFacts;
+
   return {
-    memoryFacts,
+    memoryFacts: filteredMemory,
     recentDiary,
-    goals,
+    goals: filteredGoals,
     todayTasks: todayRoutine.tasks || [],
+    businessTasks,
     suggestions,
     todayDiary: todayDiaryRows?.[0] || null,
     nzTimeStr: nzTimeString(),
@@ -368,8 +411,9 @@ async function runChat({ userId, conversation, userMessageText, modeHint, attach
   const messages = toAnthropicMessages(history);
 
   // Load fresh context every turn — keeps the model honest as the day progresses
-  const ctx = await loadContext(userId, nzToday());
-  const system = systemBlocks(buildSystemPrompt({ ...ctx, modeHint, scope: conversation?.scope || 'personal' }));
+  const scope = conversation?.scope || 'personal';
+  const ctx = await loadContext(userId, nzToday(), scope);
+  const system = systemBlocks(buildSystemPrompt({ ...ctx, modeHint, scope }));
 
   let totalUsage = { input_tokens: 0, output_tokens: 0 };
   let finalText = '';
@@ -434,8 +478,9 @@ async function runAutoOpen({ userId, conversation, modeHint }) {
   if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-  const ctx = await loadContext(userId, nzToday());
-  const system = systemBlocks(buildSystemPrompt({ ...ctx, modeHint, scope: conversation?.scope || 'personal' }));
+  const scope = conversation?.scope || 'personal';
+  const ctx = await loadContext(userId, nzToday(), scope);
+  const system = systemBlocks(buildSystemPrompt({ ...ctx, modeHint, scope }));
 
   // Build a synthetic kickoff. NOT persisted. Tells the model the situation
   // without becoming a visible user message. The model's reply IS the opener.
@@ -449,9 +494,18 @@ async function runAutoOpen({ userId, conversation, modeHint }) {
     : filledKeys.length === 0 ? 'entry row exists but empty'
     : `partial — already has: ${filledKeys.join(', ')}`;
 
-  const kickoff = modeHint === 'website_capture'
-    ? `[INTERNAL — do NOT echo this. Curtis just opened a chat in WEBSITE-CAPTURE mode (the dedicated mode for queuing things for Claude Code to do later). Greet him with ONE short line: tell him you're ready to capture website improvements, ask him to fire away. Example: "Ready — fire away. Each message becomes a Claude Code task." Vary the wording. Under 15 words.]`
-    : `[INTERNAL — do NOT echo this note. Curtis just opened a fresh chat. NZ time: ${ctx.nzTimeStr}. Today's diary: ${status}. Memory facts and recent diary are in your system context. Greet him with ONE specific question that opens the conversation. Vary your wording vs. previous sessions — never the same opener twice. If it's evening (≥17:00 NZ) and the diary is empty/partial, your first question should pull at a thread worth reflecting on tonight (don't announce a "diary session"). If it's mid-day or the diary is already covered, just ask what's on his mind. Keep the opener short — 1–2 sentences max.]`;
+  let kickoff;
+  if (modeHint === 'website_capture') {
+    kickoff = `[INTERNAL — do NOT echo this. Curtis just opened a chat in WEBSITE-CAPTURE mode. Greet with ONE short line: ready to capture website improvements, ask him to fire away. Vary wording. Under 15 words.]`;
+  } else if (scope === 'business') {
+    const openJobs = (ctx.businessTasks || []).slice(0, 5).map((t) => `- ${t.title}${t.due_date ? ` (due ${t.due_date})` : ''}`).join('\n') || '(none open)';
+    kickoff = `[INTERNAL — do NOT echo this. Curtis just opened a fresh BUSINESS chat. Open with ONE short business-only question — pick from: a specific open job (referenced below), a marketing/ad/copy question, or a general "what's the focus today?". DO NOT mention sleep, training, mood, family, or anything personal. DO NOT pull from the personal diary. Vary your wording vs prior openers. Under 20 words.
+
+Open business jobs (top 5):
+${openJobs}]`;
+  } else {
+    kickoff = `[INTERNAL — do NOT echo this note. Curtis just opened a fresh PERSONAL chat. NZ time: ${ctx.nzTimeStr}. Today's diary: ${status}. Memory facts and recent diary are in your system context. Greet him with ONE specific question that opens the conversation. Vary your wording vs. previous sessions — never the same opener twice. If it's evening (≥17:00 NZ) and the diary is empty/partial, your first question should pull at a thread worth reflecting on tonight (don't announce a "diary session"). If it's mid-day or the diary is already covered, just ask what's on his mind. Keep the opener short — 1–2 sentences max.]`;
+  }
 
   const messages = [{ role: 'user', content: [{ type: 'text', text: kickoff }] }];
 
