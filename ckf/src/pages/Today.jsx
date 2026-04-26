@@ -142,7 +142,23 @@ export default function Today() {
       setTodayBlendItems(todayBlend);
     } catch (e) { setErr(e.message); }
   }
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [date]);
+  useEffect(() => {
+    load();
+    // Refresh whenever any mutation fires the global event (chat tools,
+    // quick-add, errand complete, goal log, etc.) — keeps /today in sync
+    // without needing a manual reload.
+    const onChanged = () => load();
+    window.addEventListener('ckf-data-changed', onChanged);
+    // Also refresh when the tab regains focus (covers SMS reminders or chat
+    // edits made on another device).
+    const onVisible = () => { if (document.visibilityState === 'visible') load(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('ckf-data-changed', onChanged);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date]);
 
   async function setStatus(routineTaskId, status) {
     try {
