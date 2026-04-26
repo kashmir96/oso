@@ -136,30 +136,58 @@ const TOOLS = [
   },
   {
     name: 'log_goal_value',
-    description: "Log a new value for an existing goal. Updates current_value and writes a history row for charting. For counter-style goals (e.g. 'training sessions this month'), call get_goals first to read current_value, then log current+1.",
+    description: "Log a value for a goal. Pass for_date to backdate (default today NZ). For daily/weekly/monthly goals with sum/count aggregate, multiple logs accumulate within the window — log each meal's calories separately, not a manual running total.",
     input_schema: {
       type: 'object',
       properties: {
         goal_id: { type: 'string', description: 'UUID of the goal' },
         value: { type: 'number' },
         note: { type: 'string' },
+        for_date: { type: 'string', description: 'YYYY-MM-DD; the day this measurement is FOR. Defaults to today NZ.' },
       },
       required: ['goal_id', 'value'],
     },
   },
   {
     name: 'create_goal',
-    description: "Create a new goal Curtis wants to track. Use when he names something concrete he wants to chase: a body comp number, a revenue target, a consistency streak. Don't create vague goals — turn fuzzy intentions into measurable ones (ask him for a target if needed before calling).",
+    description: `Create a new goal. Pick the type AND timeframe by what Curtis described.
+
+TYPE:
+- 'numeric' (default) — measured value (body weight, calories, revenue).
+- 'checkbox' — daily yes/no habit; streak counts up. Tap-to-tick.
+- 'restraint' — auto-ticks daily until a fail is logged.
+
+TIMEFRAME (numeric only — when running value resets):
+- 'lifetime' (default) — never resets (body weight, savings).
+- 'daily' — resets at midnight NZ. Calories, water, screen time.
+- 'weekly' — resets Monday NZ.
+- 'monthly' — resets on the 1st NZ.
+
+AGGREGATE (numeric only — how multiple logs combine in window):
+- 'last' (default) — most recent log wins (body weight).
+- 'sum' — adds values (calories per day).
+- 'count' — number of logs (lifts per week).
+- 'avg' — average.
+
+Examples:
+- "Track calories, target 2200/day": type=numeric, timeframe=daily, aggregate=sum, target_value=2200, unit='cal', direction=lower_better.
+- "Body weight, target 80kg": timeframe=lifetime, aggregate=last, unit='kg'.
+- "4 lifts per week": timeframe=weekly, aggregate=count, target_value=4.
+
+Don't create vague goals. For numeric, ask one question if target is missing.`,
     input_schema: {
       type: 'object',
       properties: {
         name: { type: 'string' },
         category: { type: 'string', enum: ['personal','health','business','social','finance','marketing','other'] },
-        current_value: { type: 'number', description: 'starting reading; defaults to start_value' },
-        start_value: { type: 'number' },
-        target_value: { type: 'number' },
-        unit: { type: 'string', description: 'e.g. kg, %, $, sessions' },
-        direction: { type: 'string', enum: ['higher_better','lower_better'], description: 'default higher_better' },
+        goal_type: { type: 'string', enum: ['numeric','checkbox','restraint'], description: 'default numeric' },
+        timeframe: { type: 'string', enum: ['lifetime','daily','weekly','monthly'], description: 'numeric only; default lifetime' },
+        aggregate: { type: 'string', enum: ['last','sum','count','avg'], description: 'numeric only; default last' },
+        current_value: { type: 'number', description: 'numeric only — starting reading; defaults to start_value' },
+        start_value: { type: 'number', description: 'numeric only' },
+        target_value: { type: 'number', description: 'numeric — target value; checkbox/restraint — optional streak target in days' },
+        unit: { type: 'string', description: 'e.g. kg, %, $, cal, sessions' },
+        direction: { type: 'string', enum: ['higher_better','lower_better'], description: 'numeric only; default higher_better' },
       },
       required: ['name', 'category'],
     },
@@ -191,6 +219,52 @@ const TOOLS = [
     },
   },
   {
+    name: 'link_goal_to_whoop',
+    description: "Link a goal so its current_value is auto-synced from Whoop daily. Use when Curtis says 'pull this from Whoop' or the goal is something Whoop measures (sleep, recovery, HRV, RHR, strain). Immediately seeds the goal with the most recent metric. After linking, manual log_goal_value calls on this goal will be refused.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        goal_id: { type: 'string' },
+        field: {
+          type: 'string',
+          enum: ['recovery_score', 'hrv_rmssd_ms', 'resting_heart_rate', 'strain', 'sleep_performance', 'sleep_hours', 'sleep_efficiency'],
+          description: 'Which Whoop metric drives this goal',
+        },
+      },
+      required: ['goal_id', 'field'],
+    },
+  },
+  {
+    name: 'unlink_goal_data_source',
+    description: "Detach a goal from its external data source. After unlinking, manual log_goal_value works again.",
+    input_schema: {
+      type: 'object',
+      properties: { goal_id: { type: 'string' } },
+      required: ['goal_id'],
+    },
+  },
+  {
+    name: 'mark_goal_done',
+    description: "For checkbox goals only — mark today done. Increments the streak by 1 if yesterday was also done; resets to 1 otherwise. Idempotent within the same day. Use when Curtis says 'I plunged today', 'lifted today', 'did the morning routine', etc.",
+    input_schema: {
+      type: 'object',
+      properties: { goal_id: { type: 'string' } },
+      required: ['goal_id'],
+    },
+  },
+  {
+    name: 'mark_goal_fail',
+    description: "For restraint goals only — log a fail and reset the streak to 0 today. Use when Curtis says 'I drank tonight', 'I caved', 'broke the streak', etc. Be matter-of-fact about it; resetting is part of the system, not a judgement.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        goal_id: { type: 'string' },
+        note: { type: 'string', description: 'optional context — what triggered the slip' },
+      },
+      required: ['goal_id'],
+    },
+  },
+  {
     name: 'set_task_status',
     description: "Mark a routine task as done/skipped/not_started for a given date.",
     input_schema: {
@@ -214,6 +288,109 @@ const TOOLS = [
         reason: { type: 'string', description: 'why, citing what was discussed' },
       },
       required: ['suggestion'],
+    },
+  },
+  {
+    name: 'create_errand',
+    description: "Create a quick to-do — errand or 'job'. Use whenever Curtis says he needs to remember something concrete: buy X, pick up Y, follow up with Z, ship Bel's order. Set category='business' for work tasks (these surface as 'Jobs' on the Business tab); otherwise 'personal'/'health'/etc. (these surface as 'Errands' on Home). If he mentions a time, set remind_at — that fires a modal on app open AND optionally an SMS.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        description: { type: 'string' },
+        category: { type: 'string', enum: ['personal','health','business','social','finance','marketing','other'], description: "default 'personal'" },
+        due_date: { type: 'string', description: 'YYYY-MM-DD — calendar-style due day' },
+        remind_at: { type: 'string', description: "ISO timestamp — exact moment to fire the reminder. E.g. '2026-04-26T18:30:00+13:00'" },
+        sms_remind: { type: 'boolean', description: 'when remind_at fires, also send SMS to Curtis. Default false.' },
+        priority: { type: 'integer', minimum: 1, maximum: 5 },
+      },
+      required: ['title'],
+    },
+  },
+  {
+    name: 'list_errands',
+    description: "Read errands. Filter by status ('open'/'done'/'cancelled') and/or category. Use to answer 'what do I need to do today / this week' or to check work jobs.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', enum: ['open','done','cancelled'] },
+        category: { type: 'string', description: "single category, or 'business' / 'not_business'" },
+      },
+    },
+  },
+  {
+    name: 'update_errand',
+    description: "Update an errand — title, description, due_date, remind_at, sms_remind, priority, category. Updating remind_at clears the previous shown_at + sms_sent_at so the new time fires fresh.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        title: { type: 'string' },
+        description: { type: 'string' },
+        category: { type: 'string', enum: ['personal','health','business','social','finance','marketing','other'] },
+        due_date: { type: 'string' },
+        remind_at: { type: 'string' },
+        sms_remind: { type: 'boolean' },
+        priority: { type: 'integer' },
+      },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'complete_errand',
+    description: "Mark an errand done.",
+    input_schema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+  },
+  {
+    name: 'delete_errand',
+    description: "Delete an errand.",
+    input_schema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+  },
+  {
+    name: 'create_routine_task',
+    description: "Create a new recurring routine task that shows up on the Today list. Use when Curtis adds a new habit or daily action to his routine. Recurrence: 'daily' (default), 'weekly', or a CSV of weekday codes like 'mon,wed,fri'.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        description: { type: 'string' },
+        category: { type: 'string', enum: ['personal','health','business','social','finance','marketing','other'] },
+        recurrence_rule: { type: 'string', description: "default 'daily'" },
+        priority: { type: 'integer', minimum: 1, maximum: 5, description: 'default 3' },
+        estimated_minutes: { type: 'integer' },
+        linked_goal_id: { type: 'string', description: 'optional UUID of a goal this task supports' },
+        assigned_to: { type: 'string' },
+      },
+      required: ['title'],
+    },
+  },
+  {
+    name: 'update_routine_task',
+    description: "Update fields on a routine task — title, recurrence, priority, estimated_minutes, active. Use when Curtis tweaks a habit (different days, different priority).",
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        title: { type: 'string' },
+        description: { type: 'string' },
+        category: { type: 'string', enum: ['personal','health','business','social','finance','marketing','other'] },
+        recurrence_rule: { type: 'string' },
+        priority: { type: 'integer' },
+        estimated_minutes: { type: 'integer' },
+        linked_goal_id: { type: 'string' },
+        assigned_to: { type: 'string' },
+        active: { type: 'boolean' },
+      },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'delete_routine_task',
+    description: "Permanently delete a routine task. Use when Curtis has clearly retired a habit. Prefer setting active=false via update_routine_task if he might restart.",
+    input_schema: {
+      type: 'object',
+      properties: { id: { type: 'string' } },
+      required: ['id'],
     },
   },
   {
@@ -278,6 +455,54 @@ const TOOLS = [
       type: 'object',
       properties: { id: { type: 'string' } },
       required: ['id'],
+    },
+  },
+  {
+    name: 'search_swipefile',
+    description: "Search Curtis's curated knowledge base (books, articles, talks, notes, images he's saved). Use this PROACTIVELY whenever a question maps to ideas he might have already saved — e.g. mentions of an author or framework, business strategy questions, training principles, philosophical themes. Reference the source title + author when you cite from it. Prefer his swipefile over generic knowledge.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        q: { type: 'string', description: 'keywords, names, or phrases' },
+        limit: { type: 'integer', minimum: 1, maximum: 30 },
+      },
+      required: ['q'],
+    },
+  },
+  {
+    name: 'get_calendar_events',
+    description: "Fetch upcoming calendar events from Curtis's connected Google Calendar. Use when he asks about his schedule, what's coming up, when he's free, or when planning tomorrow.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        from: { type: 'string', description: 'ISO timestamp (default: now)' },
+        to: { type: 'string', description: 'ISO timestamp (default: end of NZ day + 36h buffer)' },
+      },
+    },
+  },
+  {
+    name: 'get_meals',
+    description: "Fetch Curtis's recent meal log entries (image + AI calorie/macro estimate, with manual overrides if he edited them). Use to discuss eating patterns, total day calories, what he ate around a workout, or to compare against his calorie goal.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        days: { type: 'integer', minimum: 1, maximum: 30, description: 'how many days back; default 3' },
+      },
+    },
+  },
+  {
+    name: 'get_whoop_today',
+    description: "Fetch yesterday's Whoop metrics (recovery score 0-100, HRV, resting HR, strain, sleep performance, sleep hours, sleep efficiency). Use when discussing physical state, recovery, sleep, or training readiness.",
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'get_whoop_recent',
+    description: "Fetch recent Whoop metrics for trend analysis. Use to spot patterns in recovery / sleep / strain.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        days: { type: 'integer', minimum: 1, maximum: 90, description: 'default 14' },
+      },
     },
   },
 ];
@@ -413,29 +638,89 @@ async function execute(name, input, ctx) {
     }
     case 'log_goal_value': {
       if (!input?.goal_id || input?.value == null) return { error: 'goal_id and value required' };
+      // Refuse if the goal is auto-linked to an external source — otherwise the
+      // next sync would overwrite the manual log and confuse history.
+      const g = (await sbSelect('goals', `id=eq.${input.goal_id}&user_id=eq.${userId}&select=data_source,data_source_field,name&limit=1`))?.[0];
+      if (g && g.data_source && g.data_source !== 'manual') {
+        return { error: `Goal "${g.name}" is auto-synced from ${g.data_source}${g.data_source_field ? ` (${g.data_source_field})` : ''}. Unlink first if you want to log manually.` };
+      }
       const log = await sbInsert('goal_logs', { goal_id: input.goal_id, user_id: userId, value: input.value, note: input.note || null });
       await sbUpdate('goals', `id=eq.${input.goal_id}&user_id=eq.${userId}`, { current_value: input.value });
       return { logged: true, log_id: log?.id, new_value: input.value };
     }
     case 'create_goal': {
       if (!input?.name || !input?.category) return { error: 'name and category required' };
+      const type = input.goal_type || 'numeric';
+      const today = nzToday();
+
+      if (type === 'checkbox') {
+        const goal = await sbInsert('goals', {
+          user_id: userId,
+          name: input.name, category: input.category, goal_type: 'checkbox',
+          current_value: 0, start_value: 0,
+          target_value: input.target_value ?? null,
+          unit: input.unit || 'days',
+          direction: 'higher_better',
+          last_completed_at: null,
+        });
+        return { created: true, goal };
+      }
+      if (type === 'restraint') {
+        const goal = await sbInsert('goals', {
+          user_id: userId,
+          name: input.name, category: input.category, goal_type: 'restraint',
+          current_value: 0, start_value: 0,
+          target_value: input.target_value ?? null,
+          unit: input.unit || 'days',
+          direction: 'higher_better',
+          streak_started_at: today,
+        });
+        return { created: true, goal };
+      }
       const start = input.start_value ?? input.current_value ?? null;
       const goal = await sbInsert('goals', {
         user_id: userId,
-        name: input.name,
-        category: input.category,
+        name: input.name, category: input.category, goal_type: 'numeric',
         current_value: input.current_value ?? start,
         start_value: start,
         target_value: input.target_value ?? null,
         unit: input.unit || null,
         direction: input.direction || 'higher_better',
       });
-      // Seed an initial history point if we have a value
       if (input.current_value != null || start != null) {
         const v = input.current_value ?? start;
         await sbInsert('goal_logs', { goal_id: goal.id, user_id: userId, value: v, note: 'initial' });
       }
       return { created: true, goal };
+    }
+    case 'mark_goal_done': {
+      if (!input?.goal_id) return { error: 'goal_id required' };
+      const g = (await sbSelect('goals', `id=eq.${input.goal_id}&user_id=eq.${userId}&select=*&limit=1`))?.[0];
+      if (!g) return { error: 'goal not found' };
+      if (g.goal_type !== 'checkbox') return { error: 'mark_goal_done is for checkbox goals only' };
+      const today = nzToday();
+      if (g.last_completed_at === today) return { already_done_today: true, current_value: g.current_value };
+      const fromYesterday = g.last_completed_at && (
+        new Date(today + 'T00:00:00Z') - new Date(g.last_completed_at + 'T00:00:00Z') === 86400000
+      );
+      const newStreak = fromYesterday ? (Number(g.current_value) || 0) + 1 : 1;
+      await sbUpdate('goals', `id=eq.${g.id}&user_id=eq.${userId}`, {
+        current_value: newStreak, last_completed_at: today,
+      });
+      await sbInsert('goal_logs', { goal_id: g.id, user_id: userId, value: newStreak, note: 'checkbox tick' });
+      return { marked: true, current_value: newStreak };
+    }
+    case 'mark_goal_fail': {
+      if (!input?.goal_id) return { error: 'goal_id required' };
+      const g = (await sbSelect('goals', `id=eq.${input.goal_id}&user_id=eq.${userId}&select=*&limit=1`))?.[0];
+      if (!g) return { error: 'goal not found' };
+      if (g.goal_type !== 'restraint') return { error: 'mark_goal_fail is for restraint goals only' };
+      const today = nzToday();
+      await sbUpdate('goals', `id=eq.${g.id}&user_id=eq.${userId}`, {
+        current_value: 0, streak_started_at: today,
+      });
+      await sbInsert('goal_logs', { goal_id: g.id, user_id: userId, value: 0, note: input.note || 'fail — streak reset' });
+      return { reset: true, streak_started_at: today };
     }
     case 'update_goal': {
       if (!input?.id) return { error: 'id required' };
@@ -451,6 +736,40 @@ async function execute(name, input, ctx) {
       if (!input?.id) return { error: 'id required' };
       const rows = await sbUpdate('goals', `id=eq.${input.id}&user_id=eq.${userId}`, { status: 'archived' });
       return { archived: true, goal: rows?.[0] };
+    }
+    case 'link_goal_to_whoop': {
+      if (!input?.goal_id || !input?.field) return { error: 'goal_id and field required' };
+      const ALLOWED = ['recovery_score','hrv_rmssd_ms','resting_heart_rate','strain','sleep_performance','sleep_hours','sleep_efficiency'];
+      if (!ALLOWED.includes(input.field)) return { error: `bad field; pick one of ${ALLOWED.join(', ')}` };
+      // Verify the goal exists and belongs to this user
+      const g = (await sbSelect('goals', `id=eq.${input.goal_id}&user_id=eq.${userId}&select=*&limit=1`))?.[0];
+      if (!g) return { error: 'goal not found' };
+      await sbUpdate('goals', `id=eq.${g.id}&user_id=eq.${userId}`, {
+        data_source: 'whoop',
+        data_source_field: input.field,
+      });
+      // Immediate seed: pull the most recent whoop_metrics row and update current_value
+      const recent = await sbSelect(
+        'whoop_metrics',
+        `user_id=eq.${userId}&order=date.desc&limit=1&select=date,${input.field}`
+      );
+      const v = recent?.[0]?.[input.field];
+      if (v != null) {
+        await sbUpdate('goals', `id=eq.${g.id}&user_id=eq.${userId}`, { current_value: Number(v) });
+        await sbInsert('goal_logs', {
+          goal_id: g.id, user_id: userId, value: Number(v),
+          note: `whoop ${input.field} (initial link)`,
+        });
+        return { linked: true, field: input.field, seeded_with: Number(v), as_of: recent[0].date };
+      }
+      return { linked: true, field: input.field, seeded_with: null, note: 'No Whoop data yet — value will populate on next sync' };
+    }
+    case 'unlink_goal_data_source': {
+      if (!input?.goal_id) return { error: 'goal_id required' };
+      const rows = await sbUpdate('goals', `id=eq.${input.goal_id}&user_id=eq.${userId}`, {
+        data_source: 'manual', data_source_field: null,
+      });
+      return { unlinked: true, goal: rows?.[0] };
     }
     case 'set_task_status': {
       if (!input?.routine_task_id || !input?.status) return { error: 'routine_task_id and status required' };
@@ -546,6 +865,87 @@ async function execute(name, input, ctx) {
         };
       }
     }
+    case 'create_errand': {
+      if (!input?.title) return { error: 'title required' };
+      const row = await sbInsert('ckf_errands', {
+        user_id: userId,
+        title: input.title,
+        description: input.description || null,
+        category: input.category || 'personal',
+        due_date: input.due_date || null,
+        remind_at: input.remind_at || null,
+        sms_remind: !!input.sms_remind,
+        priority: input.priority ?? 3,
+      });
+      return { created: true, errand: row };
+    }
+    case 'list_errands': {
+      const status = input?.status;
+      const category = input?.category;
+      let filter = `user_id=eq.${userId}`;
+      if (status) filter += `&status=eq.${status}`;
+      if (category === 'not_business') filter += `&category=neq.business`;
+      else if (category) filter += `&category=eq.${encodeURIComponent(category)}`;
+      const rows = await sbSelect('ckf_errands', `${filter}&order=status.asc,due_date.asc.nullslast,created_at.desc&limit=100&select=id,title,description,category,due_date,remind_at,sms_remind,priority,status,completed_at`);
+      return { errands: rows };
+    }
+    case 'update_errand': {
+      if (!input?.id) return { error: 'id required' };
+      const patch = {};
+      for (const k of ['title','description','category','due_date','remind_at','sms_remind','priority']) {
+        if (input[k] !== undefined) patch[k] = input[k];
+      }
+      if (Object.keys(patch).length === 0) return { error: 'no fields to update' };
+      if (Object.prototype.hasOwnProperty.call(patch, 'remind_at')) {
+        patch.shown_at = null; patch.sms_sent_at = null;
+      }
+      const rows = await sbUpdate('ckf_errands', `id=eq.${input.id}&user_id=eq.${userId}`, patch);
+      return { updated: true, errand: rows?.[0] };
+    }
+    case 'complete_errand': {
+      if (!input?.id) return { error: 'id required' };
+      const rows = await sbUpdate('ckf_errands', `id=eq.${input.id}&user_id=eq.${userId}`, {
+        status: 'done', completed_at: new Date().toISOString(),
+      });
+      return { completed: true, errand: rows?.[0] };
+    }
+    case 'delete_errand': {
+      if (!input?.id) return { error: 'id required' };
+      const { sbDelete } = require('./ckf-sb.js');
+      await sbDelete('ckf_errands', `id=eq.${input.id}&user_id=eq.${userId}`);
+      return { deleted: true };
+    }
+    case 'create_routine_task': {
+      if (!input?.title) return { error: 'title required' };
+      const row = await sbInsert('routine_tasks', {
+        user_id: userId,
+        title: input.title,
+        description: input.description || null,
+        category: input.category || 'personal',
+        linked_goal_id: input.linked_goal_id || null,
+        recurrence_rule: input.recurrence_rule || 'daily',
+        priority: input.priority ?? 3,
+        estimated_minutes: input.estimated_minutes ?? null,
+        assigned_to: input.assigned_to || null,
+      });
+      return { created: true, task: row };
+    }
+    case 'update_routine_task': {
+      if (!input?.id) return { error: 'id required' };
+      const patch = {};
+      for (const k of ['title','description','category','recurrence_rule','priority','estimated_minutes','linked_goal_id','assigned_to','active']) {
+        if (input[k] !== undefined) patch[k] = input[k];
+      }
+      if (Object.keys(patch).length === 0) return { error: 'no fields to update' };
+      const rows = await sbUpdate('routine_tasks', `id=eq.${input.id}&user_id=eq.${userId}`, patch);
+      return { updated: true, task: rows?.[0] };
+    }
+    case 'delete_routine_task': {
+      if (!input?.id) return { error: 'id required' };
+      const { sbDelete } = require('./ckf-sb.js');
+      await sbDelete('routine_tasks', `id=eq.${input.id}&user_id=eq.${userId}`);
+      return { deleted: true };
+    }
     case 'remember': {
       if (!input?.fact) return { error: 'fact required' };
       const row = await sbInsert('ckf_memory_facts', {
@@ -561,6 +961,96 @@ async function execute(name, input, ctx) {
       if (!input?.id) return { error: 'id required' };
       await sbUpdate('ckf_memory_facts', `id=eq.${input.id}&user_id=eq.${userId}`, { archived: true });
       return { archived: true };
+    }
+
+    case 'search_swipefile': {
+      const q = (input?.q || '').trim();
+      if (!q) return { items: [] };
+      const limit = Math.min(input?.limit || 8, 30);
+      const safe = encodeURIComponent(`*${q.replace(/[%*]/g, '')}*`);
+      const rows = await sbSelect(
+        'ckf_swipefile_items',
+        `user_id=eq.${userId}&archived=eq.false&or=(title.ilike.${safe},source_text.ilike.${safe},why_it_matters.ilike.${safe})&order=importance.desc,created_at.desc&limit=${limit}&select=id,kind,title,source_url,why_it_matters,author,tags,importance,source_text`
+      );
+      return {
+        items: (rows || []).map((r) => ({
+          ...r,
+          source_text: r.source_text ? r.source_text.slice(0, 800) : null,
+        })),
+      };
+    }
+    case 'get_calendar_events': {
+      const { getValidIntegration } = require('./ckf-oauth.js');
+      const integration = await getValidIntegration(userId, 'google_calendar');
+      if (!integration) return { not_connected: true, message: 'Google Calendar not connected' };
+      const now = new Date();
+      const from = input?.from || now.toISOString();
+      const to = input?.to || new Date(now.getTime() + 36 * 3600e3).toISOString();
+      const url = new URL('https://www.googleapis.com/calendar/v3/calendars/primary/events');
+      url.searchParams.set('timeMin', from);
+      url.searchParams.set('timeMax', to);
+      url.searchParams.set('singleEvents', 'true');
+      url.searchParams.set('orderBy', 'startTime');
+      url.searchParams.set('maxResults', '25');
+      const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${integration.access_token}` } });
+      if (!res.ok) return { error: `Google Calendar ${res.status}` };
+      const j = await res.json();
+      const events = (j.items || [])
+        .filter((e) => e.status !== 'cancelled')
+        .map((e) => ({
+          summary: e.summary || '(no title)',
+          start: e.start?.dateTime || e.start?.date,
+          end: e.end?.dateTime || e.end?.date,
+          location: e.location || null,
+          all_day: !!e.start?.date && !e.start?.dateTime,
+        }));
+      return { events, from, to };
+    }
+
+    case 'get_meals': {
+      const days = Math.min(Math.max(input?.days || 3, 1), 30);
+      const since = new Date(Date.now() - days * 86400e3).toISOString().slice(0, 10);
+      const rows = await sbSelect(
+        'ckf_meals',
+        `user_id=eq.${userId}&meal_date=gte.${since}&order=meal_date.desc,created_at.desc&limit=50&select=id,meal_date,meal_type,ai_label,ai_calories,ai_protein_g,ai_carbs_g,ai_fat_g,manual_label,manual_calories,manual_protein_g,manual_carbs_g,manual_fat_g,notes,source`
+      );
+      // Resolve manual-overrides client-side for the model
+      const meals = (rows || []).map((m) => ({
+        id: m.id, meal_date: m.meal_date, meal_type: m.meal_type,
+        label: m.manual_label ?? m.ai_label,
+        calories: m.manual_calories ?? m.ai_calories,
+        protein_g: m.manual_protein_g ?? m.ai_protein_g,
+        carbs_g: m.manual_carbs_g ?? m.ai_carbs_g,
+        fat_g: m.manual_fat_g ?? m.ai_fat_g,
+        notes: m.notes,
+        source: m.source,
+      }));
+      return { days, meals };
+    }
+    case 'get_whoop_today': {
+      const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland' });
+      const today = fmt.format(new Date());
+      const yesterday = new Date(today + 'T00:00:00Z');
+      yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+      const yStr = yesterday.toISOString().slice(0, 10);
+      const rows = await sbSelect(
+        'whoop_metrics',
+        `user_id=eq.${userId}&date=eq.${yStr}&select=*&limit=1`
+      );
+      if (!rows?.[0]) return { not_synced_yet: true, date: yStr };
+      const m = rows[0];
+      delete m.raw;
+      return { metrics: m };
+    }
+
+    case 'get_whoop_recent': {
+      const days = Math.min(Math.max(input?.days || 14, 1), 90);
+      const since = new Date(Date.now() - days * 86400e3).toISOString().slice(0, 10);
+      const rows = await sbSelect(
+        'whoop_metrics',
+        `user_id=eq.${userId}&date=gte.${since}&order=date.desc&limit=${days}&select=date,recovery_score,hrv_rmssd_ms,resting_heart_rate,strain,sleep_performance,sleep_hours,sleep_efficiency`
+      );
+      return { days, metrics: rows };
     }
 
     default:

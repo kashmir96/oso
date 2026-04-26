@@ -18,6 +18,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const { sbSelect, sbInsert, sbUpdate, sbDelete } = require('./_lib/ckf-sb.js');
 const { withGate, reply } = require('./_lib/ckf-guard.js');
 const { TOOLS, execute, clip, nzToday } = require('./_lib/ckf-tools.js');
+const { logAnthropicUsage } = require('./_lib/ckf-usage.js');
 
 // Use Haiku for chat — short conversational replies don't need Sonnet's depth,
 // and Haiku is ~3x faster. Heavier reasoning (diary AI summary, weekly summary,
@@ -59,6 +60,13 @@ The DYNAMIC system block (next) already includes his memory facts, recent diary,
 - \`remember(fact, topic, importance)\` — durable patterns, values, relationships, recurring struggles, aspirations. NOT ephemeral one-day moods. Importance 4–5 only for top-of-mind facts.
 - \`create_routine_suggestion\` — concrete habit ideas. Enters as PENDING; he approves in Settings.
 - \`log_goal_value\`, \`set_task_status\`, \`archive_memory_fact\` — when he tells you something concrete that maps to a row.
+- \`create_goal\` / \`update_goal\` / \`archive_goal\` — when he names something he wants to track, change, or stop tracking. Pick the type:
+  - **numeric** for measured values (body fat %, revenue, weight). Needs target + unit.
+  - **checkbox** for daily habits where the streak counts up by 1 each day he does it ("plunge every day", "lift today"). Tap-to-tick.
+  - **restraint** for things he's trying to abstain from — auto-ticks daily UNLESS he logs a fail ("no alcohol", "no porn"). Reset on slip.
+  Don't create vague goals — turn fuzzy intentions into something concrete. For numeric, ASK ONE question to pin down the target if it's missing. Tell him what you created.
+- \`mark_goal_done\` — checkbox goals only. Increments the streak. Use when he says "I did X today".
+- \`mark_goal_fail\` — restraint goals only. Resets the streak. Use when he says he slipped. Be matter-of-fact, not preachy.
 - \`create_business_task\` (default) / \`create_business_project\` / \`queue_website_improvement\` — whenever he mentions business work he needs to do, capture it IMMEDIATELY without asking follow-up questions. Title can be his words verbatim. Skip optional fields he didn't volunteer. **Routing rules:**
   1. If he mentions "website", "claude code", "the app", "fix the X", "in the dashboard/chat" or otherwise describes a code change to the oso/ckf web app → \`queue_website_improvement\`. Tell him "Queued for Claude Code."
   2. Else if his message contains the word "project" → \`create_business_project\`. Tell him "Saved as a project."
@@ -73,7 +81,6 @@ When the UI tells you the chat is in **website_capture** mode, you behave differ
 - If he says "done", "that's all", "stop", or similar wrap-up phrases, reply with a brief tally: "Got <n>. They're on the Business page in Website improvements." Don't keep capturing.
 - If he asks a question or wants to actually discuss something, tell him "I'm in capture mode — open a normal chat for that" and don't try to answer.
 - DO NOT use any other tool. DO NOT engage as therapist/business advisor/etc.
-- \`create_goal\` / \`update_goal\` / \`archive_goal\` — when he names something he wants to track, change, or stop tracking. Don't create vague goals — turn fuzzy intentions into a measurable name + target + unit. If the target isn't clear, ASK ONE question to pin it down before creating. Always tell him in your reply what you created so the recap is accurate.
 
 # Evening reflection flow — when the chat is fresh
 If a conversation is just starting AND today's diary is empty or partial AND it's evening (≥ 17:00 NZ), conduct the diary as a tight conversation:
@@ -167,7 +174,7 @@ ${todayDiary
 
 ## NZ time right now
 ${nzTimeStr || ''}
-${modeHint ? `\n## Hat hint from UI\nHe explicitly asked you to lean ${modeHint} this conversation. Honour it unless context clearly says otherwise.\n` : ''}`;
+`;
 }
 
 // Build the system field as an array for prompt caching:
@@ -263,13 +270,39 @@ function makeTitle(text) {
   return t || 'New chat';
 }
 
+// Convert frontend-shaped attachments into Anthropic content blocks.
+function attachmentsToBlocks(attachments) {
+  if (!Array.isArray(attachments)) return [];
+  const out = [];
+  for (const a of attachments) {
+    if (!a?.data_base64) continue;
+    if (a.kind === 'image') {
+      out.push({
+        type: 'image',
+        source: { type: 'base64', media_type: a.media_type || 'image/jpeg', data: a.data_base64 },
+      });
+    } else if (a.kind === 'document') {
+      out.push({
+        type: 'document',
+        source: { type: 'base64', media_type: a.media_type || 'application/pdf', data: a.data_base64 },
+      });
+    }
+  }
+  return out;
+}
+
 // ── Main send loop ──
-async function runChat({ userId, conversation, userMessageText, modeHint }) {
+async function runChat({ userId, conversation, userMessageText, modeHint, attachments }) {
   if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-  // Persist the user message first
-  const userBlocks = [{ type: 'text', text: userMessageText }];
+  // Persist the user message — attachments go into content_blocks so they
+  // replay back to the model on subsequent turns within the conversation.
+  const attBlocks = attachmentsToBlocks(attachments);
+  const userBlocks = [];
+  if (attBlocks.length > 0) userBlocks.push(...attBlocks);
+  if (userMessageText && userMessageText.trim()) userBlocks.push({ type: 'text', text: userMessageText });
+  if (userBlocks.length === 0) userBlocks.push({ type: 'text', text: '(empty message)' });
   await saveMessage(conversation.id, userId, 'user', userMessageText, userBlocks);
 
   // If conversation has no title yet, set one from the first user message
@@ -301,6 +334,7 @@ async function runChat({ userId, conversation, userMessageText, modeHint }) {
 
     totalUsage.input_tokens += response.usage?.input_tokens || 0;
     totalUsage.output_tokens += response.usage?.output_tokens || 0;
+    logAnthropicUsage({ user_id: userId, action: 'chat', model: MODEL, usage: response.usage });
 
     if (response.stop_reason === 'tool_use') {
       // Persist the assistant turn (with its tool_use blocks) so the conversation is replayable later
@@ -383,6 +417,7 @@ async function runAutoOpen({ userId, conversation, modeHint }) {
     });
     totalUsage.input_tokens += response.usage?.input_tokens || 0;
     totalUsage.output_tokens += response.usage?.output_tokens || 0;
+    logAnthropicUsage({ user_id: userId, action: 'chat', model: MODEL, usage: response.usage });
 
     if (response.stop_reason === 'tool_use') {
       // The model wants to read context (e.g. get_recent_diary_entries). Honour it,
@@ -424,31 +459,36 @@ exports.handler = withGate(async (event, { user }) => {
   const { action } = body;
 
   if (action === 'list_conversations') {
+    const scope = body.scope; // optional 'personal' | 'business'
+    const filter = scope ? `&scope=eq.${encodeURIComponent(scope)}` : '';
     const rows = await sbSelect(
       'ckf_conversations',
-      `user_id=eq.${user.id}&order=last_message_at.desc&limit=50&select=id,title,primary_mode,nz_date,started_at,last_message_at`
+      `user_id=eq.${user.id}${filter}&order=last_message_at.desc&limit=50&select=id,title,primary_mode,scope,nz_date,started_at,last_message_at`
     );
     return reply(200, { conversations: rows });
   }
 
   if (action === 'open_today') {
     const date = nzToday();
+    const scope = body.scope === 'business' ? 'business' : 'personal';
     let rows = await sbSelect(
       'ckf_conversations',
-      `user_id=eq.${user.id}&nz_date=eq.${date}&order=started_at.desc&limit=1&select=*`
+      `user_id=eq.${user.id}&scope=eq.${scope}&nz_date=eq.${date}&order=started_at.desc&limit=1&select=*`
     );
     if (rows?.[0]) return reply(200, { conversation: rows[0] });
     const created = await sbInsert('ckf_conversations', {
-      user_id: user.id, nz_date: date, primary_mode: 'therapist',
+      user_id: user.id, nz_date: date, primary_mode: 'therapist', scope,
     });
     return reply(200, { conversation: created });
   }
 
   if (action === 'create_conversation') {
+    const scope = body.scope === 'business' ? 'business' : 'personal';
     const created = await sbInsert('ckf_conversations', {
       user_id: user.id,
       nz_date: nzToday(),
       primary_mode: body.mode || 'therapist',
+      scope,
       title: body.title || null,
     });
     return reply(200, { conversation: created });
@@ -500,15 +540,18 @@ exports.handler = withGate(async (event, { user }) => {
   }
 
   if (action === 'send') {
-    const { conversation_id, text, mode_hint } = body;
-    if (!conversation_id || !text || !text.trim()) return reply(400, { error: 'conversation_id and text required' });
+    const { conversation_id, text, mode_hint, attachments } = body;
+    const hasText = text && text.trim();
+    const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
+    if (!conversation_id || (!hasText && !hasAttachments)) return reply(400, { error: 'conversation_id and (text or attachments) required' });
     const conversation = await getConversation(user.id, conversation_id);
     if (!conversation) return reply(404, { error: 'conversation not found' });
     const result = await runChat({
       userId: user.id,
       conversation,
-      userMessageText: text.trim(),
+      userMessageText: hasText ? text.trim() : '',
       modeHint: mode_hint || null,
+      attachments,
     });
     // Re-load messages so the client renders the full final state including any tool turns
     const messages = await sbSelect(
@@ -535,3 +578,6 @@ exports.handler = withGate(async (event, { user }) => {
 
   return reply(400, { error: 'Unknown action' });
 });
+
+// Exposed for ckf-quick.js (the Siri/Shortcut single-shot endpoint).
+module.exports.runChat = runChat;

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import Header from '../components/Header.jsx';
-import { call } from '../lib/api.js';
+import { call, notifyChanged } from '../lib/api.js';
 import { fmtRelative, fmtShortDate } from '../lib/format.js';
 import {
   isRecordingSupported, startRecording,
@@ -9,14 +9,9 @@ import {
   isTtsOn, setTtsOn,
   createVoiceSession,
 } from '../lib/voice.js';
+import { processFile, revokePreview } from '../lib/upload.js';
 
-const HATS = [
-  { id: 'therapist', label: 'Therapist' },
-  { id: 'business',  label: 'Business' },
-  { id: 'pt',        label: 'PT' },
-  { id: 'spiritual', label: 'Spiritual' },
-];
-
+// Hat selection is handled by the model from context; no manual UI for it.
 function voiceLabel(state) {
   switch (state) {
     case 'listening':  return '🎙 Listening…';
@@ -28,8 +23,10 @@ function voiceLabel(state) {
   }
 }
 
-export default function Chat() {
-  const { id } = useParams();
+export default function Chat({ embedded = false, scope = 'personal' }) {
+  const { id: routeId } = useParams();
+  const [embeddedId, setEmbeddedId] = useState(null);
+  const id = embedded ? embeddedId : routeId;
   const nav = useNavigate();
   const [searchParams] = useSearchParams();
   // ?mode=website_capture from the Business page Website-mode FAB. The hint is
@@ -40,6 +37,9 @@ export default function Chat() {
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  // ?mode=website_capture flips the chat into capture-only behaviour. Threaded
+  // through to ckf-chat (auto_open + send) so the AI's STABLE_SYSTEM keeps it
+  // active across every turn, not just the first.
   const [modeHint, setModeHint] = useState(urlMode || null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState([]);
@@ -57,21 +57,41 @@ export default function Chat() {
   const [voiceMode, setVoiceMode] = useState(false);
   const [voiceState, setVoiceState] = useState('idle');
 
-  // ── Routing logic: if no id, open today's conversation and redirect to /chat/:id ──
+  // Attachments staged for the next message (image / document blobs encoded
+  // base64 — sent inline to Claude vision/document, not yet stored in Storage).
+  const cameraInputRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const [attachments, setAttachments] = useState([]);
+
+  // "+" fan-out for camera / file / TTS. Closes when an option is picked or
+  // the user taps outside.
+  const [plusOpen, setPlusOpen] = useState(false);
+  const mealInputRef = useRef(null);
+  const [logMealBusy, setLogMealBusy] = useState(false);
+
+  // ── Routing logic ──
+  // - Standalone /chat (no id): open today's conversation and redirect to /chat/:id
+  // - Embedded (on Home): just open today's id locally; never navigates
   useEffect(() => {
     if (id) return;
     let alive = true;
+    // Reset embedded id when scope changes — Home and Business hold separate threads.
+    if (embedded) setEmbeddedId(null);
     (async () => {
       try {
-        const r = await call('ckf-chat', { action: 'open_today' });
+        const r = await call('ckf-chat', { action: 'open_today', scope });
         if (!alive) return;
-        nav(`/chat/${r.conversation.id}`, { replace: true });
+        if (embedded) {
+          setEmbeddedId(r.conversation.id);
+        } else {
+          nav(`/chat/${r.conversation.id}`, { replace: true });
+        }
       } catch (e) {
         if (alive) setErr(e.message);
       }
     })();
     return () => { alive = false; };
-  }, [id, nav]);
+  }, [id, nav, embedded, scope]);
 
   // ── Load conversation + messages on id change ──
   const loadConversation = useCallback(async () => {
@@ -100,15 +120,13 @@ export default function Chat() {
       })
       .catch((e) => setErr(e.message))
       .finally(() => setBusy(false));
-    // Intentionally not depending on modeHint — we only auto-open once per
-    // conversation, regardless of later hat changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, conversation, messages.length]);
 
   // ── Load history list when drawer opens ──
   useEffect(() => {
     if (!historyOpen) return;
-    call('ckf-chat', { action: 'list_conversations' })
+    call('ckf-chat', { action: 'list_conversations', scope })
       .then((r) => setHistory(r.conversations))
       .catch((e) => setErr(e.message));
   }, [historyOpen]);
@@ -121,22 +139,82 @@ export default function Chat() {
 
   async function send() {
     const text = draft.trim();
-    if (!text || busy || !id) return;
+    if ((!text && attachments.length === 0) || busy || !id) return;
     setDraft('');
     setBusy(true); setErr('');
+    const payloadAttachments = attachments.map(({ kind, media_type, data_base64, filename }) => ({
+      kind, media_type, data_base64, filename,
+    }));
+    // Clear staged attachments + revoke object URLs
+    attachments.forEach(revokePreview);
+    setAttachments([]);
     // Optimistic append
-    setMessages((m) => [...m, { id: 'optimistic', role: 'user', content_text: text, created_at: new Date().toISOString() }]);
+    setMessages((m) => [...m, { id: 'optimistic', role: 'user', content_text: text || '(attachment)', created_at: new Date().toISOString() }]);
     try {
-      const r = await call('ckf-chat', { action: 'send', conversation_id: id, text, mode_hint: modeHint });
+      const r = await call('ckf-chat', {
+        action: 'send', conversation_id: id, text: text || '',
+        attachments: payloadAttachments,
+        mode_hint: modeHint,
+      });
       setMessages(r.messages);
-      // Notify caller (Voice mode listener) about the new assistant text
       window.dispatchEvent(new CustomEvent('ckf-assistant-text', { detail: r.text }));
+      // Many chat tools mutate data (create_errand, log_goal_value, etc.).
+      // Tell the strips to refresh.
+      notifyChanged();
     } catch (e) {
       setErr(e.message);
     } finally {
       setBusy(false);
       taRef.current?.focus();
     }
+  }
+
+  async function onPickFiles(files, fromCamera) {
+    if (!files || files.length === 0) return;
+    setErr('');
+    for (const f of files) {
+      try {
+        const att = await processFile(f);
+        att.from_camera = !!fromCamera;
+        setAttachments((a) => [...a, att]);
+      } catch (e) {
+        setErr(e.message);
+      }
+    }
+  }
+  function removeAttachment(i) {
+    setAttachments((a) => {
+      revokePreview(a[i]);
+      return a.filter((_, idx) => idx !== i);
+    });
+  }
+
+  // Log a meal directly via /meals API — image goes to Storage + AI scan,
+  // visible to the trainer share, NOT pushed into the chat conversation.
+  async function logMealFromCamera(files) {
+    const file = files?.[0];
+    if (!file) return;
+    setErr(''); setLogMealBusy(true);
+    try {
+      const att = await processFile(file);
+      const logTo = localStorage.getItem('ckf_meals_log_goal') || null;
+      await call('ckf-meals', {
+        action: 'create',
+        image_base64: att.data_base64,
+        mime_type: att.media_type,
+        log_to_goal_id: logTo,
+      });
+      revokePreview(att);
+      // Inject a friendly "logged" message into the assistant stream so the
+      // user gets feedback inside chat without re-running auto_open.
+      setMessages((m) => [...m, {
+        id: `meal-${Date.now()}`,
+        role: 'assistant',
+        content_text: `Meal logged. The AI estimate is in your Meals page${logTo ? ' and counted toward your linked calorie goal' : ''}.`,
+        created_at: new Date().toISOString(),
+      }]);
+    } catch (e) { setErr(e.message); }
+    finally { setLogMealBusy(false); }
   }
 
   function onKeyDown(e) {
@@ -227,6 +305,7 @@ export default function Chat() {
     try {
       const r = await call('ckf-chat', { action: 'send', conversation_id: id, text, mode_hint: modeHint });
       setMessages(r.messages);
+      notifyChanged();
       return r.text;
     } catch (e) {
       setErr(e.message);
@@ -281,20 +360,23 @@ export default function Chat() {
   }, [id]);
 
   async function newChat() {
-    const r = await call('ckf-chat', { action: 'create_conversation' });
+    const r = await call('ckf-chat', { action: 'create_conversation', scope });
     nav(`/chat/${r.conversation.id}`);
     setHistoryOpen(false);
   }
 
   if (err) return <div className="app"><div className="error">{err}</div></div>;
-  if (!id || !conversation) return <div className="app"><div className="loading">Loading…</div></div>;
+  // Render the shell immediately even before the conversation loads — so the
+  // composer + voice/camera buttons are present right away. Input is disabled
+  // until id resolves; the stream shows a quiet "Opening…" placeholder.
+  const ready = !!id && !!conversation;
 
   // Filter to renderable messages: text from user/assistant. Tool results are silent.
-  const visible = messages.filter((m) => {
+  const visible = ready ? messages.filter((m) => {
     if (m.role === 'tool') return false;
     if (m.role === 'assistant' && !m.content_text?.trim()) return false; // tool-only assistant turn
     return true;
-  });
+  }) : [];
 
   // Detect any tool_use blocks in the most recent assistant turn so we can hint
   // "thinking…" subtly.
@@ -302,49 +384,35 @@ export default function Chat() {
   const lastUsedTools = (lastAsst?.content_blocks || []).filter((b) => b?.type === 'tool_use').map((b) => b.name);
 
   return (
-    <div className="chat-shell">
-      <header className="chat-header">
-        <button onClick={() => setHistoryOpen(true)} className="chat-icon-btn" aria-label="History">☰</button>
-        <div className="chat-title">
-          <div style={{ fontWeight: 600 }}>{conversation.title || 'New chat'}</div>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{fmtShortDate(conversation.nz_date)}</div>
-        </div>
-        <button onClick={newChat} className="chat-icon-btn" aria-label="New chat">+</button>
-      </header>
+    <div className={`chat-shell ${embedded ? 'chat-embedded' : ''}`}>
+      {!embedded && (
+        <header className="chat-header">
+          <button onClick={() => setHistoryOpen(true)} className="chat-icon-btn" aria-label="History">☰</button>
+          <div className="chat-title">
+            <div style={{ fontWeight: 600 }}>{conversation?.title || 'New chat'}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{conversation?.nz_date ? fmtShortDate(conversation.nz_date) : ''}</div>
+          </div>
+          <button onClick={newChat} className="chat-icon-btn" aria-label="New chat">+</button>
+        </header>
+      )}
 
-      <div className="hat-row">
-        {HATS.map((h) => (
-          <button
-            key={h.id}
-            className={`hat-pill ${modeHint === h.id ? 'active' : ''}`}
-            onClick={() => setModeHint(modeHint === h.id ? null : h.id)}
-          >
-            {h.label}
-          </button>
-        ))}
-        <button
-          className={`hat-pill ${voiceMode ? 'active voice-active' : ''}`}
-          onClick={flipVoiceMode}
-          title="Hands-free voice mode — listen, reply, repeat"
-          style={{ marginLeft: 'auto' }}
-        >
-          {voiceMode ? voiceLabel(voiceState) : 'Hands-free'}
-        </button>
-        <button
-          className={`hat-pill ${ttsOn ? 'active' : ''}`}
-          onClick={flipTts}
-          title="Speak replies aloud"
-          disabled={voiceMode}
-        >
-          {ttsOn ? '🔊' : '🔈'}
-        </button>
-        <Link to="/chat/memory" className="hat-pill">Memory</Link>
-      </div>
+      {/* Voice-mode status pill — only when active, very subtle */}
+      {voiceMode && (
+        <div className="voice-status">
+          <span className="dot" /> {voiceLabel(voiceState)}
+          <button onClick={flipVoiceMode} className="voice-stop">stop</button>
+        </div>
+      )}
 
       <div className="chat-stream" ref={scrollRef}>
-        {visible.length === 0 && !busy && (
+        {!ready && (
           <div className="empty" style={{ padding: '40px 16px', textAlign: 'center' }}>
             Opening…
+          </div>
+        )}
+        {ready && visible.length === 0 && !busy && (
+          <div className="empty" style={{ padding: '40px 16px', textAlign: 'center' }}>
+            Say hi, or pick a thread.
           </div>
         )}
         {visible.map((m) => (
@@ -367,41 +435,125 @@ export default function Chat() {
         )}
       </div>
 
+      {attachments.length > 0 && (
+        <div className="attachment-tray">
+          {attachments.map((a, i) => (
+            <div key={i} className="attachment-chip" title={a.filename}>
+              {a.kind === 'image'
+                ? <img src={a.preview_url} alt="" />
+                : <span style={{ fontSize: 18 }}>📄</span>}
+              <span className="attachment-name">{a.filename}</span>
+              <button onClick={() => removeAttachment(i)} aria-label="Remove" className="attachment-x">✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Hidden file inputs — triggered by the composer buttons. */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        style={{ display: 'none' }}
+        onChange={(e) => { onPickFiles(e.target.files, true); e.target.value = ''; }}
+      />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,application/pdf"
+        multiple
+        style={{ display: 'none' }}
+        onChange={(e) => { onPickFiles(e.target.files, false); e.target.value = ''; }}
+      />
+      <input
+        ref={mealInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        style={{ display: 'none' }}
+        onChange={(e) => { logMealFromCamera(e.target.files); e.target.value = ''; }}
+      />
+
       <div className="chat-composer">
+        {plusOpen && (
+          <div className="plus-fan" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => { flipTts(); setPlusOpen(false); }}
+              className={`tts-btn ${ttsOn ? 'on' : ''}`}
+              disabled={voiceMode}
+              title={ttsOn ? 'Read replies aloud — on' : 'Read replies aloud — off'}
+            >{ttsOn ? '🔊' : '🔈'}</button>
+            <button
+              onClick={() => { cameraInputRef.current?.click(); setPlusOpen(false); }}
+              className="cam-btn"
+              disabled={voiceMode || busy}
+              title="Take a photo"
+            >📷</button>
+            <button
+              onClick={() => { fileInputRef.current?.click(); setPlusOpen(false); }}
+              className="file-btn"
+              disabled={voiceMode || busy}
+              title="Attach an image or PDF"
+            >📎</button>
+            <button
+              onClick={() => { mealInputRef.current?.click(); setPlusOpen(false); }}
+              className="meal-btn"
+              disabled={voiceMode || busy || logMealBusy}
+              title="Log a meal (saves to /meals + trainer share)"
+            >🍽</button>
+          </div>
+        )}
         <button
-          onClick={toggleMic}
-          className={`mic-btn ${recording ? 'recording' : ''}`}
-          disabled={transcribing || busy || voiceMode}
-          aria-label={recording ? 'Stop recording' : 'Record voice'}
-          title={voiceMode ? 'Disabled in hands-free mode' : recording ? 'Stop' : 'Tap to talk once'}
-        >
-          {transcribing ? '…' : recording ? '■' : '🎙'}
-        </button>
-        <textarea
-          ref={taRef}
-          rows={1}
-          value={draft}
-          placeholder={
-            voiceMode ? 'Hands-free is on — just talk. Tap to stop.'
-            : recording ? 'Listening…'
-            : transcribing ? 'Transcribing…'
-            : 'Type or tap the mic'
-          }
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={onKeyDown}
-          disabled={busy || recording || transcribing || voiceMode}
-        />
-        <button onClick={send} className="primary" disabled={busy || recording || transcribing || voiceMode || !draft.trim()}>Send</button>
+          onClick={() => setPlusOpen((v) => !v)}
+          className={`plus-btn ${plusOpen ? 'open' : ''}`}
+          disabled={voiceMode || busy}
+          aria-label={plusOpen ? 'Close attachments' : 'Open attachments'}
+          title="Attach photo, file, or toggle read-aloud"
+        >+</button>
+        <div className="composer-field">
+          <textarea
+            ref={taRef}
+            rows={1}
+            value={draft}
+            placeholder={
+              !ready ? 'Opening…'
+              : voiceMode ? 'Hands-free is on — just talk.'
+              : 'Type a message…'
+            }
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={onKeyDown}
+            onFocus={() => setPlusOpen(false)}
+            disabled={busy || voiceMode || !ready}
+          />
+          <button
+            onClick={flipVoiceMode}
+            className={`field-mic ${voiceMode ? 'recording' : ''}`}
+            disabled={busy && !voiceMode}
+            aria-label={voiceMode ? 'Stop hands-free' : 'Switch to hands-free conversation'}
+            title={voiceMode ? 'Stop hands-free' : 'Hands-free voice — tap and talk'}
+          >
+            {voiceMode ? '■' : '🗨'}
+          </button>
+        </div>
+        <button onClick={send} className="primary" disabled={!ready || busy || voiceMode || (!draft.trim() && attachments.length === 0)}>Send</button>
       </div>
 
-      {historyOpen && (
+      {!embedded && historyOpen && (
         <div className="drawer" onClick={() => setHistoryOpen(false)}>
           <div className="drawer-panel" onClick={(e) => e.stopPropagation()}>
             <div className="drawer-header">
               <div style={{ fontWeight: 600 }}>Conversations</div>
               <button onClick={() => setHistoryOpen(false)} className="chat-icon-btn">✕</button>
             </div>
-            <button className="primary" style={{ margin: '0 12px 12px', width: 'calc(100% - 24px)' }} onClick={newChat}>+ New chat</button>
+            <button className="primary" style={{ margin: '0 12px 8px', width: 'calc(100% - 24px)' }} onClick={newChat}>+ New chat</button>
+            <Link
+              to="/chat/memory"
+              onClick={() => setHistoryOpen(false)}
+              style={{ display: 'block', margin: '0 12px 12px', textAlign: 'center', fontSize: 13 }}
+            >
+              View long-term memory →
+            </Link>
             {history.length === 0 ? <div className="empty">No history yet.</div> :
               history.map((c) => (
                 <Link

@@ -1,103 +1,53 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import Header from '../components/Header.jsx';
 import GoalCard from '../components/GoalCard.jsx';
-import { call } from '../lib/api.js';
-import { nzToday } from '../lib/format.js';
+import TodayStrip from '../components/TodayStrip.jsx';
+import { callCached } from '../lib/api.js';
+import Chat from './Chat.jsx';
 
+// Home: goals strip → mixed Today strip (errands + calendar + biz + routine) → chat.
 export default function Dashboard() {
   const [goals, setGoals] = useState(null);
-  const [today, setToday] = useState(null);
-  const [pending, setPending] = useState([]);
   const [err, setErr] = useState('');
-  const date = nzToday();
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const [g, t, s] = await Promise.all([
-          call('ckf-goals', { action: 'list' }),
-          call('ckf-tasks', { action: 'today', date }),
-          call('ckf-suggestions', { action: 'list', status: 'pending' }),
-        ]);
-        if (!alive) return;
-        setGoals(g.goals.filter((x) => x.status === 'active'));
-        setToday(t.tasks);
-        setPending(s.suggestions);
-      } catch (e) {
-        if (alive) setErr(e.message);
-      }
-    })();
-    return () => { alive = false; };
-  }, [date]);
-
-  if (err) return <div className="app"><div className="error">{err}</div></div>;
-  if (!goals || !today) return <div className="app"><div className="loading">Loading…</div></div>;
-
-  const doneCount = today.filter((t) => t.log?.status === 'done').length;
+  function refresh() {
+    callCached('ckf-goals', { action: 'list' })
+      .then((r) => setGoals(r.goals.filter((g) => g.status === 'active')))
+      .catch((e) => setErr(e.message));
+  }
+  useEffect(() => { refresh(); }, []);
 
   return (
-    <div className="app">
-      <Header
-        title="Today"
-        right={<Link to="/goals" style={{ fontSize: 13 }}>Manage</Link>}
-      />
-
-      {goals.length === 0 ? (
-        <div className="empty">
-          No goals yet. <Link to="/goals">Add one</Link>.
+    <div className="home">
+      <div className="home-goals">
+        <div className="home-goals-head">
+          <div className="home-title">Goals</div>
+          <Link to="/goals" className="home-manage">Manage</Link>
         </div>
-      ) : (
-        <div className="goal-grid">
-          {goals.map((g) => <GoalCard key={g.id} goal={g} />)}
-        </div>
-      )}
-
-      <div className="section-title" style={{ display: 'flex', justifyContent: 'space-between' }}>
-        <span>Today's routine</span>
-        <span style={{ color: 'var(--text-muted)' }}>{doneCount}/{today.length}</span>
+        {err && <div className="error">{err}</div>}
+        {!goals ? (
+          <div className="loading" style={{ padding: '8px 0' }}>Loading…</div>
+        ) : goals.length === 0 ? (
+          <div className="empty" style={{ padding: '6px 12px', textAlign: 'left' }}>
+            No goals yet. Tell the chat what you want to track, or <Link to="/goals">add one</Link>.
+          </div>
+        ) : (
+          <div className="goal-grid home-goal-grid">
+            {goals.map((g) => <GoalCard key={g.id} goal={g} onChanged={refresh} />)}
+          </div>
+        )}
       </div>
 
-      {today.length === 0 ? (
-        <div className="empty">No routine tasks for today. <Link to="/today">Add one</Link>.</div>
-      ) : (
-        <div className="card">
-          {today.slice(0, 4).map((t) => (
-            <div key={t.id} className={`today-task ${t.log?.status === 'done' ? 'done' : ''}`}>
-              <div className={`checkbox ${t.log?.status || ''}`}>{t.log?.status === 'done' ? '✓' : ''}</div>
-              <div className="body">
-                <div className="title">{t.title}</div>
-                {(t.category || t.estimated_minutes) && (
-                  <div className="meta">{t.category}{t.estimated_minutes ? ` · ${t.estimated_minutes}m` : ''}</div>
-                )}
-              </div>
-            </div>
-          ))}
-          {today.length > 4 && (
-            <div style={{ textAlign: 'right', marginTop: 6 }}>
-              <Link to="/today" style={{ fontSize: 12 }}>+{today.length - 4} more →</Link>
-            </div>
-          )}
-        </div>
-      )}
+      <TodayStrip
+        title="Today"
+        scope="all"
+        defaultCategory="personal"
+        moreHref="/today"
+      />
 
-      {pending.length > 0 && (
-        <>
-          <div className="section-title">{pending.length} suggestion{pending.length === 1 ? '' : 's'} awaiting approval</div>
-          <div className="card">
-            {pending.slice(0, 3).map((s) => (
-              <div key={s.id} className="suggestion" style={{ borderStyle: 'solid' }}>
-                <div>{s.suggestion}</div>
-                {s.reason && <div className="why">{s.reason}</div>}
-              </div>
-            ))}
-            <div style={{ textAlign: 'right' }}>
-              <Link to="/settings" style={{ fontSize: 13 }}>Review all →</Link>
-            </div>
-          </div>
-        </>
-      )}
+      <div className="home-chat">
+        <Chat embedded scope="personal" />
+      </div>
     </div>
   );
 }

@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e0f12">
+<meta name="robots" content="noindex,nofollow">
+<title>Meal log</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    background: #0e0f12; color: #e8eaed;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 600px; margin: 0 auto; padding: 20px 16px 60px; padding-top: max(20px, env(safe-area-inset-top)); }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: #9aa0a6; font-size: 13px; margin-bottom: 16px; }
+  .err { color: #d96a6a; padding: 10px; background: rgba(217,106,106,.08); border-radius: 8px; margin: 8px 0; font-size: 13px; }
+  .ok { color: #7ec8a4; font-size: 12px; }
+  label { display: block; color: #9aa0a6; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+  input, select, textarea {
+    width: 100%; font: inherit;
+    background: #1d2027; color: #e8eaed; border: 1px solid #262a33;
+    border-radius: 8px; padding: 8px 10px;
+  }
+  textarea { min-height: 60px; resize: vertical; }
+  button {
+    font: inherit; cursor: pointer;
+    background: #1d2027; color: #e8eaed; border: 1px solid #262a33;
+    border-radius: 8px; padding: 6px 12px; font-size: 12px;
+  }
+  button.primary { background: #7ec8a4; color: #06130c; border-color: #7ec8a4; font-weight: 600; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .row { display: flex; gap: 6px; margin-top: 6px; }
+  .row > * { flex: 1; }
+  .hidden { display: none; }
+  .meal {
+    background: #16181d; border: 1px solid #262a33; border-radius: 12px;
+    padding: 12px; margin-bottom: 10px;
+  }
+  .meal-top { display: flex; gap: 12px; }
+  .meal-img { width: 100px; height: 100px; object-fit: cover; border-radius: 10px; flex: 0 0 auto; background: #0a0b0d; }
+  .meal-head { flex: 1; min-width: 0; }
+  .meal-title { font-weight: 600; font-size: 15px; }
+  .meal-meta { color: #9aa0a6; font-size: 12px; margin-top: 2px; }
+  .meal-cal { color: #7ec8a4; font-size: 13px; margin-top: 4px; }
+  .meal-edit-btn { font-size: 11px; padding: 4px 10px; margin-top: 6px; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; background: #1d2027; color: #9aa0a6; border: 1px solid #262a33; }
+  .meal-edit { margin-top: 10px; padding-top: 10px; border-top: 1px solid #262a33; }
+  .meal-edit label { font-size: 10px; }
+  .meal-edit-meta { font-size: 11px; color: #6c727b; margin-top: 6px; }
+  .meal-ingredients { font-size: 12px; color: #9aa0a6; margin-top: 6px; }
+
+  /* Whoop panel */
+  .whoop {
+    background: #16181d; border: 1px solid #262a33; border-radius: 12px;
+    padding: 12px; margin-bottom: 14px;
+  }
+  .whoop-head {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+    color: #9aa0a6; margin-bottom: 6px;
+  }
+  .whoop-today {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px;
+  }
+  .whoop-today .stat {
+    background: #1d2027; border-radius: 8px; padding: 6px 8px; text-align: center;
+  }
+  .whoop-today .stat .v { font-weight: 600; font-size: 15px; }
+  .whoop-today .stat .l { font-size: 10px; color: #9aa0a6; text-transform: uppercase; letter-spacing: .04em; }
+  .whoop-recent { display: flex; gap: 4px; overflow-x: auto; }
+  .whoop-recent .day {
+    flex: 0 0 auto; min-width: 56px;
+    background: #1d2027; border-radius: 6px; padding: 4px 6px; font-size: 10px;
+    color: #9aa0a6; text-align: center;
+  }
+  .whoop-recent .day .d { font-weight: 600; color: #e8eaed; font-size: 11px; }
+  .whoop-recent .day .row { color: #9aa0a6; }
+  .whoop-recent .day .rec { color: #7ec8a4; font-weight: 600; }
+  .ring {
+    --pct: 0;
+    width: 32px; height: 32px; border-radius: 50%;
+    background: conic-gradient(#7ec8a4 calc(var(--pct) * 1%), #262a33 0);
+    display: inline-flex; align-items: center; justify-content: center;
+    margin: 0 auto 2px;
+  }
+  .ring::before {
+    content: ''; width: 24px; height: 24px; background: #1d2027; border-radius: 50%;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 id="title">Meal log</h1>
+  <div class="sub" id="subtitle">Loading…</div>
+  <div id="err" class="err hidden"></div>
+  <div id="whoop" class="hidden"></div>
+  <div id="meals"></div>
+</div>
+
+<script>
+  const token = location.hash.replace(/^#/, '').trim();
+  const FN = '/.netlify/functions/ckf-meals-public';
+
+  const els = {
+    title: document.getElementById('title'),
+    subtitle: document.getElementById('subtitle'),
+    err: document.getElementById('err'),
+    whoop: document.getElementById('whoop'),
+    meals: document.getElementById('meals'),
+  };
+
+  function showErr(msg) { els.err.textContent = msg; els.err.classList.remove('hidden'); }
+  function clearErr() { els.err.classList.add('hidden'); }
+
+  async function call(action, body = {}) {
+    const res = await fetch(FN, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, share_token: token, ...body }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`);
+    return data;
+  }
+
+  function pickField(m, k) {
+    return m['manual_' + k] != null ? m['manual_' + k] : m['ai_' + k];
+  }
+
+  function escapeHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  }
+
+  function ingredientsText(m) {
+    const ai = Array.isArray(m.ai_ingredients) ? m.ai_ingredients : [];
+    if (!ai.length) return '';
+    return 'AI saw: ' + ai.map((it) => `${it.item}${it.portion ? ` (${it.portion})` : ''}`).join(', ');
+  }
+
+  function render(meals) {
+    els.meals.innerHTML = '';
+    if (!meals.length) {
+      els.meals.innerHTML = '<div class="sub">Curtis hasn\'t logged any meals yet.</div>';
+      return;
+    }
+    for (const m of meals) {
+      const lbl = pickField(m, 'label') || 'Meal';
+      const cal = pickField(m, 'calories');
+      const p = pickField(m, 'protein_g');
+      const c = pickField(m, 'carbs_g');
+      const f = pickField(m, 'fat_g');
+      const conf = m.ai_confidence;
+      const date = m.meal_date || '';
+
+      const div = document.createElement('div');
+      div.className = 'meal';
+      div.dataset.id = m.id;
+      div.innerHTML = `
+        <div class="meal-top">
+          ${m.image_url ? `<img class="meal-img" src="${m.image_url}" alt="">` : '<div class="meal-img"></div>'}
+          <div class="meal-head">
+            <div class="meal-title">${escapeHtml(lbl)}</div>
+            <div class="meal-meta">${escapeHtml(date)}${m.meal_type ? ' · ' + escapeHtml(m.meal_type) : ''}${conf && conf !== 'high' ? ` · <span class="pill">${escapeHtml(conf)} conf</span>` : ''}</div>
+            <div class="meal-cal">${cal != null ? Math.round(cal) + ' cal' : '— cal'}${p != null ? ` · ${Math.round(p)}g P` : ''}${c != null ? ` · ${Math.round(c)}g C` : ''}${f != null ? ` · ${Math.round(f)}g F` : ''}</div>
+            ${m.notes ? `<div class="meal-meta" style="margin-top:4px;">${escapeHtml(m.notes)}</div>` : ''}
+            <button class="meal-edit-btn" data-act="toggle">Correct</button>
+          </div>
+        </div>
+        <div class="meal-ingredients">${escapeHtml(ingredientsText(m))}</div>
+        <div class="meal-edit hidden">
+          <div class="row">
+            <div><label>Label</label><input data-f="manual_label" value="${escapeHtml(m.manual_label ?? m.ai_label ?? '')}"></div>
+          </div>
+          <div class="row">
+            <div><label>Calories</label><input type="number" step="any" data-f="manual_calories" value="${m.manual_calories ?? m.ai_calories ?? ''}"></div>
+            <div><label>Protein g</label><input type="number" step="any" data-f="manual_protein_g" value="${m.manual_protein_g ?? m.ai_protein_g ?? ''}"></div>
+          </div>
+          <div class="row">
+            <div><label>Carbs g</label><input type="number" step="any" data-f="manual_carbs_g" value="${m.manual_carbs_g ?? m.ai_carbs_g ?? ''}"></div>
+            <div><label>Fat g</label><input type="number" step="any" data-f="manual_fat_g" value="${m.manual_fat_g ?? m.ai_fat_g ?? ''}"></div>
+          </div>
+          <div><label>Notes</label><textarea data-f="notes">${escapeHtml(m.notes ?? '')}</textarea></div>
+          <div class="row" style="margin-top:8px;">
+            <button class="primary" data-act="save">Save corrections</button>
+            <button data-act="cancel">Cancel</button>
+          </div>
+          <div class="meal-edit-meta">Your edits override the AI estimate. Curtis sees them on his side.</div>
+          <div class="ok hidden" data-saved>Saved.</div>
+        </div>
+      `;
+      els.meals.appendChild(div);
+    }
+    bindRowActions();
+  }
+
+  function bindRowActions() {
+    els.meals.querySelectorAll('.meal').forEach((row) => {
+      const id = row.dataset.id;
+      const editPanel = row.querySelector('.meal-edit');
+      row.querySelector('[data-act="toggle"]').onclick = () => editPanel.classList.toggle('hidden');
+      row.querySelector('[data-act="cancel"]').onclick = () => editPanel.classList.add('hidden');
+      row.querySelector('[data-act="save"]').onclick = async (e) => {
+        clearErr();
+        const btn = e.currentTarget;
+        const okEl = row.querySelector('[data-saved]');
+        const patch = { id };
+        for (const inp of editPanel.querySelectorAll('[data-f]')) {
+          const f = inp.dataset.f;
+          let v = inp.value;
+          if (inp.type === 'number') v = v === '' ? null : Number(v);
+          else if (v === '') v = null;
+          patch[f] = v;
+        }
+        btn.disabled = true; btn.textContent = 'Saving…';
+        try {
+          await call('update', patch);
+          okEl.classList.remove('hidden');
+          setTimeout(() => okEl.classList.add('hidden'), 1500);
+          await loadMeals();
+        } catch (err) { showErr(err.message); }
+        btn.disabled = false; btn.textContent = 'Save corrections';
+      };
+    });
+  }
+
+  async function loadMeals() {
+    try {
+      const r = await call('list', { limit: 50 });
+      render(r.meals || []);
+    } catch (e) { showErr(e.message); }
+  }
+
+  function fmtWhoopValue(v, kind) {
+    if (v == null) return '—';
+    if (kind === 'sleep_hours') return Number(v).toFixed(1) + 'h';
+    if (kind === 'percent') return Math.round(v) + '%';
+    if (kind === 'strain') return Number(v).toFixed(1);
+    return Math.round(v);
+  }
+
+  function renderWhoop(metrics) {
+    if (!metrics || metrics.length === 0) {
+      els.whoop.classList.add('hidden');
+      return;
+    }
+    els.whoop.classList.remove('hidden');
+    const today = metrics[0];
+    const recent = metrics.slice(0, 7);
+
+    const todayHtml = `
+      <div class="whoop-today">
+        <div class="stat">
+          <div class="ring" style="--pct:${today.recovery_score ?? 0}"></div>
+          <div class="v">${fmtWhoopValue(today.recovery_score, 'percent')}</div>
+          <div class="l">Recovery</div>
+        </div>
+        <div class="stat">
+          <div class="v">${fmtWhoopValue(today.sleep_hours, 'sleep_hours')}</div>
+          <div class="l">Sleep</div>
+        </div>
+        <div class="stat">
+          <div class="v">${fmtWhoopValue(today.strain, 'strain')}</div>
+          <div class="l">Strain</div>
+        </div>
+        <div class="stat">
+          <div class="v">${fmtWhoopValue(today.hrv_rmssd_ms)}</div>
+          <div class="l">HRV ms</div>
+        </div>
+      </div>
+    `;
+
+    const recentHtml = recent.length > 1 ? `
+      <div class="whoop-recent">
+        ${recent.map((d) => {
+          const dateStr = (d.date || '').slice(5);
+          return `
+            <div class="day">
+              <div class="d">${escapeHtml(dateStr)}</div>
+              <div class="rec">${fmtWhoopValue(d.recovery_score, 'percent')}</div>
+              <div class="row">slp ${fmtWhoopValue(d.sleep_hours, 'sleep_hours')}</div>
+              <div class="row">str ${fmtWhoopValue(d.strain, 'strain')}</div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    ` : '';
+
+    els.whoop.innerHTML = `
+      <div class="whoop">
+        <div class="whoop-head">Whoop · ${escapeHtml(today.date || '')}</div>
+        ${todayHtml}
+        ${recentHtml}
+      </div>
+    `;
+  }
+
+  async function loadWhoop() {
+    try {
+      const r = await call('whoop_recent', { days: 14 });
+      renderWhoop(r.metrics || []);
+    } catch (e) {
+      // Whoop is optional — silently hide if not available.
+      els.whoop.classList.add('hidden');
+    }
+  }
+
+  async function init() {
+    if (!token) {
+      els.title.textContent = 'No share token';
+      els.subtitle.textContent = 'Open the share link Curtis sent you.';
+      return;
+    }
+    try {
+      const info = await call('info');
+      els.title.textContent = info.label || 'Meal log';
+      els.subtitle.textContent = "Curtis's recent meals + Whoop stats. Tap Correct to fix any portion sizes or calorie estimates.";
+      await Promise.all([loadWhoop(), loadMeals()]);
+    } catch (e) {
+      els.title.textContent = 'Link expired or revoked';
+      els.subtitle.textContent = 'Ask Curtis for a fresh share link.';
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>

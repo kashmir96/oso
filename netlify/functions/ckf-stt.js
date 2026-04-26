@@ -7,10 +7,11 @@
  * Env: OPENAI_API_KEY
  */
 const { withGate, reply } = require('./_lib/ckf-guard.js');
+const { logUsage } = require('./_lib/ckf-usage.js');
 
 const MAX_BYTES = 24 * 1024 * 1024; // ~24 MB safety; Whisper allows 25 MB
 
-exports.handler = withGate(async (event) => {
+exports.handler = withGate(async (event, { user }) => {
   if (!process.env.OPENAI_API_KEY) {
     return reply(500, { error: 'OPENAI_API_KEY not configured' });
   }
@@ -54,6 +55,10 @@ exports.handler = withGate(async (event) => {
     const data = await res.json();
     if (!res.ok) {
       return reply(res.status, { error: data?.error?.message || `Whisper ${res.status}` });
+    }
+    const seconds = Number(data?.duration) || 0;
+    if (seconds > 0) {
+      logUsage({ user_id: user.id, provider: 'openai', action: 'stt', model: 'whisper-1', audio_seconds: seconds });
     }
     return reply(200, {
       text: (data?.text || '').trim(),

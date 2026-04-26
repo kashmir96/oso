@@ -5,6 +5,9 @@ export function nzToday() {
   return fmt.format(new Date()); // YYYY-MM-DD
 }
 
+// Already exported above; re-export safe.
+export const NZ_DATE_FMT = new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland' });
+
 export function fmtShortDate(d) {
   if (!d) return '';
   const date = typeof d === 'string' ? new Date(d.length === 10 ? d + 'T12:00:00Z' : d) : d;

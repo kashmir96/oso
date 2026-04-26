@@ -65,6 +65,24 @@
 [functions."ckf-diary-reminder"]
   schedule = "0 8,9 * * *"
 
+# CKF Whoop sync — pulls yesterday's recovery/sleep/strain. 19:00 UTC = 07/08 NZ.
+[functions."ckf-whoop-sync"]
+  schedule = "0 19 * * *"
+
+# CKF errand reminders — checks every 5 min for due reminders, sends SMS.
+[functions."ckf-reminder-sms"]
+  schedule = "*/5 * * * *"
+
+# CKF weekly summary auto-generate — Sunday 17:00 NZ.
+# Cron fires on UTC 04:00 + 05:00 to cover NZST (UTC+12) and NZDT (UTC+13);
+# the handler hard-checks Pacific/Auckland weekday + hour.
+[functions."ckf-weekly-cron"]
+  schedule = "0 4,5 * * 0"
+
+# CKF streak nudge — 20:00 NZ. SMS if any checkbox goal hasn't been ticked today.
+[functions."ckf-streak-nudge"]
+  schedule = "0 7,8 * * *"
+
 # ── CKF SPA: any /ckf/* request that isn't a real file falls back to /ckf/index.html ──
 [[redirects]]
   from = "/ckf/*"
