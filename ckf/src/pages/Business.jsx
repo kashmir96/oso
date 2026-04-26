@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import GoalCard from '../components/GoalCard.jsx';
 import TodayStrip from '../components/TodayStrip.jsx';
 import { call, callCached } from '../lib/api.js';
@@ -10,17 +10,15 @@ const BUSINESS_CATEGORIES = new Set(['business', 'marketing', 'finance']);
 
 // Business: business goals + jobs strip + business chat (from main),
 // then a hub section below: Marketing playbook entry + Projects +
-// Website improvements queue + two floating mode FABs.
+// Website improvements queue. Mode switching happens by typing
+// "marketing mode" / "website mode" into the chat — no buttons.
 export default function Business() {
-  const nav = useNavigate();
   const [goals, setGoals] = useState(null);
   const [openTaskCount, setOpenTaskCount] = useState(0);
   const [projects, setProjects] = useState(null);
   const [websiteTasks, setWebsiteTasks] = useState(null);
   const [addingProject, setAddingProject] = useState(false);
   const [addingWebsite, setAddingWebsite] = useState(false);
-  const [marketingBusy, setMarketingBusy] = useState(false);
-  const [websiteBusy, setWebsiteBusy] = useState(false);
   const [err, setErr] = useState('');
 
   function refresh() {
@@ -43,36 +41,6 @@ export default function Business() {
   }
 
   useEffect(() => { refresh(); }, []);
-
-  // Marketing mode FAB — fresh marketing chat with ad-creation kickoff.
-  async function startMarketingMode() {
-    setMarketingBusy(true); setErr('');
-    try {
-      const conv = await call('mktg-chat', { action: 'create_conversation', kind: 'context' });
-      const cid = conv.conversation.id;
-      call('mktg-chat', { action: 'auto_open', conversation_id: cid, mode_hint: 'create_ad' })
-        .catch(() => {});
-      nav(`/business/marketing/chat/${cid}`);
-    } catch (e) {
-      setErr(e.message);
-      setMarketingBusy(false);
-    }
-  }
-
-  // Website mode FAB — fresh diary chat in capture-only mode.
-  // ?mode=website_capture flag is read by Chat.jsx and threaded through to
-  // ckf-chat so every message becomes a queued website task.
-  async function startWebsiteMode() {
-    setWebsiteBusy(true); setErr('');
-    try {
-      const conv = await call('ckf-chat', { action: 'create_conversation', mode: 'business' });
-      const cid = conv.conversation.id;
-      nav(`/chat/${cid}?mode=website_capture`);
-    } catch (e) {
-      setErr(e.message);
-      setWebsiteBusy(false);
-    }
-  }
 
   async function setWebsiteStatus(id, status) {
     await call('ckf-business', { action: 'update_website', id, status });
@@ -124,11 +92,10 @@ export default function Business() {
         <Chat embedded scope="business" />
       </div>
 
-      {/* ─────── Marketing + projects + website queue (added on this branch) ─────── */}
-      {/* Bottom padding clears the two stacked FABs so content can scroll past
-          them without being permanently covered. ~210px = website FAB height
-          (150px bottom offset) + a little breathing room. */}
-      <div className="app" style={{ paddingTop: 8, paddingBottom: 220 }}>
+      {/* ─────── Marketing + projects + website queue ─────── */}
+      {/* Mode switching now happens by typing "marketing mode" or
+          "website mode" into the chat above. No floating buttons. */}
+      <div className="app" style={{ paddingTop: 8, paddingBottom: 16 }}>
         <Link to="/business/marketing" className="card" style={{ marginBottom: 14, display: 'block', textDecoration: 'none', color: 'inherit' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
@@ -191,25 +158,6 @@ export default function Business() {
           </details>
         )}
       </div>
-
-      <button
-        onClick={startWebsiteMode}
-        disabled={websiteBusy}
-        className="fab fab-website"
-        title="Capture a backlog of website improvements for Claude Code"
-        aria-label="Website mode"
-      >
-        {websiteBusy ? '…' : '📦 Website mode'}
-      </button>
-      <button
-        onClick={startMarketingMode}
-        disabled={marketingBusy}
-        className="primary fab fab-pulse"
-        title="Start an ad in marketing mode"
-        aria-label="Marketing mode"
-      >
-        {marketingBusy ? '…' : '✨ Marketing mode'}
-      </button>
     </div>
   );
 }
