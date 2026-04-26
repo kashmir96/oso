@@ -5,14 +5,21 @@ import TodayStrip from '../components/TodayStrip.jsx';
 import { callCached } from '../lib/api.js';
 import Chat from './Chat.jsx';
 
-// Home: goals strip → mixed Today strip (errands + calendar + biz + routine) → chat.
+// Categories that belong to the Business tab — kept in sync with Business.jsx.
+const BUSINESS_CATEGORIES = new Set(['business', 'marketing', 'finance']);
+
+// Home: personal goals strip → mixed Today strip (errands + calendar + biz + routine) → chat.
+// Business-categorised goals are intentionally hidden here so they don't double up
+// with the Business tab.
 export default function Dashboard() {
   const [goals, setGoals] = useState(null);
   const [err, setErr] = useState('');
 
   function refresh() {
     callCached('ckf-goals', { action: 'list' })
-      .then((r) => setGoals(r.goals.filter((g) => g.status === 'active')))
+      .then((r) => setGoals(
+        r.goals.filter((g) => g.status === 'active' && !BUSINESS_CATEGORIES.has(g.category))
+      ))
       .catch((e) => setErr(e.message));
   }
   useEffect(() => { refresh(); }, []);

@@ -689,7 +689,12 @@ async function execute(name, input, ctx) {
       return { logged: true, log_id: log?.id, new_value: input.value };
     }
     case 'create_goal': {
-      if (!input?.name || !input?.category) return { error: 'name and category required' };
+      if (!input?.name) return { error: 'name required' };
+      // Default category by chat scope so a goal created in business chat lands
+      // in business and vice versa. Only kick in if the model didn't pass one.
+      let category = input.category;
+      if (!category) category = ctx?.scope === 'business' ? 'business' : 'personal';
+      input = { ...input, category };
       const type = input.goal_type || 'numeric';
       const today = nzToday();
 
