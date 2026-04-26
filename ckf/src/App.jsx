@@ -11,6 +11,8 @@ import Weekly from './pages/Weekly.jsx';
 import NinetyDayGoals from './pages/NinetyDayGoals.jsx';
 import Business from './pages/Business.jsx';
 import BusinessTasks from './pages/BusinessTasks.jsx';
+import Errands from './pages/Errands.jsx';
+import ReminderModal from './components/ReminderModal.jsx';
 import Settings from './pages/Settings.jsx';
 import BottomNav from './components/BottomNav.jsx';
 
@@ -22,6 +24,7 @@ function Gated({ children, hideNav }) {
     <>
       {children}
       {!hideNav && <BottomNav />}
+      <ReminderModal />
     </>
   );
 }
@@ -47,6 +50,7 @@ function Shell() {
       <Route path="/ninety-day-goals" element={<Gated><NinetyDayGoals /></Gated>} />
       <Route path="/business" element={<Gated><Business /></Gated>} />
       <Route path="/business/tasks" element={<Gated><BusinessTasks /></Gated>} />
+      <Route path="/errands" element={<Gated><Errands /></Gated>} />
       <Route path="/settings" element={<Gated><Settings /></Gated>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

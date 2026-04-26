@@ -311,6 +311,76 @@ textarea { min-height: 110px; resize: vertical; }
 .coming-up-empty { color: var(--text-muted); font-style: italic; font-weight: 400; }
 .coming-up-arrow { color: var(--text-dim); font-size: 18px; flex: 0 0 auto; }
 
+/* ── Errands card (Home / Business) ── */
+.errands-card {
+  margin: 6px 12px 0;
+  padding: 10px 12px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elev);
+}
+.errands-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.errands-quick-add { background: transparent; border: none; padding: 2px 8px; font-size: 11px; color: var(--accent); }
+.errands-quick-form { display: flex; gap: 6px; margin-bottom: 8px; }
+.errands-quick-form input { padding: 8px 10px; font-size: 13px; }
+.errands-quick-form button { padding: 0 12px; height: 36px; font-size: 13px; }
+.errands-list { list-style: none; padding: 0; margin: 0; }
+.errands-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.errands-item:last-child { border-bottom: none; }
+.errands-tick {
+  width: 22px; height: 22px; padding: 0;
+  border-radius: 50%; border: 1px solid var(--border);
+  background: transparent; color: var(--text-dim);
+  flex: 0 0 auto;
+}
+.errands-tick:hover { border-color: var(--accent); color: var(--accent); }
+.errands-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.errands-due, .errands-remind, .errands-sms { font-size: 11px; color: var(--text-dim); flex: 0 0 auto; }
+.errands-more { padding: 6px 0; text-align: right; font-size: 12px; }
+
+/* ── Reminder modal (overlay) ── */
+.reminder-modal {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.6);
+  z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+.reminder-panel {
+  width: 100%; max-width: 420px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex; flex-direction: column;
+  max-height: 80vh; overflow: hidden;
+}
+.reminder-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.reminder-close {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.reminder-list { padding: 6px 16px; overflow-y: auto; flex: 1; min-height: 0; }
+.reminder-item { padding: 12px 0; border-bottom: 1px solid var(--border); }
+.reminder-item:last-child { border-bottom: none; }
+.reminder-title { font-weight: 600; }
+.reminder-desc { color: var(--text-dim); font-size: 13px; margin-top: 4px; white-space: pre-wrap; }
+.reminder-meta { color: var(--text-muted); font-size: 11px; margin-top: 6px; }
+.reminder-actions { margin-top: 8px; }
+.reminder-foot {
+  display: flex; gap: 8px; padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+.reminder-foot button { flex: 1; }
+
 /* ── Voice status (only visible when hands-free is on) ── */
 .voice-status {
   display: flex; align-items: center; gap: 8px;

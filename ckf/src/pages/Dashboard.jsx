@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import GoalCard from '../components/GoalCard.jsx';
+import ErrandsCard from '../components/ErrandsCard.jsx';
 import { call } from '../lib/api.js';
 import { nzToday, fmtShortDate } from '../lib/format.js';
 import Chat from './Chat.jsx';
@@ -86,6 +87,13 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      <ErrandsCard
+        title="Errands"
+        filter="not_business"
+        defaultCategory="personal"
+        moreHref="/errands"
+      />
 
       <Link to="/today" className="coming-up" aria-label="Open routine">
         <span className="coming-up-label">Coming up</span>

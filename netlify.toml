@@ -69,6 +69,10 @@
 [functions."ckf-whoop-sync"]
   schedule = "0 19 * * *"
 
+# CKF errand reminders — checks every 5 min for due reminders, sends SMS.
+[functions."ckf-reminder-sms"]
+  schedule = "*/5 * * * *"
+
 # ── CKF SPA: any /ckf/* request that isn't a real file falls back to /ckf/index.html ──
 [[redirects]]
   from = "/ckf/*"

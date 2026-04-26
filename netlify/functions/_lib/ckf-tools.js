@@ -291,6 +291,62 @@ Don't create vague goals. For numeric, ask one question if target is missing.`,
     },
   },
   {
+    name: 'create_errand',
+    description: "Create a quick to-do — errand or 'job'. Use whenever Curtis says he needs to remember something concrete: buy X, pick up Y, follow up with Z, ship Bel's order. Set category='business' for work tasks (these surface as 'Jobs' on the Business tab); otherwise 'personal'/'health'/etc. (these surface as 'Errands' on Home). If he mentions a time, set remind_at — that fires a modal on app open AND optionally an SMS.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        description: { type: 'string' },
+        category: { type: 'string', enum: ['personal','health','business','social','finance','marketing','other'], description: "default 'personal'" },
+        due_date: { type: 'string', description: 'YYYY-MM-DD — calendar-style due day' },
+        remind_at: { type: 'string', description: "ISO timestamp — exact moment to fire the reminder. E.g. '2026-04-26T18:30:00+13:00'" },
+        sms_remind: { type: 'boolean', description: 'when remind_at fires, also send SMS to Curtis. Default false.' },
+        priority: { type: 'integer', minimum: 1, maximum: 5 },
+      },
+      required: ['title'],
+    },
+  },
+  {
+    name: 'list_errands',
+    description: "Read errands. Filter by status ('open'/'done'/'cancelled') and/or category. Use to answer 'what do I need to do today / this week' or to check work jobs.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', enum: ['open','done','cancelled'] },
+        category: { type: 'string', description: "single category, or 'business' / 'not_business'" },
+      },
+    },
+  },
+  {
+    name: 'update_errand',
+    description: "Update an errand — title, description, due_date, remind_at, sms_remind, priority, category. Updating remind_at clears the previous shown_at + sms_sent_at so the new time fires fresh.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        title: { type: 'string' },
+        description: { type: 'string' },
+        category: { type: 'string', enum: ['personal','health','business','social','finance','marketing','other'] },
+        due_date: { type: 'string' },
+        remind_at: { type: 'string' },
+        sms_remind: { type: 'boolean' },
+        priority: { type: 'integer' },
+      },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'complete_errand',
+    description: "Mark an errand done.",
+    input_schema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+  },
+  {
+    name: 'delete_errand',
+    description: "Delete an errand.",
+    input_schema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+  },
+  {
     name: 'create_routine_task',
     description: "Create a new recurring routine task that shows up on the Today list. Use when Curtis adds a new habit or daily action to his routine. Recurrence: 'daily' (default), 'weekly', or a CSV of weekday codes like 'mon,wed,fri'.",
     input_schema: {
@@ -707,6 +763,56 @@ async function execute(name, input, ctx) {
         due_date: input.due_date || null,
       });
       return { created: true, id: row?.id };
+    }
+    case 'create_errand': {
+      if (!input?.title) return { error: 'title required' };
+      const row = await sbInsert('ckf_errands', {
+        user_id: userId,
+        title: input.title,
+        description: input.description || null,
+        category: input.category || 'personal',
+        due_date: input.due_date || null,
+        remind_at: input.remind_at || null,
+        sms_remind: !!input.sms_remind,
+        priority: input.priority ?? 3,
+      });
+      return { created: true, errand: row };
+    }
+    case 'list_errands': {
+      const status = input?.status;
+      const category = input?.category;
+      let filter = `user_id=eq.${userId}`;
+      if (status) filter += `&status=eq.${status}`;
+      if (category === 'not_business') filter += `&category=neq.business`;
+      else if (category) filter += `&category=eq.${encodeURIComponent(category)}`;
+      const rows = await sbSelect('ckf_errands', `${filter}&order=status.asc,due_date.asc.nullslast,created_at.desc&limit=100&select=id,title,description,category,due_date,remind_at,sms_remind,priority,status,completed_at`);
+      return { errands: rows };
+    }
+    case 'update_errand': {
+      if (!input?.id) return { error: 'id required' };
+      const patch = {};
+      for (const k of ['title','description','category','due_date','remind_at','sms_remind','priority']) {
+        if (input[k] !== undefined) patch[k] = input[k];
+      }
+      if (Object.keys(patch).length === 0) return { error: 'no fields to update' };
+      if (Object.prototype.hasOwnProperty.call(patch, 'remind_at')) {
+        patch.shown_at = null; patch.sms_sent_at = null;
+      }
+      const rows = await sbUpdate('ckf_errands', `id=eq.${input.id}&user_id=eq.${userId}`, patch);
+      return { updated: true, errand: rows?.[0] };
+    }
+    case 'complete_errand': {
+      if (!input?.id) return { error: 'id required' };
+      const rows = await sbUpdate('ckf_errands', `id=eq.${input.id}&user_id=eq.${userId}`, {
+        status: 'done', completed_at: new Date().toISOString(),
+      });
+      return { completed: true, errand: rows?.[0] };
+    }
+    case 'delete_errand': {
+      if (!input?.id) return { error: 'id required' };
+      const { sbDelete } = require('./ckf-sb.js');
+      await sbDelete('ckf_errands', `id=eq.${input.id}&user_id=eq.${userId}`);
+      return { deleted: true };
     }
     case 'create_routine_task': {
       if (!input?.title) return { error: 'title required' };

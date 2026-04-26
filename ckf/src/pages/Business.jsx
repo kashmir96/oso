@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import GoalCard from '../components/GoalCard.jsx';
+import ErrandsCard from '../components/ErrandsCard.jsx';
 import { call } from '../lib/api.js';
 import Chat from './Chat.jsx';
 
@@ -54,6 +55,13 @@ export default function Business() {
           </div>
         )}
       </div>
+
+      <ErrandsCard
+        title="Jobs"
+        filter="business"
+        defaultCategory="business"
+        moreHref="/errands"
+      />
 
       <div className="home-chat">
         <Chat embedded />
