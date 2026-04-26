@@ -1,8 +1,9 @@
 /**
  * mktg-chat.js — conversational interface to the PrimalPantry marketing playbook.
  *
- * Mirrors ckf-chat structure (Haiku 4.5, prompt caching, tool-use loop) but
- * with marketing-domain tools and system prompt.
+ * Mirrors ckf-chat structure (prompt caching, tool-use loop) but with
+ * marketing-domain tools and system prompt. Uses Sonnet 4.6 — the wizard
+ * flow is dense enough that Haiku 4.5 fumbles the orchestration.
  *
  * Actions:
  *   list_conversations
@@ -18,7 +19,13 @@ const { sbSelect, sbInsert, sbUpdate, sbDelete } = require('./_lib/ckf-sb.js');
 const { withGate, reply } = require('./_lib/ckf-guard.js');
 const { TOOLS, execute, clip } = require('./_lib/mktg-tools.js');
 
-const MODEL = 'claude-haiku-4-5-20251001';
+// Sonnet 4.6 across the board. Haiku 4.5 was fine for early-step orchestration
+// but fumbled the dense 7-step wizard flow once we added the critique pass +
+// trust_priority inference + structured finalize. The model switch is across
+// the whole chat (not just late steps) — simpler routing, no cache thrash from
+// mid-conversation model swaps, and the per-turn cost difference is marginal
+// at our volume.
+const MODEL = 'claude-sonnet-4-6';
 const MAX_TURNS = 5;
 const MAX_HISTORY = 30;
 const MEMORY_LIMIT = 60;
