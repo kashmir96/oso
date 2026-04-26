@@ -1,4 +1,4 @@
-:root {
+:root, [data-theme="dark"] {
   --bg: #0e0f12;
   --bg-elev: #16181d;
   --bg-elev-2: #1d2027;
@@ -14,6 +14,25 @@
   --radius: 14px;
   --radius-sm: 10px;
 }
+
+[data-theme="light"] {
+  --bg: #ffffff;
+  --bg-elev: #f6f7f9;
+  --bg-elev-2: #eceef2;
+  --border: #d8dce3;
+  --text: #1d2027;
+  --text-dim: #5b6068;
+  --text-muted: #8a8f97;
+  --accent: #2f8d63;
+  --accent-dim: #5cae89;
+  --warn: #b87a2a;
+  --bad: #c14848;
+  --good: #2f8d63;
+}
+
+[data-theme="light"] body { background: var(--bg); color: var(--text); }
+[data-theme="light"] button.primary { color: #ffffff; }
+[data-theme="light"] .nav-bottom { background: rgba(255,255,255,.92); }
 
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; }
@@ -237,12 +256,13 @@ textarea { min-height: 110px; resize: vertical; }
 }
 .home-goals {
   flex: 0 0 auto;
-  padding: 10px 0 8px;
-  padding-top: max(10px, env(safe-area-inset-top));
+  padding: 8px 0 4px;
+  padding-top: max(8px, env(safe-area-inset-top));
   border-bottom: 1px solid var(--border);
   background: var(--bg);
 }
-.home-goals .home-goals-head { padding: 0 12px; }
+.home-goals .home-goals-head { padding: 0 12px; margin-bottom: 4px; }
+.home-title { font-size: 11px; }
 .home-goals-head {
   display: flex; justify-content: space-between; align-items: baseline;
   margin-bottom: 8px;
@@ -268,15 +288,15 @@ textarea { min-height: 110px; resize: vertical; }
 .home-goal-grid::-webkit-scrollbar { height: 0; }
 .home-goal-grid .goal-card {
   flex: 0 0 auto;
-  width: 110px;
-  padding: 8px 8px 6px;
+  width: 92px;
+  padding: 6px 8px 5px;
   scroll-snap-align: start;
 }
-.home-goal-grid .goal-card .name { font-size: 11px; }
-.home-goal-grid .goal-card .value { font-size: 15px; }
-.home-goal-grid .goal-card .target { font-size: 10px; }
-.home-goal-grid .goal-card .updated { font-size: 9px; }
-.home-goal-grid .goal-card .bar { margin-top: 4px; }
+.home-goal-grid .goal-card .name { font-size: 10px; line-height: 1.15; }
+.home-goal-grid .goal-card .value { font-size: 14px; }
+.home-goal-grid .goal-card .target { font-size: 9px; }
+.home-goal-grid .goal-card .updated { font-size: 8px; }
+.home-goal-grid .goal-card .bar { margin-top: 3px; height: 3px; }
 
 .src-badge {
   display: inline-block;
@@ -313,14 +333,14 @@ textarea { min-height: 110px; resize: vertical; }
 
 /* ── Strips (Errands / Jobs / Coming up) — horizontal pill rows ── */
 .strip {
-  margin-top: 6px;
+  margin-top: 4px;
   border-bottom: 1px solid var(--border);
-  padding-bottom: 8px;
+  padding-bottom: 4px;
 }
 .strip-head {
   display: flex; justify-content: space-between; align-items: baseline;
   padding: 0 12px;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 .strip-title-link {
   color: inherit; text-decoration: none;
@@ -349,16 +369,16 @@ textarea { min-height: 110px; resize: vertical; }
 
 .action-pill {
   flex: 0 0 auto;
-  display: inline-flex; align-items: center; gap: 6px;
+  display: inline-flex; align-items: center; gap: 5px;
   background: var(--bg-elev);
   border: 1px solid var(--border);
   border-radius: 999px;
-  padding: 6px 12px;
-  font-size: 12px;
+  padding: 4px 10px;
+  font-size: 11px;
   color: var(--text);
   text-decoration: none;
   scroll-snap-align: start;
-  max-width: 240px;
+  max-width: 200px;
   cursor: pointer;
 }
 .action-pill:hover { border-color: var(--accent-dim); }
@@ -375,12 +395,12 @@ textarea { min-height: 110px; resize: vertical; }
 
 .pill-add {
   flex: 0 0 auto;
-  width: 32px; height: 32px;
+  width: 26px; height: 26px;
   border-radius: 50%;
   background: var(--bg-elev);
   border: 1px dashed var(--border);
   color: var(--accent);
-  font-size: 18px;
+  font-size: 14px;
   display: inline-flex; align-items: center; justify-content: center;
   cursor: pointer;
 }
@@ -575,6 +595,7 @@ textarea { min-height: 110px; resize: vertical; }
   border-top: 1px solid var(--border);
   background: var(--bg);
   padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  position: relative; /* anchor for .plus-fan */
 }
 .chat-composer textarea {
   flex: 1;
@@ -605,6 +626,66 @@ textarea { min-height: 110px; resize: vertical; }
   display: inline-flex; align-items: center; justify-content: center;
   font-size: 16px; padding: 0;
   flex: 0 0 auto;
+}
+
+/* "+" plus-fan composer button + popout */
+.plus-btn {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 22px; padding: 0;
+  flex: 0 0 auto;
+  transition: transform .15s;
+}
+.plus-btn.open { transform: rotate(45deg); border-color: var(--accent); color: var(--accent); }
+.plus-fan {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 12px;
+  display: flex; gap: 8px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.3);
+  z-index: 10;
+}
+.plus-fan button {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  font-size: 14px; padding: 0;
+}
+
+/* Mic button living inside the textarea field */
+.composer-field {
+  flex: 1; min-width: 0;
+  position: relative;
+  display: flex;
+}
+.composer-field textarea {
+  padding-right: 44px; /* room for the mic */
+}
+.field-mic {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 14px;
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+.field-mic:hover { color: var(--accent); border-color: var(--accent-dim); }
+.field-mic.recording {
+  background: var(--bad);
+  color: #1a0606;
+  border-color: var(--bad);
+  animation: pulse 1.1s infinite;
 }
 
 /* ── Attachment tray (above composer) ── */

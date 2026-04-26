@@ -55,6 +55,10 @@ export default function Chat({ embedded = false }) {
   const fileInputRef = useRef(null);
   const [attachments, setAttachments] = useState([]);
 
+  // "+" fan-out for camera / file / TTS. Closes when an option is picked or
+  // the user taps outside.
+  const [plusOpen, setPlusOpen] = useState(false);
+
   // ── Routing logic ──
   // - Standalone /chat (no id): open today's conversation and redirect to /chat/:id
   // - Embedded (on Home): just open today's id locally; never navigates
@@ -317,14 +321,17 @@ export default function Chat({ embedded = false }) {
   }
 
   if (err) return <div className="app"><div className="error">{err}</div></div>;
-  if (!id || !conversation) return <div className="app"><div className="loading">Loading…</div></div>;
+  // Render the shell immediately even before the conversation loads — so the
+  // composer + voice/camera buttons are present right away. Input is disabled
+  // until id resolves; the stream shows a quiet "Opening…" placeholder.
+  const ready = !!id && !!conversation;
 
   // Filter to renderable messages: text from user/assistant. Tool results are silent.
-  const visible = messages.filter((m) => {
+  const visible = ready ? messages.filter((m) => {
     if (m.role === 'tool') return false;
     if (m.role === 'assistant' && !m.content_text?.trim()) return false; // tool-only assistant turn
     return true;
-  });
+  }) : [];
 
   // Detect any tool_use blocks in the most recent assistant turn so we can hint
   // "thinking…" subtly.
@@ -337,8 +344,8 @@ export default function Chat({ embedded = false }) {
         <header className="chat-header">
           <button onClick={() => setHistoryOpen(true)} className="chat-icon-btn" aria-label="History">☰</button>
           <div className="chat-title">
-            <div style={{ fontWeight: 600 }}>{conversation.title || 'New chat'}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{fmtShortDate(conversation.nz_date)}</div>
+            <div style={{ fontWeight: 600 }}>{conversation?.title || 'New chat'}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{conversation?.nz_date ? fmtShortDate(conversation.nz_date) : ''}</div>
           </div>
           <button onClick={newChat} className="chat-icon-btn" aria-label="New chat">+</button>
         </header>
@@ -353,9 +360,14 @@ export default function Chat({ embedded = false }) {
       )}
 
       <div className="chat-stream" ref={scrollRef}>
-        {visible.length === 0 && !busy && (
+        {!ready && (
           <div className="empty" style={{ padding: '40px 16px', textAlign: 'center' }}>
             Opening…
+          </div>
+        )}
+        {ready && visible.length === 0 && !busy && (
+          <div className="empty" style={{ padding: '40px 16px', textAlign: 'center' }}>
+            Say hi, or pick a thread.
           </div>
         )}
         {visible.map((m) => (
@@ -411,51 +423,61 @@ export default function Chat({ embedded = false }) {
       />
 
       <div className="chat-composer">
+        {plusOpen && (
+          <div className="plus-fan" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => { flipTts(); setPlusOpen(false); }}
+              className={`tts-btn ${ttsOn ? 'on' : ''}`}
+              disabled={voiceMode}
+              title={ttsOn ? 'Read replies aloud — on' : 'Read replies aloud — off'}
+            >{ttsOn ? '🔊' : '🔈'}</button>
+            <button
+              onClick={() => { cameraInputRef.current?.click(); setPlusOpen(false); }}
+              className="cam-btn"
+              disabled={voiceMode || busy}
+              title="Take a photo"
+            >📷</button>
+            <button
+              onClick={() => { fileInputRef.current?.click(); setPlusOpen(false); }}
+              className="file-btn"
+              disabled={voiceMode || busy}
+              title="Attach an image or PDF"
+            >📎</button>
+          </div>
+        )}
         <button
-          onClick={flipTts}
-          className={`tts-btn ${ttsOn ? 'on' : ''}`}
-          disabled={voiceMode}
-          aria-label={ttsOn ? 'Turn off read-aloud' : 'Turn on read-aloud'}
-          title={ttsOn ? 'Read replies aloud — on' : 'Read replies aloud — off'}
-        >
-          {ttsOn ? '🔊' : '🔈'}
-        </button>
-        <button
-          onClick={flipVoiceMode}
-          className={`mic-btn convo-btn ${voiceMode ? 'recording' : ''}`}
-          disabled={busy && !voiceMode}
-          aria-label={voiceMode ? 'Stop hands-free' : 'Start hands-free conversation'}
-          title={voiceMode ? 'Stop hands-free' : 'Hands-free conversation — talk and listen'}
-        >
-          {voiceMode ? '■' : '🗨'}
-        </button>
-        <button
-          onClick={() => cameraInputRef.current?.click()}
-          className="cam-btn"
+          onClick={() => setPlusOpen((v) => !v)}
+          className={`plus-btn ${plusOpen ? 'open' : ''}`}
           disabled={voiceMode || busy}
-          aria-label="Take photo"
-          title="Take a photo"
-        >📷</button>
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          className="file-btn"
-          disabled={voiceMode || busy}
-          aria-label="Attach file"
-          title="Attach an image or PDF"
-        >📎</button>
-        <textarea
-          ref={taRef}
-          rows={1}
-          value={draft}
-          placeholder={
-            voiceMode ? 'Hands-free is on — just talk.'
-            : 'Type a message…'
-          }
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={onKeyDown}
-          disabled={busy || voiceMode}
-        />
-        <button onClick={send} className="primary" disabled={busy || voiceMode || (!draft.trim() && attachments.length === 0)}>Send</button>
+          aria-label={plusOpen ? 'Close attachments' : 'Open attachments'}
+          title="Attach photo, file, or toggle read-aloud"
+        >+</button>
+        <div className="composer-field">
+          <textarea
+            ref={taRef}
+            rows={1}
+            value={draft}
+            placeholder={
+              !ready ? 'Opening…'
+              : voiceMode ? 'Hands-free is on — just talk.'
+              : 'Type a message…'
+            }
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={onKeyDown}
+            onFocus={() => setPlusOpen(false)}
+            disabled={busy || voiceMode || !ready}
+          />
+          <button
+            onClick={flipVoiceMode}
+            className={`field-mic ${voiceMode ? 'recording' : ''}`}
+            disabled={busy && !voiceMode}
+            aria-label={voiceMode ? 'Stop hands-free' : 'Switch to hands-free conversation'}
+            title={voiceMode ? 'Stop hands-free' : 'Hands-free voice — tap and talk'}
+          >
+            {voiceMode ? '■' : '🗨'}
+          </button>
+        </div>
+        <button onClick={send} className="primary" disabled={!ready || busy || voiceMode || (!draft.trim() && attachments.length === 0)}>Send</button>
       </div>
 
       {!embedded && historyOpen && (

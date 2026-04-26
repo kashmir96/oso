@@ -4,6 +4,7 @@ import Header from '../components/Header.jsx';
 import { useAuth } from '../lib/auth.jsx';
 import { call, getToken } from '../lib/api.js';
 import { fmtRelative } from '../lib/format.js';
+import { getTheme, setTheme } from '../lib/theme.js';
 
 const CATEGORIES = ['personal','health','business','social','finance','marketing','other'];
 
@@ -41,6 +42,8 @@ export default function Settings() {
           <button onClick={() => { logout(); nav('/login'); }} className="danger">Sign out</button>
         </div>
       </div>
+
+      <Appearance />
 
       <Connections />
 
@@ -100,6 +103,28 @@ function SuggestionCard({ s, onApprove, onReject }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function Appearance() {
+  const [theme, setT] = useState(() => getTheme());
+  function pick(t) { setT(t); setTheme(t); }
+  return (
+    <div className="card" style={{ marginBottom: 12 }}>
+      <div className="section-title" style={{ margin: '0 0 8px' }}>Appearance</div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button
+          className={theme === 'dark' ? 'primary' : ''}
+          onClick={() => pick('dark')}
+          style={{ flex: 1 }}
+        >🌙 Dark</button>
+        <button
+          className={theme === 'light' ? 'primary' : ''}
+          onClick={() => pick('light')}
+          style={{ flex: 1 }}
+        >☀ Light</button>
+      </div>
     </div>
   );
 }
