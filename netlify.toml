@@ -61,9 +61,10 @@
 
 # CKF Second Brain — diary reminder.
 # UTC schedule fires twice (covers NZST UTC+12 and NZDT UTC+13).
-# The handler hard-checks Pacific/Auckland local hour and only sends at 21:00 NZ.
+# The handler hard-checks Pacific/Auckland local hour and only sends at 22:00 NZ
+# (10pm — Curtis's deadline to log the evening reflection).
 [functions."ckf-diary-reminder"]
-  schedule = "0 8,9 * * *"
+  schedule = "0 9,10 * * *"
 
 # CKF Whoop sync — pulls yesterday's recovery/sleep/strain. 19:00 UTC = 07/08 NZ.
 [functions."ckf-whoop-sync"]

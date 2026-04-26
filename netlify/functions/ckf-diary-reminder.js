@@ -1,10 +1,10 @@
 /**
  * ckf-diary-reminder.js — scheduled.
  *
- * Cron in netlify.toml fires twice (08:00 + 09:00 UTC) to cover NZST and NZDT.
- * The handler computes the local Pacific/Auckland hour and only sends at exactly 21:00.
- * If a diary entry already exists for today's NZ date for cfairweather1996@gmail.com,
- * no SMS is sent.
+ * Cron in netlify.toml fires twice (09:00 + 10:00 UTC) to cover NZST (UTC+12)
+ * and NZDT (UTC+13). The handler computes Pacific/Auckland local hour and
+ * only sends at exactly 22:00 NZ (10pm — Curtis's deadline before bed).
+ * If a diary entry already exists for today's NZ date, no SMS is sent.
  *
  * SMS body: hard-coded; recipient hard-coded inside _lib/ckf-sms.js.
  */
@@ -30,7 +30,7 @@ function nzNow() {
 exports.handler = async () => {
   try {
     const { date, hour } = nzNow();
-    if (hour !== 21) {
+    if (hour !== 22) {
       return { statusCode: 200, body: JSON.stringify({ skipped: true, reason: `not 21:00 NZ (got ${hour})` }) };
     }
 
@@ -52,7 +52,7 @@ exports.handler = async () => {
     }
 
     const url = `${process.env.APP_URL || 'https://oso.nz'}/ckf/chat`;
-    const body = `Diary time, Curtis. Tonight: ${url}`;
+    const body = `10pm Curtis — diary not in yet. Open: ${url}`;
     await sendCkfSms(ALLOWED_NUMBER, body);
 
     return { statusCode: 200, body: JSON.stringify({ sent: true, to: ALLOWED_NUMBER, date }) };
