@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import GoalCard from '../components/GoalCard.jsx';
-import ErrandsCard from '../components/ErrandsCard.jsx';
-import ComingUpStrip from '../components/ComingUpStrip.jsx';
+import TodayStrip from '../components/TodayStrip.jsx';
 import { call } from '../lib/api.js';
 import Chat from './Chat.jsx';
 
-// Home: goals strip → Coming up pills → Errands pills → embedded chat.
+// Home: goals strip → mixed Today strip (errands + calendar + biz + routine) → chat.
 export default function Dashboard() {
   const [goals, setGoals] = useState(null);
   const [err, setErr] = useState('');
@@ -16,7 +15,6 @@ export default function Dashboard() {
       .then((r) => setGoals(r.goals.filter((g) => g.status === 'active')))
       .catch((e) => setErr(e.message));
   }
-
   useEffect(() => { refresh(); }, []);
 
   return (
@@ -40,13 +38,11 @@ export default function Dashboard() {
         )}
       </div>
 
-      <ComingUpStrip />
-
-      <ErrandsCard
-        title="Errands"
-        filter="not_business"
+      <TodayStrip
+        title="Today"
+        scope="all"
         defaultCategory="personal"
-        moreHref="/errands"
+        moreHref="/today"
       />
 
       <div className="home-chat">

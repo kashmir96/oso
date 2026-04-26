@@ -45,6 +45,8 @@ export default function Settings() {
 
       <Appearance />
 
+      <TrainerShare />
+
       <Connections />
 
       <ChangePassword />
@@ -103,6 +105,93 @@ function SuggestionCard({ s, onApprove, onReject }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function TrainerShare() {
+  const [shares, setShares] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [label, setLabel] = useState('Trainer');
+  const [err, setErr] = useState('');
+  const [copiedId, setCopiedId] = useState(null);
+  const APP_URL = (typeof window !== 'undefined' ? window.location.origin : '');
+
+  async function load() {
+    try {
+      const r = await call('ckf-meals', { action: 'list_shares' });
+      setShares(r.shares || []);
+    } catch (e) { setErr(e.message); }
+  }
+  useEffect(() => { load(); }, []);
+
+  async function create() {
+    setBusy(true); setErr('');
+    try {
+      await call('ckf-meals', { action: 'create_share', label: label || 'Trainer' });
+      await load();
+    } catch (e) { setErr(e.message); } finally { setBusy(false); }
+  }
+  async function revoke(id) {
+    if (!confirm('Revoke this share link? Anyone using it will lose access.')) return;
+    await call('ckf-meals', { action: 'revoke_share', id });
+    load();
+  }
+  function copyUrl(token, id) {
+    const url = `${APP_URL}/ckf-meals.html#${token}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedId(id);
+      setTimeout(() => setCopiedId((v) => v === id ? null : v), 1500);
+    });
+  }
+
+  const active = (shares || []).filter((s) => !s.revoked);
+  const revoked = (shares || []).filter((s) => s.revoked);
+
+  return (
+    <div className="card" style={{ marginBottom: 12 }}>
+      <div className="section-title" style={{ margin: '0 0 8px' }}>Meals · trainer share link</div>
+      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>
+        Generate a link your trainer can use to upload meal photos. Calories are estimated by AI; you can edit anything.
+        The link only allows uploading + viewing meals — nothing else in the app is exposed.
+        <Link to="/meals" style={{ marginLeft: 6 }}>Open Meals →</Link>
+      </div>
+
+      {!shares ? <div className="loading">Loading…</div> :
+        active.length === 0 ? (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+            <div className="field" style={{ flex: 1, marginBottom: 0 }}>
+              <label>Label</label>
+              <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Trainer's name" />
+            </div>
+            <button className="primary" onClick={create} disabled={busy}>{busy ? '…' : 'Generate link'}</button>
+          </div>
+        ) : (
+          <>
+            {active.map((s) => {
+              const url = `${APP_URL}/ckf-meals.html#${s.share_token}`;
+              return (
+                <div key={s.id} style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 4 }}>{s.label || 'Share'}</div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <input value={url} readOnly onClick={(e) => e.target.select()} style={{ flex: 1, fontSize: 12 }} />
+                    <button onClick={() => copyUrl(s.share_token, s.id)} className="primary" style={{ padding: '6px 12px', fontSize: 12 }}>
+                      {copiedId === s.id ? 'Copied' : 'Copy'}
+                    </button>
+                    <button onClick={() => revoke(s.id)} className="danger" style={{ padding: '6px 10px', fontSize: 12 }}>Revoke</button>
+                  </div>
+                </div>
+              );
+            })}
+            <button onClick={create} disabled={busy} style={{ marginTop: 6, fontSize: 12 }}>+ another link</button>
+          </>
+        )}
+      {revoked.length > 0 && (
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
+          {revoked.length} revoked link{revoked.length === 1 ? '' : 's'}.
+        </div>
+      )}
+      {err && <div className="error">{err}</div>}
     </div>
   );
 }

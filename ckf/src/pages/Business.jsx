@@ -1,16 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import GoalCard from '../components/GoalCard.jsx';
-import ErrandsCard from '../components/ErrandsCard.jsx';
-import ComingUpStrip from '../components/ComingUpStrip.jsx';
+import TodayStrip from '../components/TodayStrip.jsx';
 import { call } from '../lib/api.js';
 import Chat from './Chat.jsx';
 
 const BUSINESS_CATEGORIES = new Set(['business', 'marketing', 'finance']);
 
-// Business: same shape as Home (goals strip + chat) but filtered to
-// business / marketing / finance category goals. The chat is the same
-// conversation as Home — context carries across.
+// Business: same shape as Home but filtered to business / marketing / finance
+// goals + business jobs + business deadlines.
 export default function Business() {
   const [goals, setGoals] = useState(null);
   const [openTaskCount, setOpenTaskCount] = useState(0);
@@ -57,13 +55,11 @@ export default function Business() {
         )}
       </div>
 
-      <ComingUpStrip />
-
-      <ErrandsCard
+      <TodayStrip
         title="Jobs"
-        filter="business"
+        scope="business"
         defaultCategory="business"
-        moreHref="/errands"
+        moreHref="/business/tasks"
       />
 
       <div className="home-chat">

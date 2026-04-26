@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e0f12">
+<meta name="robots" content="noindex,nofollow">
+<title>Meal log</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    background: #0e0f12; color: #e8eaed;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 600px; margin: 0 auto; padding: 20px 16px 80px; padding-top: max(20px, env(safe-area-inset-top)); }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: #9aa0a6; font-size: 13px; margin-bottom: 16px; }
+  .err { color: #d96a6a; padding: 10px; background: rgba(217,106,106,.08); border-radius: 8px; margin: 8px 0; font-size: 13px; }
+  .card { background: #16181d; border: 1px solid #262a33; border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+  label { display: block; color: #9aa0a6; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+  input, select, textarea {
+    width: 100%; font: inherit;
+    background: #1d2027; color: #e8eaed; border: 1px solid #262a33;
+    border-radius: 10px; padding: 10px 12px;
+  }
+  textarea { min-height: 80px; resize: vertical; }
+  button {
+    font: inherit; cursor: pointer;
+    background: #1d2027; color: #e8eaed; border: 1px solid #262a33;
+    border-radius: 10px; padding: 10px 14px;
+  }
+  button.primary { background: #7ec8a4; color: #06130c; border-color: #7ec8a4; font-weight: 600; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .row { display: flex; gap: 8px; margin-top: 8px; }
+  .preview { width: 100%; max-height: 360px; object-fit: contain; border-radius: 10px; background: #0a0b0d; margin-bottom: 8px; }
+  .hidden { display: none; }
+  .meal-list { display: flex; flex-direction: column; gap: 10px; }
+  .meal-item { display: flex; gap: 12px; align-items: stretch; }
+  .meal-thumb { width: 90px; height: 90px; object-fit: cover; border-radius: 10px; flex: 0 0 auto; background: #0a0b0d; }
+  .meal-body { flex: 1; min-width: 0; }
+  .meal-title { font-weight: 600; }
+  .meal-meta { color: #9aa0a6; font-size: 12px; margin-top: 2px; }
+  .meal-cal { color: #7ec8a4; font-size: 13px; margin-top: 4px; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; background: #1d2027; color: #9aa0a6; border: 1px solid #262a33; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 id="title">Meal log</h1>
+  <div class="sub" id="subtitle">Loading…</div>
+
+  <div id="err" class="err hidden"></div>
+
+  <div class="card" id="upload-card">
+    <label>Photo</label>
+    <input type="file" id="file" accept="image/*" capture="environment" />
+    <img id="preview" class="preview hidden" alt="" />
+
+    <div class="row">
+      <div style="flex:1">
+        <label>Type</label>
+        <select id="meal_type">
+          <option value="">—</option>
+          <option value="breakfast">Breakfast</option>
+          <option value="lunch">Lunch</option>
+          <option value="dinner">Dinner</option>
+          <option value="snack">Snack</option>
+        </select>
+      </div>
+      <div style="flex:1">
+        <label>Date</label>
+        <input id="meal_date" type="date" />
+      </div>
+    </div>
+
+    <label style="margin-top: 10px;">Notes (optional)</label>
+    <textarea id="notes" placeholder="Anything to add — portion size, prep, etc."></textarea>
+
+    <div class="row">
+      <button id="submit" class="primary" style="flex:1" disabled>Submit</button>
+    </div>
+  </div>
+
+  <h2 style="font-size:14px; color:#9aa0a6; text-transform:uppercase; letter-spacing:.06em; margin: 18px 0 8px;">Recent</h2>
+  <div id="meals" class="meal-list"></div>
+</div>
+
+<script>
+  // Share token lives in the URL hash so it's not sent in the Referer header.
+  const token = location.hash.replace(/^#/, '').trim();
+  const FN = '/.netlify/functions/ckf-meals-public';
+
+  const els = {
+    title: document.getElementById('title'),
+    subtitle: document.getElementById('subtitle'),
+    err: document.getElementById('err'),
+    file: document.getElementById('file'),
+    preview: document.getElementById('preview'),
+    meal_type: document.getElementById('meal_type'),
+    meal_date: document.getElementById('meal_date'),
+    notes: document.getElementById('notes'),
+    submit: document.getElementById('submit'),
+    meals: document.getElementById('meals'),
+  };
+
+  let currentBlob = null;
+  els.meal_date.value = new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland' }).format(new Date());
+
+  function showErr(msg) {
+    els.err.textContent = msg;
+    els.err.classList.remove('hidden');
+  }
+  function clearErr() { els.err.classList.add('hidden'); }
+
+  async function call(action, body = {}) {
+    const res = await fetch(FN, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, share_token: token, ...body }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`);
+    return data;
+  }
+
+  function blobToBase64(blob) {
+    return new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => { const idx = r.result.indexOf(','); res(idx >= 0 ? r.result.slice(idx + 1) : r.result); };
+      r.onerror = rej;
+      r.readAsDataURL(blob);
+    });
+  }
+
+  async function resizeImage(file) {
+    if (file.size < 250 * 1024) return file;
+    const img = await new Promise((res, rej) => {
+      const i = new Image();
+      i.onload = () => res(i); i.onerror = rej;
+      i.src = URL.createObjectURL(file);
+    });
+    const MAX = 1280;
+    const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+    if (scale === 1) { URL.revokeObjectURL(img.src); return file; }
+    const w = Math.round(img.width * scale);
+    const h = Math.round(img.height * scale);
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    c.getContext('2d').drawImage(img, 0, 0, w, h);
+    URL.revokeObjectURL(img.src);
+    const blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.85));
+    return new File([blob], 'meal.jpg', { type: 'image/jpeg' });
+  }
+
+  els.file.addEventListener('change', async (e) => {
+    clearErr();
+    const f = e.target.files?.[0];
+    if (!f) { currentBlob = null; els.submit.disabled = true; return; }
+    try {
+      currentBlob = await resizeImage(f);
+      els.preview.src = URL.createObjectURL(currentBlob);
+      els.preview.classList.remove('hidden');
+      els.submit.disabled = false;
+    } catch (e) { showErr(e.message); }
+  });
+
+  els.submit.addEventListener('click', async () => {
+    if (!currentBlob) return;
+    clearErr();
+    els.submit.disabled = true;
+    els.submit.textContent = 'Estimating…';
+    try {
+      const image_base64 = await blobToBase64(currentBlob);
+      await call('upload', {
+        image_base64, mime_type: currentBlob.type,
+        notes: els.notes.value || null,
+        meal_type: els.meal_type.value || null,
+        meal_date: els.meal_date.value || null,
+      });
+      // Reset
+      els.file.value = '';
+      els.preview.classList.add('hidden');
+      els.notes.value = '';
+      currentBlob = null;
+      await loadMeals();
+    } catch (e) { showErr(e.message); }
+    finally {
+      els.submit.disabled = !currentBlob;
+      els.submit.textContent = 'Submit';
+    }
+  });
+
+  function pickField(m, k) {
+    return m['manual_' + k] != null ? m['manual_' + k] : m['ai_' + k];
+  }
+
+  async function loadMeals() {
+    try {
+      const r = await call('list', { limit: 30 });
+      els.meals.innerHTML = '';
+      if (!r.meals || r.meals.length === 0) {
+        els.meals.innerHTML = '<div class="sub">No meals yet.</div>';
+        return;
+      }
+      for (const m of r.meals) {
+        const div = document.createElement('div');
+        div.className = 'meal-item';
+        const lbl = pickField(m, 'label') || 'Meal';
+        const cal = pickField(m, 'calories');
+        const p = pickField(m, 'protein_g');
+        const c = pickField(m, 'carbs_g');
+        const f = pickField(m, 'fat_g');
+        const date = m.meal_date || '';
+        div.innerHTML = `
+          ${m.image_url ? `<img class="meal-thumb" src="${m.image_url}" alt="">` : '<div class="meal-thumb"></div>'}
+          <div class="meal-body">
+            <div class="meal-title">${escapeHtml(lbl)}</div>
+            <div class="meal-meta">${date}${m.meal_type ? ' · ' + m.meal_type : ''} ${m.source === 'share' ? '<span class="pill">via share</span>' : ''}</div>
+            <div class="meal-cal">${cal != null ? Math.round(cal) + ' cal' : '— cal'}${p != null ? ' · ' + Math.round(p) + 'g P' : ''}${c != null ? ' · ' + Math.round(c) + 'g C' : ''}${f != null ? ' · ' + Math.round(f) + 'g F' : ''}</div>
+            ${m.notes ? `<div class="meal-meta" style="margin-top:4px;">${escapeHtml(m.notes)}</div>` : ''}
+          </div>
+        `;
+        els.meals.appendChild(div);
+      }
+    } catch (e) { showErr(e.message); }
+  }
+
+  function escapeHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  }
+
+  async function init() {
+    if (!token) {
+      els.title.textContent = 'No share token';
+      els.subtitle.textContent = 'Open the share link your friend gave you.';
+      document.getElementById('upload-card').classList.add('hidden');
+      return;
+    }
+    try {
+      const info = await call('info');
+      els.title.textContent = info.label || 'Meal log';
+      els.subtitle.textContent = 'Upload a meal photo — calories will be estimated automatically.';
+      await loadMeals();
+    } catch (e) {
+      els.title.textContent = 'Link expired or revoked';
+      els.subtitle.textContent = 'Ask Curtis for a fresh share link.';
+      document.getElementById('upload-card').classList.add('hidden');
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>
