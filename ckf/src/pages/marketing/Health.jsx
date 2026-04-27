@@ -142,6 +142,131 @@ export default function Health() {
           </div>
         )}
       </Section>
+
+      <Section title="ETL (one-time corpus seed)">
+        <EtlPanel />
+      </Section>
+    </div>
+  );
+}
+
+// ─── ETL panel: triggers per-CSV ETL via netlify function ──────────────────
+function EtlPanel() {
+  const [available, setAvailable] = useState(null);
+  const [results, setResults]     = useState({});
+  const [busy, setBusy]           = useState(null); // slug currently running
+  const [allBusy, setAllBusy]     = useState(false);
+  const [retailFrom, setRetailFrom] = useState('');
+  const [retailTo, setRetailTo]     = useState('');
+  const [err, setErr] = useState('');
+
+  async function refresh() {
+    setErr('');
+    try { const r = await call('mktg-etl-run', { action: 'list' }); setAvailable(r.available || []); }
+    catch (e) { setErr(e.message); }
+  }
+  useEffect(() => { refresh(); }, []);
+
+  async function runOne(slug) {
+    setBusy(slug); setErr('');
+    try {
+      const r = await call('mktg-etl-run', {
+        action: 'run', csv: slug,
+        retail_era_from: retailFrom || undefined,
+        retail_era_to:   retailTo   || undefined,
+      });
+      setResults((s) => ({ ...s, [slug]: r }));
+    } catch (e) { setErr(`${slug}: ${e.message}`); }
+    finally { setBusy(null); }
+  }
+
+  async function runAll() {
+    if (!available) return;
+    setAllBusy(true); setErr('');
+    for (const a of available) {
+      if (!a.present) continue;
+      await runOne(a.slug);
+    }
+    setAllBusy(false);
+  }
+
+  if (!available) return <div className="loading">Loading…</div>;
+
+  const presentN = available.filter((a) => a.present).length;
+
+  return (
+    <div className="card" style={{ padding: 12 }}>
+      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>
+        One-time seed of the canonical schema from your historical CSVs.
+        Idempotent — re-runs skip rows that already landed (via source_row_hash).
+        <br />
+        <strong>Step 1:</strong> open your Supabase project → Storage →
+        <code> mktg-etl-csvs</code> bucket → drag in the 9 CSVs from
+        <code> marketing-playbook/Marketing Agent/</code>.<br />
+        <strong>Step 2:</strong> click "Run all" below. Each CSV runs as a
+        separate netlify call (well under the timeout).
+      </div>
+
+      <div className="row" style={{ marginBottom: 10 }}>
+        <div className="field" style={{ flex: 1, marginBottom: 0 }}>
+          <label style={{ fontSize: 11 }}>Retail era from (optional)</label>
+          <input value={retailFrom} onChange={(e) => setRetailFrom(e.target.value)} placeholder="2024-MM-DD" style={{ fontSize: 12 }} />
+        </div>
+        <div className="field" style={{ flex: 1, marginBottom: 0 }}>
+          <label style={{ fontSize: 11 }}>Retail era to (optional)</label>
+          <input value={retailTo} onChange={(e) => setRetailTo(e.target.value)} placeholder="2024-MM-DD" style={{ fontSize: 12 }} />
+        </div>
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 10 }}>
+        Creatives whose date sits in this window are flagged generalizable=false
+        (retrieval skips them as exemplars). Leave blank to flag manually later.
+      </div>
+
+      <div className="row" style={{ marginBottom: 10 }}>
+        <button className="primary" onClick={runAll} disabled={allBusy || presentN === 0}>
+          {allBusy ? 'Running all…' : `Run all (${presentN} present)`}
+        </button>
+        <button onClick={refresh} disabled={allBusy}>Refresh bucket</button>
+      </div>
+
+      <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+        <thead>
+          <tr style={{ borderBottom: '1px solid var(--border)' }}>
+            <th style={{ textAlign: 'left', padding: 6 }}>CSV</th>
+            <th style={{ textAlign: 'left', padding: 6 }}>Target</th>
+            <th style={{ textAlign: 'left', padding: 6 }}>Status</th>
+            <th style={{ textAlign: 'right', padding: 6 }}>Rows</th>
+            <th style={{ textAlign: 'right', padding: 6 }}>+New</th>
+            <th style={{ textAlign: 'right', padding: 6 }}>Skip</th>
+            <th style={{ textAlign: 'right', padding: 6 }}></th>
+          </tr>
+        </thead>
+        <tbody>
+          {available.map((a) => {
+            const r = results[a.slug];
+            return (
+              <tr key={a.slug} style={{ borderBottom: '1px solid var(--border)' }}>
+                <td style={{ padding: 6 }}>{a.filename}</td>
+                <td style={{ padding: 6, color: 'var(--text-muted)' }}>{a.target_table.replace('mktg_','')}</td>
+                <td style={{ padding: 6 }}>
+                  {!a.present && <span className="pill warn" style={{ fontSize: 10 }}>missing</span>}
+                  {a.present  && <span className="pill"      style={{ fontSize: 10 }}>present</span>}
+                  {r          && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--text-muted)' }}>{r.latency_ms}ms</span>}
+                </td>
+                <td style={{ padding: 6, textAlign: 'right' }}>{r?.rows_in_csv ?? '—'}</td>
+                <td style={{ padding: 6, textAlign: 'right' }}>{r?.inserted ?? '—'}</td>
+                <td style={{ padding: 6, textAlign: 'right' }}>{r?.skipped ?? '—'}</td>
+                <td style={{ padding: 6, textAlign: 'right' }}>
+                  <button onClick={() => runOne(a.slug)} disabled={!a.present || !!busy} style={{ fontSize: 11, padding: '3px 8px' }}>
+                    {busy === a.slug ? '…' : 'Run'}
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {err && <div className="error" style={{ marginTop: 8 }}>{err}</div>}
     </div>
   );
 }
