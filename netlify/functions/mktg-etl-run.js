@@ -105,10 +105,40 @@ exports.handler = withGate(async (event) => {
 
   try {
     if (action === 'list') {
-      // Tell the UI which CSVs are present in the bucket vs missing.
-      let listing;
-      try { listing = await listBucket(); }
-      catch (e) { return reply(500, { error: e.message }); }
+      // Diagnostic-friendly: surface the specific missing piece (migration
+      // not run, bucket missing, etc.) so the UI can render a helpful
+      // message rather than a generic 500.
+      let listing = [];
+      let bucketReady = true;
+      let setupHint = null;
+      try {
+        listing = await listBucket();
+      } catch (e) {
+        bucketReady = false;
+        const msg = String(e?.message || e);
+        if (msg.includes('Bucket not found') || msg.includes('"statusCode":"404"') || msg.includes('400')) {
+          setupHint = 'Bucket "mktg-etl-csvs" does not exist yet. Run supabase-creative-agent-v4.sql in the Supabase SQL editor.';
+        } else if (msg.includes('Invalid JWT') || msg.includes('JWS') || msg.includes('401')) {
+          setupHint = 'Supabase service key is invalid -- check SUPABASE_SERVICE_KEY in Netlify env vars.';
+        } else {
+          setupHint = `Bucket access failed: ${msg.slice(0, 300)}`;
+        }
+      }
+      // Also confirm migrations 1-3 are applied so the UI can warn before
+      // the operator clicks Run.
+      let schemaReady = true;
+      let schemaHint = null;
+      try {
+        const versions = await sbSelect('mktg_schema_versions', 'select=schema_version&order=schema_version.asc');
+        const haveCore = versions.some((v) => v.schema_version === '1.0.0');
+        if (!haveCore) {
+          schemaReady = false;
+          schemaHint = 'Schema migration 1.0.0 not applied. Run supabase-creative-agent.sql first.';
+        }
+      } catch (e) {
+        schemaReady = false;
+        schemaHint = `mktg_schema_versions table missing -- run supabase-creative-agent.sql first. (${String(e?.message || e).slice(0,200)})`;
+      }
       const presentNames = new Set((listing || []).map((o) => o.name));
       const available = ORDER.map((slug) => ({
         slug,
@@ -116,7 +146,13 @@ exports.handler = withGate(async (event) => {
         present:  presentNames.has(FILENAMES[slug]),
         target_table: TARGET_TABLES[slug],
       }));
-      return reply(200, { available, bucket: BUCKET });
+      return reply(200, {
+        available, bucket: BUCKET,
+        bucket_ready: bucketReady,
+        schema_ready: schemaReady,
+        setup_hint: setupHint,
+        schema_hint: schemaHint,
+      });
     }
 
     if (action === 'run') {

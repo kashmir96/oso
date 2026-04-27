@@ -153,6 +153,7 @@ export default function Health() {
 // ─── ETL panel: triggers per-CSV ETL via netlify function ──────────────────
 function EtlPanel() {
   const [available, setAvailable] = useState(null);
+  const [setup, setSetup]         = useState({ bucket_ready: true, schema_ready: true });
   const [results, setResults]     = useState({});
   const [busy, setBusy]           = useState(null); // slug currently running
   const [allBusy, setAllBusy]     = useState(false);
@@ -162,8 +163,16 @@ function EtlPanel() {
 
   async function refresh() {
     setErr('');
-    try { const r = await call('mktg-etl-run', { action: 'list' }); setAvailable(r.available || []); }
-    catch (e) { setErr(e.message); }
+    try {
+      const r = await call('mktg-etl-run', { action: 'list' });
+      setAvailable(r.available || []);
+      setSetup({
+        bucket_ready: !!r.bucket_ready,
+        schema_ready: !!r.schema_ready,
+        setup_hint:   r.setup_hint || null,
+        schema_hint:  r.schema_hint || null,
+      });
+    } catch (e) { setErr(e.message); }
   }
   useEffect(() => { refresh(); }, []);
 
@@ -193,6 +202,7 @@ function EtlPanel() {
   if (!available) return <div className="loading">Loading…</div>;
 
   const presentN = available.filter((a) => a.present).length;
+  const blockingHint = !setup.schema_ready ? setup.schema_hint : (!setup.bucket_ready ? setup.setup_hint : null);
 
   return (
     <div className="card" style={{ padding: 12 }}>
@@ -206,6 +216,12 @@ function EtlPanel() {
         <strong>Step 2:</strong> click "Run all" below. Each CSV runs as a
         separate netlify call (well under the timeout).
       </div>
+
+      {blockingHint && (
+        <div className="error" style={{ marginBottom: 10, fontSize: 12 }}>
+          <strong>Setup needed:</strong> {blockingHint}
+        </div>
+      )}
 
       <div className="row" style={{ marginBottom: 10 }}>
         <div className="field" style={{ flex: 1, marginBottom: 0 }}>

@@ -11,6 +11,38 @@ import {
 } from '../lib/voice.js';
 import { processFile, revokePreview } from '../lib/upload.js';
 
+// Marketing-mode shortcut: typing one of these phrases in the business chat
+// jumps straight to the creative-agent pipeline (no roundtrip to ckf-chat).
+// Triggers are matched generously -- whitespace, punctuation, surrounding
+// text don't matter. The matched phrase is stripped from the message; the
+// remainder rides through as ?seed= for the brief intake to pre-fill.
+const MARKETING_MODE_TRIGGERS = [
+  'marketing mode',
+  "let's make an ad",
+  'lets make an ad',
+  'i want to make an ad',
+  'i want to create an ad',
+  "let's run an ad",
+  'lets run an ad',
+  'create an ad',
+  'new creative',
+];
+
+function isMarketingModeTrigger(text) {
+  const lower = (text || '').toLowerCase();
+  return MARKETING_MODE_TRIGGERS.some((t) => lower.includes(t));
+}
+
+function stripMarketingModeTrigger(text) {
+  let out = text || '';
+  for (const t of MARKETING_MODE_TRIGGERS) {
+    const re = new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'ig');
+    out = out.replace(re, '');
+  }
+  // Remove dangling punctuation/spaces left at the join.
+  return out.replace(/^[\s.,—:;-]+|[\s.,—:;-]+$/g, '').replace(/\s{2,}/g, ' ').trim();
+}
+
 // Hat selection is handled by the model from context; no manual UI for it.
 function voiceLabel(state) {
   switch (state) {
@@ -140,6 +172,20 @@ export default function Chat({ embedded = false, scope = 'personal' }) {
   async function send() {
     const text = draft.trim();
     if ((!text && attachments.length === 0) || busy || !id) return;
+
+    // "Marketing mode" trigger in the business chat -> route to the new
+    // creative-agent pipeline. Don't post the message to the chat API; the
+    // creative page is now the artifact. Whatever else Curtis typed in the
+    // same message rides through as ?seed= so the brief intake form picks
+    // it up as a starting objective.
+    if (scope === 'business' && isMarketingModeTrigger(text)) {
+      const seed = stripMarketingModeTrigger(text);
+      setDraft('');
+      const url = '/business/marketing/creative' + (seed ? `?seed=${encodeURIComponent(seed)}` : '');
+      nav(url);
+      return;
+    }
+
     setDraft('');
     setBusy(true); setErr('');
     const payloadAttachments = attachments.map(({ kind, media_type, data_base64, filename }) => ({
