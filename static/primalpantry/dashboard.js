@@ -4543,6 +4543,8 @@ function loadActiveTab() {
     if (!window._finPreloaded) loadFinanceTab();
   } else if (activeTab === 'actions') {
     loadActionsTab();
+  } else if (activeTab === 'drilldown') {
+    if (typeof loadDrilldownData === 'function') loadDrilldownData(false);
   } else if (activeTab === 'settings') {
     loadSettingsTab();
   }
@@ -14773,28 +14775,33 @@ window.loyExpirePoints = async function() {
 };
 
 /* ═══════════════════════════════════════════════════════
-   SKU DRILLDOWN — pulls all records on demand
+   SKU DRILLDOWN — pulls all records, no caps, sorted by revenue
    ═══════════════════════════════════════════════════════ */
 let drilldownLoaded = false;
+let drilldownLoading = false;
 let drilldownOrders = [];
 let drilldownLineItems = [];
 let drilldownChart = null;
 let drilldownSort = { col: 'revenue', desc: true };
 
-async function loadDrilldownData() {
+async function loadDrilldownData(force) {
+  if (drilldownLoading) return;
+  if (drilldownLoaded && !force) { renderDrilldown(); return; }
   const status = document.getElementById('drilldown-status');
   const btn = document.getElementById('drilldown-load-btn');
+  const loadingEl = document.getElementById('drilldown-loading');
+  const contentEl = document.getElementById('drilldown-content');
   if (!status || !btn) return;
 
-  status.textContent = 'Loading orders...';
+  drilldownLoading = true;
+  status.textContent = 'Loading…';
   btn.disabled = true;
-  btn.textContent = 'Loading...';
+  if (loadingEl) loadingEl.style.display = 'block';
+  if (contentEl) contentEl.style.display = 'none';
 
   try {
-    // Pull EVERYTHING — paginate manually until we get all rows.
-    // Server already has a 30-page cap (30k rows) — for ~17k orders this is fine.
     const tok = JSON.parse(localStorage.getItem('pp_staff') || '{}').token;
-    if (!tok) { status.textContent = 'Not authenticated.'; btn.disabled = false; btn.textContent = 'Load all data'; return; }
+    if (!tok) throw new Error('Not authenticated');
 
     async function pullAll(table, label) {
       let allRows = [];
@@ -14814,7 +14821,8 @@ async function loadDrilldownData() {
         if (data.error) throw new Error(data.error.message || 'fetch failed');
         const rows = data.data || [];
         allRows = allRows.concat(rows);
-        status.textContent = `Loading ${label}: ${allRows.length.toLocaleString()} rows...`;
+        if (loadingEl) loadingEl.querySelector('p').textContent =
+          `Loading ${label}: ${allRows.length.toLocaleString()} rows…`;
         if (rows.length < PAGE) break;
         offset += PAGE;
       }
@@ -14825,19 +14833,21 @@ async function loadDrilldownData() {
     drilldownLineItems = await pullAll('order_line_items', 'line items');
 
     drilldownLoaded = true;
-    status.textContent = `Loaded ${drilldownOrders.length.toLocaleString()} orders, ${drilldownLineItems.length.toLocaleString()} line items.`;
+    drilldownLoading = false;
+    status.textContent = `${drilldownOrders.length.toLocaleString()} orders · ${drilldownLineItems.length.toLocaleString()} line items`;
     btn.disabled = false;
     btn.textContent = 'Refresh data';
 
-    document.getElementById('drilldown-empty').style.display = 'none';
-    document.getElementById('drilldown-content').style.display = 'block';
-
+    if (loadingEl) loadingEl.style.display = 'none';
+    if (contentEl) contentEl.style.display = 'block';
     renderDrilldown();
   } catch (e) {
     console.error('[drilldown] error:', e);
     status.textContent = 'Error: ' + e.message;
+    drilldownLoading = false;
     btn.disabled = false;
     btn.textContent = 'Retry';
+    if (loadingEl) loadingEl.querySelector('p').textContent = 'Failed to load. Check console for details.';
   }
 }
 
@@ -14894,8 +14904,17 @@ function renderDrilldown() {
     drilldownSummaryCard('Orders', totalOrders.toLocaleString()) +
     drilldownSummaryCard('Unique SKUs', Object.keys(skuStats).length.toLocaleString());
 
+  // Stash for the table renderer (so it has totals + ranks)
+  window._drilldownTotals = { rev: totalRev, qty: totalQty };
+
+  // Top performers leaderboards
+  const sortedByRev = Object.values(skuStats).sort((a, b) => b.revenue - a.revenue);
+  const sortedByVol = Object.values(skuStats).sort((a, b) => b.qty - a.qty);
+  document.getElementById('drilldown-top-revenue').innerHTML = drilldownLeaderboard(sortedByRev.slice(0, 5), totalRev, 'revenue');
+  document.getElementById('drilldown-top-volume').innerHTML = drilldownLeaderboard(sortedByVol.slice(0, 5), totalQty, 'volume');
+
   // Time series chart — top 10 SKUs by revenue
-  const sorted = Object.values(skuStats).sort((a, b) => b.revenue - a.revenue);
+  const sorted = sortedByRev;
   const top = sorted.slice(0, 10);
   const others = sorted.slice(10);
 
@@ -14957,12 +14976,45 @@ function drilldownSummaryCard(label, value) {
   </div>`;
 }
 
+function drilldownLeaderboard(rows, total, mode) {
+  // mode = 'revenue' or 'volume'
+  const fmtMoney = v => '$' + v.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  const medals = ['🥇', '🥈', '🥉', '4', '5'];
+  return rows.map((r, i) => {
+    const value = mode === 'revenue' ? fmtMoney(r.revenue) : r.qty.toLocaleString() + ' units';
+    const share = mode === 'revenue'
+      ? (total > 0 ? ((r.revenue / total) * 100).toFixed(1) : '0.0')
+      : (total > 0 ? ((r.qty / total) * 100).toFixed(1) : '0.0');
+    const barWidth = mode === 'revenue'
+      ? (rows[0].revenue > 0 ? (r.revenue / rows[0].revenue) * 100 : 0)
+      : (rows[0].qty > 0 ? (r.qty / rows[0].qty) * 100 : 0);
+    return `<div style="margin-bottom:8px;">
+      <div style="display:flex;align-items:center;gap:8px;font-size:0.82rem;margin-bottom:3px;">
+        <span style="width:18px;font-size:${i < 3 ? '0.95rem' : '0.7rem'};color:${i < 3 ? '#d4a574' : 'var(--dim,#9c9287)'};">${medals[i]}</span>
+        <span style="flex:1;font-family:monospace;color:var(--fg,#e8e1d3);font-size:0.78rem;">${r.sku}</span>
+        <span style="font-weight:600;color:var(--fg,#e8e1d3);">${value}</span>
+        <span style="font-size:0.7rem;color:var(--dim,#9c9287);width:48px;text-align:right;">${share}%</span>
+      </div>
+      <div style="height:3px;background:rgba(255,255,255,0.05);border-radius:2px;margin-left:26px;overflow:hidden;">
+        <div style="width:${barWidth}%;height:100%;background:linear-gradient(90deg,#8b6f47,#d4a574);"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 function renderDrilldownTable(skuStats) {
+  const totals = window._drilldownTotals || { rev: 0 };
   let rows = Object.values(skuStats).map(r => ({
     ...r,
     orders: r.orders.size,
     aov: r.qty > 0 ? r.revenue / r.qty : 0,
+    revShare: totals.rev > 0 ? (r.revenue / totals.rev) * 100 : 0,
   }));
+
+  // Pre-compute revenue rank (1 = highest revenue)
+  const byRev = [...rows].sort((a, b) => b.revenue - a.revenue);
+  const rankMap = {};
+  byRev.forEach((r, i) => { rankMap[r.sku] = i + 1; });
 
   const col = drilldownSort.col;
   rows.sort((a, b) => {
@@ -14972,25 +15024,40 @@ function renderDrilldownTable(skuStats) {
   });
 
   const fmtMoney = v => '$' + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const rowBg = rank => {
+    if (rank === 1) return 'background:rgba(212,165,116,0.10);';
+    if (rank <= 3) return 'background:rgba(212,165,116,0.05);';
+    return '';
+  };
   const tbody = document.getElementById('drilldown-table-body');
-  tbody.innerHTML = rows.map(r => `
-    <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+  tbody.innerHTML = rows.map(r => {
+    const rank = rankMap[r.sku];
+    return `<tr style="border-bottom:1px solid rgba(255,255,255,0.04);${rowBg(rank)}">
+      <td style="padding:6px 8px;text-align:right;color:${rank <= 3 ? '#d4a574' : 'var(--dim,#9c9287)'};font-weight:${rank <= 3 ? 700 : 400};">${rank}</td>
       <td style="padding:6px 8px;color:var(--fg,#e8e1d3);font-family:monospace;font-size:0.78rem;">${r.sku}</td>
       <td style="padding:6px 8px;text-align:right;">${r.qty.toLocaleString()}</td>
       <td style="padding:6px 8px;text-align:right;font-weight:600;">${fmtMoney(r.revenue)}</td>
+      <td style="padding:6px 8px;text-align:right;color:var(--dim,#9c9287);">${r.revShare.toFixed(1)}%</td>
       <td style="padding:6px 8px;text-align:right;">${r.orders.toLocaleString()}</td>
       <td style="padding:6px 8px;text-align:right;">${fmtMoney(r.aov)}</td>
       <td style="padding:6px 8px;text-align:right;color:var(--dim,#9c9287);font-size:0.75rem;">${r.first || '-'}</td>
       <td style="padding:6px 8px;text-align:right;color:var(--dim,#9c9287);font-size:0.75rem;">${r.last || '-'}</td>
-    </tr>
-  `).join('');
+    </tr>`;
+  }).join('');
   document.getElementById('drilldown-table-count').textContent = rows.length + ' SKUs';
 }
 
-// Hook up event listeners
+// Hook up event listeners + auto-load on tab open
 document.addEventListener('DOMContentLoaded', () => {
   const btn = document.getElementById('drilldown-load-btn');
-  if (btn) btn.addEventListener('click', loadDrilldownData);
+  if (btn) btn.addEventListener('click', () => loadDrilldownData(true));
+
+  const clearBtn = document.getElementById('drilldown-clear');
+  if (clearBtn) clearBtn.addEventListener('click', () => {
+    const ids = ['drilldown-from', 'drilldown-to', 'drilldown-sku-filter'];
+    ids.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    if (drilldownLoaded) renderDrilldown();
+  });
 
   ['drilldown-from', 'drilldown-to', 'drilldown-sku-filter'].forEach(id => {
     const el = document.getElementById(id);

@@ -2037,44 +2037,59 @@
     <div style="padding:1rem 1.25rem;background:var(--surface,#1a1813);border-bottom:1px solid var(--border);">
       <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
         <h2 style="margin:0;font-size:1.05rem;color:var(--fg,#e8e1d3);">SKU Drilldown</h2>
-        <span id="drilldown-status" style="font-size:0.78rem;color:var(--dim,#9c9287);">Click "Load all data" to begin</span>
-        <button id="drilldown-load-btn" style="margin-left:auto;padding:6px 14px;background:var(--accent,#8b6f47);color:#fff;border:none;border-radius:6px;font-size:0.82rem;cursor:pointer;">Load all data</button>
+        <span id="drilldown-status" style="font-size:0.78rem;color:var(--dim,#9c9287);"></span>
+        <button id="drilldown-load-btn" style="margin-left:auto;padding:6px 14px;background:transparent;color:var(--dim,#9c9287);border:1px solid var(--border);border-radius:6px;font-size:0.78rem;cursor:pointer;">Refresh data</button>
       </div>
-      <div style="display:flex;align-items:center;gap:0.75rem;margin-top:0.75rem;flex-wrap:wrap;font-size:0.82rem;color:var(--dim,#9c9287);">
+      <div style="display:flex;align-items:center;gap:0.75rem;margin-top:0.75rem;flex-wrap:wrap;font-size:0.78rem;color:var(--dim,#9c9287);">
+        <span style="opacity:0.7;">Optional filters:</span>
         <label>From: <input type="date" id="drilldown-from" style="background:#0f0e0c;color:#e8e1d3;border:1px solid var(--border);border-radius:4px;padding:3px 6px;"></label>
         <label>To: <input type="date" id="drilldown-to" style="background:#0f0e0c;color:#e8e1d3;border:1px solid var(--border);border-radius:4px;padding:3px 6px;"></label>
-        <label>SKU filter: <input type="text" id="drilldown-sku-filter" placeholder="e.g. balm-vr-120" style="background:#0f0e0c;color:#e8e1d3;border:1px solid var(--border);border-radius:4px;padding:3px 8px;width:160px;"></label>
+        <label>SKU contains: <input type="text" id="drilldown-sku-filter" placeholder="search..." style="background:#0f0e0c;color:#e8e1d3;border:1px solid var(--border);border-radius:4px;padding:3px 8px;width:140px;"></label>
+        <button id="drilldown-clear" style="padding:3px 10px;background:transparent;color:var(--dim,#9c9287);border:1px solid var(--border);border-radius:4px;font-size:0.72rem;cursor:pointer;">Clear filters</button>
         <span id="drilldown-count" style="margin-left:auto;"></span>
       </div>
     </div>
 
-    <div id="drilldown-empty" style="padding:3rem 1.25rem;text-align:center;color:var(--dim,#9c9287);">
-      <p style="font-size:0.9rem;margin-bottom:0.5rem;">This page pulls every order and line item across your full history (no row cap).</p>
-      <p style="font-size:0.8rem;">Use it for deep SKU analysis. The dashboard widgets are capped for speed — this isn't.</p>
+    <div id="drilldown-loading" style="padding:3rem 1.25rem;text-align:center;color:var(--dim,#9c9287);">
+      <p style="font-size:0.9rem;">Loading all orders + line items…</p>
     </div>
 
     <div id="drilldown-content" style="display:none;padding:1rem 1.25rem;">
       <!-- Summary cards -->
       <div id="drilldown-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.75rem;margin-bottom:1.5rem;"></div>
 
+      <!-- Top performers leaderboards -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem;" id="drilldown-leaderboards">
+        <div style="background:#1a1813;border:1px solid var(--border);border-radius:8px;padding:1rem;">
+          <h3 style="margin:0 0 0.75rem;font-size:0.92rem;color:var(--fg,#e8e1d3);">🏆 Top by Revenue</h3>
+          <div id="drilldown-top-revenue" style="font-size:0.82rem;"></div>
+        </div>
+        <div style="background:#1a1813;border:1px solid var(--border);border-radius:8px;padding:1rem;">
+          <h3 style="margin:0 0 0.75rem;font-size:0.92rem;color:var(--fg,#e8e1d3);">📦 Top by Volume</h3>
+          <div id="drilldown-top-volume" style="font-size:0.82rem;"></div>
+        </div>
+      </div>
+
       <!-- SKU performance over time chart -->
       <div style="background:#1a1813;border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1rem;">
-        <h3 style="margin:0 0 0.75rem;font-size:0.95rem;color:var(--fg,#e8e1d3);">SKU Revenue Over Time (Top 10 + Other)</h3>
+        <h3 style="margin:0 0 0.75rem;font-size:0.95rem;color:var(--fg,#e8e1d3);">Revenue Over Time (Top 10 SKUs)</h3>
         <div style="position:relative;height:340px;"><canvas id="drilldown-time-chart"></canvas></div>
       </div>
 
       <!-- SKU performance table -->
       <div style="background:#1a1813;border:1px solid var(--border);border-radius:8px;padding:1rem;">
         <div style="display:flex;align-items:center;gap:1rem;margin-bottom:0.75rem;">
-          <h3 style="margin:0;font-size:0.95rem;color:var(--fg,#e8e1d3);">All SKUs</h3>
+          <h3 style="margin:0;font-size:0.95rem;color:var(--fg,#e8e1d3);">All SKUs — Click any column to sort</h3>
           <span id="drilldown-table-count" style="font-size:0.75rem;color:var(--dim,#9c9287);"></span>
         </div>
         <table style="width:100%;font-size:0.82rem;">
           <thead>
             <tr style="text-align:left;color:var(--dim,#9c9287);border-bottom:1px solid var(--border);">
+              <th style="padding:6px 8px;text-align:right;width:40px;">#</th>
               <th style="padding:6px 8px;cursor:pointer;" data-dd-sort="sku">SKU</th>
               <th style="padding:6px 8px;cursor:pointer;text-align:right;" data-dd-sort="qty">Units</th>
               <th style="padding:6px 8px;cursor:pointer;text-align:right;" data-dd-sort="revenue">Revenue</th>
+              <th style="padding:6px 8px;cursor:pointer;text-align:right;" data-dd-sort="revShare">% of Rev</th>
               <th style="padding:6px 8px;cursor:pointer;text-align:right;" data-dd-sort="orders">Orders</th>
               <th style="padding:6px 8px;cursor:pointer;text-align:right;" data-dd-sort="aov">Avg Price</th>
               <th style="padding:6px 8px;cursor:pointer;text-align:right;" data-dd-sort="first">First Sold</th>
