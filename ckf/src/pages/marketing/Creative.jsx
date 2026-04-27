@@ -347,6 +347,13 @@ function Pipeline({ id }) {
         <PerformedSummary perf={creative.performance} />
       )}
 
+      {/* Voiceover -- final step. Available once the creative has a script
+          worth voicing (post-approval). Stays visible through shipped /
+          performed so you can re-render after edits or A/B variants. */}
+      {(status === 'user_approved' || status === 'shipped' || status === 'performed') && (
+        <VoiceoverStep creative={creative} onChange={load} />
+      )}
+
       {status === 'user_rejected' && (
         <div className="card" style={{ marginBottom: 12, opacity: 0.7 }}>
           <div className="section-title" style={{ margin: '0 0 6px' }}>Rejected</div>
@@ -716,6 +723,104 @@ function PerformedSummary({ perf }) {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── VoiceoverStep — final step in the pipeline ────────────────────────────
+// Renders the script via ElevenLabs (Liam, punchy voice settings) into an
+// MP3 in the public mktg-vo bucket. The link is permanent and shareable;
+// your editor opens it directly to download into their video tool.
+//
+// Source of script:
+//   video_script -> components.script.full_script
+//   ad          -> components.body  (read aloud as a 1-shot script line)
+//
+// Re-rendering replaces the prior file (the bucket doesn't accumulate
+// orphans on regenerate).
+function VoiceoverStep({ creative, onChange }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  const hasScript =
+    !!creative.components?.script?.full_script ||
+    !!creative.components?.body;
+
+  async function generate() {
+    setBusy(true); setErr('');
+    try {
+      await call('mktg-vo', { action: 'generate_creative', creative_id: creative.creative_id });
+      onChange?.();
+    } catch (e) { setErr(e.message); } finally { setBusy(false); }
+  }
+
+  async function remove() {
+    if (!confirm('Delete the voiceover MP3? The link will stop working.')) return;
+    setBusy(true); setErr('');
+    try {
+      await call('mktg-vo', { action: 'delete_creative', creative_id: creative.creative_id });
+      onChange?.();
+    } catch (e) { setErr(e.message); } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="card" style={{ marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <div className="section-title" style={{ margin: 0 }}>Voiceover (ElevenLabs)</div>
+        {creative.voiceover_url && (
+          <span className="pill" style={{ fontSize: 11 }}>ready</span>
+        )}
+      </div>
+
+      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>
+        Renders the script as an MP3 with a punchy energetic voice (Liam by
+        default; override with <code>ELEVENLABS_AD_VOICE_ID</code> in Netlify
+        env). The download link is public and permanent — paste it to your
+        editor, they open it in browser to download.
+      </div>
+
+      {!hasScript && (
+        <div className="empty" style={{ fontSize: 12 }}>
+          No script body to voice yet. Approve a draft / variant first.
+        </div>
+      )}
+
+      {hasScript && !creative.voiceover_url && (
+        <button onClick={generate} disabled={busy} className="primary" style={{ fontSize: 13, padding: '8px 14px' }}>
+          {busy ? 'Generating…' : 'Generate voiceover'}
+        </button>
+      )}
+
+      {creative.voiceover_url && (
+        <>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+            <input value={creative.voiceover_url} readOnly onClick={(e) => e.target.select()} style={{ flex: 1, fontSize: 12 }} />
+            <button
+              onClick={() => navigator.clipboard.writeText(creative.voiceover_url)}
+              style={{ padding: '6px 12px', fontSize: 12 }}
+            >Copy link</button>
+            <a
+              href={creative.voiceover_url}
+              target="_blank"
+              rel="noreferrer"
+              style={{ padding: '6px 12px', fontSize: 12, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)' }}
+            >▶ Download MP3</a>
+          </div>
+          <audio controls src={creative.voiceover_url} style={{ width: '100%', marginBottom: 8 }} />
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={generate} disabled={busy} style={{ fontSize: 11, padding: '4px 10px' }}>
+              {busy ? '…' : '↻ Re-render'}
+            </button>
+            <button onClick={remove} disabled={busy} className="danger" style={{ fontSize: 11, padding: '4px 10px' }}>
+              Delete
+            </button>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>
+              voice: {creative.voiceover_voice_id || 'default'}
+            </span>
+          </div>
+        </>
+      )}
+      {err && <div className="error" style={{ fontSize: 12, marginTop: 8 }}>{err}</div>}
     </div>
   );
 }

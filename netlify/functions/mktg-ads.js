@@ -651,7 +651,13 @@ exports.handler = withGate(async (event, { user }) => {
       const rows = await sbSelect('mktg_creatives', `creative_id=eq.${encodeURIComponent(body.creative_id)}&select=*&limit=1`);
       const row = rows?.[0];
       if (!row) return reply(404, { error: 'creative not found' });
-      return reply(200, { creative: row });
+      // Materialise the public VO URL so the UI doesn't need SUPABASE_URL.
+      // Mirrors the same pattern get_draft uses for legacy drafts.
+      const enriched = row.voiceover_storage_path ? {
+        ...row,
+        voiceover_url: `${process.env.SUPABASE_URL}/storage/v1/object/public/mktg-vo/${row.voiceover_storage_path}`,
+      } : row;
+      return reply(200, { creative: enriched });
     }
 
     if (action === 'creative_update_components') {

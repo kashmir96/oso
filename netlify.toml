@@ -18,6 +18,15 @@
   directory = "netlify/functions"
   node_bundler = "esbuild"
 
+# Agent stages (creative pipeline + lifecycle jobs) call Anthropic with
+# retry-once + Zod validation. Sonnet 4.6 finishes in 5-10s; bump to the
+# max (26s) for occasional cold starts + retry rounds. The default 10s
+# was the cause of Strategy stage 504s.
+[functions."mktg-ads"]
+  timeout = 26
+[functions."mktg-vo"]
+  timeout = 26
+
 [functions."sales-alert"]
   schedule = "0 * * * *"
 
