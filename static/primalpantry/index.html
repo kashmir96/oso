@@ -153,6 +153,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
       Finance
     </button>
+    <button class="nav-item" data-tab="drilldown">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+      Drilldown
+    </button>
     <button class="nav-item" data-tab="settings">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       Settings
@@ -2025,6 +2029,63 @@
       </div>
     </div>
   </div><!-- /tab-finance -->
+
+  <!-- ============================================================ -->
+  <!-- DRILLDOWN TAB — pulls ALL records (no caps) for SKU analysis -->
+  <!-- ============================================================ -->
+  <div id="tab-drilldown" class="tab-content">
+    <div style="padding:1rem 1.25rem;background:var(--surface,#1a1813);border-bottom:1px solid var(--border);">
+      <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+        <h2 style="margin:0;font-size:1.05rem;color:var(--fg,#e8e1d3);">SKU Drilldown</h2>
+        <span id="drilldown-status" style="font-size:0.78rem;color:var(--dim,#9c9287);">Click "Load all data" to begin</span>
+        <button id="drilldown-load-btn" style="margin-left:auto;padding:6px 14px;background:var(--accent,#8b6f47);color:#fff;border:none;border-radius:6px;font-size:0.82rem;cursor:pointer;">Load all data</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.75rem;margin-top:0.75rem;flex-wrap:wrap;font-size:0.82rem;color:var(--dim,#9c9287);">
+        <label>From: <input type="date" id="drilldown-from" style="background:#0f0e0c;color:#e8e1d3;border:1px solid var(--border);border-radius:4px;padding:3px 6px;"></label>
+        <label>To: <input type="date" id="drilldown-to" style="background:#0f0e0c;color:#e8e1d3;border:1px solid var(--border);border-radius:4px;padding:3px 6px;"></label>
+        <label>SKU filter: <input type="text" id="drilldown-sku-filter" placeholder="e.g. balm-vr-120" style="background:#0f0e0c;color:#e8e1d3;border:1px solid var(--border);border-radius:4px;padding:3px 8px;width:160px;"></label>
+        <span id="drilldown-count" style="margin-left:auto;"></span>
+      </div>
+    </div>
+
+    <div id="drilldown-empty" style="padding:3rem 1.25rem;text-align:center;color:var(--dim,#9c9287);">
+      <p style="font-size:0.9rem;margin-bottom:0.5rem;">This page pulls every order and line item across your full history (no row cap).</p>
+      <p style="font-size:0.8rem;">Use it for deep SKU analysis. The dashboard widgets are capped for speed — this isn't.</p>
+    </div>
+
+    <div id="drilldown-content" style="display:none;padding:1rem 1.25rem;">
+      <!-- Summary cards -->
+      <div id="drilldown-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.75rem;margin-bottom:1.5rem;"></div>
+
+      <!-- SKU performance over time chart -->
+      <div style="background:#1a1813;border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1rem;">
+        <h3 style="margin:0 0 0.75rem;font-size:0.95rem;color:var(--fg,#e8e1d3);">SKU Revenue Over Time (Top 10 + Other)</h3>
+        <div style="position:relative;height:340px;"><canvas id="drilldown-time-chart"></canvas></div>
+      </div>
+
+      <!-- SKU performance table -->
+      <div style="background:#1a1813;border:1px solid var(--border);border-radius:8px;padding:1rem;">
+        <div style="display:flex;align-items:center;gap:1rem;margin-bottom:0.75rem;">
+          <h3 style="margin:0;font-size:0.95rem;color:var(--fg,#e8e1d3);">All SKUs</h3>
+          <span id="drilldown-table-count" style="font-size:0.75rem;color:var(--dim,#9c9287);"></span>
+        </div>
+        <table style="width:100%;font-size:0.82rem;">
+          <thead>
+            <tr style="text-align:left;color:var(--dim,#9c9287);border-bottom:1px solid var(--border);">
+              <th style="padding:6px 8px;cursor:pointer;" data-dd-sort="sku">SKU</th>
+              <th style="padding:6px 8px;cursor:pointer;text-align:right;" data-dd-sort="qty">Units</th>
+              <th style="padding:6px 8px;cursor:pointer;text-align:right;" data-dd-sort="revenue">Revenue</th>
+              <th style="padding:6px 8px;cursor:pointer;text-align:right;" data-dd-sort="orders">Orders</th>
+              <th style="padding:6px 8px;cursor:pointer;text-align:right;" data-dd-sort="aov">Avg Price</th>
+              <th style="padding:6px 8px;cursor:pointer;text-align:right;" data-dd-sort="first">First Sold</th>
+              <th style="padding:6px 8px;cursor:pointer;text-align:right;" data-dd-sort="last">Last Sold</th>
+            </tr>
+          </thead>
+          <tbody id="drilldown-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div><!-- /tab-drilldown -->
 
   <div id="tab-actions" class="tab-content genie-tab">
     <!-- Mystical AI Summary -->

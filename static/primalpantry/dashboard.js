@@ -371,9 +371,9 @@ if (savedStaff && (Date.now() - staffTs) < THIRTY_DAYS) {
 const ROLE_TABS = {
   manufacturing: ['manufacturing'],
   shipping: ['shipping'],
-  office: ['sales', 'orders', 'shipping', 'customers', 'comms', 'manufacturing', 'website', 'marketing', 'finance', 'actions'],
-  admin: ['sales', 'orders', 'shipping', 'customers', 'comms', 'manufacturing', 'website', 'marketing', 'finance', 'actions'],
-  owner: ['sales', 'orders', 'shipping', 'customers', 'comms', 'manufacturing', 'website', 'marketing', 'finance', 'actions', 'settings'],
+  office: ['sales', 'orders', 'shipping', 'customers', 'comms', 'manufacturing', 'website', 'marketing', 'finance', 'actions', 'drilldown'],
+  admin: ['sales', 'orders', 'shipping', 'customers', 'comms', 'manufacturing', 'website', 'marketing', 'finance', 'actions', 'drilldown'],
+  owner: ['sales', 'orders', 'shipping', 'customers', 'comms', 'manufacturing', 'website', 'marketing', 'finance', 'actions', 'drilldown', 'settings'],
 };
 
 function applyTabVisibility() {
@@ -4438,7 +4438,7 @@ async function loadOrderJourney(order) {
 const navDrawer = document.getElementById('nav-drawer');
 const navOverlay = document.getElementById('nav-overlay');
 const navLabel = document.getElementById('nav-active-label');
-const navNames = { sales: 'Overview', orders: 'Orders', shipping: 'Shipping', customers: 'Customers', comms: 'Communications', manufacturing: 'Product & Inventory', website: 'Website Analytics', marketing: 'Marketing', finance: 'Finance', settings: 'Settings' };
+const navNames = { sales: 'Overview', orders: 'Orders', shipping: 'Shipping', customers: 'Customers', comms: 'Communications', manufacturing: 'Product & Inventory', website: 'Website Analytics', marketing: 'Marketing', finance: 'Finance', drilldown: 'SKU Drilldown', settings: 'Settings' };
 
 function openNav() { navDrawer.classList.add('open'); navOverlay.classList.add('open'); }
 function closeNav() { navDrawer.classList.remove('open'); navOverlay.classList.remove('open'); }
@@ -14771,3 +14771,241 @@ window.loyExpirePoints = async function() {
     loyLoadLog();
   } catch (e) { alert('Error: ' + e.message); }
 };
+
+/* ═══════════════════════════════════════════════════════
+   SKU DRILLDOWN — pulls all records on demand
+   ═══════════════════════════════════════════════════════ */
+let drilldownLoaded = false;
+let drilldownOrders = [];
+let drilldownLineItems = [];
+let drilldownChart = null;
+let drilldownSort = { col: 'revenue', desc: true };
+
+async function loadDrilldownData() {
+  const status = document.getElementById('drilldown-status');
+  const btn = document.getElementById('drilldown-load-btn');
+  if (!status || !btn) return;
+
+  status.textContent = 'Loading orders...';
+  btn.disabled = true;
+  btn.textContent = 'Loading...';
+
+  try {
+    // Pull EVERYTHING — paginate manually until we get all rows.
+    // Server already has a 30-page cap (30k rows) — for ~17k orders this is fine.
+    const tok = JSON.parse(localStorage.getItem('pp_staff') || '{}').token;
+    if (!tok) { status.textContent = 'Not authenticated.'; btn.disabled = false; btn.textContent = 'Load all data'; return; }
+
+    async function pullAll(table, label) {
+      let allRows = [];
+      let offset = 0;
+      const PAGE = 1000;
+      let safety = 50;
+      while (safety-- > 0) {
+        const res = await fetch('/.netlify/functions/dashboard-data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token: tok, table, operation: 'select',
+            params: { select: '*', limit: PAGE, offset }
+          })
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error.message || 'fetch failed');
+        const rows = data.data || [];
+        allRows = allRows.concat(rows);
+        status.textContent = `Loading ${label}: ${allRows.length.toLocaleString()} rows...`;
+        if (rows.length < PAGE) break;
+        offset += PAGE;
+      }
+      return allRows;
+    }
+
+    drilldownOrders = await pullAll('orders', 'orders');
+    drilldownLineItems = await pullAll('order_line_items', 'line items');
+
+    drilldownLoaded = true;
+    status.textContent = `Loaded ${drilldownOrders.length.toLocaleString()} orders, ${drilldownLineItems.length.toLocaleString()} line items.`;
+    btn.disabled = false;
+    btn.textContent = 'Refresh data';
+
+    document.getElementById('drilldown-empty').style.display = 'none';
+    document.getElementById('drilldown-content').style.display = 'block';
+
+    renderDrilldown();
+  } catch (e) {
+    console.error('[drilldown] error:', e);
+    status.textContent = 'Error: ' + e.message;
+    btn.disabled = false;
+    btn.textContent = 'Retry';
+  }
+}
+
+function renderDrilldown() {
+  if (!drilldownLoaded) return;
+
+  const fromVal = document.getElementById('drilldown-from').value;
+  const toVal = document.getElementById('drilldown-to').value;
+  const skuFilter = (document.getElementById('drilldown-sku-filter').value || '').toLowerCase().trim();
+
+  // Filter orders by date range
+  const orderDateMap = {};
+  drilldownOrders.forEach(o => {
+    const d = (o.order_date || '').slice(0, 10);
+    if (fromVal && d < fromVal) return;
+    if (toVal && d > toVal) return;
+    orderDateMap[o.id] = d;
+  });
+
+  // Filter line items by sku and order in range
+  const filtered = drilldownLineItems.filter(li => {
+    if (!orderDateMap[li.order_id]) return false;
+    if (skuFilter && !(li.sku || '').toLowerCase().includes(skuFilter)) return false;
+    return true;
+  });
+
+  document.getElementById('drilldown-count').textContent = filtered.length.toLocaleString() + ' line items';
+
+  // Aggregate per SKU
+  const skuStats = {};
+  const skuDaily = {};
+  filtered.forEach(li => {
+    const sku = li.sku || 'Unknown';
+    const d = orderDateMap[li.order_id];
+    const qty = Number(li.quantity || 0);
+    const rev = qty * Number(li.unit_price || 0);
+    if (!skuStats[sku]) skuStats[sku] = { sku, qty: 0, revenue: 0, orders: new Set(), first: d, last: d };
+    skuStats[sku].qty += qty;
+    skuStats[sku].revenue += rev;
+    skuStats[sku].orders.add(li.order_id);
+    if (d < skuStats[sku].first) skuStats[sku].first = d;
+    if (d > skuStats[sku].last) skuStats[sku].last = d;
+    if (!skuDaily[sku]) skuDaily[sku] = {};
+    skuDaily[sku][d] = (skuDaily[sku][d] || 0) + rev;
+  });
+
+  // Summary cards
+  const totalRev = Object.values(skuStats).reduce((s, x) => s + x.revenue, 0);
+  const totalQty = Object.values(skuStats).reduce((s, x) => s + x.qty, 0);
+  const totalOrders = new Set(filtered.map(li => li.order_id)).size;
+  document.getElementById('drilldown-summary').innerHTML =
+    drilldownSummaryCard('Total Revenue', '$' + totalRev.toLocaleString(undefined, { maximumFractionDigits: 0 })) +
+    drilldownSummaryCard('Units Sold', totalQty.toLocaleString()) +
+    drilldownSummaryCard('Orders', totalOrders.toLocaleString()) +
+    drilldownSummaryCard('Unique SKUs', Object.keys(skuStats).length.toLocaleString());
+
+  // Time series chart — top 10 SKUs by revenue
+  const sorted = Object.values(skuStats).sort((a, b) => b.revenue - a.revenue);
+  const top = sorted.slice(0, 10);
+  const others = sorted.slice(10);
+
+  const datesSet = new Set();
+  Object.values(skuDaily).forEach(daily => Object.keys(daily).forEach(d => datesSet.add(d)));
+  const labels = Array.from(datesSet).sort();
+
+  const palette = ['#d4a574', '#8b6f47', '#c2a378', '#e8c89a', '#a08869', '#7a6147', '#9e7f5a', '#bfa078', '#6b5238', '#9c7e54'];
+  const datasets = top.map((row, i) => ({
+    label: row.sku,
+    data: labels.map(d => skuDaily[row.sku]?.[d] || 0),
+    borderColor: palette[i % palette.length],
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    tension: 0.3,
+    pointRadius: 0,
+    pointHitRadius: 8,
+  }));
+  if (others.length > 0) {
+    datasets.push({
+      label: 'Other (' + others.length + ' SKUs)',
+      data: labels.map(d => others.reduce((sum, row) => sum + (skuDaily[row.sku]?.[d] || 0), 0)),
+      borderColor: '#5e5346',
+      backgroundColor: 'transparent',
+      borderWidth: 1.5,
+      borderDash: [4, 3],
+      tension: 0.3,
+      pointRadius: 0,
+    });
+  }
+
+  if (drilldownChart) drilldownChart.destroy();
+  const ctx = document.getElementById('drilldown-time-chart').getContext('2d');
+  drilldownChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true, labels: { color: '#9c9287', font: { size: 10 }, padding: 6, boxWidth: 12 } },
+        tooltip: { callbacks: { label: c => c.parsed.y ? c.dataset.label + ': $' + c.parsed.y.toFixed(2) : '' } },
+      },
+      scales: {
+        x: { ticks: { color: '#9c9287', maxTicksLimit: 12, font: { size: 9 } }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { color: '#9c9287', callback: v => '$' + (v >= 1000 ? (v/1000).toFixed(1) + 'k' : v) }, grid: { color: 'rgba(51,45,39,0.5)' } },
+      },
+    },
+  });
+
+  // Render table
+  renderDrilldownTable(skuStats);
+}
+
+function drilldownSummaryCard(label, value) {
+  return `<div style="background:#1a1813;border:1px solid var(--border,#2a2620);border-radius:6px;padding:0.85rem 1rem;">
+    <div style="font-size:0.7rem;color:var(--dim,#9c9287);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">${label}</div>
+    <div style="font-size:1.3rem;font-weight:600;color:var(--fg,#e8e1d3);">${value}</div>
+  </div>`;
+}
+
+function renderDrilldownTable(skuStats) {
+  let rows = Object.values(skuStats).map(r => ({
+    ...r,
+    orders: r.orders.size,
+    aov: r.qty > 0 ? r.revenue / r.qty : 0,
+  }));
+
+  const col = drilldownSort.col;
+  rows.sort((a, b) => {
+    let av = a[col], bv = b[col];
+    if (typeof av === 'string') return drilldownSort.desc ? bv.localeCompare(av) : av.localeCompare(bv);
+    return drilldownSort.desc ? bv - av : av - bv;
+  });
+
+  const fmtMoney = v => '$' + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const tbody = document.getElementById('drilldown-table-body');
+  tbody.innerHTML = rows.map(r => `
+    <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+      <td style="padding:6px 8px;color:var(--fg,#e8e1d3);font-family:monospace;font-size:0.78rem;">${r.sku}</td>
+      <td style="padding:6px 8px;text-align:right;">${r.qty.toLocaleString()}</td>
+      <td style="padding:6px 8px;text-align:right;font-weight:600;">${fmtMoney(r.revenue)}</td>
+      <td style="padding:6px 8px;text-align:right;">${r.orders.toLocaleString()}</td>
+      <td style="padding:6px 8px;text-align:right;">${fmtMoney(r.aov)}</td>
+      <td style="padding:6px 8px;text-align:right;color:var(--dim,#9c9287);font-size:0.75rem;">${r.first || '-'}</td>
+      <td style="padding:6px 8px;text-align:right;color:var(--dim,#9c9287);font-size:0.75rem;">${r.last || '-'}</td>
+    </tr>
+  `).join('');
+  document.getElementById('drilldown-table-count').textContent = rows.length + ' SKUs';
+}
+
+// Hook up event listeners
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('drilldown-load-btn');
+  if (btn) btn.addEventListener('click', loadDrilldownData);
+
+  ['drilldown-from', 'drilldown-to', 'drilldown-sku-filter'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', () => { if (drilldownLoaded) renderDrilldown(); });
+    if (el && id === 'drilldown-sku-filter') {
+      el.addEventListener('input', () => { if (drilldownLoaded) renderDrilldown(); });
+    }
+  });
+
+  document.querySelectorAll('[data-dd-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.ddSort;
+      if (drilldownSort.col === col) drilldownSort.desc = !drilldownSort.desc;
+      else { drilldownSort.col = col; drilldownSort.desc = true; }
+      if (drilldownLoaded) renderDrilldown();
+    });
+  });
+});

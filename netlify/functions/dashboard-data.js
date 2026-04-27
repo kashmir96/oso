@@ -154,9 +154,15 @@ exports.handler = async (event) => {
       query = query.order(params.order.col, { ascending: params.order.ascending ?? true });
     }
 
-    // Apply limit
+    // Apply limit + offset (offset support for client-side pagination, e.g. drilldown page)
     if (params.limit) {
-      query = query.limit(params.limit);
+      const off = parseInt(params.offset || 0);
+      const lim = parseInt(params.limit);
+      if (off > 0) {
+        query = query.range(off, off + lim - 1);
+      } else {
+        query = query.limit(lim);
+      }
     }
 
     // Apply select for insert/update/upsert (to return data)
@@ -175,8 +181,9 @@ exports.handler = async (event) => {
     if (operation === 'select' && !params.limit && !params.single) {
       let allData = [];
       const PAGE = 1000;
-      // Bigger tables (orders) hit the byte cap first; smaller tables (line items)
-      // need many more pages to be useful. Let byte/time guards do the limiting.
+      // Pagination cap — bumped to 30 pages so smaller-row tables (line items)
+      // can return enough data for SKU performance widgets. Big-row tables
+      // (orders) get capped earlier by the byte budget.
       const MAX_PAGES = 30;
       const MAX_PAYLOAD_BYTES = 4 * 1024 * 1024; // 4MB safe cutoff (before the 6MB hard limit)
       const START_TIME = Date.now();
