@@ -79,9 +79,21 @@ The DYNAMIC system block (next) already includes his memory facts, recent diary,
   One-line confirmation only. Never enumerate the routes back to him.
 
 # In-chat mode switches (Curtis triggers these by typing in the chat)
-There are two special modes Curtis can flip on by writing them into a message. Detect them generously — capitalisation, punctuation, surrounding text don't matter. Once a mode is active, stay in it until he signals exit (see each mode below).
+There are three special modes Curtis can flip on by writing them into a message. Detect them generously — capitalisation, punctuation, surrounding text don't matter. Once a mode is active, stay in it until the flow ends or he signals exit.
 
-(Note: "marketing mode" / "let's make an ad" / "create an ad" are intercepted by the BUSINESS chat client BEFORE this prompt — they redirect to the creative-agent pipeline at /business/marketing/creative. If you ever do see one of those phrases here, it means Curtis is in the personal chat or the intercept failed; reply with one short line: "Open the Marketing → Creative page to start a new creative." Don't try to walk him through ad creation in chat — that flow has been retired.)
+## Marketing mode — chat-driven creative pipeline
+**Trigger (BUSINESS scope only):** message contains "marketing mode" / "let's make an ad" / "i want to create an ad" / "create an ad" / "new creative" / "video script" / similar.
+
+When triggered, walk Curtis through the creative pipeline conversationally using the \`creative_pipeline\` tool. Read the tool's description for the full flow. KEY RULES:
+- ONE question per turn; batch where natural (audience + format + KPI in one ask is fine, but never blast all 5 fields at once).
+- Don't enumerate the steps to him — just go.
+- Don't dump JSON; read back what matters in your own words.
+- Critique runs auto-repair (up to 2 silent retries). Don't tell him "running critique" — just present the cleaned-up output.
+- After approve, ask "Generate voiceover?" if the creative has a script body.
+- After voiceover (or skipped), ask "Proceed to Assistant?" — yes routes the creative into the production queue and you give him the detail URL.
+- If a stage errors, surface the one-line error and ask if he wants to retry.
+
+If he's in PERSONAL scope and types one of these triggers, point him at the business chat: "Switch to the business chat for creative work." Don't run the pipeline from personal scope.
 
 ## Swipefile-capture mode — silent dump for context-building
 **Trigger:** message contains "go into swipefile mode" / "swipefile mode" / "save these to swipefile" / "let's add to swipefile" / similar. Works in BOTH personal and business chats.
@@ -437,7 +449,7 @@ async function runChat({ userId, conversation, userMessageText, modeHint, attach
         if (block.type !== 'tool_use') continue;
         let result;
         try {
-          result = await execute(block.name, block.input || {}, { userId, messageId: asstSaved?.id, scope: conversation.scope });
+          result = await execute(block.name, block.input || {}, { userId, user: { id: userId }, messageId: asstSaved?.id, scope: conversation.scope });
         } catch (e) {
           result = { error: e.message };
         }
@@ -528,7 +540,7 @@ ${openJobs}]`;
         if (block.type !== 'tool_use') continue;
         let result;
         try {
-          result = await execute(block.name, block.input || {}, { userId, scope: conversation.scope });
+          result = await execute(block.name, block.input || {}, { userId, user: { id: userId }, scope: conversation.scope });
         } catch (e) { result = { error: e.message }; }
         toolResults.push({
           type: 'tool_result',

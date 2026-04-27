@@ -558,6 +558,52 @@ Don't create vague goals. For numeric, ask one question if target is missing.`,
       },
     },
   },
+
+  // ─── Marketing creative pipeline (chat-driven Creative agent) ─────────────
+  // One tool, action-dispatched, drives the entire flow:
+  //   intake_brief -> run_strategy -> (run_variants_ad | run_outline ->
+  //   run_hooks -> run_draft) -> run_critique (auto-repair x2) -> approve
+  //   -> generate_voiceover -> submit_to_assistant.
+  // Single tool keeps Curtis's tool list compact + lets the AI think about
+  // pipeline state in one place.
+  {
+    name: 'creative_pipeline',
+    description: "Drive the chat-conversational creative pipeline. ONLY use in business chat when Curtis says 'marketing mode' / 'let's make an ad' / 'create an ad' / similar. Walk him conversationally through the steps below; ONE question per turn, batch where natural. Don't enumerate the steps to him — just go.\n\nFLOW:\n1. Ask creative_type (ad / video_script) + objective + audience + format + KPI + constraints. When you have ENOUGH (objective + audience + creative_type minimum), call action='intake_brief'.\n2. Call action='run_strategy'. Summarise the angle in 1-2 sentences. Ask: 'sound right or want a different angle?' If reroll, call run_strategy again.\n3a. For ads: call action='run_variants_ad'. Show 3 variants in compact form. Ask which (1/2/3). Call action='pick_variant'.\n3b. For video: call action='run_outline'. Read back beats briefly. Then action='run_hooks' -> show hook variants -> action='pick_hook'. Then action='run_draft'.\n4. Call action='run_critique' (auto-repairs up to 2x silently). If verdict=ship, present the final piece. If verdict=replace, tell Curtis the angle isn't landing and offer to start fresh from strategy. If verdict=repair-cap-hit, surface the rationale and let Curtis decide.\n5. Once Curtis says 'looks good' / 'approve' / 'ship it' -- call action='approve' with a brief approval_reason from his words.\n6. Ask: 'Generate voiceover?' (only if creative has a script body). On yes: action='generate_voiceover'. Give him the public_url to copy.\n7. Ask: 'Proceed to Assistant?' On yes: action='submit_to_assistant'. Tell him: 'Done. It's in the production queue at /business/marketing/assistant.' Reply with the detail_url so he can open it.\n\nGENERAL: keep replies short. Don't dump full JSON. Cite specifics from the agent output (angle name, scores) but in your own words. If a stage errors, surface the specific error in one line and ask if he wants to retry.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: [
+            'intake_brief','run_strategy','run_variants_ad','pick_variant',
+            'run_outline','run_hooks','pick_hook','run_draft',
+            'run_critique','approve','generate_voiceover','submit_to_assistant',
+          ],
+        },
+        creative_id: { type: 'string', description: 'required for every action after intake_brief' },
+        // intake_brief
+        creative_type: { type: 'string', enum: ['ad','video_script'] },
+        brief: {
+          type: 'object',
+          properties: {
+            objective:          { type: 'string' },
+            audience:           { type: 'string' },
+            kpi_target:         { type: 'object' },
+            platform:           { type: 'string', description: 'meta / google / tiktok / youtube / shorts' },
+            format:             { type: 'string', description: 'static / video / carousel / reel' },
+            length_or_duration: { type: 'string' },
+            constraints:        { type: 'array', items: { type: 'string' } },
+          },
+        },
+        // pick_variant / pick_hook
+        idx: { type: 'integer', minimum: 1, maximum: 6 },
+        // approve
+        approval_reason:   { type: 'string', description: 'short note from Curtis about why he approved (his words)' },
+        feedback_analysis: { type: 'object', description: 'optional structured feedback' },
+      },
+      required: ['action'],
+    },
+  },
 ];
 
 // ── Helpers ──
@@ -1167,6 +1213,40 @@ async function execute(name, input, ctx) {
         `user_id=eq.${userId}&date=gte.${since}&order=date.desc&limit=${days}&select=date,recovery_score,hrv_rmssd_ms,resting_heart_rate,strain,sleep_performance,sleep_hours,sleep_efficiency`
       );
       return { days, metrics: rows };
+    }
+
+    case 'creative_pipeline': {
+      const pipeline = require('./mktg-pipeline.js');
+      const a = input?.action;
+      switch (a) {
+        case 'intake_brief':
+          return pipeline.intakeBrief({ userId, brief: input.brief || {}, creative_type: input.creative_type });
+        case 'run_strategy':
+          return pipeline.runStrategy({ user_id: userId, creative_id: input.creative_id });
+        case 'run_variants_ad':
+          return pipeline.runVariants({ user_id: userId, creative_id: input.creative_id });
+        case 'pick_variant':
+          return pipeline.pickVariant({ creative_id: input.creative_id, idx: input.idx });
+        case 'run_outline':
+          return pipeline.runOutline({ user_id: userId, creative_id: input.creative_id });
+        case 'run_hooks':
+          return pipeline.runHooks({ user_id: userId, creative_id: input.creative_id });
+        case 'pick_hook':
+          return pipeline.pickHook({ creative_id: input.creative_id, idx: input.idx });
+        case 'run_draft':
+          return pipeline.runDraft({ user_id: userId, creative_id: input.creative_id });
+        case 'run_critique':
+          return pipeline.runCritiqueWithRepair({ user_id: userId, creative_id: input.creative_id });
+        case 'approve':
+          return pipeline.approveCreative({ creative_id: input.creative_id, approval_reason: input.approval_reason, feedback_analysis: input.feedback_analysis });
+        case 'generate_voiceover':
+          // Lazy: pass the user object via ctx (ckf-chat passes it through).
+          return pipeline.generateVoiceover({ user: ctx.user || { id: userId }, creative_id: input.creative_id });
+        case 'submit_to_assistant':
+          return pipeline.submitToAssistant({ creative_id: input.creative_id });
+        default:
+          return { error: `unknown creative_pipeline action: ${a}` };
+      }
     }
 
     default:

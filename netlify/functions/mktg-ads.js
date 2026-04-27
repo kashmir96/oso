@@ -676,6 +676,44 @@ exports.handler = withGate(async (event, { user }) => {
       return reply(200, { creative: Array.isArray(updated) ? updated[0] : updated });
     }
 
+    if (action === 'list_creatives') {
+      // Used by the Assistant queue (production handoff) to show creatives
+      // alongside legacy mktg_drafts. Same response shape so the UI can
+      // render both kinds with one row component.
+      const status = body.status; // optional filter (submitted / in_production / needs_approval / live etc.)
+      const filter = status ? `status=eq.${encodeURIComponent(status)}&` : '';
+      const rows = await sbSelect(
+        'mktg_creatives',
+        `${filter}order=updated_at.desc&limit=80&select=creative_id,status,creative_type,brief,components,submitted_at,approved_at,production_notes,production_asset_url,approval_notes,voiceover_storage_path,voiceover_label,voiceover_generated_at,updated_at,created_at`
+      );
+      // Stamp on the public VO URL + a uniform shape (objective / format / audience).
+      const enriched = rows.map((r) => ({
+        kind:        'creative',
+        id:          r.creative_id,
+        creative_id: r.creative_id,
+        status:      r.status,
+        creative_type: r.creative_type,
+        objective:   r.brief?.objective || null,
+        format:      r.brief?.format || null,
+        audience_type: r.brief?.audience || null,
+        components:  r.components,
+        submitted_at: r.submitted_at,
+        approved_at: r.approved_at,
+        production_notes: r.production_notes,
+        production_asset_url: r.production_asset_url,
+        approval_notes: r.approval_notes,
+        updated_at:  r.updated_at,
+        created_at:  r.created_at,
+        voiceover_storage_path: r.voiceover_storage_path,
+        voiceover_label: r.voiceover_label,
+        voiceover_generated_at: r.voiceover_generated_at,
+        voiceover_url: r.voiceover_storage_path
+          ? `${process.env.SUPABASE_URL}/storage/v1/object/public/mktg-vo/${r.voiceover_storage_path}`
+          : null,
+      }));
+      return reply(200, { creatives: enriched });
+    }
+
     if (action === 'creative_transition') {
       // Block 5 transitions a creative through the lifecycle: drafted ->
       // user_approved / user_rejected, user_approved -> shipped, shipped ->

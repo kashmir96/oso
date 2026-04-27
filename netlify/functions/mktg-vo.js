@@ -135,6 +135,14 @@ async function renderAndUpload({ userId, ownerId, scriptText, voiceIdOverride })
   return { storagePath, voice, bytes: buf.length };
 }
 
+// Expose the inner render + upload + URL helpers so other server-side modules
+// (like _lib/mktg-pipeline.js, called from chat) can produce voiceovers
+// without re-entering through the auth gate.
+exports.renderAndUpload = renderAndUpload;
+exports.publicUrlFor    = publicUrlFor;
+exports.deleteFromStorage = deleteFromStorage;
+exports.scriptFromCreative = scriptFromCreative;
+
 exports.handler = withGate(async (event, { user }) => {
   if (event.httpMethod !== 'POST') return reply(405, { error: 'Method not allowed' });
   let body;
