@@ -27,24 +27,35 @@ const { FILENAMES, TARGET_TABLES, ORDER, TRANSFORMERS, parseCsvBuffer } = requir
 const BUCKET = 'mktg-etl-csvs';
 
 async function listBucket() {
-  // PostgREST style request to storage list endpoint.
+  // POST /storage/v1/object/list/{bucket} -- the body MUST include `prefix`
+  // (empty string for bucket root). supabase-storage rejects the request
+  // otherwise. sortBy is optional and we don't bother with it.
   const url = `${process.env.SUPABASE_URL}/storage/v1/object/list/${BUCKET}`;
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${process.env.SUPABASE_SERVICE_KEY}`,
+      apikey: process.env.SUPABASE_SERVICE_KEY,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ limit: 100, offset: 0, sortBy: { column: 'name', order: 'asc' } }),
+    body: JSON.stringify({ prefix: '', limit: 100, offset: 0 }),
   });
-  if (!res.ok) throw new Error(`Storage list failed: ${res.status} ${(await res.text()).slice(0, 300)}`);
+  if (!res.ok) {
+    const body = await res.text();
+    // Throw an error tag so the diagnostic can distinguish "bucket missing"
+    // from "request malformed" / "permission denied".
+    throw new Error(`Storage list failed: ${res.status} ${body.slice(0, 300)}`);
+  }
   return await res.json();
 }
 
 async function downloadFromBucket(filename) {
   const url = `${process.env.SUPABASE_URL}/storage/v1/object/${BUCKET}/${encodeURIComponent(filename)}`;
   const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${process.env.SUPABASE_SERVICE_KEY}` },
+    headers: {
+      Authorization: `Bearer ${process.env.SUPABASE_SERVICE_KEY}`,
+      apikey: process.env.SUPABASE_SERVICE_KEY,
+    },
   });
   if (!res.ok) throw new Error(`Storage download failed for ${filename}: ${res.status} ${(await res.text()).slice(0, 200)}`);
   return Buffer.from(await res.arrayBuffer());
@@ -116,10 +127,11 @@ exports.handler = withGate(async (event) => {
       } catch (e) {
         bucketReady = false;
         const msg = String(e?.message || e);
-        if (msg.includes('Bucket not found') || msg.includes('"statusCode":"404"') || msg.includes('400')) {
+        // Match the actual Supabase error strings, not just HTTP statuses.
+        if (msg.includes('Bucket not found') || msg.includes('"statusCode":"404"')) {
           setupHint = 'Bucket "mktg-etl-csvs" does not exist yet. Run supabase-creative-agent-v4.sql in the Supabase SQL editor.';
-        } else if (msg.includes('Invalid JWT') || msg.includes('JWS') || msg.includes('401')) {
-          setupHint = 'Supabase service key is invalid -- check SUPABASE_SERVICE_KEY in Netlify env vars.';
+        } else if (msg.includes('Invalid JWT') || msg.includes('JWS') || msg.includes(' 401 ') || msg.includes(' 403 ')) {
+          setupHint = 'Supabase service key invalid or lacks Storage admin permission -- check SUPABASE_SERVICE_KEY in Netlify env.';
         } else {
           setupHint = `Bucket access failed: ${msg.slice(0, 300)}`;
         }
