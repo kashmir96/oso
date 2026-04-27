@@ -16,6 +16,7 @@ import SwipeFile from './SwipeFile.jsx';
 import Wizard from './Wizard.jsx';
 import Drafts from './Drafts.jsx';
 import Assistant from './Assistant.jsx';
+import Creative from './Creative.jsx';
 
 // Lazy-loaded entry-point — everything in /pages/marketing/* lives in this
 // chunk and is only fetched when the user opens /business/marketing.
@@ -37,6 +38,10 @@ export default function Marketing() {
       <Route path="swipe" element={<SwipeFile />} />
       <Route path="drafts" element={<Drafts />} />
       <Route path="assistant" element={<Assistant />} />
+      {/* New creative-agent pipeline (Block 5). Replaces the old wizard once
+          we cut over (legacy routes above stay until then.) */}
+      <Route path="creative" element={<Creative />} />
+      <Route path="creative/:id" element={<Creative />} />
       {/* New ad creation is a chat, not a form. /wizard (no id) spawns a
           fresh marketing chat in ad-creation mode. /wizard/:id stays as the
           editable review surface for an existing draft (used by the chat's
