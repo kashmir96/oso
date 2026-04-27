@@ -690,6 +690,103 @@ exports.handler = withGate(async (event, { user }) => {
       return reply(200, { creative: Array.isArray(updated) ? updated[0] : updated });
     }
 
+    // ── Proposal queue (Block 6 jobs write here, Block 7 dashboard reads) ──
+    if (action === 'proposals_list') {
+      const status = body.status || 'pending';
+      const filter = `status=eq.${encodeURIComponent(status)}` + (body.job ? `&job=eq.${encodeURIComponent(body.job)}` : '');
+      const rows = await sbSelect('mktg_pending_proposals', `${filter}&order=created_at.desc&limit=200&select=*`);
+      return reply(200, { proposals: rows });
+    }
+    if (action === 'proposal_approve') {
+      if (!body.proposal_id) return reply(400, { error: 'proposal_id required' });
+      const rows = await sbSelect('mktg_pending_proposals', `proposal_id=eq.${encodeURIComponent(body.proposal_id)}&select=*&limit=1`);
+      const p = rows?.[0];
+      if (!p) return reply(404, { error: 'proposal not found' });
+      // Apply the proposal to the live tables based on type. Hard Req #7
+      // generalisation gate: pattern proposals require >=3 evidence; the
+      // Zod stage schema already enforces this at agent-output time, but
+      // re-check here in case the proposal was hand-edited.
+      const payload = p.payload || {};
+      let applied_to = null;
+      try {
+        if (p.type === 'pattern' || p.type === 'anti_pattern') {
+          if (!Array.isArray(payload.evidence_creative_ids) || payload.evidence_creative_ids.length < 3) {
+            return reply(400, { error: 'pattern requires >=3 evidence_creative_ids (generalisation gate)' });
+          }
+          const inserted = await sbInsert('mktg_playbook_patterns', {
+            pattern_type: payload.pattern_type || (p.type === 'anti_pattern' ? 'anti_pattern' : 'composition'),
+            name:        payload.name,
+            description: payload.description,
+            definition:  payload.definition || {},
+            evidence_creative_ids: payload.evidence_creative_ids,
+            audience_segments: payload.audience_segments || [],
+            performance_summary: { n_observations: payload.evidence_creative_ids.length },
+            active:      true,
+            approved_by: user.id,
+            approved_at: new Date().toISOString(),
+          });
+          applied_to = Array.isArray(inserted) ? inserted[0]?.pattern_id : inserted?.pattern_id;
+        } else if (p.type === 'pattern_deprecate') {
+          if (!payload.pattern_id) return reply(400, { error: 'payload.pattern_id required' });
+          await sbUpdate('mktg_playbook_patterns', `pattern_id=eq.${encodeURIComponent(payload.pattern_id)}`, {
+            active: false, deprecation_reason: payload.reason || 'operator-approved deprecation', last_updated: new Date().toISOString(),
+          });
+          applied_to = payload.pattern_id;
+        } else if (p.type === 'pain_point') {
+          const inserted = await sbInsert('mktg_pain_points', {
+            name:               payload.name || 'unnamed',
+            description:        payload.description || '',
+            example_phrasings:  payload.definition?.example_phrasings || [],
+            audience_segment:   null, frequency: 0, products_relevant: [], active: true,
+          });
+          applied_to = Array.isArray(inserted) ? inserted[0]?.pain_point_id : inserted?.pain_point_id;
+        } else if (p.type === 'pain_point_deprecate') {
+          if (!payload.pattern_id) return reply(400, { error: 'payload.pattern_id required (pain_point_id)' });
+          await sbUpdate('mktg_pain_points', `pain_point_id=eq.${encodeURIComponent(payload.pattern_id)}`, { active: false });
+          applied_to = payload.pattern_id;
+        }
+        // stat_check / taste_audit_action / self_audit_action: approval just
+        // marks the proposal handled -- no live-table mutation.
+      } catch (e) {
+        return reply(500, { error: `apply failed: ${e.message || e}` });
+      }
+      await sbUpdate('mktg_pending_proposals', `proposal_id=eq.${encodeURIComponent(body.proposal_id)}`, {
+        status: 'approved', reviewed_at: new Date().toISOString(),
+        reviewed_by: user.id, applied_at: new Date().toISOString(),
+      });
+      return reply(200, { approved: true, applied_to });
+    }
+    if (action === 'proposal_reject') {
+      if (!body.proposal_id) return reply(400, { error: 'proposal_id required' });
+      await sbUpdate('mktg_pending_proposals', `proposal_id=eq.${encodeURIComponent(body.proposal_id)}`, {
+        status: 'rejected', reviewed_at: new Date().toISOString(), reviewed_by: user.id,
+      });
+      return reply(200, { rejected: true });
+    }
+
+    // ── Audit memos + job-run history (dashboard reads these) ──────────────
+    if (action === 'audit_memos_list') {
+      const filter = body.kind ? `kind=eq.${encodeURIComponent(body.kind)}&` : '';
+      const rows = await sbSelect('mktg_audit_memos', `${filter}order=created_at.desc&limit=20&select=*`);
+      return reply(200, { memos: rows });
+    }
+    if (action === 'job_runs_list') {
+      const filter = body.job ? `job=eq.${encodeURIComponent(body.job)}&` : '';
+      const rows = await sbSelect('mktg_job_runs', `${filter}order=ran_at.desc&limit=50&select=*`);
+      return reply(200, { runs: rows });
+    }
+
+    // ── Token / cost telemetry (dashboard reads) ───────────────────────────
+    if (action === 'agent_calls_summary') {
+      // Compact aggregation -- last 30 days by stage.
+      const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
+      const rows = await sbSelect(
+        'mktg_agent_calls',
+        `created_at=gte.${encodeURIComponent(since)}&select=stage,validation_status,latency_ms,input_tokens,output_tokens,cost_usd,model,created_at&limit=2000&order=created_at.desc`
+      );
+      return reply(200, { calls: rows, since });
+    }
+
     // ── Legacy draft actions (kept for the existing wizard UI) ─────────────
     if (action === 'list_drafts') {
       const status = body.status; // optional filter
