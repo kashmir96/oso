@@ -90,6 +90,34 @@
 [functions."ckf-ninety-day-nudge"]
   schedule = "0 20,21 * * *"
 
+# ── Creative-agent lifecycle jobs (Block 6) ─────────────────────────────────
+# Each job has a threshold gate inside the function -- the cron is a max
+# cadence. Schedules in UTC; daily jobs picked off-peak NZ for cheap retries.
+
+# Daily 03:00 / 03:30 NZST -- pattern + pain-point re-extraction (threshold gated)
+[functions."mktg-job-playbook-extract"]
+  schedule = "0 15 * * *"
+[functions."mktg-job-pain-point-extract"]
+  schedule = "30 15 * * *"
+
+# Weekly Sunday -- anti-pattern + retention-drop detection (no agent calls)
+[functions."mktg-job-anti-pattern-detect"]
+  schedule = "0 16 * * 0"
+[functions."mktg-job-retention-drop-detect"]
+  schedule = "30 16 * * 0"
+
+# Every 25 new performed records -- taste vs perf audit (threshold gated daily)
+[functions."mktg-job-taste-vs-perf"]
+  schedule = "45 15 * * *"
+
+# Monthly -- self-audit (1st at 04:00 NZST = 16:00 UTC prev day)
+[functions."mktg-job-self-audit"]
+  schedule = "0 16 1 * *"
+
+# Quarterly -- stat freshness (1st of Jan/Apr/Jul/Oct at 09:00 NZST)
+[functions."mktg-job-stat-freshness"]
+  schedule = "0 21 1 1,4,7,10 *"
+
 # ── CKF SPA: any /ckf/* request that isn't a real file falls back to /ckf/index.html ──
 [[redirects]]
   from = "/ckf/*"
