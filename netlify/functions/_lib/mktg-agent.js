@@ -31,7 +31,12 @@ const { retrieve } = require('./mktg-retrieval.js');
 const { validateStageOutput, STAGE_NAMES } = require('./mktg-agent-stages.js');
 const { SYSTEM_PROMPT, SYSTEM_PROMPT_VERSION, SYSTEM_PROMPT_HASH } = require('./mktg-prompt.js');
 
-const DEFAULT_MODEL = process.env.MKTG_GENERATION_MODEL || 'claude-opus-4-7';
+// Sonnet 4.6 as default. Opus 4.7 ran 15-30s per stage, blowing past
+// Netlify's 26s sync timeout (504). Sonnet finishes in 5-10s for the same
+// envelope + Zod validation pipeline. Flip to Opus per-deploy via
+// MKTG_GENERATION_MODEL or per-call via opts.model when willing to
+// trade latency for max quality.
+const DEFAULT_MODEL = process.env.MKTG_GENERATION_MODEL || 'claude-sonnet-4-6';
 const MAX_OUTPUT_TOKENS = 4000;
 
 // Anthropic Opus 4.7 list price (per Mtok). Update when Anthropic changes
