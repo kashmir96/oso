@@ -581,6 +581,19 @@ exports.generateFeedback = generateFeedback;
 exports.getDraft         = getDraft;
 exports.patchDraft       = patchDraft;
 
+// New creative-agent service (Block 4). Lazy-required to keep cold-start
+// cheap when only the legacy draft actions are hit.
+let _agentMod;
+function agentMod() {
+  if (!_agentMod) _agentMod = require('./_lib/mktg-agent.js');
+  return _agentMod;
+}
+let _lifecycleMod;
+function lifecycleMod() {
+  if (!_lifecycleMod) _lifecycleMod = require('./_lib/mktg-lifecycle.js');
+  return _lifecycleMod;
+}
+
 exports.handler = withGate(async (event, { user }) => {
   if (event.httpMethod !== 'POST') return reply(405, { error: 'Method not allowed' });
   let body;
@@ -588,6 +601,96 @@ exports.handler = withGate(async (event, { user }) => {
   const { action } = body;
 
   try {
+    // ── New creative-agent stage actions (Block 4) ─────────────────────────
+    // The old generate_concepts / generate_creative / generate_copy actions
+    // below stay in place for the existing wizard UI until Block 5 cuts over.
+    if (action === 'agent_run_stage') {
+      const { stage, brief, creative_id, model, extra } = body;
+      if (!stage || !brief) return reply(400, { error: 'stage and brief required' });
+      const result = await agentMod().runStage({
+        user_id: user.id,
+        creative_id: creative_id || null,
+        stage,
+        brief,
+        opts: { model, extra },
+      });
+      // Return 200 even on validation failure -- the UI surfaces raw output
+      // + validation_error per spec. Hard 5xx is reserved for genuine errors.
+      return reply(200, result);
+    }
+
+    if (action === 'creative_create') {
+      // Block 4 thin wrapper: insert a fresh mktg_creatives row at status=drafted.
+      // Block 5 UI calls this once the brief is filled in. The actual stage runs
+      // happen via agent_run_stage with the returned creative_id passed for
+      // telemetry attribution.
+      const { creative_type, brief } = body;
+      if (!['ad','video_script'].includes(creative_type)) return reply(400, { error: 'creative_type must be ad|video_script' });
+      if (!brief || typeof brief !== 'object') return reply(400, { error: 'brief object required' });
+      // Lifecycle invariant: drafted requires brief + components + exemplars_used.
+      const insertRow = {
+        creative_type,
+        brief,
+        components: {},        // Block 5 fills in as stages return
+        exemplars_used: [],
+        playbook_patterns_used: [],
+        pattern_tags: [],
+        status: 'drafted',
+        generalizable: true,
+        user_id: user.id,
+      };
+      const err = lifecycleMod().validateDraftedInsert(insertRow);
+      if (err) return reply(400, { error: err });
+      const inserted = await sbInsert('mktg_creatives', insertRow);
+      const row = Array.isArray(inserted) ? inserted[0] : inserted;
+      return reply(200, { creative: row });
+    }
+
+    if (action === 'creative_get') {
+      if (!body.creative_id) return reply(400, { error: 'creative_id required' });
+      const rows = await sbSelect('mktg_creatives', `creative_id=eq.${encodeURIComponent(body.creative_id)}&select=*&limit=1`);
+      const row = rows?.[0];
+      if (!row) return reply(404, { error: 'creative not found' });
+      return reply(200, { creative: row });
+    }
+
+    if (action === 'creative_update_components') {
+      // Block 5 patches the components blob as each stage approves.
+      if (!body.creative_id) return reply(400, { error: 'creative_id required' });
+      if (!body.patch || typeof body.patch !== 'object') return reply(400, { error: 'patch object required' });
+      const rows = await sbSelect('mktg_creatives', `creative_id=eq.${encodeURIComponent(body.creative_id)}&select=*&limit=1`);
+      const cur = rows?.[0];
+      if (!cur) return reply(404, { error: 'creative not found' });
+      const merged = { ...(cur.components || {}), ...body.patch };
+      const updated = await sbUpdate(
+        'mktg_creatives',
+        `creative_id=eq.${encodeURIComponent(body.creative_id)}`,
+        { components: merged, updated_at: new Date().toISOString() }
+      );
+      return reply(200, { creative: Array.isArray(updated) ? updated[0] : updated });
+    }
+
+    if (action === 'creative_transition') {
+      // Block 5 transitions a creative through the lifecycle: drafted ->
+      // user_approved / user_rejected, user_approved -> shipped, shipped ->
+      // performed. The state machine + invariants live in mktg-lifecycle.
+      const { creative_id, to_status, extras = {} } = body;
+      if (!creative_id || !to_status) return reply(400, { error: 'creative_id and to_status required' });
+      const rows = await sbSelect('mktg_creatives', `creative_id=eq.${encodeURIComponent(creative_id)}&select=*&limit=1`);
+      const cur = rows?.[0];
+      if (!cur) return reply(404, { error: 'creative not found' });
+      let patch;
+      try { ({ patch } = lifecycleMod().transition(cur, to_status, extras)); }
+      catch (e) { return reply(400, { error: e.message }); }
+      const updated = await sbUpdate(
+        'mktg_creatives',
+        `creative_id=eq.${encodeURIComponent(creative_id)}`,
+        patch
+      );
+      return reply(200, { creative: Array.isArray(updated) ? updated[0] : updated });
+    }
+
+    // ── Legacy draft actions (kept for the existing wizard UI) ─────────────
     if (action === 'list_drafts') {
       const status = body.status; // optional filter
       const filter = status ? `&status=eq.${encodeURIComponent(status)}` : '';
