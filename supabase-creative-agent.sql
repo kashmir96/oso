@@ -139,7 +139,7 @@ CREATE INDEX IF NOT EXISTS idx_mktg_creatives_embedding
 -- ─── 3.2 reviews ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS mktg_reviews (
   review_id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id                UUID NOT NULL REFERENCES ckf_users(id) ON DELETE CASCADE,
+  user_id                UUID REFERENCES ckf_users(id) ON DELETE CASCADE,
   source                 TEXT NOT NULL CHECK (source IN ('trustpilot','shopify','email','dm','other')),
   captured_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
   rating                 NUMERIC,
@@ -164,7 +164,7 @@ CREATE INDEX IF NOT EXISTS idx_mktg_reviews_embed
 -- ─── 3.3 pain_points ────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS mktg_pain_points (
   pain_point_id      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id            UUID NOT NULL REFERENCES ckf_users(id) ON DELETE CASCADE,
+  user_id            UUID REFERENCES ckf_users(id) ON DELETE CASCADE,
   name               TEXT NOT NULL,
   description        TEXT NOT NULL,
   audience_segment   TEXT,
@@ -188,7 +188,7 @@ CREATE INDEX IF NOT EXISTS idx_mktg_pain_embed
 -- ─── 3.4 social_proof ───────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS mktg_social_proof (
   proof_id     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id      UUID NOT NULL REFERENCES ckf_users(id) ON DELETE CASCADE,
+  user_id      UUID REFERENCES ckf_users(id) ON DELETE CASCADE,
   type         TEXT NOT NULL CHECK (type IN ('review_quote','press_mention','stat','endorsement','award')),
   content      TEXT NOT NULL,
   source       TEXT,
@@ -207,7 +207,7 @@ CREATE INDEX IF NOT EXISTS idx_mktg_proof_current ON mktg_social_proof(current);
 -- ─── 3.5 playbook_patterns ──────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS mktg_playbook_patterns (
   pattern_id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id              UUID NOT NULL REFERENCES ckf_users(id) ON DELETE CASCADE,
+  user_id              UUID REFERENCES ckf_users(id) ON DELETE CASCADE,
   pattern_type         TEXT NOT NULL CHECK (pattern_type IN (
                          'hook_archetype','composition','structure_template',
                          'palette_cluster','pacing_pattern',
@@ -237,7 +237,7 @@ CREATE INDEX IF NOT EXISTS idx_mktg_patterns_active ON mktg_playbook_patterns(ac
 -- can grep approved historical primary text without joining mktg_creatives.
 CREATE TABLE IF NOT EXISTS mktg_primary_text_bank (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id         UUID NOT NULL REFERENCES ckf_users(id) ON DELETE CASCADE,
+  user_id         UUID REFERENCES ckf_users(id) ON DELETE CASCADE,
   text            TEXT NOT NULL,
   campaign_id     TEXT,
   notes           TEXT,
