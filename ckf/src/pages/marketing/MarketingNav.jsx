@@ -11,6 +11,7 @@ const TABS = [
   { to: '/business/marketing/ads',      label: 'Ads' },
   { to: '/business/marketing/scripts',  label: 'Scripts' },
   { to: '/business/marketing/library',  label: 'Library' },
+  { to: '/business/marketing/health',   label: 'Health' },
 ];
 
 export default function MarketingNav() {
