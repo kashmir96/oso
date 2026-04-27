@@ -15,10 +15,22 @@
  */
 
 // Status machine. Each key is FROM, value is array of allowed TO states.
+//
+// Two main flows once an AI draft is approved:
+//   user_approved -> shipped                (Curtis launches it himself)
+//   user_approved -> submitted              (Curtis sends to assistant queue)
+//                  -> in_production         (assistant claims)
+//                  -> needs_approval        (assistant uploads asset)
+//                  -> user_approved         (Curtis approves the produced asset)
+//                  OR -> in_production      (Curtis requests changes)
+//                  -> shipped -> performed
 const ALLOWED_TRANSITIONS = {
   drafted:        ['user_approved', 'user_rejected'],
-  user_approved:  ['shipped'],
+  user_approved:  ['shipped', 'submitted'],
   user_rejected:  [],                  // terminal
+  submitted:      ['in_production'],
+  in_production:  ['needs_approval'],
+  needs_approval: ['user_approved', 'in_production'], // approved (back to ready) or send back for changes
   shipped:        ['performed'],
   performed:      [],                  // terminal — re-performed updates the same row in place
 };
@@ -49,6 +61,19 @@ const INVARIANTS = {
   },
   user_rejected(c) {
     if (!c.feedback_analysis) return 'user_rejected requires feedback_analysis (why it was rejected)';
+    return null;
+  },
+  submitted(c) {
+    if (!c.submitted_at) return 'submitted requires submitted_at timestamp';
+    return null;
+  },
+  in_production(c) {
+    // No required fields beyond status -- assistant just claims the row.
+    return null;
+  },
+  needs_approval(c) {
+    // production_asset_url is the artifact for review, but the assistant might
+    // upload notes only on a re-claim, so we accept either.
     return null;
   },
   shipped(c) {
@@ -88,8 +113,14 @@ function transition(current, toStatus, extras = {}) {
 
   // Merge extras onto current for invariant evaluation; auto-stamp timestamps.
   const merged = { ...current, ...extras, status: toStatus };
-  if (toStatus === 'shipped' && !merged.shipped_at)        merged.shipped_at = new Date().toISOString();
-  if (toStatus === 'performed' && !merged.performed_at)    merged.performed_at = new Date().toISOString();
+  if (toStatus === 'shipped'   && !merged.shipped_at)   merged.shipped_at   = new Date().toISOString();
+  if (toStatus === 'performed' && !merged.performed_at) merged.performed_at = new Date().toISOString();
+  if (toStatus === 'submitted' && !merged.submitted_at) merged.submitted_at = new Date().toISOString();
+  // Re-approval after needs_approval re-stamps approved_at; first user_approved
+  // (from drafted) doesn't.
+  if (toStatus === 'user_approved' && current.status === 'needs_approval' && !merged.approved_at) {
+    merged.approved_at = new Date().toISOString();
+  }
 
   const invariantErr = INVARIANTS[toStatus](merged);
   if (invariantErr) throw new Error(`transition: invariant violated — ${invariantErr}`);
@@ -97,8 +128,12 @@ function transition(current, toStatus, extras = {}) {
   // Build the minimal patch (don't echo back unchanged fields).
   const patch = { status: toStatus, updated_at: new Date().toISOString() };
   for (const k of Object.keys(extras)) patch[k] = extras[k];
-  if (toStatus === 'shipped' && !patch.shipped_at)         patch.shipped_at = merged.shipped_at;
-  if (toStatus === 'performed' && !patch.performed_at)     patch.performed_at = merged.performed_at;
+  if (toStatus === 'shipped'   && !patch.shipped_at)   patch.shipped_at   = merged.shipped_at;
+  if (toStatus === 'performed' && !patch.performed_at) patch.performed_at = merged.performed_at;
+  if (toStatus === 'submitted' && !patch.submitted_at) patch.submitted_at = merged.submitted_at;
+  if (toStatus === 'user_approved' && current.status === 'needs_approval' && !patch.approved_at) {
+    patch.approved_at = merged.approved_at;
+  }
   return { patch };
 }
 

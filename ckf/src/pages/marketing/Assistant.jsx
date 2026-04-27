@@ -21,13 +21,26 @@ export default function Assistant() {
   async function load() {
     setErr('');
     try {
-      const [r, live] = await Promise.all([
-        call('mktg-ads', { action: 'list_drafts', status: queue }),
-        // The reference rail at the bottom — recent shipped ads, capped to 8.
-        call('mktg-ads', { action: 'list_drafts', status: 'live' }),
+      // Pull from BOTH the legacy mktg_drafts table (old wizard) AND the new
+      // mktg_creatives table (chat-driven Creative pipeline). Each row is
+      // tagged with its kind so per-row actions route to the right backend.
+      const [r, live, c, cLive] = await Promise.all([
+        call('mktg-ads', { action: 'list_drafts',    status: queue }),
+        call('mktg-ads', { action: 'list_drafts',    status: 'live' }),
+        call('mktg-ads', { action: 'list_creatives', status: queue }),
+        call('mktg-ads', { action: 'list_creatives', status: 'shipped' }),
       ]);
-      setDrafts(r.drafts);
-      setLiveDrafts((live.drafts || []).slice(0, 8));
+      const fromDrafts = (r.drafts || []).map((d) => ({ ...d, kind: 'draft' }));
+      const fromCreatives = c.creatives || [];
+      // Merge + sort by updated_at desc.
+      const merged = [...fromCreatives, ...fromDrafts]
+        .sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0));
+      setDrafts(merged);
+      const liveMerged = [
+        ...(live.drafts || []).map((d) => ({ ...d, kind: 'draft' })),
+        ...(cLive.creatives || []),
+      ].sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0));
+      setLiveDrafts(liveMerged.slice(0, 8));
     } catch (e) { setErr(e.message); }
   }
   useEffect(() => { load(); }, [queue]);
@@ -59,7 +72,9 @@ export default function Assistant() {
       )}
 
       <div className="row-list">
-        {drafts && drafts.map((d) => <AssistantRow key={d.id} draft={d} onChange={load} />)}
+        {drafts && drafts.map((d) => (
+          <AssistantRow key={d.kind === 'creative' ? `c:${d.creative_id}` : `d:${d.id}`} draft={d} onChange={load} />
+        ))}
       </div>
 
       {liveDrafts && liveDrafts.length > 0 && (
@@ -70,7 +85,9 @@ export default function Assistant() {
             reference for new generations. Voiceovers re-downloadable here.
           </div>
           <div className="row-list">
-            {liveDrafts.map((d) => <LiveRow key={d.id} draft={d} onChange={load} />)}
+            {liveDrafts.map((d) => (
+              <LiveRow key={d.kind === 'creative' ? `c:${d.creative_id}` : `d:${d.id}`} draft={d} onChange={load} />
+            ))}
           </div>
         </>
       )}
@@ -80,10 +97,15 @@ export default function Assistant() {
 
 // Compact row for the reference rail. Single line + voiceover access.
 function LiveRow({ draft, onChange }) {
+  // Each row may be a legacy draft (kind='draft') or a new creative
+  // (kind='creative'); the open-link target differs.
+  const detailHref = draft.kind === 'creative'
+    ? `/business/marketing/creative/${draft.creative_id}`
+    : `/business/marketing/wizard/${draft.id}`;
   return (
     <div className="row-item" style={{ padding: 10 }}>
       <div className="name" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <Link to={`/business/marketing/wizard/${draft.id}`} style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: 'none', color: 'var(--text)' }}>
+        <Link to={detailHref} style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: 'none', color: 'var(--text)' }}>
           {draft.objective ? draft.objective.slice(0, 80) : '(no objective)'}
         </Link>
         <span className={statusPillClass(draft.status)}>{STATUS_LABEL[draft.status] || draft.status}</span>
@@ -106,13 +128,21 @@ function LiveRow({ draft, onChange }) {
 function VoiceoverButton({ draft, onChange, compact }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const supports = draft.format === 'video' || draft.format === 'reel';
+  // Creatives can voice over any creative_type with a script body, not just
+  // video/reel like legacy drafts.
+  const supports = draft.kind === 'creative'
+    ? !!(draft.components?.script?.full_script || draft.components?.body)
+    : (draft.format === 'video' || draft.format === 'reel');
   if (!supports) return null;
 
   async function generate() {
     setBusy(true); setErr('');
     try {
-      await call('mktg-vo', { action: 'generate', draft_id: draft.id });
+      if (draft.kind === 'creative') {
+        await call('mktg-vo', { action: 'generate_creative', creative_id: draft.creative_id });
+      } else {
+        await call('mktg-vo', { action: 'generate', draft_id: draft.id });
+      }
       onChange?.();
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
   }
@@ -174,20 +204,35 @@ function AssistantRow({ draft, onChange }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
+  // Route per-row actions to the right backend table. Legacy drafts use the
+  // bespoke claim_draft / mark_needs_approval actions; new creatives go
+  // through the generic creative_transition action with extras (state machine
+  // + invariants live in mktg-lifecycle.js).
   async function claim() {
     setBusy(true); setErr('');
-    try { await call('mktg-ads', { action: 'claim_draft', id: draft.id }); onChange(); }
-    catch (e) { setErr(e.message); } finally { setBusy(false); }
+    try {
+      if (draft.kind === 'creative') {
+        await call('mktg-ads', { action: 'creative_transition', creative_id: draft.creative_id, to_status: 'in_production' });
+      } else {
+        await call('mktg-ads', { action: 'claim_draft', id: draft.id });
+      }
+      onChange();
+    } catch (e) { setErr(e.message); } finally { setBusy(false); }
   }
   async function markDone() {
     setBusy(true); setErr('');
     try {
-      await call('mktg-ads', {
-        action: 'mark_needs_approval',
-        id: draft.id,
-        production_notes: productionNotes || null,
-        production_asset_url: assetUrl || null,
-      });
+      if (draft.kind === 'creative') {
+        await call('mktg-ads', {
+          action: 'creative_transition', creative_id: draft.creative_id, to_status: 'needs_approval',
+          extras: { production_notes: productionNotes || null, production_asset_url: assetUrl || null },
+        });
+      } else {
+        await call('mktg-ads', {
+          action: 'mark_needs_approval', id: draft.id,
+          production_notes: productionNotes || null, production_asset_url: assetUrl || null,
+        });
+      }
       onChange();
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
   }
@@ -209,7 +254,9 @@ function AssistantRow({ draft, onChange }) {
 
       {!open && (
         <div className="row" style={{ marginTop: 8, flexWrap: 'wrap' }}>
-          <Link to={`/business/marketing/wizard/${draft.id}`}><button>Open draft</button></Link>
+          <Link to={draft.kind === 'creative' ? `/business/marketing/creative/${draft.creative_id}` : `/business/marketing/wizard/${draft.id}`}>
+            <button>Open {draft.kind === 'creative' ? 'creative' : 'draft'}</button>
+          </Link>
           {draft.status === 'submitted' && (
             <button className="primary" onClick={claim} disabled={busy}>{busy ? '…' : 'Claim'}</button>
           )}
