@@ -58,6 +58,8 @@ export default function Settings() {
 
       <TrainerShare />
 
+      <MarketingLinks />
+
       <MarketingVoiceovers />
 
       <Connections />
@@ -299,6 +301,35 @@ function TrainerShare() {
         </div>
       )}
       {err && <div className="error">{err}</div>}
+    </div>
+  );
+}
+
+// Quick links into the marketing surface from Settings -- handy when Curtis
+// has the settings page open and wants to jump to system health, drafts,
+// or the new creative pipeline without bouncing back to the dashboard.
+function MarketingLinks() {
+  return (
+    <div className="card" style={{ marginBottom: 12 }}>
+      <div className="section-title" style={{ margin: '0 0 8px' }}>Marketing</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        <Link to="/business/marketing/creative">
+          <button className="primary" style={{ fontSize: 12, padding: '6px 10px' }}>+ New creative</button>
+        </Link>
+        <Link to="/business/marketing/drafts">
+          <button style={{ fontSize: 12, padding: '6px 10px' }}>Drafts</button>
+        </Link>
+        <Link to="/business/marketing/assistant">
+          <button style={{ fontSize: 12, padding: '6px 10px' }}>Assistant queue</button>
+        </Link>
+        <Link to="/business/marketing/health">
+          <button style={{ fontSize: 12, padding: '6px 10px' }}>System health</button>
+        </Link>
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
+        Tip: typing "marketing mode" in the business chat jumps straight to
+        the creative pipeline.
+      </div>
     </div>
   );
 }

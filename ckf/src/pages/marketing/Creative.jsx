@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, Link, useSearchParams } from 'react-router-dom';
 import Header from '../../components/Header.jsx';
 import { call } from '../../lib/api.js';
 import MarketingNav from './MarketingNav.jsx';
@@ -30,8 +30,13 @@ export default function Creative() {
 // ─── Brief intake ──────────────────────────────────────────────────────────
 function Intake() {
   const nav = useNavigate();
+  const [searchParams] = useSearchParams();
+  // `?seed=...` arrives when Curtis triggers "Marketing mode" from the
+  // business chat with extra context in the same message. Pre-fills the
+  // objective so he doesn't retype.
+  const seed = (searchParams.get('seed') || '').trim();
   const [creativeType, setCreativeType] = useState('ad');
-  const [objective, setObjective] = useState('');
+  const [objective, setObjective] = useState(seed);
   const [audience, setAudience] = useState('');
   const [platform, setPlatform] = useState('meta');
   const [format, setFormat] = useState('static');
