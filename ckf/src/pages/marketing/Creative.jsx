@@ -415,6 +415,8 @@ function AssetsPanel({ creative_id, status }) {
   const [err, setErr] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadErr, setUploadErr] = useState('');
+  const [brollBusy, setBrollBusy] = useState(false);
+  const [brollErr, setBrollErr] = useState('');
 
   async function load() {
     try {
@@ -423,6 +425,25 @@ function AssetsPanel({ creative_id, status }) {
     } catch (e) { setErr(e.message); }
   }
   useEffect(() => { if (creative_id) load(); }, [creative_id]);
+
+  // Auto-poll while there are pending video assets. Each pending video
+  // takes 30-90s; the cron picks it up within a minute. Poll every 15s
+  // until none are pending. Avoids forcing Curtis to manually refresh.
+  const hasPending = (items || []).some((a) => a.status === 'pending');
+  useEffect(() => {
+    if (!creative_id || !hasPending) return;
+    const t = setInterval(load, 15_000);
+    return () => clearInterval(t);
+  }, [creative_id, hasPending]);
+
+  async function generateBroll() {
+    setBrollBusy(true); setBrollErr('');
+    try {
+      const r = await call('mktg-assets', { action: 'generate_broll_for_creative', creative_id });
+      if (r.error) throw new Error(r.error);
+      await load();
+    } catch (e) { setBrollErr(e.message); } finally { setBrollBusy(false); }
+  }
 
   async function delAsset(asset_id) {
     if (!confirm('Delete this asset? The link will stop working.')) return;
@@ -475,7 +496,7 @@ function AssetsPanel({ creative_id, status }) {
 
       {items.length === 0 ? (
         <div className="empty" style={{ fontSize: 12 }}>
-          No assets yet. Generate an image / video from the chat ("image:" or "video:"), or upload the finished file below.
+          No assets yet. Generate an image / video from the chat ("image:" or "video:"), auto-gen b-roll below, or upload the finished file.
         </div>
       ) : (
         <>
@@ -483,6 +504,24 @@ function AssetsPanel({ creative_id, status }) {
           {images.length > 0 && <AssetGroup label="Images" assets={images} onDelete={delAsset} busy={busy} kind="image" />}
           {captions.length > 0 && <AssetGroup label="Captions" assets={captions} onDelete={delAsset} busy={busy} kind="caption" />}
         </>
+      )}
+
+      {/* B-roll auto-gen: only shown when the creative has a script with
+          broll_shots. Generates one image per shot in parallel. */}
+      <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <button onClick={generateBroll} disabled={brollBusy} style={{ fontSize: 12, padding: '5px 12px' }}>
+          {brollBusy ? 'Generating b-roll…' : '+ Auto-gen B-roll from script'}
+        </button>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+          One image per broll_shot in the script (parallel, ~$0.06 each, max 6).
+        </span>
+        {brollErr && <div className="error" style={{ fontSize: 11 }}>{brollErr}</div>}
+      </div>
+
+      {hasPending && (
+        <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-dim)' }}>
+          ↻ Auto-refreshing while pending videos finish (every 15s)…
+        </div>
       )}
 
       {/* Upload-finished-file slot. Visible once we're past initial drafted --
