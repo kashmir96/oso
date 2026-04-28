@@ -1218,29 +1218,78 @@ async function execute(name, input, ctx) {
     case 'creative_pipeline': {
       const pipeline = require('./mktg-pipeline.js');
       const a = input?.action;
+      // Helper: after a successful generation stage, insert a special
+      // pipeline_card message into the conversation. The chat client renders
+      // it as an editable card inline in the bubble stream. This is what
+      // gives Curtis the "tweak the bubble + submit" UX without having the
+      // AI manage the structured form (which it's bad at).
+      const emitCard = async (stage, creative_id, payload) => {
+        if (!ctx.conversationId) return;
+        try {
+          await sbInsert('ckf_messages', {
+            conversation_id: ctx.conversationId,
+            user_id:         userId,
+            role:            'assistant',
+            content_text:    null,
+            content_blocks:  [{ type: 'pipeline_card', stage, creative_id, payload }],
+          });
+        } catch (e) {
+          console.error('[creative_pipeline emitCard]', e);
+        }
+      };
+
       switch (a) {
         case 'intake_brief':
           return pipeline.intakeBrief({ userId, brief: input.brief || {}, creative_type: input.creative_type });
-        case 'run_strategy':
-          return pipeline.runStrategy({ user_id: userId, creative_id: input.creative_id });
-        case 'run_variants_ad':
-          return pipeline.runVariants({ user_id: userId, creative_id: input.creative_id });
+
+        case 'run_strategy': {
+          const r = await pipeline.runStrategy({ user_id: userId, creative_id: input.creative_id });
+          if (r?.ok) await emitCard('strategy', input.creative_id, {
+            primary_angle: r.angle, audience_message_fit: r.audience_fit,
+            exemplar_strength: r.exemplar_strength, flags: r.flags,
+            citations_n: r.citations_n,
+          });
+          return r;
+        }
+        case 'run_variants_ad': {
+          const r = await pipeline.runVariants({ user_id: userId, creative_id: input.creative_id });
+          if (r?.ok) await emitCard('variants_ad', input.creative_id, { variants: r.variants });
+          return r;
+        }
         case 'pick_variant':
           return pipeline.pickVariant({ creative_id: input.creative_id, idx: input.idx });
-        case 'run_outline':
-          return pipeline.runOutline({ user_id: userId, creative_id: input.creative_id });
-        case 'run_hooks':
-          return pipeline.runHooks({ user_id: userId, creative_id: input.creative_id });
+        case 'run_outline': {
+          const r = await pipeline.runOutline({ user_id: userId, creative_id: input.creative_id });
+          if (r?.ok) await emitCard('outline', input.creative_id, {
+            structure_template: r.structure, runtime: r.runtime,
+            beats: r.beats, // already pre-formatted strings; widget will let user override
+          });
+          return r;
+        }
+        case 'run_hooks': {
+          const r = await pipeline.runHooks({ user_id: userId, creative_id: input.creative_id });
+          if (r?.ok) await emitCard('hooks', input.creative_id, { hooks: r.hooks });
+          return r;
+        }
         case 'pick_hook':
           return pipeline.pickHook({ creative_id: input.creative_id, idx: input.idx });
-        case 'run_draft':
-          return pipeline.runDraft({ user_id: userId, creative_id: input.creative_id });
-        case 'run_critique':
-          return pipeline.runCritiqueWithRepair({ user_id: userId, creative_id: input.creative_id });
+        case 'run_draft': {
+          const r = await pipeline.runDraft({ user_id: userId, creative_id: input.creative_id });
+          if (r?.ok) await emitCard('draft', input.creative_id, {
+            full_script: r.full_script, word_count: r.word_count,
+          });
+          return r;
+        }
+        case 'run_critique': {
+          const r = await pipeline.runCritiqueWithRepair({ user_id: userId, creative_id: input.creative_id });
+          if (r?.ok) await emitCard('critique', input.creative_id, {
+            verdict: r.verdict, scores: r.scores, rationale: r.rationale, repairs_used: r.repairs_used,
+          });
+          return r;
+        }
         case 'approve':
           return pipeline.approveCreative({ creative_id: input.creative_id, approval_reason: input.approval_reason, feedback_analysis: input.feedback_analysis });
         case 'generate_voiceover':
-          // Lazy: pass the user object via ctx (ckf-chat passes it through).
           return pipeline.generateVoiceover({ user: ctx.user || { id: userId }, creative_id: input.creative_id });
         case 'submit_to_assistant':
           return pipeline.submitToAssistant({ creative_id: input.creative_id });

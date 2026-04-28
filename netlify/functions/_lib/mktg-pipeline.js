@@ -490,6 +490,108 @@ async function recordScriptWrapAndSubmit({ user_id, creative_id }) {
   };
 }
 
+// ─── Stage-card edits: Curtis tweaks the bubble + submits ───────────────────
+// Each pipeline stage's editable card POSTs the user's tweaks here. We
+// merge them onto components, NEVER blindly overwrite the whole blob, so
+// downstream stages still see prior-stage outputs (strategy is required
+// when running outline, etc.). Returns the next-stage hint so the chat AI
+// knows what to call next.
+//
+// The shape of `edits` is per-stage:
+//   strategy:    { primary_angle?, audience_message_fit? }
+//   variants_ad: { picked: { headline, body, cta, composition_pattern?, palette?, image_ref? } }
+//   outline:     { structure_template?, beats?: [{timestamp, beat, broll?}] }
+//   hooks:       { picked: { hook, hook_type, first_visual? } }
+//   draft:       { full_script }
+//   critique:    { /* read-only — accepting the verdict carries no edit */ }
+const NEXT_STAGE_HINT = {
+  strategy:   (c) => c.creative_type === 'video_script' ? 'run_outline'    : 'run_variants_ad',
+  variants_ad:(_) => 'run_critique',
+  outline:    (_) => 'run_hooks',
+  hooks:      (_) => 'run_draft',
+  draft:      (_) => 'run_critique',
+  critique:   (_) => 'approve',   // operator decides; AI prompts approve / regen
+};
+
+async function saveStageEdits({ user_id, creative_id, stage, edits }) {
+  if (!creative_id) return { error: 'creative_id required' };
+  if (!stage)       return { error: 'stage required' };
+  const c = await loadCreative(creative_id);
+  if (!c) return { error: 'creative not found' };
+  if (c.user_id && c.user_id !== user_id) return { error: 'creative belongs to another user' };
+
+  const before = c.components || {};
+  let after = { ...before };
+
+  switch (stage) {
+    case 'strategy': {
+      const cur = before.strategy || {};
+      after.strategy = {
+        ...cur,
+        primary_angle:        edits?.primary_angle        ?? cur.primary_angle,
+        audience_message_fit: edits?.audience_message_fit ?? cur.audience_message_fit,
+      };
+      break;
+    }
+    case 'variants_ad': {
+      const v = edits?.picked;
+      if (!v || !v.headline) return { error: 'picked variant with headline required' };
+      after.headline   = v.headline;
+      after.body       = v.body  ?? before.body  ?? '';
+      after.cta        = v.cta   ?? before.cta   ?? null;
+      if (v.composition_pattern) after.composition_pattern = v.composition_pattern;
+      if (v.palette)             after.palette             = v.palette;
+      if (v.image_ref)           after.image_ref           = v.image_ref;
+      after.variants = undefined; // clear cached variants once one is picked
+      break;
+    }
+    case 'outline': {
+      const curScript = before.script || {};
+      after.composition_pattern = edits?.structure_template ?? before.composition_pattern;
+      after.script = {
+        ...curScript,
+        outline_beats: Array.isArray(edits?.beats) ? edits.beats : (curScript.outline_beats || []),
+      };
+      break;
+    }
+    case 'hooks': {
+      const h = edits?.picked;
+      if (!h || !h.hook) return { error: 'picked hook with hook text required' };
+      after.script = {
+        ...(before.script || {}),
+        hook:      h.hook,
+        hook_type: h.hook_type || (before.script?.hook_type ?? 'unknown'),
+      };
+      after.hooks_offered = undefined;
+      break;
+    }
+    case 'draft': {
+      if (typeof edits?.full_script !== 'string' || !edits.full_script.trim()) {
+        return { error: 'full_script (non-empty string) required' };
+      }
+      after.script = {
+        ...(before.script || {}),
+        full_script: edits.full_script,
+      };
+      break;
+    }
+    case 'critique':
+      // Read-only stage; saving here is a no-op acknowledgement (used to
+      // advance the next-stage hint).
+      break;
+    default:
+      return { error: `unknown stage: ${stage}` };
+  }
+
+  await patchCreative(creative_id, { components: after });
+  return {
+    ok: true,
+    creative_id,
+    stage,
+    next_stage_hint: NEXT_STAGE_HINT[stage] ? NEXT_STAGE_HINT[stage](c) : null,
+  };
+}
+
 module.exports = {
   intakeBrief,
   runStrategy,
@@ -504,6 +606,8 @@ module.exports = {
   submitToAssistant,
   generateVoiceover,
   loadCreative,
+  // editable cards
+  saveStageEdits,
   // fast path
   recordScriptInit,
   recordScriptWrapAndSubmit,

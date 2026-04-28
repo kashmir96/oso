@@ -449,7 +449,7 @@ async function runChat({ userId, conversation, userMessageText, modeHint, attach
         if (block.type !== 'tool_use') continue;
         let result;
         try {
-          result = await execute(block.name, block.input || {}, { userId, user: { id: userId }, messageId: asstSaved?.id, scope: conversation.scope });
+          result = await execute(block.name, block.input || {}, { userId, user: { id: userId }, messageId: asstSaved?.id, conversationId: conversation.id, scope: conversation.scope });
         } catch (e) {
           result = { error: e.message };
         }
