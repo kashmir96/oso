@@ -559,6 +559,23 @@ Don't create vague goals. For numeric, ask one question if target is missing.`,
     },
   },
 
+  // ─── AI image generation (OpenAI gpt-image-1) ─────────────────────────────
+  {
+    name: 'generate_image',
+    description: "Generate AI images via OpenAI gpt-image-1 from a text prompt. Use when Curtis says 'make me an image of X', 'generate a photo of', 'image: ___', or asks for product shots / b-roll stills. Optionally tie to a creative (creative_id) so the asset surfaces on that creative's ResultCard. Optionally pass a seed_asset_id to do image-to-image (variations of an existing product photo -- the foundation for AI b-roll generation). Returns a list of public URLs Curtis can copy or download. Costs roughly $0.04-$0.06 per image.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        prompt:       { type: 'string', description: 'image description — be specific (subject, style, lighting, composition)' },
+        n:            { type: 'integer', minimum: 1, maximum: 4, description: 'how many variations (default 1, max 4)' },
+        size:         { type: 'string', enum: ['1024x1024','1024x1536','1536x1024'], description: 'default 1024x1024' },
+        creative_id:  { type: 'string', description: "optional — link this image to a specific creative" },
+        seed_asset_id: { type: 'string', description: "optional — generate a variation of an existing image asset (image-to-image)" },
+      },
+      required: ['prompt'],
+    },
+  },
+
   // ─── Marketing creative pipeline (chat-driven Creative agent) ─────────────
   // One tool, action-dispatched, drives the entire flow:
   //   intake_brief -> run_strategy -> (run_variants_ad | run_outline ->
@@ -1212,6 +1229,65 @@ async function execute(name, input, ctx) {
         `user_id=eq.${userId}&date=gte.${since}&order=date.desc&limit=${days}&select=date,recovery_score,hrv_rmssd_ms,resting_heart_rate,strain,sleep_performance,sleep_hours,sleep_efficiency`
       );
       return { days, metrics: rows };
+    }
+
+    case 'generate_image': {
+      // Bypass the HTTP gate -- we're already authenticated. Call the inner
+      // helper directly + persist the row + return a chat-friendly result.
+      const assets = require('../mktg-assets.js');
+      try {
+        const size = input?.size || '1024x1024';
+        const n    = Math.max(1, Math.min(4, input?.n || 1));
+        let seedUrl = null;
+        if (input?.seed_asset_id) {
+          const rows = await sbSelect(
+            'mktg_generated_assets',
+            `asset_id=eq.${encodeURIComponent(input.seed_asset_id)}&user_id=eq.${userId}&select=storage_path&limit=1`
+          );
+          if (rows?.[0]) seedUrl = assets.publicUrlFor(rows[0].storage_path);
+        }
+        const result = await assets.generateOpenAIImage({
+          prompt: input.prompt, n, size, seedAssetUrl: seedUrl,
+        });
+        const persisted = [];
+        for (const item of result.items) {
+          let buf;
+          if (item.buf) buf = item.buf;
+          else if (item.url) {
+            const r = await fetch(item.url);
+            if (!r.ok) continue;
+            buf = Buffer.from(await r.arrayBuffer());
+          } else continue;
+          const storage_path = await assets.uploadToBucket({
+            userId, kind: 'image', buf, mimeType: 'image/png', ext: 'png',
+          });
+          const row = await sbInsert('mktg_generated_assets', {
+            user_id: userId,
+            creative_id: input.creative_id || null,
+            kind: 'image',
+            provider: 'openai',
+            model: 'gpt-image-1',
+            prompt: input.prompt,
+            seed_asset_id: input.seed_asset_id || null,
+            storage_path,
+            mime_type: 'image/png',
+            size_bytes: buf.length,
+            width: parseInt(size.split('x')[0], 10) || null,
+            height: parseInt(size.split('x')[1], 10) || null,
+            cost_usd: 0.04,
+            status: 'ready',
+            ready_at: new Date().toISOString(),
+          });
+          const r1 = Array.isArray(row) ? row[0] : row;
+          persisted.push({
+            asset_id: r1?.asset_id,
+            public_url: assets.publicUrlFor(storage_path),
+          });
+        }
+        return { ok: true, assets: persisted, count: persisted.length };
+      } catch (e) {
+        return { error: e.message || 'image gen failed' };
+      }
     }
 
     case 'creative_pipeline': {

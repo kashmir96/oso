@@ -120,7 +120,9 @@ Record-script fast path (business chat only):
   "remember that <fact>"                    — stores a long-term memory fact
   "remind me to ___ at <time>"              — schedules an SMS reminder via errand
   "show my goals" / "open goals"            — pulls active goals
-  "what's coming up" / "calendar this week" — Google Calendar (if connected)`,
+  "what's coming up" / "calendar this week" — Google Calendar (if connected)
+  "generate an image of ___" /
+    "image: ___"                            — AI image (OpenAI gpt-image-1, ~$0.04/img). Optionally seed off an existing image for variations (b-roll). Requires OPENAI_API_KEY.`,
   );
 
   sections.push(
