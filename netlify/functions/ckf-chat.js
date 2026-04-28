@@ -320,19 +320,44 @@ async function loadContext(userId, date, scope = 'personal') {
 }
 
 // ── Convert stored messages to Anthropic format ──
+// Anthropic only accepts a fixed set of content block types. Custom UI
+// blocks like `pipeline_card` (server-emitted editable card markers) live
+// in our DB so the chat client can render them, but we MUST NOT send them
+// to Anthropic -- the API rejects unknown block types and the whole call
+// 500s. Convert custom blocks to a tiny text breadcrumb so the AI knows
+// something happened, then drop messages that end up empty.
+const ANTHROPIC_BLOCK_TYPES = new Set(['text','image','tool_use','tool_result','image_ref','document']);
+
+function sanitiseBlocksForAnthropic(blocks, role) {
+  const out = [];
+  for (const b of blocks) {
+    if (!b || typeof b !== 'object') continue;
+    if (ANTHROPIC_BLOCK_TYPES.has(b.type)) {
+      out.push(b);
+      continue;
+    }
+    if (b.type === 'pipeline_card') {
+      // Tell the AI a card landed without bombing it with structured data.
+      out.push({ type: 'text', text: `[ui:pipeline_card stage="${b.stage}" status="emitted"]` });
+      continue;
+    }
+    // Unknown custom block -- drop silently.
+  }
+  return out;
+}
+
 function toAnthropicMessages(rows) {
   // Stored shape: each row has role + content_blocks (array of blocks).
   // For 'tool' role, we collected tool_result blocks under a 'user' role for the API.
   const out = [];
   for (const r of rows) {
-    const blocks = Array.isArray(r.content_blocks) && r.content_blocks.length
+    const rawBlocks = Array.isArray(r.content_blocks) && r.content_blocks.length
       ? r.content_blocks
       : (r.content_text ? [{ type: 'text', text: r.content_text }] : []);
-    if (r.role === 'tool') {
-      out.push({ role: 'user', content: blocks });
-    } else {
-      out.push({ role: r.role, content: blocks });
-    }
+    const blocks = sanitiseBlocksForAnthropic(rawBlocks, r.role);
+    if (blocks.length === 0) continue;   // skip empty messages -- Anthropic rejects them
+    if (r.role === 'tool') out.push({ role: 'user',   content: blocks });
+    else                   out.push({ role: r.role,    content: blocks });
   }
   return out;
 }
