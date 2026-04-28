@@ -559,6 +559,57 @@ Don't create vague goals. For numeric, ask one question if target is missing.`,
     },
   },
 
+  // ─── Customer conversation hub (Intercom + email + reviews) ──────────────
+  {
+    name: 'search_customer_conversations',
+    description: "Search Curtis's customer conversation hub: Intercom threads, support emails, Trustpilot/Shopify reviews, DMs. Use when asked things like 'how do customers describe winter eczema flare-ups', 'find conversations about shipping delays', 'show me times we recommended Reviana for sensitive skin'. ALWAYS quote verbatim language from real customers. Returns up to 25 matching threads with summary + sentiment + tags.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        q:         { type: 'string', description: 'free-text query against summary + question_asked + raw_thread' },
+        source:    { type: 'string', enum: ['intercom','email','trustpilot','shopify_review','google_review','dm','phone','contact_form','other'] },
+        tag:       { type: 'string', description: "single topic tag, e.g. 'product_idea', 'complaint', 'shipping'" },
+        product:   { type: 'string', description: "filter to a specific product ref" },
+        sentiment: { type: 'string', enum: ['positive','negative','neutral','mixed'] },
+        since_days: { type: 'integer', minimum: 1, maximum: 365, description: "default 90" },
+        limit:     { type: 'integer', minimum: 1, maximum: 50, description: 'default 25' },
+      },
+    },
+  },
+  {
+    name: 'get_customer_conversation',
+    description: 'Full transcript + metadata for one conversation. Use after a search hit when Curtis wants the whole exchange.',
+    input_schema: {
+      type: 'object',
+      properties: { conversation_id: { type: 'string' } },
+      required: ['conversation_id'],
+    },
+  },
+  {
+    name: 'list_customer_topics',
+    description: "Aggregate the top topic_tags across recent customer conversations. Use for 'what are customers asking us to improve lately' / 'what's the volume on shipping complaints this month' / 'top product-idea themes'. Returns each tag with count + a sample of conversation_ids to drill into.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        since_days: { type: 'integer', minimum: 1, maximum: 365, description: 'default 30' },
+        source:     { type: 'string' },
+        sentiment:  { type: 'string', enum: ['positive','negative','neutral','mixed'] },
+      },
+    },
+  },
+  {
+    name: 'find_similar_customer_question',
+    description: "When Curtis asks 'how do I answer this customer message: ___', use this to find prior conversations where similar questions were already answered. Falls back to ILIKE text matching when no embeddings (Phase 1). Returns up to 5 matches with their resolutions so Curtis can adapt the past reply.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: "the customer's incoming message OR the canonical question" },
+        limit: { type: 'integer', minimum: 1, maximum: 10, description: 'default 5' },
+      },
+      required: ['query'],
+    },
+  },
+
   // ─── Influencer registry + contract generation ────────────────────────────
   {
     name: 'list_influencers',
@@ -1367,6 +1418,69 @@ async function execute(name, input, ctx) {
         `user_id=eq.${userId}&date=gte.${since}&order=date.desc&limit=${days}&select=date,recovery_score,hrv_rmssd_ms,resting_heart_rate,strain,sleep_performance,sleep_hours,sleep_efficiency`
       );
       return { days, metrics: rows };
+    }
+
+    // ── Customer conversation hub tools ─────────────────────────────────
+    case 'search_customer_conversations': {
+      const filters = ['select=conversation_id,source,customer_name,customer_handle,started_at,topic_tags,product_refs,sentiment,outcome,summary,question_asked,resolution', `user_id=eq.${userId}`];
+      if (input?.source) filters.push(`source=eq.${encodeURIComponent(input.source)}`);
+      if (input?.sentiment) filters.push(`sentiment=eq.${encodeURIComponent(input.sentiment)}`);
+      if (input?.tag)       filters.push(`topic_tags=cs.{${encodeURIComponent(input.tag)}}`);
+      if (input?.product)   filters.push(`product_refs=cs.{${encodeURIComponent(input.product)}}`);
+      const sinceDays = input?.since_days || 90;
+      const sinceIso = new Date(Date.now() - sinceDays * 86_400_000).toISOString();
+      filters.push(`started_at=gte.${encodeURIComponent(sinceIso)}`);
+      if (input?.q) {
+        const q = encodeURIComponent(input.q);
+        filters.push(`or=(summary.ilike.*${q}*,question_asked.ilike.*${q}*,raw_thread.ilike.*${q}*)`);
+      }
+      filters.push(`order=started_at.desc&limit=${Math.min(input?.limit || 25, 50)}`);
+      const rows = await sbSelect('mktg_customer_conversations', filters.join('&'));
+      return { conversations: rows };
+    }
+    case 'get_customer_conversation': {
+      if (!input?.conversation_id) return { error: 'conversation_id required' };
+      const rows = await sbSelect(
+        'mktg_customer_conversations',
+        `conversation_id=eq.${encodeURIComponent(input.conversation_id)}&user_id=eq.${userId}&select=*&limit=1`,
+      );
+      const c = rows?.[0];
+      if (!c) return { error: 'conversation not found' };
+      return { conversation: c };
+    }
+    case 'list_customer_topics': {
+      const sinceDays = input?.since_days || 30;
+      const sinceIso = new Date(Date.now() - sinceDays * 86_400_000).toISOString();
+      const filters = [`user_id=eq.${userId}`, `started_at=gte.${encodeURIComponent(sinceIso)}`, 'select=conversation_id,topic_tags,sentiment,source,started_at'];
+      if (input?.source)    filters.push(`source=eq.${encodeURIComponent(input.source)}`);
+      if (input?.sentiment) filters.push(`sentiment=eq.${encodeURIComponent(input.sentiment)}`);
+      filters.push('limit=1000');
+      const rows = await sbSelect('mktg_customer_conversations', filters.join('&'));
+      // Tally tags + collect a sample of conversation_ids per tag.
+      const counts = new Map();
+      for (const r of rows) {
+        const tags = Array.isArray(r.topic_tags) ? r.topic_tags : [];
+        for (const t of tags) {
+          if (!counts.has(t)) counts.set(t, { tag: t, count: 0, samples: [] });
+          const e = counts.get(t);
+          e.count++;
+          if (e.samples.length < 3) e.samples.push(r.conversation_id);
+        }
+      }
+      const sorted = [...counts.values()].sort((a, b) => b.count - a.count).slice(0, 25);
+      return { topics: sorted, total_conversations: rows.length, since_days: sinceDays };
+    }
+    case 'find_similar_customer_question': {
+      if (!input?.query) return { error: 'query required' };
+      // Phase 1: ILIKE matching against question_asked + raw_thread.
+      // Future: pgvector cosine on embedding column when corpus is embedded.
+      const q = encodeURIComponent(input.query.slice(0, 200));
+      const limit = Math.min(input?.limit || 5, 10);
+      const rows = await sbSelect(
+        'mktg_customer_conversations',
+        `user_id=eq.${userId}&or=(question_asked.ilike.*${q}*,raw_thread.ilike.*${q}*)&select=conversation_id,source,started_at,question_asked,resolution,summary,outcome&order=started_at.desc&limit=${limit}`,
+      );
+      return { matches: rows };
     }
 
     // ── Influencer registry tools ───────────────────────────────────────
