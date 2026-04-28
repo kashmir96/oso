@@ -130,6 +130,13 @@ Record-script fast path (business chat only):
   );
 
   sections.push(
+    `Marketing chat questions (in /business/marketing/chat — different chat from this one):
+  "list our products"                        — catalog with seed-image fill counts (n/7)
+  "which products are missing seed photos"   — gaps in the 7-slot grid
+  "tell me about <product id>"               — full detail incl. per-slot status (the AI sees metadata, not the photos themselves yet)`,
+  );
+
+  sections.push(
     `Pipeline state (after running marketing mode):
   /business/marketing/creative/<id>         — read-only result card for one creative (also reachable via clicking the card link)
   /business/marketing/assistant             — production queue (drafts + creatives ready for asset upload)

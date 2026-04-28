@@ -23,6 +23,22 @@ const TOOLS = [
     },
   },
 
+  // ── READ — products ──
+  {
+    name: 'list_products',
+    description: 'List every product with name, campaign, status, and seed-image fill count (out of 7 slots: front/back/side1/side2/texture-in-pack/texture-on-skin/label). Use to ground "what products do we sell" and "which products are missing seed photos". Does not include the image binaries.',
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'get_product',
+    description: 'Full detail for one product: name, full_name, tagline, description, ingredients, format/size, price, plus per-slot seed-image metadata (which slots are filled, mime type, uploaded_at). The AI cannot see the images themselves yet — only metadata. To actually view a photo, the user must open /business/marketing/products/<id>.',
+    input_schema: {
+      type: 'object',
+      properties: { id: { type: 'string', description: 'product id, e.g. "tallow-balm"' } },
+      required: ['id'],
+    },
+  },
+
   // ── READ — concepts ──
   {
     name: 'search_concepts',
@@ -305,6 +321,11 @@ const VALID_TARGET_TABLES = new Set([
   'mktg_ads','mktg_concepts','mktg_production_scripts','mktg_campaigns',
 ]);
 
+function countFilledSlots(seedImages) {
+  if (!seedImages || typeof seedImages !== 'object') return 0;
+  return Object.values(seedImages).filter((v) => v?.path).length;
+}
+
 async function execute(name, input, ctx) {
   const { userId, conversationId } = ctx;
 
@@ -330,6 +351,43 @@ async function execute(name, input, ctx) {
         ads_sample: ads,
         scripts,
       };
+    }
+
+    case 'list_products': {
+      const rows = await sbSelect(
+        'mktg_products',
+        'select=id,name,campaign_id,status,seed_images&order=name.asc'
+      );
+      return {
+        products: rows.map((p) => ({
+          id: p.id,
+          name: p.name,
+          campaign_id: p.campaign_id,
+          status: p.status,
+          seed_slots_filled: countFilledSlots(p.seed_images),
+          total_slots: 7,
+        })),
+      };
+    }
+    case 'get_product': {
+      if (!input?.id) return { error: 'id required' };
+      const rows = await sbSelect(
+        'mktg_products',
+        `id=eq.${encodeURIComponent(input.id)}&select=*&limit=1`
+      );
+      const p = rows?.[0];
+      if (!p) return { error: 'product not found' };
+      const slots = ['front','back','side1','side2','texture_pack','texture_skin','label'];
+      const seed_slots = {};
+      for (const s of slots) {
+        const info = p.seed_images?.[s];
+        seed_slots[s] = info?.path
+          ? { filled: true, mime: info.mime, uploaded_at: info.uploaded_at }
+          : { filled: false };
+      }
+      // Strip the raw seed_images blob so the AI sees the structured slots view instead.
+      const { seed_images, ...rest } = p;
+      return { product: { ...rest, seed_slots } };
     }
 
     case 'search_concepts': {
