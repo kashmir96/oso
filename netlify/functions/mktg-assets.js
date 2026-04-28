@@ -180,6 +180,72 @@ async function pollVeoOperation(operationId) {
   return { status: 'ready', videoUrl };
 }
 
+// ─── ElevenLabs Speech-to-Text → SRT/VTT captions ──────────────────────────
+// Takes a creative's voiceover MP3, sends to ElevenLabs STT (scribe_v1),
+// gets back word-level timestamps, formats as SRT or VTT, uploads to the
+// mktg-assets bucket. Used for Phase 3 captions.
+const ELEVENLABS_STT_MODEL = 'scribe_v1';
+// Cost: ~$0.40 per hour of audio at scribe_v1 list. Stamped on each row.
+const ELEVENLABS_STT_COST_PER_SEC = 0.40 / 3600;
+
+async function transcribeWithElevenLabs(audioUrl) {
+  if (!process.env.ELEVENLABS_API_KEY) throw new Error('ELEVENLABS_API_KEY not configured');
+  const audioRes = await fetch(audioUrl);
+  if (!audioRes.ok) throw new Error(`Failed to fetch audio: ${audioRes.status}`);
+  const audioBuf = Buffer.from(await audioRes.arrayBuffer());
+  const form = new FormData();
+  form.append('model_id', ELEVENLABS_STT_MODEL);
+  form.append('file', new Blob([audioBuf], { type: 'audio/mpeg' }), 'voiceover.mp3');
+  form.append('timestamps_granularity', 'word');
+  const res = await fetch('https://api.elevenlabs.io/v1/speech-to-text', {
+    method: 'POST',
+    headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY },
+    body: form,
+  });
+  if (!res.ok) throw new Error(`ElevenLabs STT ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  return await res.json();
+}
+
+// Pack words into SRT cues. Splits on punctuation + ~5s windows so the
+// captions don't pile up in one block. Returns { srt, vtt, durationSec }.
+function buildCaptionsFromWords(sttJson) {
+  const words = Array.isArray(sttJson?.words) ? sttJson.words : [];
+  if (words.length === 0) {
+    return { srt: '1\n00:00:00,000 --> 00:00:01,000\n(no speech detected)\n', vtt: 'WEBVTT\n\n00:00:00.000 --> 00:00:01.000\n(no speech detected)\n', durationSec: 0 };
+  }
+  // Group words into cues: break on terminal punctuation or every ~5 seconds.
+  const cues = [];
+  let cur = { start: words[0].start, end: words[0].end, text: '' };
+  for (const w of words) {
+    const tok = w.text || '';
+    if (!cur.text) cur.start = w.start;
+    cur.text += (cur.text ? ' ' : '') + tok.trim();
+    cur.end = w.end;
+    const isTerminal = /[.!?]$/.test(tok.trim());
+    const isLong     = (cur.end - cur.start) >= 5;
+    if (isTerminal || isLong) {
+      if (cur.text.trim()) cues.push({ ...cur, text: cur.text.trim() });
+      cur = { start: w.end, end: w.end, text: '' };
+    }
+  }
+  if (cur.text.trim()) cues.push({ ...cur, text: cur.text.trim() });
+
+  function fmtSrt(t) {
+    if (typeof t !== 'number') t = 0;
+    const ms = Math.floor((t % 1) * 1000);
+    const s  = Math.floor(t) % 60;
+    const m  = Math.floor(t / 60) % 60;
+    const h  = Math.floor(t / 3600);
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')},${String(ms).padStart(3,'0')}`;
+  }
+  function fmtVtt(t) { return fmtSrt(t).replace(',', '.'); }
+
+  const srt = cues.map((c, i) => `${i + 1}\n${fmtSrt(c.start)} --> ${fmtSrt(c.end)}\n${c.text}\n`).join('\n');
+  const vtt = `WEBVTT\n\n${cues.map((c) => `${fmtVtt(c.start)} --> ${fmtVtt(c.end)}\n${c.text}\n`).join('\n')}`;
+  const durationSec = cues[cues.length - 1]?.end || 0;
+  return { srt, vtt, durationSec };
+}
+
 // Download a Veo video URL (signed) and upload to our bucket. Returns the
 // new storage_path + bytes count.
 async function downloadAndStoreVeoVideo({ userId, videoUrl }) {
@@ -372,6 +438,124 @@ exports.handler = withGate(async (event, { user }) => {
         });
         return reply(500, { error: e.message || 'download failed' });
       }
+    }
+
+    // ── Captions: ElevenLabs STT on the creative's voiceover MP3 ─────────
+    // Produces both SRT and VTT files in one call, persists each as its
+    // own asset row so the editor can pick whichever format their tool
+    // accepts. Curtis hits this from the chat ("generate captions") or
+    // from the button on the Creative ResultCard's voiceover panel.
+    if (action === 'generate_captions') {
+      if (!body.creative_id) return reply(400, { error: 'creative_id required' });
+      const rows = await sbSelect(
+        'mktg_creatives',
+        `creative_id=eq.${encodeURIComponent(body.creative_id)}&select=user_id,voiceover_storage_path&limit=1`
+      );
+      const c = rows?.[0];
+      if (!c) return reply(404, { error: 'creative not found' });
+      if (c.user_id && c.user_id !== user.id) return reply(403, { error: 'creative belongs to another user' });
+      if (!c.voiceover_storage_path) {
+        return reply(400, { error: 'creative has no voiceover -- generate one first' });
+      }
+      const audioUrl = `${process.env.SUPABASE_URL}/storage/v1/object/public/mktg-vo/${c.voiceover_storage_path}`;
+      let stt;
+      try { stt = await transcribeWithElevenLabs(audioUrl); }
+      catch (e) { return reply(500, { error: e.message || 'STT failed' }); }
+      const { srt, vtt, durationSec } = buildCaptionsFromWords(stt);
+
+      const persisted = [];
+      for (const fmt of ['srt','vtt']) {
+        const text = fmt === 'srt' ? srt : vtt;
+        const storage_path = await uploadToBucket({
+          userId: user.id, kind: 'caption', buf: Buffer.from(text, 'utf8'),
+          mimeType: fmt === 'srt' ? 'application/x-subrip' : 'text/vtt',
+          ext: fmt,
+        });
+        const row = await sbInsert('mktg_generated_assets', {
+          user_id: user.id,
+          creative_id: body.creative_id,
+          kind: fmt === 'srt' ? 'caption_srt' : 'caption_vtt',
+          provider: 'elevenlabs',
+          model: ELEVENLABS_STT_MODEL,
+          prompt: null,
+          seed_asset_id: null,
+          storage_path,
+          mime_type: fmt === 'srt' ? 'application/x-subrip' : 'text/vtt',
+          size_bytes: Buffer.byteLength(text, 'utf8'),
+          duration_sec: durationSec,
+          cost_usd: durationSec * ELEVENLABS_STT_COST_PER_SEC,
+          status: 'ready',
+          ready_at: new Date().toISOString(),
+        });
+        const r1 = Array.isArray(row) ? row[0] : row;
+        persisted.push({
+          asset_id: r1?.asset_id, format: fmt,
+          public_url: publicUrlFor(storage_path),
+          duration_sec: durationSec,
+        });
+      }
+      logUsage({
+        user_id: user.id, provider: 'elevenlabs', action: 'stt',
+        model: ELEVENLABS_STT_MODEL, chars: Math.round(durationSec) || 0,
+      });
+      return reply(200, {
+        ok: true, captions: persisted,
+        cost_usd: durationSec * ELEVENLABS_STT_COST_PER_SEC * 2,  // 2 outputs but same transcription
+        latency_ms: null,
+      });
+    }
+
+    // ── Upload finished asset (production team uploads the rendered video) ─
+    // After the assistant produces the actual creative file, they upload it
+    // here so it lives alongside the AI-generated drafts in mktg-assets.
+    // Curtis can then re-use it / link it / share it.
+    if (action === 'upload_finished_asset') {
+      if (!body.creative_id) return reply(400, { error: 'creative_id required' });
+      if (!body.data_base64)  return reply(400, { error: 'data_base64 required' });
+      const mime = body.mime_type || 'video/mp4';
+      const ext  = (body.filename && body.filename.split('.').pop()) || (mime.split('/')[1] || 'bin');
+      const kind = mime.startsWith('video/') ? 'video' : (mime.startsWith('image/') ? 'image' : 'video');
+
+      // Authorise: ensure creative belongs to this user (or is global).
+      const rows = await sbSelect(
+        'mktg_creatives',
+        `creative_id=eq.${encodeURIComponent(body.creative_id)}&select=user_id&limit=1`
+      );
+      const cv = rows?.[0];
+      if (!cv) return reply(404, { error: 'creative not found' });
+      if (cv.user_id && cv.user_id !== user.id) return reply(403, { error: 'creative belongs to another user' });
+
+      const buf = Buffer.from(body.data_base64, 'base64');
+      if (buf.length === 0) return reply(400, { error: 'empty file payload' });
+      // Cap at ~50 MB so the function's body-size limit doesn't bite. Larger
+      // files should go through a signed-upload-URL flow (Phase 4.1).
+      if (buf.length > 50 * 1024 * 1024) {
+        return reply(400, { error: 'file too large (>50MB) -- need signed-upload-URL flow for big videos' });
+      }
+      const storage_path = await uploadToBucket({
+        userId: user.id, kind, buf, mimeType: mime, ext,
+      });
+      const row = await sbInsert('mktg_generated_assets', {
+        user_id: user.id,
+        creative_id: body.creative_id,
+        kind,
+        provider: 'upload',
+        model: 'finished_asset',
+        prompt: body.notes || null,
+        storage_path,
+        mime_type: mime,
+        size_bytes: buf.length,
+        cost_usd: 0,
+        status: 'ready',
+        ready_at: new Date().toISOString(),
+      });
+      const r1 = Array.isArray(row) ? row[0] : row;
+      return reply(200, {
+        ok: true,
+        asset_id: r1?.asset_id,
+        public_url: publicUrlFor(storage_path),
+        kind, bytes: buf.length,
+      });
     }
 
     if (action === 'list') {

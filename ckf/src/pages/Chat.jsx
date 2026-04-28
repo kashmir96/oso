@@ -124,7 +124,9 @@ Record-script fast path (business chat only):
   "generate an image of ___" /
     "image: ___"                            — AI image (OpenAI gpt-image-1, ~$0.04/img). Optionally seed off an existing image for variations (b-roll). Requires OPENAI_API_KEY.
   "generate a video of ___" /
-    "video: ___" / "make a 5s clip of ___"  — AI video (Gemini Veo 2, ~$0.50/sec, default 5s). Long-running: returns immediately, cron finalises in ~1-2 min. Image-to-video by seeding off an asset. Requires GEMINI_API_KEY.`,
+    "video: ___" / "make a 5s clip of ___"  — AI video (Gemini Veo 2, ~$0.50/sec, default 5s). Long-running: returns immediately, cron finalises in ~1-2 min. Image-to-video by seeding off an asset. Requires GEMINI_API_KEY.
+  "generate captions for <creative>" /
+    "caption that VO"                       — SRT + VTT caption files from a creative's voiceover (ElevenLabs scribe_v1). Cheap (~$0.0001/sec). Also as a button on the Creative ResultCard's voiceover panel.`,
   );
 
   sections.push(
