@@ -676,6 +676,28 @@ exports.handler = withGate(async (event, { user }) => {
       return reply(200, { creative: Array.isArray(updated) ? updated[0] : updated });
     }
 
+    // ── Fast path: "record script" widget in business chat ─────────────
+    // Two actions used by the inline RecordScriptWidget. No AI in the loop
+    // until record_script_submit (which runs the wrap_script stage).
+    if (action === 'record_script_init') {
+      const pipeline = require('./_lib/mktg-pipeline.js');
+      const r = await pipeline.recordScriptInit({
+        user_id: user.id,
+        script_text: body.script_text,
+        creative_type: body.creative_type || 'video_script',
+        objective_hint: body.objective_hint,
+      });
+      return reply(r.error ? 400 : 200, r);
+    }
+    if (action === 'record_script_submit') {
+      if (!body.creative_id) return reply(400, { error: 'creative_id required' });
+      const pipeline = require('./_lib/mktg-pipeline.js');
+      const r = await pipeline.recordScriptWrapAndSubmit({
+        user_id: user.id, creative_id: body.creative_id,
+      });
+      return reply(r.error ? 400 : 200, r);
+    }
+
     if (action === 'list_creatives') {
       // Used by the Assistant queue (production handoff) to show creatives
       // alongside legacy mktg_drafts. Same response shape so the UI can

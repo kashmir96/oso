@@ -26,6 +26,12 @@
   timeout = 26
 [functions."mktg-vo"]
   timeout = 26
+# ckf-chat: chat AI call can chain through a creative_pipeline tool that
+# itself runs a Sonnet stage. Two sequential model calls easily exceed the
+# default 10s. Bumping to 26s -- if a single chat turn ever exceeds that,
+# the right fix is splitting the work across turns, not raising again.
+[functions."ckf-chat"]
+  timeout = 26
 
 [functions."sales-alert"]
   schedule = "0 * * * *"

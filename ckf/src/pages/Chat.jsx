@@ -143,9 +143,34 @@ export default function Chat({ embedded = false, scope = 'personal' }) {
     scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, busy]);
 
+  // ── "Record script" fast-path widget (business chat) ──
+  // Triggers: "record script", "voice this", "i have a script", "paste a script",
+  // "read this script". Opens an inline bubble with a textarea + Generate Audio
+  // + Send to Assistant buttons. No AI in the loop until Send to Assistant
+  // (which runs the wrap_script stage server-side).
+  const [recordWidget, setRecordWidget] = useState(null);
+  function isRecordScriptTrigger(t) {
+    const s = (t || '').toLowerCase();
+    return /\b(record\s+script|voice\s+this|i\s+have\s+a\s+script|paste\s+a\s+script|read\s+this\s+script)\b/.test(s);
+  }
+  function stripRecordScriptTrigger(text) {
+    return (text || '')
+      .replace(/\b(record\s+script|voice\s+this|i\s+have\s+a\s+script|paste\s+a\s+script|read\s+this\s+script)\b/ig, '')
+      .replace(/^[\s.,—:;-]+|[\s.,—:;-]+$/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  }
+
   async function send() {
     const text = draft.trim();
     if ((!text && attachments.length === 0) || busy || !id) return;
+
+    if (scope === 'business' && isRecordScriptTrigger(text)) {
+      setDraft('');
+      // initial: any text typed alongside the trigger pre-fills the textarea
+      setRecordWidget({ initial: stripRecordScriptTrigger(text) });
+      return;
+    }
 
     setDraft('');
     setBusy(true); setErr('');
@@ -460,6 +485,12 @@ export default function Chat({ embedded = false, scope = 'personal' }) {
             <div className="bubble-meta">{fmtRelative(m.created_at)}</div>
           </div>
         ))}
+        {recordWidget && (
+          <RecordScriptWidget
+            initial={recordWidget.initial}
+            onClose={() => setRecordWidget(null)}
+          />
+        )}
         {busy && (
           <div className="bubble assistant ghost">
             <div className="bubble-text">
@@ -622,6 +653,133 @@ export default function Chat({ embedded = false, scope = 'personal' }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── RecordScriptWidget ────────────────────────────────────────────────────
+// Inline bubble in business chat for the "fast path": Curtis types
+// "record script" -> this opens with a textarea -> he pastes / writes the
+// script -> Generate audio voices it via ElevenLabs -> Send to Assistant
+// wraps it with timeline + B-roll via the wrap_script stage and routes to
+// the production queue. Ephemeral state -- closes after submit or cancel.
+function RecordScriptWidget({ initial = '', onClose }) {
+  const [script, setScript] = useState(initial);
+  const [creativeId, setCreativeId] = useState(null);
+  const [audioUrl, setAudioUrl] = useState(null);
+  const [busy, setBusy] = useState(null); // 'voice' | 'submit' | null
+  const [err, setErr] = useState('');
+  const [submitted, setSubmitted] = useState(null); // { detail_url, timeline_n, broll_n }
+
+  // Make sure the row exists before voicing or submitting -- both reuse the
+  // same creative_id so generation + submit point at the same record.
+  async function ensureRow() {
+    if (creativeId) return creativeId;
+    const r = await call('mktg-ads', {
+      action: 'record_script_init',
+      script_text: script,
+      creative_type: 'video_script',
+    });
+    if (r.error) throw new Error(r.error);
+    setCreativeId(r.creative_id);
+    return r.creative_id;
+  }
+
+  async function generateAudio() {
+    if (!script.trim()) { setErr('Paste a script first.'); return; }
+    setBusy('voice'); setErr('');
+    try {
+      const id = await ensureRow();
+      const r = await call('mktg-vo', { action: 'generate_creative', creative_id: id });
+      setAudioUrl(r.public_url);
+    } catch (e) { setErr(e.message); } finally { setBusy(null); }
+  }
+
+  async function sendToAssistant() {
+    if (!script.trim()) { setErr('Paste a script first.'); return; }
+    setBusy('submit'); setErr('');
+    try {
+      const id = await ensureRow();
+      const r = await call('mktg-ads', { action: 'record_script_submit', creative_id: id });
+      if (r.error) throw new Error(r.error);
+      setSubmitted({
+        detail_url: r.detail_url,
+        timeline_n: r.timeline_n,
+        broll_n:    r.broll_n,
+      });
+    } catch (e) { setErr(e.message); } finally { setBusy(null); }
+  }
+
+  const wordCount = script.trim() ? script.trim().split(/\s+/).length : 0;
+
+  // After submit: collapse to a confirmation row.
+  if (submitted) {
+    return (
+      <div className="bubble assistant" style={{ borderLeft: '3px solid var(--accent, #5cb85c)' }}>
+        <div className="bubble-text">
+          <div style={{ marginBottom: 4 }}><strong>Sent to Assistant.</strong></div>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>
+            Wrapped with {submitted.timeline_n} timeline beats + {submitted.broll_n} B-roll shots.
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <a href={submitted.detail_url} style={{ fontSize: 12, padding: '4px 10px', textDecoration: 'none', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)' }}>Open creative →</a>
+            <a href="/business/marketing/assistant" style={{ fontSize: 12, padding: '4px 10px', textDecoration: 'none', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)' }}>Assistant queue</a>
+            <button onClick={onClose} style={{ fontSize: 11, padding: '4px 10px', marginLeft: 'auto' }}>Close</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bubble user" style={{ background: 'var(--card-bg, #1c1c1e)', border: '1px solid var(--border)' }}>
+      <div className="bubble-text" style={{ width: '100%' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <strong>Record script</strong>
+          <button onClick={onClose} style={{ fontSize: 11, padding: '2px 8px' }}>✕</button>
+        </div>
+        <textarea
+          value={script}
+          onChange={(e) => setScript(e.target.value)}
+          rows={8}
+          placeholder="Paste or type the spoken script. Voice it as-is, or send to Assistant to wrap with timeline + B-roll + timestamps."
+          style={{ width: '100%', fontFamily: 'inherit', fontSize: 13, padding: 8, borderRadius: 6, border: '1px solid var(--border)', resize: 'vertical' }}
+          disabled={!!busy}
+        />
+        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+          {wordCount} words · ~{Math.max(1, Math.round(wordCount / 2.5))}s spoken
+        </div>
+
+        {audioUrl && (
+          <div style={{ marginTop: 8 }}>
+            <audio controls src={audioUrl} style={{ width: '100%' }} />
+            <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+              <a href={audioUrl} target="_blank" rel="noreferrer" style={{ fontSize: 11, padding: '3px 8px', textDecoration: 'none', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)' }}>▶ Download MP3</a>
+              <button onClick={() => navigator.clipboard.writeText(audioUrl)} style={{ fontSize: 11, padding: '3px 8px' }}>Copy link</button>
+            </div>
+          </div>
+        )}
+
+        {err && <div className="error" style={{ fontSize: 11, marginTop: 6 }}>{err}</div>}
+
+        <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+          <button
+            onClick={generateAudio}
+            disabled={!!busy || !script.trim()}
+            className="primary"
+            style={{ fontSize: 12, padding: '6px 12px' }}
+          >
+            {busy === 'voice' ? 'Generating audio…' : (audioUrl ? '↻ Re-render audio' : 'Generate audio')}
+          </button>
+          <button
+            onClick={sendToAssistant}
+            disabled={!!busy || !script.trim()}
+            style={{ fontSize: 12, padding: '6px 12px' }}
+          >
+            {busy === 'submit' ? 'Wrapping + sending…' : 'Send to Assistant →'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

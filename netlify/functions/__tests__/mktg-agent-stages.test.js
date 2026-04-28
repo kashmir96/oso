@@ -5,11 +5,36 @@ const assert = require('node:assert');
 const { validateStageOutput, STAGE_NAMES } = require('../_lib/mktg-agent-stages.js');
 
 // --- Stage registry --------------------------------------------------------
-test('STAGE_NAMES covers all 8 stages from the spec', () => {
+test('STAGE_NAMES covers all 9 stages (8 spec + wrap_script fast-path)', () => {
   assert.deepStrictEqual(
     STAGE_NAMES.sort(),
-    ['critique','draft','feedback','hooks','outline','playbook_extract','strategy','variants_ad']
+    ['critique','draft','feedback','hooks','outline','playbook_extract','strategy','variants_ad','wrap_script']
   );
+});
+
+// --- wrap_script (fast path: script-first record bubble) ------------------
+test('wrap_script: minimal valid passes', () => {
+  const r = validateStageOutput('wrap_script', {
+    preserved_script: "Hi I'm Curtis, founder of PrimalPantry.",
+    hook: "Hi I'm Curtis, founder of PrimalPantry.",
+    hook_type: 'founder-direct',
+    estimated_runtime: '0:05',
+    timeline: [
+      { timestamp: '0:00-0:05', spoken_line: "Hi I'm Curtis, founder of PrimalPantry.", broll: 'founder face-cam' },
+    ],
+    broll_shots: ['founder face-cam'],
+    cta_placement: '0:04 — text overlay shop now',
+    notes_for_editor: 'Lift natural pause before "PrimalPantry" if too punchy.',
+  });
+  assert.strictEqual(r.ok, true);
+});
+
+test('wrap_script: empty timeline fails', () => {
+  const r = validateStageOutput('wrap_script', {
+    preserved_script: 'x', hook: 'x', hook_type: 'y', estimated_runtime: '0:01',
+    timeline: [], broll_shots: ['a'], cta_placement: 'end', notes_for_editor: '',
+  });
+  assert.strictEqual(r.ok, false);
 });
 
 test('validateStageOutput: unknown stage rejected', () => {

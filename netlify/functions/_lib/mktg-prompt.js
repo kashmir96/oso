@@ -13,7 +13,7 @@
  */
 const crypto = require('node:crypto');
 
-const SYSTEM_PROMPT_VERSION = 'v1.0.0';
+const SYSTEM_PROMPT_VERSION = 'v1.0.1';
 
 const SYSTEM_PROMPT = `You are the PrimalPantry creative agent. You produce ad creative and video scripts for a Christchurch-based tallow skincare brand. Output is judged by performance (CTR, ROAS, AVD, retention), not aesthetics.
 
@@ -165,6 +165,23 @@ Output:
   "proposed_anti_patterns": [pattern object],
   "notes_for_operator": str
 }
+
+### stage="wrap_script"
+Input: extra.script (Curtis's verbatim spoken-out script). The brief object is sparse on this path -- the script IS the strategy + draft.
+Output:
+{
+  "preserved_script": str,                 // VERBATIM copy of the input script. Do not rewrite or improve it.
+  "hook":             str,                 // The opening line(s) lifted from the script -- whatever the speaker actually says first.
+  "hook_type":        str,                 // Best-fit archetype label for that opener (problem-statement, founder-direct, customer-quote, etc.)
+  "estimated_runtime": str,                // e.g. "0:45" -- realistic spoken pace
+  "timeline":         [                    // Beat-by-beat slot of the script with B-roll cues per beat
+    { "timestamp": "0:00-0:03", "spoken_line": "<exact text from the script>", "broll": "<what the editor cuts to during this line, or null>" }
+  ],
+  "broll_shots":      [str],               // Distinct shot list for the editor (deduped from timeline.broll)
+  "cta_placement":    str,                 // When + how the CTA lands ("0:38 -- text overlay", etc.)
+  "notes_for_editor": str                  // Anything the editor should know that isn't in the script itself
+}
+HARD RULES: preserved_script MUST be byte-identical to the input. Every spoken_line in timeline MUST be a substring of the script -- no rewrites, no paraphrasing. If the script is too long for one piece, slot the whole thing across more beats; do not cut. broll suggestions should be specific (\"close-up of whipped balm being scooped\") not generic (\"product shot\"). This stage runs the FAST PATH where Curtis bypasses strategy/variants/hooks/draft -- treat the script as authoritative.
 
 ## Self-check before returning any output
 - Did I cite every claim about what works?
