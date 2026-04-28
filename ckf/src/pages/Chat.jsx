@@ -182,6 +182,8 @@ export default function Chat({ embedded = false, scope = 'personal' }) {
     setAttachments([]);
     // Optimistic append
     setMessages((m) => [...m, { id: 'optimistic', role: 'user', content_text: text || '(attachment)', created_at: new Date().toISOString() }]);
+    const sentAtMs = Date.now();
+    const baselineMsgCount = messages.length;
     try {
       const r = await call('ckf-chat', {
         action: 'send', conversation_id: id, text: text || '',
@@ -190,15 +192,65 @@ export default function Chat({ embedded = false, scope = 'personal' }) {
       });
       setMessages(r.messages);
       window.dispatchEvent(new CustomEvent('ckf-assistant-text', { detail: r.text }));
-      // Many chat tools mutate data (create_errand, log_goal_value, etc.).
-      // Tell the strips to refresh.
       notifyChanged();
     } catch (e) {
-      setErr(e.message);
+      // Netlify-timeout (504/502/timeout) recovery: the function often keeps
+      // running past the 26s wall-clock kill, so the DB write completes even
+      // though the HTTP response was cut. Don't surface a scary error -- wait
+      // a beat, re-fetch the conversation, and if new messages exist, treat
+      // it as success.
+      const isGatewayTimeout = e.status === 504 || e.status === 502 || /timeout|timed out/i.test(e.message || '');
+      if (isGatewayTimeout) {
+        const recovered = await tryRecoverFromTimeout(id, baselineMsgCount, sentAtMs);
+        if (recovered.ok) {
+          setMessages(recovered.messages);
+          if (recovered.lastAssistantText) {
+            window.dispatchEvent(new CustomEvent('ckf-assistant-text', { detail: recovered.lastAssistantText }));
+          }
+          notifyChanged();
+        } else if (recovered.partialOk) {
+          // Tool result landed but the AI's reply call timed out. Show what
+          // we have and a soft note rather than a red error.
+          setMessages(recovered.messages);
+          notifyChanged();
+          setErr('That took longer than usual to reply -- the work landed but the assistant didn\'t finish typing. Send "continue" or look at the result.');
+        } else {
+          setErr(`Timed out after ${(Date.now() - sentAtMs) / 1000 | 0}s with no reply. Try again -- the system might have been cold.`);
+        }
+      } else {
+        setErr(e.message);
+      }
     } finally {
       setBusy(false);
       taRef.current?.focus();
     }
+  }
+
+  // Background poll after a 504. Fetch the conversation; if the message count
+  // went up since we sent, the function actually completed. Returns:
+  //   { ok: true, messages, lastAssistantText }       -- final assistant reply landed
+  //   { partialOk: true, messages }                   -- tool result landed but no final reply
+  //   { ok: false }                                   -- nothing landed
+  async function tryRecoverFromTimeout(convId, baselineMsgCount, sentAtMs) {
+    // Poll up to 3 times over ~6s -- the function might still be writing
+    // when the gateway killed the response.
+    for (let i = 0; i < 3; i++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      try {
+        const r = await call('ckf-chat', { action: 'get_conversation', id: convId });
+        const newMsgs = r?.messages || [];
+        if (newMsgs.length <= baselineMsgCount) continue;
+        // Find the last assistant message AFTER our send timestamp.
+        const lastAsst = [...newMsgs].reverse().find((m) =>
+          m.role === 'assistant' && m.content_text?.trim() &&
+          new Date(m.created_at).getTime() >= sentAtMs - 1000
+        );
+        if (lastAsst) return { ok: true, messages: newMsgs, lastAssistantText: lastAsst.content_text };
+        // Got new tool/user messages but no assistant text yet.
+        return { partialOk: true, messages: newMsgs };
+      } catch { /* keep polling */ }
+    }
+    return { ok: false };
   }
 
   async function onPickFiles(files, fromCamera) {
