@@ -18,6 +18,44 @@ import PipelineCard from '../components/PipelineCard.jsx';
 // + stages + approve + VO + assistant submit, all inline. The Creative page
 // becomes a view-only result card he visits when the flow ends.
 
+// Busy bubble for non-pipeline waits (chat-AI thinking, refreshes, etc.).
+// Tracks its own elapsed time and surfaces Refresh/Cancel buttons after
+// 20s so Curtis can recover from a hung tool loop without page-reloading.
+function BusyDots({ lastUsedTools, onRefresh, onCancel }) {
+  const [startedAt] = useState(() => Date.now());
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setTick((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+  void tick;
+  const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+  const showKickstart = elapsed > 20;
+  return (
+    <div className="bubble assistant ghost">
+      <div className="bubble-text">
+        <span className="dots"><span/><span/><span/></span>
+        {(lastUsedTools || []).length > 0 && (
+          <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--text-muted)' }}>
+            using {lastUsedTools.slice(0, 3).join(', ')}{lastUsedTools.length > 3 ? '…' : ''}
+          </span>
+        )}
+        {elapsed > 4 && (
+          <span style={{ marginLeft: 6, fontSize: 11, color: showKickstart ? 'var(--warn, #d2891f)' : 'var(--text-muted)' }}>
+            {elapsed}s
+          </span>
+        )}
+        {showKickstart && (
+          <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button onClick={onRefresh} className="primary" style={{ fontSize: 11, padding: '4px 10px' }}>↻ Refresh</button>
+            <button onClick={onCancel} style={{ fontSize: 11, padding: '4px 10px' }}>Cancel</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Map raw stage keys to user-friendly labels for the running-status pill.
 function prettyStageName(stage) {
   return ({
@@ -646,6 +684,55 @@ export default function Chat({ embedded = false, scope = 'personal' }) {
   // actually re-renders the elapsed counter).
   void statusTick;
 
+  // ── Manual kick-start handlers when something hangs ───────────────────
+  // These are exposed in the status row after ~20s elapsed AND on a
+  // stand-alone "stuck" panel when busy is true with no pipeline stage.
+
+  // Cancel: just clear the local spinner. The server-side work might still
+  // be running -- that's fine; the next refreshConversation will pick up
+  // any results.
+  function cancelInFlight() {
+    setBusy(false);
+    setPipelineStatus(null);
+    setErr('');
+  }
+
+  // Refresh: re-fetch the conversation. If the server completed but the
+  // HTTP response was killed (504/timeout-after-write), this surfaces the
+  // results without forcing a page reload.
+  async function refreshConversation() {
+    if (!id) return;
+    try {
+      const conv = await call('ckf-chat', { action: 'get_conversation', id });
+      setMessages(conv.messages);
+      notifyChanged();
+    } catch (e) { setErr(e.message); }
+  }
+
+  // Retry the currently-running pipeline stage. Only meaningful when
+  // pipelineStatus is set; clears + re-fires the same stage with a fresh
+  // 26s budget.
+  async function retryPipelineStage() {
+    if (!pipelineStatus) return;
+    const { stage, creative_id } = pipelineStatus;
+    setPipelineStatus({ stage, startedAt: Date.now(), label: `Retrying ${prettyStageName(stage)}`, creative_id });
+    setBusy(true); setErr('');
+    try {
+      await call('mktg-ads', {
+        action: 'pipeline_run_stage_for_card',
+        conversation_id: id, creative_id, stage,
+      });
+      const conv = await call('ckf-chat', { action: 'get_conversation', id });
+      setMessages(conv.messages);
+      notifyChanged();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+      setPipelineStatus(null);
+    }
+  }
+
   // Detect successful intake_brief tool results in fresh assistant messages
   // and auto-fire the strategy stage via the direct endpoint (NOT the chat
   // AI -- that's how we avoid 504s from chained Sonnet calls in one tool
@@ -686,7 +773,7 @@ export default function Chat({ embedded = false, scope = 'personal' }) {
     autoFiredRef.current.add(pendingCreativeId);
     (async () => {
       setBusy(true); setErr('');
-      setPipelineStatus({ stage: 'strategy', startedAt: Date.now(), label: 'Generating strategy' });
+      setPipelineStatus({ stage: 'strategy', startedAt: Date.now(), label: 'Generating strategy', creative_id: pendingCreativeId });
       try {
         await call('mktg-ads', {
           action: 'pipeline_run_stage_for_card',
@@ -732,6 +819,7 @@ export default function Chat({ embedded = false, scope = 'personal' }) {
     setPipelineStatus({
       stage: next_stage_hint, startedAt: Date.now(),
       label: `Generating ${prettyStageName(next_stage_hint)}`,
+      creative_id,
     });
     try {
       await call('mktg-ads', {
@@ -838,10 +926,12 @@ export default function Chat({ embedded = false, scope = 'personal' }) {
         )}
         {/* Pipeline-stage status: when a slow stage is running directly
             (not through the chat AI), show which stage + how long. Lets
-            Curtis distinguish "behind-the-scenes work" from "stuck". */}
+            Curtis distinguish "behind-the-scenes work" from "stuck".
+            After 20s, kick-start buttons appear so he can recover. */}
         {pipelineStatus && (() => {
           const elapsed = Math.floor((Date.now() - pipelineStatus.startedAt) / 1000);
           const isLong  = elapsed > 18;
+          const showKickstart = elapsed > 20;
           return (
             <div className="bubble assistant ghost">
               <div className="bubble-text">
@@ -850,24 +940,20 @@ export default function Chat({ embedded = false, scope = 'personal' }) {
                   {pipelineStatus.label || `Running ${prettyStageName(pipelineStatus.stage)}`}…
                 </span>
                 <span style={{ marginLeft: 6, fontSize: 11, color: isLong ? 'var(--warn, #d2891f)' : 'var(--text-muted)' }}>
-                  {elapsed}s{isLong ? ' (longer than usual — still working)' : ''}
+                  {elapsed}s{isLong ? ' (longer than usual)' : ''}
                 </span>
+                {showKickstart && (
+                  <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <button onClick={refreshConversation} className="primary" style={{ fontSize: 11, padding: '4px 10px' }}>↻ Refresh</button>
+                    <button onClick={retryPipelineStage} style={{ fontSize: 11, padding: '4px 10px' }}>Retry stage</button>
+                    <button onClick={cancelInFlight} style={{ fontSize: 11, padding: '4px 10px' }}>Cancel</button>
+                  </div>
+                )}
               </div>
             </div>
           );
         })()}
-        {busy && !pipelineStatus && (
-          <div className="bubble assistant ghost">
-            <div className="bubble-text">
-              <span className="dots"><span/><span/><span/></span>
-              {lastUsedTools.length > 0 && (
-                <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--text-muted)' }}>
-                  using {lastUsedTools.slice(0, 3).join(', ')}{lastUsedTools.length > 3 ? '…' : ''}
-                </span>
-              )}
-            </div>
-          </div>
-        )}
+        {busy && !pipelineStatus && <BusyDots lastUsedTools={lastUsedTools} onRefresh={refreshConversation} onCancel={cancelInFlight} />}
       </div>
 
       {attachments.length > 0 && (
