@@ -132,6 +132,12 @@
 [functions."mktg-job-stat-freshness"]
   schedule = "0 21 1 1,4,7,10 *"
 
+# Every minute -- poll Veo for any pending video generation jobs and
+# finalise (download + upload + mark ready) the ones that completed. Means
+# Curtis doesn't have to keep the chat tab open while a video renders.
+[functions."mktg-job-poll-videos"]
+  schedule = "* * * * *"
+
 # ── CKF SPA: any /ckf/* request that isn't a real file falls back to /ckf/index.html ──
 [[redirects]]
   from = "/ckf/*"
