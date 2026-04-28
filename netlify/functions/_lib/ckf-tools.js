@@ -559,6 +559,98 @@ Don't create vague goals. For numeric, ask one question if target is missing.`,
     },
   },
 
+  // ─── Influencer registry + contract generation ────────────────────────────
+  {
+    name: 'list_influencers',
+    description: "List influencers / creators in the registry. Filterable by platform, status (prospect/contacted/sample_sent/active/churned/blocked), niche tags, or free-text query (matches name + handle + notes). Returns up to 50 by default; sorted by last_contacted_at DESC.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        q:          { type: 'string', description: 'free-text search across name + handle + notes' },
+        platform:   { type: 'string' },
+        status:     { type: 'string', enum: ['prospect','contacted','sample_sent','active','churned','blocked'] },
+        tag:        { type: 'string' },
+        limit:      { type: 'integer', minimum: 1, maximum: 200 },
+      },
+    },
+  },
+  {
+    name: 'get_influencer',
+    description: 'Full detail for one influencer including contracts attached to them.',
+    input_schema: {
+      type: 'object',
+      properties: { influencer_id: { type: 'string' } },
+      required: ['influencer_id'],
+    },
+  },
+  {
+    name: 'add_influencer',
+    description: "Add a new influencer to the registry. Use when Curtis describes a new creator he wants tracked. Required: name + platform. Everything else optional but capture what he gives you. Returns the new influencer_id.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        name:             { type: 'string' },
+        handle:           { type: 'string', description: 'no leading @' },
+        platform:         { type: 'string', enum: ['instagram','tiktok','youtube','shorts','threads','facebook','x','twitch','blog','other'] },
+        email:            { type: 'string' },
+        phone:            { type: 'string' },
+        agent_contact:    { type: 'string', description: 'manager / agent contact if relevant' },
+        follower_count:   { type: 'integer' },
+        audience_geo:     { type: 'string' },
+        audience_segment: { type: 'string', description: "e.g. 'cold NZ women 28-55, eczema mums'" },
+        niche_tags:       { type: 'array', items: { type: 'string' } },
+        status:           { type: 'string', enum: ['prospect','contacted','sample_sent','active','churned','blocked'], description: "default 'prospect'" },
+        rate_card_nzd:    { type: 'object', description: '{ post: 250, reel: 600, story: 100 } etc.' },
+        notes:            { type: 'string' },
+      },
+      required: ['name','platform'],
+    },
+  },
+  {
+    name: 'update_influencer',
+    description: "Update fields on an existing influencer. Use when status changes, rates update, or Curtis says 'add a note that ___'.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        influencer_id:    { type: 'string' },
+        name:             { type: 'string' },
+        handle:           { type: 'string' },
+        platform:         { type: 'string' },
+        email:            { type: 'string' },
+        phone:            { type: 'string' },
+        agent_contact:    { type: 'string' },
+        follower_count:   { type: 'integer' },
+        audience_geo:     { type: 'string' },
+        audience_segment: { type: 'string' },
+        niche_tags:       { type: 'array', items: { type: 'string' } },
+        status:           { type: 'string' },
+        rate_card_nzd:    { type: 'object' },
+        notes:            { type: 'string' },
+        last_contacted_at: { type: 'string', description: 'ISO timestamp' },
+      },
+      required: ['influencer_id'],
+    },
+  },
+  {
+    name: 'generate_influencer_contract',
+    description: "Render a content-use agreement / paid-collab / UGC-purchase / sample-test contract for an influencer. The AI fills the template using PrimalPantry's standard terms + the variables Curtis provides (deliverables, fee, exclusivity, usage rights, term). Persists the rendered text in mktg_influencer_contracts with status='draft' so Curtis can email it. Returns contract_id + rendered text.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        influencer_id:    { type: 'string' },
+        kind:             { type: 'string', enum: ['content_use_agreement','paid_collaboration','ugc_purchase','sample_test','exclusivity_addendum'] },
+        deliverables:     { type: 'string', description: 'plain-language list, e.g. "1 reel + 3 stories within 14 days"' },
+        fee_nzd:          { type: 'number', description: 'omit for sample_test / unpaid use_agreement' },
+        usage_rights:     { type: 'string', description: 'e.g. "PrimalPantry may repurpose the content for paid social ads for 12 months"' },
+        exclusivity:      { type: 'string', description: 'e.g. "no competing tallow-skincare brand collabs for 30 days post-publish"' },
+        term_months:      { type: 'integer', description: 'how long the usage rights last' },
+        deadline_iso:     { type: 'string', description: "deadline for delivery (ISO date)" },
+        notes:            { type: 'string', description: 'anything specific to add' },
+      },
+      required: ['influencer_id','kind'],
+    },
+  },
+
   // ─── B-roll batch from script (OpenAI gpt-image-1, parallel) ─────────────
   {
     name: 'generate_broll_for_creative',
@@ -1277,6 +1369,102 @@ async function execute(name, input, ctx) {
       return { days, metrics: rows };
     }
 
+    // ── Influencer registry tools ───────────────────────────────────────
+    case 'list_influencers': {
+      const filters = ['select=*', `user_id=eq.${userId}`];
+      if (input?.platform) filters.push(`platform=eq.${encodeURIComponent(input.platform)}`);
+      if (input?.status)   filters.push(`status=eq.${encodeURIComponent(input.status)}`);
+      if (input?.tag)      filters.push(`niche_tags=cs.{${encodeURIComponent(input.tag)}}`);
+      if (input?.q) {
+        const q = encodeURIComponent(input.q);
+        filters.push(`or=(name.ilike.*${q}*,handle.ilike.*${q}*,notes.ilike.*${q}*)`);
+      }
+      const limit = Math.min(Math.max(input?.limit || 50, 1), 200);
+      filters.push(`order=last_contacted_at.desc.nullslast,created_at.desc&limit=${limit}`);
+      const rows = await sbSelect('mktg_influencers', filters.join('&'));
+      return { influencers: rows };
+    }
+    case 'get_influencer': {
+      if (!input?.influencer_id) return { error: 'influencer_id required' };
+      const enc = encodeURIComponent(input.influencer_id);
+      const [influencerRows, contractRows] = await Promise.all([
+        sbSelect('mktg_influencers', `influencer_id=eq.${enc}&user_id=eq.${userId}&select=*&limit=1`),
+        sbSelect('mktg_influencer_contracts', `influencer_id=eq.${enc}&user_id=eq.${userId}&select=contract_id,kind,status,sent_at,signed_at,signed_by_name,created_at&order=created_at.desc&limit=20`),
+      ]);
+      const influencer = influencerRows?.[0];
+      if (!influencer) return { error: 'influencer not found' };
+      return { influencer, contracts: contractRows || [] };
+    }
+    case 'add_influencer': {
+      if (!input?.name || !input?.platform) return { error: 'name + platform required' };
+      const row = await sbInsert('mktg_influencers', {
+        user_id: userId,
+        name: input.name,
+        handle: input.handle || null,
+        platform: input.platform,
+        email: input.email || null,
+        phone: input.phone || null,
+        agent_contact: input.agent_contact || null,
+        follower_count: input.follower_count || null,
+        audience_geo: input.audience_geo || null,
+        audience_segment: input.audience_segment || null,
+        niche_tags: Array.isArray(input.niche_tags) ? input.niche_tags : [],
+        status: input.status || 'prospect',
+        rate_card_nzd: input.rate_card_nzd || null,
+        notes: input.notes || null,
+        source: 'chat',
+      });
+      const r1 = Array.isArray(row) ? row[0] : row;
+      return { added: true, influencer_id: r1?.influencer_id, influencer: r1 };
+    }
+    case 'update_influencer': {
+      if (!input?.influencer_id) return { error: 'influencer_id required' };
+      const allowed = ['name','handle','platform','email','phone','agent_contact','follower_count','audience_geo','audience_segment','niche_tags','status','rate_card_nzd','notes','last_contacted_at'];
+      const patch = { updated_at: new Date().toISOString() };
+      for (const k of allowed) if (input[k] !== undefined) patch[k] = input[k];
+      const updated = await sbUpdate(
+        'mktg_influencers',
+        `influencer_id=eq.${encodeURIComponent(input.influencer_id)}&user_id=eq.${userId}`,
+        patch,
+      );
+      return { updated: true, influencer: Array.isArray(updated) ? updated[0] : updated };
+    }
+    case 'generate_influencer_contract': {
+      if (!input?.influencer_id || !input?.kind) return { error: 'influencer_id + kind required' };
+      const rows = await sbSelect(
+        'mktg_influencers',
+        `influencer_id=eq.${encodeURIComponent(input.influencer_id)}&user_id=eq.${userId}&select=*&limit=1`,
+      );
+      const inf = rows?.[0];
+      if (!inf) return { error: 'influencer not found' };
+      const rendered = renderInfluencerContract({ influencer: inf, ...input });
+      const payload = {
+        deliverables: input.deliverables || null,
+        fee_nzd: input.fee_nzd ?? null,
+        usage_rights: input.usage_rights || null,
+        exclusivity: input.exclusivity || null,
+        term_months: input.term_months || null,
+        deadline_iso: input.deadline_iso || null,
+        notes: input.notes || null,
+      };
+      const inserted = await sbInsert('mktg_influencer_contracts', {
+        user_id: userId,
+        influencer_id: input.influencer_id,
+        kind: input.kind,
+        payload,
+        rendered_text: rendered.text,
+        rendered_html: rendered.html,
+        status: 'draft',
+      });
+      const r1 = Array.isArray(inserted) ? inserted[0] : inserted;
+      return {
+        contract_id: r1?.contract_id,
+        kind: input.kind,
+        rendered_text: rendered.text,
+        copy_text: '\n\n— Copy the contract above into your email and send. Mark it sent via update_influencer (status=contacted) once delivered. —\n',
+      };
+    }
+
     case 'generate_broll_for_creative': {
       if (!input?.creative_id) return { error: 'creative_id required' };
       try {
@@ -1504,6 +1692,118 @@ async function queueRepoTask(userId, input, repo, label) {
       fallback_reason: `website_tasks table or repo column missing — saved as business_task instead. Apply supabase-website-tasks.sql to enable the ${repo} queue.`,
     };
   }
+}
+
+// ─── Influencer contract templates ──────────────────────────────────────────
+// Standard PrimalPantry contract clauses, parameterised. Returned as plain
+// text + simple HTML (for nicer email send). Curtis can edit the rendered
+// text later via update_influencer_contract (not yet exposed; for now: edit
+// in Supabase or surface a dedicated tool when needed).
+function renderInfluencerContract({ influencer, kind, deliverables, fee_nzd, usage_rights, exclusivity, term_months, deadline_iso, notes }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const deadline = deadline_iso ? new Date(deadline_iso).toISOString().slice(0, 10) : null;
+  const fee = (typeof fee_nzd === 'number') ? `NZ$${fee_nzd.toFixed(2)}` : null;
+  const term = term_months ? `${term_months} months from publication date` : '12 months from publication date';
+  const handleLine = influencer.handle ? `${influencer.platform} @${influencer.handle}` : influencer.platform;
+
+  const titleByKind = {
+    content_use_agreement: 'Content Use Agreement',
+    paid_collaboration:    'Paid Collaboration Agreement',
+    ugc_purchase:          'UGC Content Purchase Agreement',
+    sample_test:           'Product Test Agreement',
+    exclusivity_addendum:  'Exclusivity Addendum',
+  };
+  const title = titleByKind[kind] || 'Creator Agreement';
+
+  const lines = [];
+  lines.push(`# PrimalPantry — ${title}`);
+  lines.push(`Date: ${today}`);
+  lines.push(``);
+  lines.push(`**Between**`);
+  lines.push(`PrimalPantry NZ Ltd (Christchurch, NZ) — "PrimalPantry"`);
+  lines.push(`and`);
+  lines.push(`${influencer.name} (${handleLine}) — "Creator"`);
+  if (influencer.email) lines.push(`Creator email: ${influencer.email}`);
+  lines.push(``);
+
+  lines.push(`## 1. Deliverables`);
+  if (deliverables) {
+    lines.push(deliverables);
+  } else if (kind === 'sample_test') {
+    lines.push(`- Creator receives PrimalPantry product sample(s) at no charge to test in good faith.`);
+    lines.push(`- No content delivery is required, but if the Creator chooses to post, clauses 2-4 below apply.`);
+  } else {
+    lines.push(`- (deliverables to be specified — fill the deliverables field)`);
+  }
+  if (deadline) lines.push(``, `Deadline for delivery: ${deadline}.`);
+  lines.push(``);
+
+  lines.push(`## 2. Fee`);
+  if (fee) {
+    lines.push(`PrimalPantry will pay Creator ${fee} (NZD), inclusive of GST where applicable, within 14 days of delivery + acceptance of the deliverables described in §1.`);
+  } else if (kind === 'sample_test') {
+    lines.push(`No fee. The product sample is the consideration.`);
+  } else if (kind === 'content_use_agreement') {
+    lines.push(`No fee. This agreement covers PrimalPantry's permission to use Creator's existing public content as outlined in §3.`);
+  } else {
+    lines.push(`No fee specified. (If this is a paid engagement, set fee_nzd in the contract payload.)`);
+  }
+  lines.push(``);
+
+  lines.push(`## 3. Usage Rights`);
+  if (usage_rights) {
+    lines.push(usage_rights);
+  } else {
+    lines.push(`Creator grants PrimalPantry a non-exclusive, royalty-free licence to:`);
+    lines.push(`- Repurpose the deliverables (and/or pre-existing public content named below) on PrimalPantry's owned channels (web, email, organic social)`);
+    lines.push(`- Use the deliverables in paid social advertising (Meta, TikTok, YouTube, Google) for ${term}.`);
+    lines.push(`- Edit, crop, caption, subtitle, and recompose the content provided the Creator's identity is not misrepresented.`);
+    lines.push(``);
+    lines.push(`Creator retains copyright. Creator confirms they own (or have full rights to) every element of the supplied content (footage, voice, music, third-party appearances).`);
+  }
+  lines.push(``);
+
+  lines.push(`## 4. Brand & Compliance`);
+  lines.push(`- Content must NOT make medical claims about PrimalPantry products (cure / treat / heal / fix). PrimalPantry is a Gold Supporter of the Eczema Association of New Zealand and that relationship requires we never overpromise.`);
+  lines.push(`- Content must comply with NZ Advertising Standards Authority code, the Fair Trading Act, and (where applicable) Meta / TikTok / YouTube branded-content disclosure rules.`);
+  lines.push(`- Tallow is rendered beef fat. PrimalPantry's brand voice is upfront about that. Creator agrees not to obscure the ingredient.`);
+  lines.push(``);
+
+  if (kind === 'exclusivity_addendum' || exclusivity) {
+    lines.push(`## 5. Exclusivity`);
+    lines.push(exclusivity || `Creator agrees not to publish content for any competing tallow-skincare or natural-skincare brand for 30 days post-publish of the deliverables in §1.`);
+    lines.push(``);
+  }
+
+  lines.push(`## ${exclusivity || kind === 'exclusivity_addendum' ? '6' : '5'}. Term`);
+  lines.push(`This agreement runs for ${term}. PrimalPantry may continue to use deliverables published prior to expiry on owned channels indefinitely; paid-ad usage ends with the term unless extended in writing.`);
+  lines.push(``);
+
+  lines.push(`## ${exclusivity || kind === 'exclusivity_addendum' ? '7' : '6'}. Termination`);
+  lines.push(`Either party may terminate with 14 days' written notice. PrimalPantry may pull paid ads using the content immediately on Creator's written request and will do so within 7 days. Fees earned before termination are not refundable.`);
+  lines.push(``);
+
+  if (notes) {
+    lines.push(`## Additional notes`);
+    lines.push(notes);
+    lines.push(``);
+  }
+
+  lines.push(`## Acceptance`);
+  lines.push(`Creator: ${influencer.name}`);
+  lines.push(`Signature: _______________________________`);
+  lines.push(`Date: _______________________________`);
+  lines.push(``);
+  lines.push(`PrimalPantry: Curtis Fairweather, Founder`);
+  lines.push(`Signature: _______________________________`);
+  lines.push(`Date: ${today}`);
+
+  const text = lines.join('\n');
+  const html = `<pre style="font-family:Inter,system-ui,sans-serif;white-space:pre-wrap;">${escapeHtml(text)}</pre>`;
+  return { text, html };
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
 
 module.exports = { TOOLS, execute, clip, nzToday };
