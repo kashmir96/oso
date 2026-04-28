@@ -482,7 +482,6 @@ export default function Chat({ embedded = false, scope = 'personal' }) {
     setHistoryOpen(false);
   }
 
-  if (err) return <div className="app"><div className="error">{err}</div></div>;
   // Render the shell immediately even before the conversation loads — so the
   // composer + voice/camera buttons are present right away. Input is disabled
   // until id resolves; the stream shows a quiet "Opening…" placeholder.
@@ -512,6 +511,9 @@ export default function Chat({ embedded = false, scope = 'personal' }) {
   // and auto-fire the strategy stage via the direct endpoint (NOT the chat
   // AI -- that's how we avoid 504s from chained Sonnet calls in one tool
   // loop). The first card lands in the conversation as a result.
+  // CRITICAL: this useEffect MUST be declared before any conditional
+  // early returns (e.g. `if (err) return ...`) -- otherwise hook order
+  // changes between renders and React tears the whole component down.
   useEffect(() => {
     if (!ready || busy) return;
     // Walk recent messages looking for a tool_use creative_pipeline call
@@ -605,6 +607,10 @@ export default function Chat({ embedded = false, scope = 'personal' }) {
   // "thinking…" subtly.
   const lastAsst = [...messages].reverse().find((m) => m.role === 'assistant');
   const lastUsedTools = (lastAsst?.content_blocks || []).filter((b) => b?.type === 'tool_use').map((b) => b.name);
+
+  // Early returns AFTER all hooks have been called, never before -- React
+  // requires the same hook order on every render.
+  if (err && !ready) return <div className="app"><div className="error">{err}</div></div>;
 
   return (
     <div className={`chat-shell ${embedded ? 'chat-embedded' : ''}`}>
