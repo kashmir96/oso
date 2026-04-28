@@ -505,6 +505,104 @@ exports.handler = withGate(async (event, { user }) => {
       });
     }
 
+    // ── B-roll auto-gen: one image per broll_shot in the creative's script ─
+    // The wrap_script stage produces a broll_shots array on
+    // creative.components.script.broll_shots. This action turns each entry
+    // into an AI-generated still by running them in parallel through
+    // OpenAI gpt-image-1. Brand-prefixes the prompts so generations stay
+    // on PrimalPantry visual register. Caps at 6 to fit in the timeout.
+    if (action === 'generate_broll_for_creative') {
+      if (!body.creative_id) return reply(400, { error: 'creative_id required' });
+      const rows = await sbSelect(
+        'mktg_creatives',
+        `creative_id=eq.${encodeURIComponent(body.creative_id)}&select=user_id,components,brief&limit=1`
+      );
+      const c = rows?.[0];
+      if (!c) return reply(404, { error: 'creative not found' });
+      if (c.user_id && c.user_id !== user.id) return reply(403, { error: 'creative belongs to another user' });
+
+      // Pull broll_shots from the script. Allow override via body.shots.
+      const shots = Array.isArray(body.shots) && body.shots.length
+        ? body.shots
+        : (c.components?.script?.broll_shots || c.components?.script?.shot_list || []);
+      if (!Array.isArray(shots) || shots.length === 0) {
+        return reply(400, { error: 'no broll_shots on this creative -- run the script wrap stage first or pass shots[]' });
+      }
+      const cap = Math.min(parseInt(body.cap, 10) || 6, 6);
+      const limited = shots.slice(0, cap);
+      const size = body.size || '1024x1536';   // 9:16 default for vertical b-roll
+      // Brand-prefix every prompt so the generations stay on register.
+      const brandPrefix = body.brand_prefix || 'PrimalPantry NZ tallow skincare brand visual style: warm, plain-spoken, kiwi-coded. ';
+      // Optional seed (existing product photo) for image-to-image variations.
+      let seedUrl = null;
+      if (body.seed_asset_id) {
+        const seedRows = await sbSelect(
+          'mktg_generated_assets',
+          `asset_id=eq.${encodeURIComponent(body.seed_asset_id)}&select=storage_path,user_id&limit=1`
+        );
+        if (seedRows?.[0]) seedUrl = publicUrlFor(seedRows[0].storage_path);
+      }
+
+      // Run them in parallel. Each call should complete in 5-10s; 6 in
+      // parallel finishes inside the 26s timeout.
+      const t0 = Date.now();
+      const tasks = limited.map((shot) => (async () => {
+        try {
+          const prompt = `${brandPrefix}${shot}`;
+          const result = await generateOpenAIImage({ prompt, n: 1, size, seedAssetUrl: seedUrl });
+          const item = result.items[0];
+          if (!item) return null;
+          let buf;
+          if (item.buf) buf = item.buf;
+          else if (item.url) {
+            const r = await fetch(item.url);
+            if (!r.ok) return null;
+            buf = Buffer.from(await r.arrayBuffer());
+          } else return null;
+          const storage_path = await uploadToBucket({
+            userId: user.id, kind: 'image', buf, mimeType: 'image/png', ext: 'png',
+          });
+          const row = await sbInsert('mktg_generated_assets', {
+            user_id: user.id,
+            creative_id: body.creative_id,
+            kind: 'image',
+            provider: 'openai',
+            model: OPENAI_IMAGE_MODEL,
+            prompt,
+            seed_asset_id: body.seed_asset_id || null,
+            storage_path,
+            mime_type: 'image/png',
+            size_bytes: buf.length,
+            width: parseInt(size.split('x')[0], 10) || null,
+            height: parseInt(size.split('x')[1], 10) || null,
+            cost_usd: OPENAI_IMAGE_COSTS[size] || 0.06,
+            status: 'ready',
+            ready_at: new Date().toISOString(),
+          });
+          const r1 = Array.isArray(row) ? row[0] : row;
+          return { asset_id: r1?.asset_id, public_url: publicUrlFor(storage_path), prompt };
+        } catch (e) {
+          console.error('[broll]', shot, e?.message || e);
+          return { error: e?.message || String(e), prompt: shot };
+        }
+      })());
+      const results = await Promise.all(tasks);
+      const ok    = results.filter((r) => r && !r.error);
+      const fails = results.filter((r) => r && r.error);
+      logUsage({
+        user_id: user.id, provider: 'openai', action: 'broll_batch',
+        model: OPENAI_IMAGE_MODEL, chars: limited.join(' ').length,
+      });
+      return reply(200, {
+        ok: true,
+        generated: ok.length, failed: fails.length, requested: limited.length,
+        assets: ok,
+        failures: fails,
+        cost_usd: ok.length * (OPENAI_IMAGE_COSTS[size] || 0.06),
+        latency_ms: Date.now() - t0,
+      });
+    }
+
     // ── Upload finished asset (production team uploads the rendered video) ─
     // After the assistant produces the actual creative file, they upload it
     // here so it lives alongside the AI-generated drafts in mktg-assets.

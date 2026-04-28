@@ -559,6 +559,22 @@ Don't create vague goals. For numeric, ask one question if target is missing.`,
     },
   },
 
+  // ─── B-roll batch from script (OpenAI gpt-image-1, parallel) ─────────────
+  {
+    name: 'generate_broll_for_creative',
+    description: "Auto-generate one AI image per broll_shot in the creative's script (the list produced by the wrap_script stage). Used when Curtis says 'generate broll for this creative', 'b-roll please', 'fill in the shots'. Optionally pass seed_asset_id (an existing product photo) to keep all generations grounded in the real product. Caps at 6 shots to fit the timeout. Cost roughly $0.06 per shot at 9:16.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        creative_id:   { type: 'string', description: 'the creative whose broll_shots to render' },
+        cap:           { type: 'integer', minimum: 1, maximum: 6, description: 'max number of shots to generate (default 6)' },
+        seed_asset_id: { type: 'string', description: 'optional — anchor every shot off an existing product image (image-to-image)' },
+        size:          { type: 'string', enum: ['1024x1024','1024x1536','1536x1024'], description: 'default 1024x1536 (9:16 for reels)' },
+      },
+      required: ['creative_id'],
+    },
+  },
+
   // ─── AI captions from voiceover (ElevenLabs STT) ──────────────────────────
   {
     name: 'generate_captions',
@@ -1259,6 +1275,29 @@ async function execute(name, input, ctx) {
         `user_id=eq.${userId}&date=gte.${since}&order=date.desc&limit=${days}&select=date,recovery_score,hrv_rmssd_ms,resting_heart_rate,strain,sleep_performance,sleep_hours,sleep_efficiency`
       );
       return { days, metrics: rows };
+    }
+
+    case 'generate_broll_for_creative': {
+      if (!input?.creative_id) return { error: 'creative_id required' };
+      try {
+        const mktgAssets = require('../mktg-assets.js');
+        const fakeEvent = {
+          httpMethod: 'POST',
+          body: JSON.stringify({
+            action: 'generate_broll_for_creative',
+            creative_id: input.creative_id,
+            cap: input.cap,
+            seed_asset_id: input.seed_asset_id,
+            size: input.size,
+          }),
+        };
+        const res = await mktgAssets.handler(fakeEvent, { user: { id: userId } });
+        let parsed; try { parsed = JSON.parse(res.body); } catch { parsed = {}; }
+        if (res.statusCode >= 400) return { error: parsed.error || `broll batch failed (${res.statusCode})` };
+        return parsed;
+      } catch (e) {
+        return { error: e.message || 'broll gen failed' };
+      }
     }
 
     case 'generate_captions': {
