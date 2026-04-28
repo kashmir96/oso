@@ -18,6 +18,18 @@ import PipelineCard from '../components/PipelineCard.jsx';
 // + stages + approve + VO + assistant submit, all inline. The Creative page
 // becomes a view-only result card he visits when the flow ends.
 
+// Map raw stage keys to user-friendly labels for the running-status pill.
+function prettyStageName(stage) {
+  return ({
+    strategy:    'strategy',
+    variants_ad: 'ad variants',
+    outline:     'outline',
+    hooks:       'hooks',
+    draft:       'draft script',
+    critique:    'critique',
+  }[stage]) || stage;
+}
+
 // Help-text generator: a static list of every typed trigger + slash command
 // the chat understands. Rendered locally as a chat message when Curtis types
 // /help. Scope-aware — business chat shows the marketing-only triggers;
@@ -617,6 +629,23 @@ export default function Chat({ embedded = false, scope = 'personal' }) {
   // don't double-fire on every render. Set keyed by creative_id.
   const autoFiredRef = useRef(new Set());
 
+  // Pipeline-stage status indicator. Set when a slow stage is running so
+  // Curtis can see "Running variants… 8s" instead of just generic dots.
+  // Cleared when the stage completes (success or error).
+  // Shape: { stage: 'variants_ad', startedAt: epoch_ms, label?: string } | null
+  const [pipelineStatus, setPipelineStatus] = useState(null);
+  const [statusTick, setStatusTick] = useState(0); // forces re-render every second while a stage runs
+  useEffect(() => {
+    if (!pipelineStatus) return;
+    const t = setInterval(() => setStatusTick((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [pipelineStatus]);
+  // statusTick is read implicitly via Date.now() during render; reference
+  // it once so React knows this component depends on it (avoids the
+  // "value never used" warning AND ensures the second-by-second tick
+  // actually re-renders the elapsed counter).
+  void statusTick;
+
   // Detect successful intake_brief tool results in fresh assistant messages
   // and auto-fire the strategy stage via the direct endpoint (NOT the chat
   // AI -- that's how we avoid 504s from chained Sonnet calls in one tool
@@ -657,6 +686,7 @@ export default function Chat({ embedded = false, scope = 'personal' }) {
     autoFiredRef.current.add(pendingCreativeId);
     (async () => {
       setBusy(true); setErr('');
+      setPipelineStatus({ stage: 'strategy', startedAt: Date.now(), label: 'Generating strategy' });
       try {
         await call('mktg-ads', {
           action: 'pipeline_run_stage_for_card',
@@ -668,7 +698,10 @@ export default function Chat({ embedded = false, scope = 'personal' }) {
       } catch (e) {
         const isTimeout = e.status === 504 || e.status === 502;
         setErr(isTimeout ? 'Strategy is still generating -- card will appear in a moment, refresh if it doesn\'t.' : e.message);
-      } finally { setBusy(false); }
+      } finally {
+        setBusy(false);
+        setPipelineStatus(null);
+      }
     })();
   }, [messages, ready, busy, id]);
 
@@ -696,6 +729,10 @@ export default function Chat({ embedded = false, scope = 'personal' }) {
     // Run the next slow stage directly. The endpoint inserts a new card
     // message into the conversation; we refresh after to see it.
     setBusy(true); setErr('');
+    setPipelineStatus({
+      stage: next_stage_hint, startedAt: Date.now(),
+      label: `Generating ${prettyStageName(next_stage_hint)}`,
+    });
     try {
       await call('mktg-ads', {
         action: 'pipeline_run_stage_for_card',
@@ -710,7 +747,10 @@ export default function Chat({ embedded = false, scope = 'personal' }) {
     } catch (e) {
       const isTimeout = e.status === 504 || e.status === 502;
       setErr(isTimeout ? 'Stage ran longer than expected -- refresh in a moment to see the next card.' : e.message);
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+      setPipelineStatus(null);
+    }
   }
 
   // Detect any tool_use blocks in the most recent assistant turn so we can hint
@@ -796,7 +836,27 @@ export default function Chat({ embedded = false, scope = 'personal' }) {
             onClose={() => setRecordWidget(null)}
           />
         )}
-        {busy && (
+        {/* Pipeline-stage status: when a slow stage is running directly
+            (not through the chat AI), show which stage + how long. Lets
+            Curtis distinguish "behind-the-scenes work" from "stuck". */}
+        {pipelineStatus && (() => {
+          const elapsed = Math.floor((Date.now() - pipelineStatus.startedAt) / 1000);
+          const isLong  = elapsed > 18;
+          return (
+            <div className="bubble assistant ghost">
+              <div className="bubble-text">
+                <span className="dots"><span/><span/><span/></span>
+                <span style={{ marginLeft: 8, fontSize: 12 }}>
+                  {pipelineStatus.label || `Running ${prettyStageName(pipelineStatus.stage)}`}…
+                </span>
+                <span style={{ marginLeft: 6, fontSize: 11, color: isLong ? 'var(--warn, #d2891f)' : 'var(--text-muted)' }}>
+                  {elapsed}s{isLong ? ' (longer than usual — still working)' : ''}
+                </span>
+              </div>
+            </div>
+          );
+        })()}
+        {busy && !pipelineStatus && (
           <div className="bubble assistant ghost">
             <div className="bubble-text">
               <span className="dots"><span/><span/><span/></span>
