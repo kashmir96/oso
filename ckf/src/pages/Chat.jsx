@@ -173,6 +173,23 @@ export default function Chat({ embedded = false, scope = 'personal' }) {
       return;
     }
 
+    // Slash commands -- client-side intercepts. /new and /reset start a
+    // fresh conversation; /clear deletes the current one as well so it
+    // doesn't clutter the history sidebar (useful for wiping a failed
+    // marketing-mode pipeline). All bypass the chat API.
+    const lower = text.toLowerCase().trim();
+    if (lower === '/new' || lower === '/reset') {
+      setDraft('');
+      await resetChat();
+      return;
+    }
+    if (lower === '/clear' || lower === '/delete') {
+      setDraft('');
+      if (!confirm('Delete this conversation and start fresh?')) return;
+      await resetChat({ discard: true });
+      return;
+    }
+
     setDraft('');
     setBusy(true); setErr('');
     const payloadAttachments = attachments.map(({ kind, media_type, data_base64, filename }) => ({
@@ -482,6 +499,22 @@ export default function Chat({ embedded = false, scope = 'personal' }) {
     setHistoryOpen(false);
   }
 
+  // "Reset" — start a fresh conversation in the same scope. Used for the
+  // /reset and /new slash commands and the Reset button in the header.
+  // Optionally deletes the current conversation if `discard` is true.
+  async function resetChat({ discard = false } = {}) {
+    if (discard && id) {
+      try { await call('ckf-chat', { action: 'delete_conversation', id }); }
+      catch { /* swallow -- starting fresh is more important than cleanup */ }
+    }
+    autoFiredRef.current = new Set();
+    setSubmittedCards(new Set());
+    setMessages([]);
+    setRecordWidget(null);
+    setErr('');
+    await newChat();
+  }
+
   // Render the shell immediately even before the conversation loads — so the
   // composer + voice/camera buttons are present right away. Input is disabled
   // until id resolves; the stream shows a quiet "Opening…" placeholder.
@@ -621,6 +654,17 @@ export default function Chat({ embedded = false, scope = 'personal' }) {
             <div style={{ fontWeight: 600 }}>{conversation?.title || 'New chat'}</div>
             <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{conversation?.nz_date ? fmtShortDate(conversation.nz_date) : ''}</div>
           </div>
+          {/* Discard + restart for failed marketing-mode runs. The + button
+              starts a new conversation but leaves the old one in history;
+              this nukes the current row entirely. Click guarded by a
+              confirm dialog. Same effect as typing "/clear". */}
+          <button
+            onClick={() => { if (confirm('Delete this conversation and start fresh?')) resetChat({ discard: true }); }}
+            className="chat-icon-btn"
+            aria-label="Reset and discard this chat"
+            title="Reset (deletes this conversation)"
+            style={{ opacity: 0.7 }}
+          >↻</button>
           <button onClick={newChat} className="chat-icon-btn" aria-label="New chat">+</button>
         </header>
       )}
