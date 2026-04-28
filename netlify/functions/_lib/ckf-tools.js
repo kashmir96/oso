@@ -568,16 +568,15 @@ Don't create vague goals. For numeric, ask one question if target is missing.`,
   // pipeline state in one place.
   {
     name: 'creative_pipeline',
-    description: "Drive the chat-conversational creative pipeline. ONLY use in business chat when Curtis says 'marketing mode' / 'let's make an ad' / 'create an ad' / similar. Walk him conversationally through the steps below; ONE question per turn, batch where natural. Don't enumerate the steps to him — just go.\n\nLATENCY GUARDRAIL: each pipeline stage is a separate Anthropic call (~5-15s). NEVER call this tool more than ONCE per turn, and NEVER combine it with another tool call in the same response. Wait for the result, reply, then let Curtis prompt the next step. Bunching tool calls causes 504 timeouts.\n\nFLOW:\n1. Ask creative_type (ad / video_script) + objective + audience + format + KPI + constraints. When you have ENOUGH (objective + audience + creative_type minimum), call action='intake_brief'.\n2. Call action='run_strategy'. Summarise the angle in 1-2 sentences. Ask: 'sound right or want a different angle?' If reroll, call run_strategy again.\n3a. For ads: call action='run_variants_ad'. Show 3-4 variants in compact form (just headline + axis). Ask which (1/2/3/4). Call action='pick_variant'.\n3b. For video: call action='run_outline'. Read back beats briefly. Then action='run_hooks' -> show hook variants -> action='pick_hook'. Then action='run_draft'.\n4. Call action='run_critique' (auto-repairs up to 2x silently). If verdict=ship, present the final piece. If verdict=replace, tell Curtis the angle isn't landing and offer to start fresh from strategy. If verdict=repair-cap-hit, surface the rationale and let Curtis decide.\n5. Once Curtis says 'looks good' / 'approve' / 'ship it' -- call action='approve' with a brief approval_reason from his words.\n6. Ask: 'Generate voiceover?' (only if creative has a script body). On yes: action='generate_voiceover'. Give him the public_url to copy.\n7. Ask: 'Proceed to Assistant?' On yes: action='submit_to_assistant'. Tell him: 'Done. It's in the production queue at /business/marketing/assistant.' Reply with the detail_url so he can open it.\n\nGENERAL: keep replies short (1-3 sentences). Don't dump full JSON. Cite specifics (angle name, scores) but in your own words. If a stage errors, surface the specific error in one line and ask if he wants to retry.",
+    description: "Drive the chat-conversational creative pipeline. ONLY use in business chat when Curtis says 'marketing mode' / 'let's make an ad' / 'create an ad' / similar.\n\nIMPORTANT (architecture): you DO NOT run the slow generation stages (strategy, variants, outline, hooks, draft, critique) yourself. Those are dispatched by the CLIENT directly to a separate endpoint with its own latency budget -- you'd time out if you tried. Your job is brief intake + final lifecycle (approve, voiceover, submit_to_assistant).\n\nFLOW:\n1. Ask creative_type (ad / video_script) + objective + audience + format + KPI + constraints. ONE question per turn, batch where natural. When you have ENOUGH (objective + audience + creative_type minimum), call action='intake_brief'. Reply: 'Got it -- generating strategy now.' (The client takes over and shows editable cards inline as each stage produces output. Curtis tweaks + submits each card; the client fires the next stage. You will see new pipeline_card messages appear in the conversation -- DON'T comment on them; let Curtis interact with the cards.)\n2. After Curtis approves the critique card OR says he's happy, call action='approve' with a brief approval_reason from his words.\n3. Ask: 'Generate voiceover?' (only if creative has a script body). On yes: action='generate_voiceover'. Give him the public_url.\n4. Ask: 'Proceed to Assistant?' On yes: action='submit_to_assistant'. Tell him: 'Done. It's in the production queue.' Reply with the detail_url.\n\nLATENCY GUARDRAIL: never call this tool more than ONCE per turn. Never combine with another tool call in the same response.",
     input_schema: {
       type: 'object',
       properties: {
         action: {
           type: 'string',
           enum: [
-            'intake_brief','run_strategy','run_variants_ad','pick_variant',
-            'run_outline','run_hooks','pick_hook','run_draft',
-            'run_critique','approve','generate_voiceover','submit_to_assistant',
+            'intake_brief',
+            'approve','generate_voiceover','submit_to_assistant',
           ],
         },
         creative_id: { type: 'string', description: 'required for every action after intake_brief' },
@@ -1216,77 +1215,16 @@ async function execute(name, input, ctx) {
     }
 
     case 'creative_pipeline': {
+      // Trimmed dispatcher: only fast actions live here. The slow generation
+      // stages (strategy/variants/outline/hooks/draft/critique) moved out of
+      // the chat-AI tool loop to mktg-ads.pipeline_run_stage_for_card --
+      // that endpoint is called by the CLIENT directly with its own 26s
+      // budget, avoiding the chained-Sonnet 504s.
       const pipeline = require('./mktg-pipeline.js');
       const a = input?.action;
-      // Helper: after a successful generation stage, insert a special
-      // pipeline_card message into the conversation. The chat client renders
-      // it as an editable card inline in the bubble stream. This is what
-      // gives Curtis the "tweak the bubble + submit" UX without having the
-      // AI manage the structured form (which it's bad at).
-      const emitCard = async (stage, creative_id, payload) => {
-        if (!ctx.conversationId) return;
-        try {
-          await sbInsert('ckf_messages', {
-            conversation_id: ctx.conversationId,
-            user_id:         userId,
-            role:            'assistant',
-            content_text:    null,
-            content_blocks:  [{ type: 'pipeline_card', stage, creative_id, payload }],
-          });
-        } catch (e) {
-          console.error('[creative_pipeline emitCard]', e);
-        }
-      };
-
       switch (a) {
         case 'intake_brief':
           return pipeline.intakeBrief({ userId, brief: input.brief || {}, creative_type: input.creative_type });
-
-        case 'run_strategy': {
-          const r = await pipeline.runStrategy({ user_id: userId, creative_id: input.creative_id });
-          if (r?.ok) await emitCard('strategy', input.creative_id, {
-            primary_angle: r.angle, audience_message_fit: r.audience_fit,
-            exemplar_strength: r.exemplar_strength, flags: r.flags,
-            citations_n: r.citations_n,
-          });
-          return r;
-        }
-        case 'run_variants_ad': {
-          const r = await pipeline.runVariants({ user_id: userId, creative_id: input.creative_id });
-          if (r?.ok) await emitCard('variants_ad', input.creative_id, { variants: r.variants });
-          return r;
-        }
-        case 'pick_variant':
-          return pipeline.pickVariant({ creative_id: input.creative_id, idx: input.idx });
-        case 'run_outline': {
-          const r = await pipeline.runOutline({ user_id: userId, creative_id: input.creative_id });
-          if (r?.ok) await emitCard('outline', input.creative_id, {
-            structure_template: r.structure, runtime: r.runtime,
-            beats: r.beats, // already pre-formatted strings; widget will let user override
-          });
-          return r;
-        }
-        case 'run_hooks': {
-          const r = await pipeline.runHooks({ user_id: userId, creative_id: input.creative_id });
-          if (r?.ok) await emitCard('hooks', input.creative_id, { hooks: r.hooks });
-          return r;
-        }
-        case 'pick_hook':
-          return pipeline.pickHook({ creative_id: input.creative_id, idx: input.idx });
-        case 'run_draft': {
-          const r = await pipeline.runDraft({ user_id: userId, creative_id: input.creative_id });
-          if (r?.ok) await emitCard('draft', input.creative_id, {
-            full_script: r.full_script, word_count: r.word_count,
-          });
-          return r;
-        }
-        case 'run_critique': {
-          const r = await pipeline.runCritiqueWithRepair({ user_id: userId, creative_id: input.creative_id });
-          if (r?.ok) await emitCard('critique', input.creative_id, {
-            verdict: r.verdict, scores: r.scores, rationale: r.rationale, repairs_used: r.repairs_used,
-          });
-          return r;
-        }
         case 'approve':
           return pipeline.approveCreative({ creative_id: input.creative_id, approval_reason: input.approval_reason, feedback_analysis: input.feedback_analysis });
         case 'generate_voiceover':
@@ -1294,7 +1232,7 @@ async function execute(name, input, ctx) {
         case 'submit_to_assistant':
           return pipeline.submitToAssistant({ creative_id: input.creative_id });
         default:
-          return { error: `unknown creative_pipeline action: ${a}` };
+          return { error: `unknown creative_pipeline action: ${a}. Slow stages (run_*) are now client-driven via /mktg-ads pipeline_run_stage_for_card.` };
       }
     }
 

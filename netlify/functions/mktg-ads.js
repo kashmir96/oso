@@ -698,10 +698,64 @@ exports.handler = withGate(async (event, { user }) => {
       return reply(r.error ? 400 : 200, r);
     }
 
+    // SPLIT EXECUTION: the chat AI used to call run_strategy / run_variants
+    // / etc. directly inside its tool loop. That chained 3 Sonnet calls in
+    // one HTTP window (Haiku-think + Sonnet-stage + Haiku-reply), reliably
+    // exceeding 26s. Now the client calls THIS endpoint directly to run a
+    // stage with its own fresh 26s budget. The endpoint runs the stage AND
+    // inserts a pipeline_card message into the conversation so the chat
+    // history reflects the stage. Returns success + the new message id so
+    // the client can append locally without a full conversation refetch.
+    if (action === 'pipeline_run_stage_for_card') {
+      if (!body.creative_id || !body.stage || !body.conversation_id) {
+        return reply(400, { error: 'creative_id + stage + conversation_id required' });
+      }
+      const pipeline = require('./_lib/mktg-pipeline.js');
+      const stage = body.stage;
+      const dispatch = {
+        strategy:    () => pipeline.runStrategy({ user_id: user.id, creative_id: body.creative_id }),
+        variants_ad: () => pipeline.runVariants({ user_id: user.id, creative_id: body.creative_id }),
+        outline:     () => pipeline.runOutline({  user_id: user.id, creative_id: body.creative_id }),
+        hooks:       () => pipeline.runHooks({    user_id: user.id, creative_id: body.creative_id }),
+        draft:       () => pipeline.runDraft({    user_id: user.id, creative_id: body.creative_id }),
+        critique:    () => pipeline.runCritiqueWithRepair({ user_id: user.id, creative_id: body.creative_id }),
+      };
+      if (!dispatch[stage]) return reply(400, { error: `unknown stage: ${stage}` });
+
+      const r = await dispatch[stage]();
+      if (!r?.ok) return reply(500, { error: r?.error || 'stage failed' });
+
+      // Build the same payload shape emitCard used to insert. Client renders
+      // the card from this payload via PipelineCard.
+      const payloadByStage = {
+        strategy:    () => ({ primary_angle: r.angle, audience_message_fit: r.audience_fit, exemplar_strength: r.exemplar_strength, flags: r.flags, citations_n: r.citations_n }),
+        variants_ad: () => ({ variants: r.variants }),
+        outline:     () => ({ structure_template: r.structure, runtime: r.runtime, beats: r.beats }),
+        hooks:       () => ({ hooks: r.hooks }),
+        draft:       () => ({ full_script: r.full_script, word_count: r.word_count }),
+        critique:    () => ({ verdict: r.verdict, scores: r.scores, rationale: r.rationale, repairs_used: r.repairs_used }),
+      };
+      const payload = payloadByStage[stage]();
+
+      // Insert the card message into ckf_messages so chat history persists it.
+      const inserted = await sbInsert('ckf_messages', {
+        conversation_id: body.conversation_id,
+        user_id:         user.id,
+        role:            'assistant',
+        content_text:    null,
+        content_blocks:  [{ type: 'pipeline_card', stage, creative_id: body.creative_id, payload }],
+      });
+      const msg = Array.isArray(inserted) ? inserted[0] : inserted;
+      return reply(200, {
+        ok: true, stage, message: msg,
+        cost_usd: r.cost_usd, latency_ms: r.latency_ms,
+      });
+    }
+
     // Stage-card edits from the chat bubble. Curtis tweaks the rendered
     // card (variants, outline, hooks, draft, etc.) and submits -- this
     // persists the edits onto components and returns the next-stage hint
-    // the chat AI uses to continue the flow.
+    // the client uses to fire the next stage.
     if (action === 'pipeline_save_stage_edits') {
       if (!body.creative_id || !body.stage) return reply(400, { error: 'creative_id + stage required' });
       const pipeline = require('./_lib/mktg-pipeline.js');

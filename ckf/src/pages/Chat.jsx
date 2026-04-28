@@ -504,28 +504,100 @@ export default function Chat({ embedded = false, scope = 'personal' }) {
   // advanced. Keyed by message id + block index.
   const [submittedCards, setSubmittedCards] = useState(() => new Set());
 
-  // Submit handler: persist edits already happened in PipelineCard. We
-  // post a synthetic user message back to the chat so the AI sees the
-  // approval and runs the next stage.
-  async function onCardSubmit({ stage, next_stage_hint, msgKey }) {
+  // Track which creative_ids we've already auto-fired strategy for, so we
+  // don't double-fire on every render. Set keyed by creative_id.
+  const autoFiredRef = useRef(new Set());
+
+  // Detect successful intake_brief tool results in fresh assistant messages
+  // and auto-fire the strategy stage via the direct endpoint (NOT the chat
+  // AI -- that's how we avoid 504s from chained Sonnet calls in one tool
+  // loop). The first card lands in the conversation as a result.
+  useEffect(() => {
+    if (!ready || busy) return;
+    // Walk recent messages looking for a tool_use creative_pipeline call
+    // with action='intake_brief' AND its matching tool_result with a
+    // creative_id we haven't auto-fired yet.
+    const recent = messages.slice(-8);
+    let pendingCreativeId = null;
+    for (let i = 0; i < recent.length; i++) {
+      const m = recent[i];
+      if (m.role !== 'assistant') continue;
+      const blocks = Array.isArray(m.content_blocks) ? m.content_blocks : [];
+      const intakeBrief = blocks.find((b) =>
+        b?.type === 'tool_use' && b?.name === 'creative_pipeline' && b?.input?.action === 'intake_brief'
+      );
+      if (!intakeBrief) continue;
+      // Look for the matching tool_result in the next message.
+      const next = recent[i + 1];
+      if (!next || next.role !== 'tool') continue;
+      const toolBlocks = Array.isArray(next.content_blocks) ? next.content_blocks : [];
+      const result = toolBlocks.find((b) => b?.type === 'tool_result' && b?.tool_use_id === intakeBrief.id);
+      if (!result) continue;
+      // tool_result.content is a JSON string with the pipeline.intakeBrief output.
+      let parsed = null;
+      try { parsed = typeof result.content === 'string' ? JSON.parse(result.content) : result.content; } catch {}
+      const cid = parsed?.creative_id;
+      if (cid && parsed?.ok && !autoFiredRef.current.has(cid)) {
+        pendingCreativeId = cid;
+      }
+    }
+    if (!pendingCreativeId) return;
+    autoFiredRef.current.add(pendingCreativeId);
+    (async () => {
+      setBusy(true); setErr('');
+      try {
+        await call('mktg-ads', {
+          action: 'pipeline_run_stage_for_card',
+          conversation_id: id, creative_id: pendingCreativeId, stage: 'strategy',
+        });
+        const conv = await call('ckf-chat', { action: 'get_conversation', id });
+        setMessages(conv.messages);
+        notifyChanged();
+      } catch (e) {
+        const isTimeout = e.status === 504 || e.status === 502;
+        setErr(isTimeout ? 'Strategy is still generating -- card will appear in a moment, refresh if it doesn\'t.' : e.message);
+      } finally { setBusy(false); }
+    })();
+  }, [messages, ready, busy, id]);
+
+  // Submit handler: edits were already saved by PipelineCard via
+  // pipeline_save_stage_edits. Now we directly call the run-stage endpoint
+  // (NOT through the chat AI -- that's how we avoid 504s from chained
+  // Sonnet calls in one tool loop). The endpoint runs the stage with its
+  // own 26s budget, inserts a new pipeline_card message, and we refresh
+  // the conversation.
+  async function onCardSubmit({ stage, next_stage_hint, creative_id, msgKey }) {
     setSubmittedCards((s) => new Set(s).add(msgKey));
-    // Synthesise a brief user message to advance the pipeline. Keep it
-    // explicit so the AI knows it's an auto-advance, not Curtis paraphrasing.
-    const advanceText = next_stage_hint
-      ? `Approved ${stage}. Run ${next_stage_hint} next.`
-      : `Approved ${stage}.`;
+    if (!next_stage_hint) {
+      // No next stage means we're done with the slow flow (critique was the
+      // last). Tell the AI conversationally so it can prompt approve / VO /
+      // submit-to-Assistant.
+      try {
+        const r = await call('ckf-chat', {
+          action: 'send', conversation_id: id, text: 'Approved the final stage. Ready for approval / voiceover / Assistant.', mode_hint: modeHint,
+        });
+        setMessages(r.messages);
+        notifyChanged();
+      } catch (e) { setErr(e.message); }
+      return;
+    }
+    // Run the next slow stage directly. The endpoint inserts a new card
+    // message into the conversation; we refresh after to see it.
     setBusy(true); setErr('');
     try {
-      const r = await call('ckf-chat', {
-        action: 'send', conversation_id: id, text: advanceText, mode_hint: modeHint,
+      await call('mktg-ads', {
+        action: 'pipeline_run_stage_for_card',
+        conversation_id: id,
+        creative_id,
+        stage: next_stage_hint,
       });
-      setMessages(r.messages);
-      window.dispatchEvent(new CustomEvent('ckf-assistant-text', { detail: r.text }));
+      // Refresh the conversation to pick up the freshly-inserted card.
+      const conv = await call('ckf-chat', { action: 'get_conversation', id });
+      setMessages(conv.messages);
       notifyChanged();
     } catch (e) {
-      // Even if the AI call times out, the edits are saved. Soft-error.
       const isTimeout = e.status === 504 || e.status === 502;
-      setErr(isTimeout ? 'Edits saved. AI took too long to advance — type "next" to continue.' : e.message);
+      setErr(isTimeout ? 'Stage ran longer than expected -- refresh in a moment to see the next card.' : e.message);
     } finally { setBusy(false); }
   }
 
@@ -583,7 +655,7 @@ export default function Chat({ embedded = false, scope = 'personal' }) {
                     creative_id={b.creative_id}
                     payload={b.payload}
                     locked={submittedCards.has(msgKey)}
-                    onSubmit={({ stage, next_stage_hint }) => onCardSubmit({ stage, next_stage_hint, msgKey })}
+                    onSubmit={({ stage, next_stage_hint }) => onCardSubmit({ stage, next_stage_hint, creative_id: b.creative_id, msgKey })}
                   />
                 );
               })}
