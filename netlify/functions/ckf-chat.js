@@ -24,7 +24,7 @@ const { logAnthropicUsage } = require('./_lib/ckf-usage.js');
 // and Haiku is ~3x faster. Heavier reasoning (diary AI summary, weekly summary,
 // 90-day breakdown) stays on Sonnet via _lib/ckf-ai.js.
 const MODEL = 'claude-haiku-4-5-20251001';
-const MAX_TURNS = 4;          // tool-use loop cap — keep it tight
+const MAX_TURNS = 6;          // tool-use loop cap. Was 4 -- bumped slightly so a confused AI has more room to recover before the safety net (see the post-loop fallback below) kicks in.
 const MAX_HISTORY = 24;       // most recent messages we send back to the model
 const MEMORY_LIMIT = 40;
 const RECENT_DIARY = 4;
@@ -487,6 +487,33 @@ async function runChat({ userId, conversation, userMessageText, modeHint, attach
     finalText = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
     await saveMessage(conversation.id, userId, 'assistant', finalText || '', finalBlocks, response.usage);
     break;
+  }
+
+  // Safety net: if the loop exited because we hit MAX_TURNS without ever
+  // getting a final text reply, force one more model call WITHOUT tools so
+  // it has no choice but to produce text. Otherwise Curtis sees "thinking…"
+  // forever and the conversation has no reply saved.
+  if (!finalText) {
+    try {
+      const closer = await client.messages.create({
+        model: MODEL,
+        max_tokens: 400,
+        system,
+        messages: [
+          ...messages,
+          { role: 'user', content: [{ type: 'text', text: '[Internal: hit tool-loop cap. Reply briefly with what you accomplished and what Curtis should do next. No more tool calls.]' }] },
+        ],
+      });
+      finalBlocks = closer.content;
+      finalText = closer.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim()
+        || 'I got tangled up running tools. Try rephrasing, or type /reset to start fresh.';
+      totalUsage.input_tokens  += closer.usage?.input_tokens  || 0;
+      totalUsage.output_tokens += closer.usage?.output_tokens || 0;
+      await saveMessage(conversation.id, userId, 'assistant', finalText, finalBlocks, closer.usage);
+    } catch (e) {
+      finalText = 'I got tangled up. Try rephrasing, or type /reset to start fresh.';
+      await saveMessage(conversation.id, userId, 'assistant', finalText, [{ type: 'text', text: finalText }]);
+    }
   }
 
   await touchConversation(conversation.id);
