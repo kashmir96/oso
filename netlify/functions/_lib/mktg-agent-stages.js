@@ -178,6 +178,28 @@ const PlaybookExtractSchema = z.object({
   notes_for_operator:     z.string(),
 }).strict();
 
+// wrap_script -- "fast path" stage. Curtis already has a script written.
+// This stage takes his verbatim script (in extra.script) and produces the
+// production scaffolding around it: timeline beats with timestamps,
+// B-roll suggestions, and a section breakdown. The script body is NOT
+// rewritten -- it must be preserved verbatim. Used by the chat
+// "record script" widget to skip strategy/variants/hooks/draft and go
+// straight to a producible asset.
+const WrapScriptSchema = z.object({
+  preserved_script:   z.string().min(1),
+  hook:               z.string(),
+  hook_type:          z.string(),
+  estimated_runtime:  z.string(),
+  timeline:           z.array(z.object({
+    timestamp:        z.string(),
+    spoken_line:      z.string(),
+    broll:            z.string().nullable().optional(),
+  }).strict()).min(1),
+  broll_shots:        z.array(z.string()).min(1),
+  cta_placement:      z.string(),
+  notes_for_editor:   z.string(),
+}).strict();
+
 // ─── Registry ──────────────────────────────────────────────────────────────
 const SCHEMAS = {
   strategy:         StrategySchema,
@@ -188,6 +210,7 @@ const SCHEMAS = {
   critique:         CritiqueSchema,
   feedback:         FeedbackSchema,
   playbook_extract: PlaybookExtractSchema,
+  wrap_script:      WrapScriptSchema,
 };
 
 const STAGE_NAMES = Object.keys(SCHEMAS);
@@ -215,5 +238,5 @@ module.exports = {
   validateStageOutput,
   // Re-export individual schemas for tests / programmatic introspection
   StrategySchema, VariantsAdSchema, OutlineSchema, HooksSchema, DraftSchema,
-  CritiqueSchema, FeedbackSchema, PlaybookExtractSchema,
+  CritiqueSchema, FeedbackSchema, PlaybookExtractSchema, WrapScriptSchema,
 };

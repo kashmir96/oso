@@ -384,6 +384,112 @@ async function generateVoiceover({ user, creative_id }) {
   };
 }
 
+// ─── FAST PATH: record script -> wrap with timeline+broll -> voice -> submit ─
+// Curtis types "record script" in business chat; the chat UI shows an inline
+// widget. Buttons on that widget call these functions directly (the AI is not
+// in the loop until submit-to-assistant time, where it does the script
+// wrapping via the wrap_script stage).
+
+// Step 1: create a fresh creative with the script body. No agent call yet.
+async function recordScriptInit({ user_id, script_text, creative_type = 'video_script', objective_hint }) {
+  if (!script_text || !script_text.trim()) return { error: 'script_text required' };
+  const t = script_text.trim();
+  // Stash the script in the right components slot. Brief is sparse on this
+  // path; we record the objective as "(script-first record)" so it doesn't
+  // break downstream code that expects brief.objective.
+  const components = creative_type === 'video_script'
+    ? { script: { full_script: t, hook: null, outline_beats: [] } }
+    : { body: t };
+  const row = {
+    user_id,
+    creative_type,
+    brief: {
+      objective:        objective_hint || '(script-first record)',
+      audience:         '(script-first — audience inferred by editor)',
+      kpi_target:       { metric: 'purchase', target_value: null },
+      platform:         'meta',
+      format:           creative_type === 'video_script' ? 'video' : 'static',
+      length_or_duration: null,
+      constraints:      [],
+    },
+    components,
+    exemplars_used: [],
+    pattern_tags:   [],
+    status:         'drafted',
+  };
+  const inserted = await sbInsert('mktg_creatives', row);
+  const c = Array.isArray(inserted) ? inserted[0] : inserted;
+  return { ok: true, creative_id: c.creative_id };
+}
+
+// Step 2 (run on Send to Assistant): wrap the script with timeline + B-roll
+// via the wrap_script stage, then transition through user_approved ->
+// submitted. AI is in the loop ONLY for the wrap.
+async function recordScriptWrapAndSubmit({ user_id, creative_id }) {
+  const c = await loadCreative(creative_id);
+  if (!c) return { error: 'creative not found' };
+  const script = scriptOf(c);
+  if (!script) return { error: 'no script body to wrap' };
+
+  // Run the wrap_script stage. extra.script carries the verbatim text.
+  const r = await runStage({
+    user_id, creative_id, stage: 'wrap_script',
+    brief: c.brief,
+    opts: { extra: { script } },
+  });
+  if (!r.ok) return { error: r.validation_error || r.error };
+
+  // Persist the wrapped output onto components.script. preserved_script must
+  // equal the input -- if the model rewrote it, prefer the original.
+  const wrapped = r.parsed;
+  const safeScript = (wrapped.preserved_script === script) ? wrapped.preserved_script : script;
+  await patchCreative(creative_id, {
+    components: {
+      ...c.components,
+      script: {
+        ...(c.components?.script || {}),
+        full_script:        safeScript,
+        hook:               wrapped.hook,
+        hook_type:          wrapped.hook_type,
+        outline_beats:      wrapped.timeline.map((t) => ({ timestamp: t.timestamp, beat: t.spoken_line, broll: t.broll || null })),
+        section_breakdown:  wrapped.timeline.map((t) => ({ timestamp: t.timestamp, spoken_line: t.spoken_line, broll: t.broll || null })),
+        broll_shots:        wrapped.broll_shots,
+        cta_placement:      wrapped.cta_placement,
+        notes_for_editor:   wrapped.notes_for_editor,
+        estimated_runtime:  wrapped.estimated_runtime,
+      },
+      composition_pattern: 'script-first',
+    },
+  });
+
+  // Lifecycle: drafted -> user_approved -> submitted, in one go. The
+  // approval reason captures the path so the corpus knows this was a
+  // fast-track, not a full-pipeline approval.
+  const after = await loadCreative(creative_id);
+  let patch;
+  try {
+    ({ patch } = lifecycle.transition(after, 'user_approved', {
+      approval_reason: 'fast-track: script recorded directly + wrapped',
+    }));
+  } catch (e) { return { error: `approve failed: ${e.message}` }; }
+  await patchCreative(creative_id, patch);
+  const approved = await loadCreative(creative_id);
+  try {
+    ({ patch } = lifecycle.transition(approved, 'submitted', {}));
+  } catch (e) { return { error: `submit failed: ${e.message}` }; }
+  await patchCreative(creative_id, patch);
+
+  return {
+    ok: true,
+    creative_id,
+    status: 'submitted',
+    detail_url: `/business/marketing/creative/${creative_id}`,
+    timeline_n: wrapped.timeline.length,
+    broll_n:    wrapped.broll_shots.length,
+    cost_usd:   r.cost_usd,
+  };
+}
+
 module.exports = {
   intakeBrief,
   runStrategy,
@@ -398,4 +504,7 @@ module.exports = {
   submitToAssistant,
   generateVoiceover,
   loadCreative,
+  // fast path
+  recordScriptInit,
+  recordScriptWrapAndSubmit,
 };
