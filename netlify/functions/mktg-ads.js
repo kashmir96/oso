@@ -698,6 +698,22 @@ exports.handler = withGate(async (event, { user }) => {
       return reply(r.error ? 400 : 200, r);
     }
 
+    // Stage-card edits from the chat bubble. Curtis tweaks the rendered
+    // card (variants, outline, hooks, draft, etc.) and submits -- this
+    // persists the edits onto components and returns the next-stage hint
+    // the chat AI uses to continue the flow.
+    if (action === 'pipeline_save_stage_edits') {
+      if (!body.creative_id || !body.stage) return reply(400, { error: 'creative_id + stage required' });
+      const pipeline = require('./_lib/mktg-pipeline.js');
+      const r = await pipeline.saveStageEdits({
+        user_id: user.id,
+        creative_id: body.creative_id,
+        stage: body.stage,
+        edits: body.edits || {},
+      });
+      return reply(r.error ? 400 : 200, r);
+    }
+
     if (action === 'list_creatives') {
       // Used by the Assistant queue (production handoff) to show creatives
       // alongside legacy mktg_drafts. Same response shape so the UI can

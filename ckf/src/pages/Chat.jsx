@@ -10,6 +10,7 @@ import {
   createVoiceSession,
 } from '../lib/voice.js';
 import { processFile, revokePreview } from '../lib/upload.js';
+import PipelineCard from '../components/PipelineCard.jsx';
 
 // Marketing-mode is now driven by the AI in chat (creative_pipeline tool),
 // not by a client-side intercept that navigates away. Curtis types
@@ -487,12 +488,46 @@ export default function Chat({ embedded = false, scope = 'personal' }) {
   // until id resolves; the stream shows a quiet "Opening…" placeholder.
   const ready = !!id && !!conversation;
 
-  // Filter to renderable messages: text from user/assistant. Tool results are silent.
+  // Filter to renderable messages: text from user/assistant + pipeline cards.
+  // Tool results are silent. Card-only assistant messages (text=null +
+  // pipeline_card block) ARE shown via the dedicated card renderer.
   const visible = ready ? messages.filter((m) => {
     if (m.role === 'tool') return false;
-    if (m.role === 'assistant' && !m.content_text?.trim()) return false; // tool-only assistant turn
+    const blocks = Array.isArray(m.content_blocks) ? m.content_blocks : [];
+    const hasPipelineCard = blocks.some((b) => b?.type === 'pipeline_card');
+    if (m.role === 'assistant' && !m.content_text?.trim() && !hasPipelineCard) return false;
     return true;
   }) : [];
+
+  // Track which cards have been "used" (submitted). Once submitted, we lock
+  // the card so Curtis can't accidentally re-edit a stage that already
+  // advanced. Keyed by message id + block index.
+  const [submittedCards, setSubmittedCards] = useState(() => new Set());
+
+  // Submit handler: persist edits already happened in PipelineCard. We
+  // post a synthetic user message back to the chat so the AI sees the
+  // approval and runs the next stage.
+  async function onCardSubmit({ stage, next_stage_hint, msgKey }) {
+    setSubmittedCards((s) => new Set(s).add(msgKey));
+    // Synthesise a brief user message to advance the pipeline. Keep it
+    // explicit so the AI knows it's an auto-advance, not Curtis paraphrasing.
+    const advanceText = next_stage_hint
+      ? `Approved ${stage}. Run ${next_stage_hint} next.`
+      : `Approved ${stage}.`;
+    setBusy(true); setErr('');
+    try {
+      const r = await call('ckf-chat', {
+        action: 'send', conversation_id: id, text: advanceText, mode_hint: modeHint,
+      });
+      setMessages(r.messages);
+      window.dispatchEvent(new CustomEvent('ckf-assistant-text', { detail: r.text }));
+      notifyChanged();
+    } catch (e) {
+      // Even if the AI call times out, the edits are saved. Soft-error.
+      const isTimeout = e.status === 504 || e.status === 502;
+      setErr(isTimeout ? 'Edits saved. AI took too long to advance — type "next" to continue.' : e.message);
+    } finally { setBusy(false); }
+  }
 
   // Detect any tool_use blocks in the most recent assistant turn so we can hint
   // "thinking…" subtly.
@@ -531,12 +566,31 @@ export default function Chat({ embedded = false, scope = 'personal' }) {
             Say hi, or pick a thread.
           </div>
         )}
-        {visible.map((m) => (
-          <div key={m.id} className={`bubble ${m.role}`}>
-            <div className="bubble-text">{m.content_text}</div>
-            <div className="bubble-meta">{fmtRelative(m.created_at)}</div>
-          </div>
-        ))}
+        {visible.map((m) => {
+          const blocks = Array.isArray(m.content_blocks) ? m.content_blocks : [];
+          const cards = blocks
+            .map((b, i) => ({ b, i }))
+            .filter(({ b }) => b?.type === 'pipeline_card');
+          return (
+            <div key={m.id} className={`bubble ${m.role}`}>
+              {m.content_text?.trim() && <div className="bubble-text">{m.content_text}</div>}
+              {cards.map(({ b, i }) => {
+                const msgKey = `${m.id}:${i}`;
+                return (
+                  <PipelineCard
+                    key={msgKey}
+                    stage={b.stage}
+                    creative_id={b.creative_id}
+                    payload={b.payload}
+                    locked={submittedCards.has(msgKey)}
+                    onSubmit={({ stage, next_stage_hint }) => onCardSubmit({ stage, next_stage_hint, msgKey })}
+                  />
+                );
+              })}
+              <div className="bubble-meta">{fmtRelative(m.created_at)}</div>
+            </div>
+          );
+        })}
         {recordWidget && (
           <RecordScriptWidget
             initial={recordWidget.initial}
