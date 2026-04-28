@@ -121,6 +121,9 @@ function ResultCard({ id }) {
         hasScript={hasScript}
       />
 
+      <AssetsPanel creative_id={creative.creative_id} status={status} />
+
+
       <LifecycleCard
         creative={creative}
         busy={busy}
@@ -225,6 +228,37 @@ function ScriptCard({ script }) {
 }
 
 function VoiceoverCard({ creative, onGenerate, onDelete, busy, hasScript }) {
+  const [captions, setCaptions] = useState(null);  // [{format, public_url}]
+  const [capBusy, setCapBusy] = useState(false);
+  const [capErr,  setCapErr]  = useState('');
+
+  // Load any existing captions for this creative once when we mount.
+  useEffect(() => {
+    if (!creative?.creative_id || !creative.voiceover_url) return;
+    (async () => {
+      try {
+        const r = await call('mktg-assets', { action: 'list', creative_id: creative.creative_id, kind: undefined });
+        const cap = (r.assets || []).filter((a) => a.kind === 'caption_srt' || a.kind === 'caption_vtt' && a.status === 'ready');
+        if (cap.length) {
+          setCaptions(cap.map((c) => ({
+            format: c.kind === 'caption_srt' ? 'srt' : 'vtt',
+            public_url: c.public_url,
+            asset_id: c.asset_id,
+          })));
+        }
+      } catch { /* ignore — non-blocking */ }
+    })();
+  }, [creative?.creative_id, creative?.voiceover_url]);
+
+  async function generateCaptions() {
+    setCapBusy(true); setCapErr('');
+    try {
+      const r = await call('mktg-assets', { action: 'generate_captions', creative_id: creative.creative_id });
+      if (r.error) throw new Error(r.error);
+      setCaptions(r.captions || []);
+    } catch (e) { setCapErr(e.message); } finally { setCapBusy(false); }
+  }
+
   if (!hasScript) return null;
   return (
     <div className="card" style={{ marginBottom: 12 }}>
@@ -244,12 +278,35 @@ function VoiceoverCard({ creative, onGenerate, onDelete, busy, hasScript }) {
             <a href={creative.voiceover_url} target="_blank" rel="noreferrer" style={{ padding: '6px 12px', fontSize: 12, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)' }}>▶ Download MP3</a>
           </div>
           <audio controls src={creative.voiceover_url} style={{ width: '100%', marginBottom: 8 }} />
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <button onClick={onGenerate} disabled={busy} style={{ fontSize: 11, padding: '4px 10px' }}>{busy ? '…' : '↻ Re-render'}</button>
             <button onClick={onDelete} disabled={busy} className="danger" style={{ fontSize: 11, padding: '4px 10px' }}>Delete</button>
             <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>
               voice: {creative.voiceover_voice_id || 'default'}
             </span>
+          </div>
+
+          {/* Captions row -- generate or download. */}
+          <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>Captions (from the VO above)</div>
+            {captions && captions.length > 0 ? (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {captions.map((c) => (
+                  <a key={c.asset_id} href={c.public_url} target="_blank" rel="noreferrer"
+                    style={{ fontSize: 11, padding: '4px 10px', textDecoration: 'none', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)' }}>
+                    Download .{c.format}
+                  </a>
+                ))}
+                <button onClick={generateCaptions} disabled={capBusy} style={{ fontSize: 11, padding: '4px 10px' }}>
+                  {capBusy ? 'Re-generating…' : '↻ Regenerate'}
+                </button>
+              </div>
+            ) : (
+              <button onClick={generateCaptions} disabled={capBusy} style={{ fontSize: 12, padding: '5px 12px' }}>
+                {capBusy ? 'Generating captions…' : '+ Generate AI captions'}
+              </button>
+            )}
+            {capErr && <div className="error" style={{ fontSize: 11, marginTop: 6 }}>{capErr}</div>}
           </div>
         </>
       )}
@@ -347,6 +404,153 @@ function LifecycleCard({ creative, busy, onTransition, onChange }) {
     );
   }
   return null;
+}
+
+// ─── Assets panel: AI-generated images/videos/captions + uploaded finished files ─
+// Lists everything tied to this creative_id, grouped by kind. Lets Curtis
+// (or the assistant) upload the finished video file.
+function AssetsPanel({ creative_id, status }) {
+  const [items, setItems] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [uploadErr, setUploadErr] = useState('');
+
+  async function load() {
+    try {
+      const r = await call('mktg-assets', { action: 'list', creative_id });
+      setItems((r.assets || []).filter((a) => a.status === 'ready' || a.status === 'pending'));
+    } catch (e) { setErr(e.message); }
+  }
+  useEffect(() => { if (creative_id) load(); }, [creative_id]);
+
+  async function delAsset(asset_id) {
+    if (!confirm('Delete this asset? The link will stop working.')) return;
+    setBusy(true); setErr('');
+    try {
+      await call('mktg-assets', { action: 'delete', asset_id });
+      await load();
+    } catch (e) { setErr(e.message); } finally { setBusy(false); }
+  }
+
+  async function onUploadFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 50 * 1024 * 1024) {
+      setUploadErr('File too large (>50MB).');
+      e.target.value = '';
+      return;
+    }
+    setUploading(true); setUploadErr('');
+    try {
+      const buf = await file.arrayBuffer();
+      const data_base64 = arrayBufferToBase64(buf);
+      await call('mktg-assets', {
+        action: 'upload_finished_asset',
+        creative_id,
+        data_base64,
+        mime_type: file.type || 'video/mp4',
+        filename: file.name,
+      });
+      await load();
+    } catch (e) { setUploadErr(e.message); }
+    finally { setUploading(false); e.target.value = ''; }
+  }
+
+  if (!creative_id) return null;
+  if (!items) return null;
+
+  const images   = items.filter((a) => a.kind === 'image');
+  const videos   = items.filter((a) => a.kind === 'video');
+  const captions = items.filter((a) => a.kind === 'caption_srt' || a.kind === 'caption_vtt');
+
+  const isShipReady = status === 'submitted' || status === 'in_production' || status === 'needs_approval' || status === 'shipped' || status === 'performed';
+
+  return (
+    <div className="card" style={{ marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <div className="section-title" style={{ margin: 0 }}>Assets</div>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{items.length} total</span>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="empty" style={{ fontSize: 12 }}>
+          No assets yet. Generate an image / video from the chat ("image:" or "video:"), or upload the finished file below.
+        </div>
+      ) : (
+        <>
+          {videos.length > 0 && <AssetGroup label="Videos" assets={videos} onDelete={delAsset} busy={busy} kind="video" />}
+          {images.length > 0 && <AssetGroup label="Images" assets={images} onDelete={delAsset} busy={busy} kind="image" />}
+          {captions.length > 0 && <AssetGroup label="Captions" assets={captions} onDelete={delAsset} busy={busy} kind="caption" />}
+        </>
+      )}
+
+      {/* Upload-finished-file slot. Visible once we're past initial drafted --
+          mirrors the Assistant queue flow. */}
+      {isShipReady && (
+        <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
+            Upload the finished file (the rendered video the editor produced)
+          </div>
+          <input type="file" onChange={onUploadFile} disabled={uploading}
+            accept="video/*,image/*"
+            style={{ fontSize: 12 }} />
+          {uploading && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>Uploading…</div>}
+          {uploadErr && <div className="error" style={{ fontSize: 11, marginTop: 4 }}>{uploadErr}</div>}
+        </div>
+      )}
+      {err && <div className="error" style={{ fontSize: 11, marginTop: 8 }}>{err}</div>}
+    </div>
+  );
+}
+
+function AssetGroup({ label, assets, onDelete, busy, kind }) {
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        {label} ({assets.length})
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {assets.map((a) => (
+          <div key={a.asset_id} style={{ width: 200, border: '1px solid var(--border)', borderRadius: 6, padding: 6, fontSize: 11 }}>
+            {kind === 'image' && a.status === 'ready' && (
+              <a href={a.public_url} target="_blank" rel="noreferrer">
+                <img src={a.public_url} alt={a.prompt || ''} style={{ width: '100%', borderRadius: 4, marginBottom: 4 }} />
+              </a>
+            )}
+            {kind === 'video' && a.status === 'ready' && (
+              <video src={a.public_url} controls style={{ width: '100%', borderRadius: 4, marginBottom: 4 }} />
+            )}
+            {kind === 'video' && a.status === 'pending' && (
+              <div style={{ background: 'var(--bg-soft)', padding: 12, textAlign: 'center', borderRadius: 4, marginBottom: 4 }}>
+                Generating…<br /><span style={{ fontSize: 10, color: 'var(--text-muted)' }}>refresh in 1-2 min</span>
+              </div>
+            )}
+            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-dim)' }} title={a.prompt || ''}>
+              {a.provider === 'upload' ? '↑ uploaded' : (a.prompt || a.kind)}
+            </div>
+            <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+              <a href={a.public_url} target="_blank" rel="noreferrer" style={{ fontSize: 10, padding: '2px 6px', textDecoration: 'none', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)' }}>Open</a>
+              <button onClick={() => navigator.clipboard.writeText(a.public_url)} style={{ fontSize: 10, padding: '2px 6px' }}>Copy</button>
+              <button onClick={() => onDelete(a.asset_id)} disabled={busy} className="danger" style={{ fontSize: 10, padding: '2px 6px', marginLeft: 'auto' }}>Del</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Minimal browser-side base64 encoder for the upload path. Avoids a
+// 3rd-party dep -- TextEncoder + btoa with a chunk loop handles big files.
+function arrayBufferToBase64(buf) {
+  const bytes = new Uint8Array(buf);
+  let binary = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
 }
 
 // ─── Performance attach ────────────────────────────────────────────────────

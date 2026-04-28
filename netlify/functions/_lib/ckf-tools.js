@@ -559,6 +559,19 @@ Don't create vague goals. For numeric, ask one question if target is missing.`,
     },
   },
 
+  // ─── AI captions from voiceover (ElevenLabs STT) ──────────────────────────
+  {
+    name: 'generate_captions',
+    description: "Generate SRT + VTT caption files from an existing voiceover MP3 on a creative. Use when Curtis says 'generate captions', 'caption that', 'subtitle the VO', etc. Requires the creative to already have a voiceover (call generate_voiceover first). Cheap (~$0.0001/sec). Returns public URLs for both SRT and VTT files; the editor can drag whichever format their tool accepts. Requires ELEVENLABS_API_KEY (already configured for VO).",
+    input_schema: {
+      type: 'object',
+      properties: {
+        creative_id: { type: 'string', description: "the creative whose voiceover to caption" },
+      },
+      required: ['creative_id'],
+    },
+  },
+
   // ─── AI video generation (Gemini Veo, long-running) ───────────────────────
   {
     name: 'generate_video',
@@ -1246,6 +1259,22 @@ async function execute(name, input, ctx) {
         `user_id=eq.${userId}&date=gte.${since}&order=date.desc&limit=${days}&select=date,recovery_score,hrv_rmssd_ms,resting_heart_rate,strain,sleep_performance,sleep_hours,sleep_efficiency`
       );
       return { days, metrics: rows };
+    }
+
+    case 'generate_captions': {
+      if (!input?.creative_id) return { error: 'creative_id required' };
+      // Re-enter mktg-assets handler in-process; bypass the gate by
+      // constructing a fake event + passing user explicitly.
+      try {
+        const mktgAssets = require('../mktg-assets.js');
+        const fakeEvent = { httpMethod: 'POST', body: JSON.stringify({ action: 'generate_captions', creative_id: input.creative_id }) };
+        const res = await mktgAssets.handler(fakeEvent, { user: { id: userId } });
+        let parsed; try { parsed = JSON.parse(res.body); } catch { parsed = {}; }
+        if (res.statusCode >= 400) return { error: parsed.error || `caption gen failed (${res.statusCode})` };
+        return parsed;
+      } catch (e) {
+        return { error: e.message || 'caption gen failed' };
+      }
     }
 
     case 'generate_video': {
