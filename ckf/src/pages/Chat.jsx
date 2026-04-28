@@ -127,7 +127,8 @@ Record-script fast path (business chat only):
     `Pipeline state (after running marketing mode):
   /business/marketing/creative/<id>         — read-only result card for one creative (also reachable via clicking the card link)
   /business/marketing/assistant             — production queue (drafts + creatives ready for asset upload)
-  /business/marketing/health                — system dashboard: pending pattern proposals, audit memos, token cost`,
+  /business/marketing/health                — system dashboard: pending pattern proposals, audit memos, token cost
+  /business/marketing/products              — product catalog with 7 seed-image slots per product (front, back, side1/2, texture in pack/on skin, label) — feeds future generators`,
   );
 
   return sections.join('\n\n');
