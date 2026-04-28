@@ -18,6 +18,71 @@ import PipelineCard from '../components/PipelineCard.jsx';
 // + stages + approve + VO + assistant submit, all inline. The Creative page
 // becomes a view-only result card he visits when the flow ends.
 
+// Help-text generator: a static list of every typed trigger + slash command
+// the chat understands. Rendered locally as a chat message when Curtis types
+// /help. Scope-aware — business chat shows the marketing-only triggers;
+// personal chat hides them.
+function buildHelpText(scope) {
+  const sections = [];
+
+  sections.push(
+    `Slash commands (any chat):
+  /help, /?              — this list
+  /new, /reset           — start a new conversation (keeps the old one)
+  /clear, /delete        — delete this conversation and start fresh`,
+  );
+
+  if (scope === 'business') {
+    sections.push(
+      `Marketing-mode triggers (business chat only):
+  "marketing mode"        — start full creative pipeline (brief → strategy → variants/outline+hooks+draft → critique → approve)
+  "let's make an ad"      — same
+  "i want to create an ad"— same
+  "create an ad"          — same
+  "new creative"          — same
+
+Record-script fast path (business chat only):
+  "record script"         — opens an inline bubble with a script textarea + Generate Audio + Send to Assistant buttons. Skips the planning stages, just wraps your script with timeline + B-roll and files it to the production queue.
+  "voice this"            — same
+  "i have a script"       — same
+  "paste a script"        — same
+  "read this script"      — same`,
+    );
+
+    sections.push(
+      `Capture modes (business chat only):
+  "website mode"          — start queuing PrimalPantry storefront improvements (every following message gets queued until you say "exit website mode")
+  "system update"         — start queuing CKF / second-brain code changes (every following message until "stop")`,
+    );
+  }
+
+  sections.push(
+    `Capture modes (both chats):
+  "swipefile mode"        — silent dump: every following message is saved to your swipefile until you say "leave swipefile mode"`,
+  );
+
+  sections.push(
+    `Things you can ask the AI directly (no triggers needed):
+  "what did i write about X"                — searches diary + memory + swipefile
+  "show my recent meals"                    — pulls last 7 days of meals
+  "create a routine task to ___"            — adds to your routine
+  "log <metric> = <value>"                  — logs a goal value
+  "remember that <fact>"                    — stores a long-term memory fact
+  "remind me to ___ at <time>"              — schedules an SMS reminder via errand
+  "show my goals" / "open goals"            — pulls active goals
+  "what's coming up" / "calendar this week" — Google Calendar (if connected)`,
+  );
+
+  sections.push(
+    `Pipeline state (after running marketing mode):
+  /business/marketing/creative/<id>         — read-only result card for one creative (also reachable via clicking the card link)
+  /business/marketing/assistant             — production queue (drafts + creatives ready for asset upload)
+  /business/marketing/health                — system dashboard: pending pattern proposals, audit memos, token cost`,
+  );
+
+  return sections.join('\n\n');
+}
+
 // Hat selection is handled by the model from context; no manual UI for it.
 function voiceLabel(state) {
   switch (state) {
@@ -187,6 +252,18 @@ export default function Chat({ embedded = false, scope = 'personal' }) {
       setDraft('');
       if (!confirm('Delete this conversation and start fresh?')) return;
       await resetChat({ discard: true });
+      return;
+    }
+    if (lower === '/help' || lower === '/commands' || lower === '/?') {
+      setDraft('');
+      // Inject a local-only help message. Doesn't go to the API; just shown
+      // in the bubble stream until the next refresh.
+      const helpText = buildHelpText(scope);
+      setMessages((m) => [
+        ...m,
+        { id: `help-${Date.now()}`, role: 'user',      content_text: text, created_at: new Date().toISOString() },
+        { id: `help-r-${Date.now()}`, role: 'assistant', content_text: helpText, created_at: new Date().toISOString() },
+      ]);
       return;
     }
 
