@@ -37,6 +37,12 @@ const OPENAI_IMAGE_COSTS = {
   '1792x1024': 0.06,
 };
 
+// Veo (Gemini) video model. Veo 2 is in preview. Long-running.
+// Per-second list price varies; ~$0.50/sec for Veo 2 standard at time of
+// writing. Update when official pricing stabilises.
+const GEMINI_VIDEO_MODEL = 'veo-2.0-generate-001';
+const GEMINI_VIDEO_COST_PER_SEC = 0.50;
+
 function publicUrlFor(storagePath) {
   return `${process.env.SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${storagePath}`;
 }
@@ -118,6 +124,75 @@ function decodeOpenAIImageResponse(json, size) {
     return null;
   }).filter(Boolean);
   return { items, size };
+}
+
+// ─── Gemini Veo: long-running video generation ─────────────────────────────
+// Submit returns an operation name; we poll separately + download bytes
+// when ready. Whole flow: submit -> stash row at status='pending' with
+// provider_operation_id -> cron (or client) polls -> on done, download the
+// MP4 -> upload to mktg-assets bucket -> stamp row ready.
+async function submitVeoJob({ prompt, durationSec = 5, aspectRatio = '16:9', seedImageUrl }) {
+  if (!process.env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY not configured');
+  const body = {
+    instances: [{ prompt }],
+    parameters: { aspectRatio, sampleCount: 1, durationSeconds: durationSec },
+  };
+  if (seedImageUrl) {
+    // Image-to-video: pass the seed as a base64-encoded image alongside the
+    // prompt. Veo accepts this in the instance object as `image: { bytesBase64Encoded, mimeType }`.
+    const seedRes = await fetch(seedImageUrl);
+    if (!seedRes.ok) throw new Error(`Failed to fetch seed image: ${seedRes.status}`);
+    const seedBuf = Buffer.from(await seedRes.arrayBuffer());
+    body.instances[0].image = {
+      bytesBase64Encoded: seedBuf.toString('base64'),
+      mimeType: 'image/png',
+    };
+  }
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_VIDEO_MODEL}:predictLongRunning?key=${encodeURIComponent(process.env.GEMINI_API_KEY)}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`Veo submit ${res.status}: ${(await res.text()).slice(0, 400)}`);
+  const json = await res.json();
+  if (!json.name) throw new Error('Veo submit returned no operation name');
+  return { operationId: json.name };
+}
+
+// Poll one operation. Returns { status, videoUrl?, error? }.
+async function pollVeoOperation(operationId) {
+  if (!process.env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY not configured');
+  const url = `https://generativelanguage.googleapis.com/v1beta/${operationId}?key=${encodeURIComponent(process.env.GEMINI_API_KEY)}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    const text = await res.text();
+    return { status: 'failed', error: `Veo poll ${res.status}: ${text.slice(0, 300)}` };
+  }
+  const json = await res.json();
+  if (!json.done) return { status: 'pending' };
+  if (json.error) return { status: 'failed', error: json.error?.message || JSON.stringify(json.error).slice(0, 300) };
+  // Response shape varies; both observed paths handled.
+  const samples = json.response?.generatedSamples || json.response?.predictions || [];
+  const first = samples[0];
+  const videoUrl = first?.video?.uri || first?.videoUri || first?.uri;
+  if (!videoUrl) return { status: 'failed', error: 'Veo done but no video uri in response' };
+  return { status: 'ready', videoUrl };
+}
+
+// Download a Veo video URL (signed) and upload to our bucket. Returns the
+// new storage_path + bytes count.
+async function downloadAndStoreVeoVideo({ userId, videoUrl }) {
+  // Veo signed URLs require the API key for download.
+  const sep = videoUrl.includes('?') ? '&' : '?';
+  const downloadUrl = `${videoUrl}${sep}key=${encodeURIComponent(process.env.GEMINI_API_KEY)}`;
+  const res = await fetch(downloadUrl);
+  if (!res.ok) throw new Error(`Veo video download ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  const storage_path = await uploadToBucket({
+    userId, kind: 'video', buf, mimeType: 'video/mp4', ext: 'mp4',
+  });
+  return { storage_path, bytes: buf.length };
 }
 
 exports.handler = withGate(async (event, { user }) => {
@@ -204,6 +279,99 @@ exports.handler = withGate(async (event, { user }) => {
         cost_usd: persisted.length * costPerImage,
         latency_ms: Date.now() - t0,
       });
+    }
+
+    // ── Video: submit, check, poll-many ─────────────────────────────────
+    if (action === 'generate_video') {
+      if (!body.prompt) return reply(400, { error: 'prompt required' });
+      const durationSec = Math.max(2, Math.min(8, parseInt(body.duration_sec, 10) || 5));
+      let seedAssetUrl = null;
+      if (body.seed_asset_id) {
+        const rows = await sbSelect(
+          'mktg_generated_assets',
+          `asset_id=eq.${encodeURIComponent(body.seed_asset_id)}&select=storage_path,user_id&limit=1`
+        );
+        const seed = rows?.[0];
+        if (!seed) return reply(404, { error: 'seed asset not found' });
+        if (seed.user_id && seed.user_id !== user.id) return reply(403, { error: 'seed belongs to another user' });
+        seedAssetUrl = publicUrlFor(seed.storage_path);
+      }
+      let submission;
+      try {
+        submission = await submitVeoJob({
+          prompt: body.prompt,
+          durationSec,
+          aspectRatio: body.aspect_ratio || '16:9',
+          seedImageUrl: seedAssetUrl,
+        });
+      } catch (e) { return reply(500, { error: e.message || 'Veo submit failed' }); }
+      const row = await sbInsert('mktg_generated_assets', {
+        user_id: user.id,
+        creative_id: body.creative_id || null,
+        kind: 'video',
+        provider: 'gemini',
+        model: GEMINI_VIDEO_MODEL,
+        prompt: body.prompt,
+        seed_asset_id: body.seed_asset_id || null,
+        provider_operation_id: submission.operationId,
+        storage_path: '__pending__',  // sentinel; replaced when ready
+        mime_type: 'video/mp4',
+        duration_sec: durationSec,
+        cost_usd: durationSec * GEMINI_VIDEO_COST_PER_SEC,
+        status: 'pending',
+      });
+      const r1 = Array.isArray(row) ? row[0] : row;
+      return reply(200, {
+        ok: true,
+        asset_id: r1?.asset_id,
+        operation_id: submission.operationId,
+        eta_seconds: 30 + durationSec * 5,  // best-effort estimate
+        cost_usd: durationSec * GEMINI_VIDEO_COST_PER_SEC,
+      });
+    }
+
+    // Check (and finalise if ready) a single video job. Used by the chat
+    // client polling. Idempotent: safe to call after the asset is already
+    // ready; just returns the current state.
+    if (action === 'check_video') {
+      if (!body.asset_id) return reply(400, { error: 'asset_id required' });
+      const rows = await sbSelect(
+        'mktg_generated_assets',
+        `asset_id=eq.${encodeURIComponent(body.asset_id)}&user_id=eq.${user.id}&select=*&limit=1`
+      );
+      const a = rows?.[0];
+      if (!a) return reply(404, { error: 'asset not found' });
+      if (a.status === 'ready') {
+        return reply(200, { status: 'ready', public_url: publicUrlFor(a.storage_path), asset: a });
+      }
+      if (a.status !== 'pending' || !a.provider_operation_id) {
+        return reply(200, { status: a.status, error: a.error || null, asset: a });
+      }
+      let pollResult;
+      try { pollResult = await pollVeoOperation(a.provider_operation_id); }
+      catch (e) { return reply(500, { error: e.message || 'poll failed' }); }
+      if (pollResult.status === 'pending') return reply(200, { status: 'pending' });
+      if (pollResult.status === 'failed') {
+        await sbUpdate('mktg_generated_assets', `asset_id=eq.${encodeURIComponent(body.asset_id)}`, {
+          status: 'failed', error: pollResult.error || 'unknown error',
+        });
+        return reply(200, { status: 'failed', error: pollResult.error });
+      }
+      // status === 'ready' -- download + upload + finalise.
+      try {
+        const { storage_path, bytes } = await downloadAndStoreVeoVideo({
+          userId: user.id, videoUrl: pollResult.videoUrl,
+        });
+        await sbUpdate('mktg_generated_assets', `asset_id=eq.${encodeURIComponent(body.asset_id)}`, {
+          storage_path, size_bytes: bytes, status: 'ready', ready_at: new Date().toISOString(),
+        });
+        return reply(200, { status: 'ready', public_url: publicUrlFor(storage_path) });
+      } catch (e) {
+        await sbUpdate('mktg_generated_assets', `asset_id=eq.${encodeURIComponent(body.asset_id)}`, {
+          status: 'failed', error: e.message || 'download failed',
+        });
+        return reply(500, { error: e.message || 'download failed' });
+      }
     }
 
     if (action === 'list') {

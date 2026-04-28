@@ -122,7 +122,9 @@ Record-script fast path (business chat only):
   "show my goals" / "open goals"            — pulls active goals
   "what's coming up" / "calendar this week" — Google Calendar (if connected)
   "generate an image of ___" /
-    "image: ___"                            — AI image (OpenAI gpt-image-1, ~$0.04/img). Optionally seed off an existing image for variations (b-roll). Requires OPENAI_API_KEY.`,
+    "image: ___"                            — AI image (OpenAI gpt-image-1, ~$0.04/img). Optionally seed off an existing image for variations (b-roll). Requires OPENAI_API_KEY.
+  "generate a video of ___" /
+    "video: ___" / "make a 5s clip of ___"  — AI video (Gemini Veo 2, ~$0.50/sec, default 5s). Long-running: returns immediately, cron finalises in ~1-2 min. Image-to-video by seeding off an asset. Requires GEMINI_API_KEY.`,
   );
 
   sections.push(

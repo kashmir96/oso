@@ -559,6 +559,23 @@ Don't create vague goals. For numeric, ask one question if target is missing.`,
     },
   },
 
+  // ─── AI video generation (Gemini Veo, long-running) ───────────────────────
+  {
+    name: 'generate_video',
+    description: "Submit a video for AI generation via Google Gemini Veo (gemini-2.0). Long-running -- the call returns IMMEDIATELY with an asset_id and an ETA. A cron polls every minute and finalises when ready (~30-90s). Curtis can then look at the asset on the Creative ResultCard or via the public URL. Use when he says 'generate a video of', 'video: ___', 'make me a 5s clip of ___'. Optionally pass a seed_asset_id (an existing image) for image-to-video animation -- great for AI b-roll from a product still. Costs ~$0.50/sec at Veo 2 list price; default 5s. Aspect ratio default 16:9; pass '9:16' for vertical reels.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        prompt:        { type: 'string', description: 'video description — be specific about subject, motion, style, lighting' },
+        duration_sec:  { type: 'integer', minimum: 2, maximum: 8, description: 'default 5' },
+        aspect_ratio:  { type: 'string', enum: ['16:9','9:16','1:1'], description: 'default 16:9' },
+        creative_id:   { type: 'string', description: "optional — link this video to a specific creative" },
+        seed_asset_id: { type: 'string', description: "optional — animate from an existing image asset (image-to-video)" },
+      },
+      required: ['prompt'],
+    },
+  },
+
   // ─── AI image generation (OpenAI gpt-image-1) ─────────────────────────────
   {
     name: 'generate_image',
@@ -1229,6 +1246,80 @@ async function execute(name, input, ctx) {
         `user_id=eq.${userId}&date=gte.${since}&order=date.desc&limit=${days}&select=date,recovery_score,hrv_rmssd_ms,resting_heart_rate,strain,sleep_performance,sleep_hours,sleep_efficiency`
       );
       return { days, metrics: rows };
+    }
+
+    case 'generate_video': {
+      // Bypass the HTTP gate -- already authenticated. Submit to Veo,
+      // stash a pending row, return asset_id. The cron mktg-job-poll-videos
+      // (every minute) finalises when Veo completes.
+      try {
+        if (!process.env.GEMINI_API_KEY) return { error: 'GEMINI_API_KEY not configured -- add it in Netlify env vars' };
+        const durationSec = Math.max(2, Math.min(8, parseInt(input?.duration_sec, 10) || 5));
+        const assets = require('../mktg-assets.js');
+        // Resolve seed if provided.
+        let seedUrl = null;
+        if (input?.seed_asset_id) {
+          const rows = await sbSelect(
+            'mktg_generated_assets',
+            `asset_id=eq.${encodeURIComponent(input.seed_asset_id)}&user_id=eq.${userId}&select=storage_path&limit=1`
+          );
+          if (rows?.[0]) seedUrl = assets.publicUrlFor(rows[0].storage_path);
+        }
+        // Submit via direct fetch (mirrors mktg-assets submitVeoJob, kept
+        // local so we don't add an export round-trip).
+        const submitBody = {
+          instances: [{ prompt: input.prompt }],
+          parameters: {
+            aspectRatio: input.aspect_ratio || '16:9',
+            sampleCount: 1,
+            durationSeconds: durationSec,
+          },
+        };
+        if (seedUrl) {
+          const seedRes = await fetch(seedUrl);
+          if (!seedRes.ok) return { error: `Failed to fetch seed image: ${seedRes.status}` };
+          const seedBuf = Buffer.from(await seedRes.arrayBuffer());
+          submitBody.instances[0].image = {
+            bytesBase64Encoded: seedBuf.toString('base64'),
+            mimeType: 'image/png',
+          };
+        }
+        const submitUrl = `https://generativelanguage.googleapis.com/v1beta/models/veo-2.0-generate-001:predictLongRunning?key=${encodeURIComponent(process.env.GEMINI_API_KEY)}`;
+        const r = await fetch(submitUrl, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(submitBody),
+        });
+        if (!r.ok) return { error: `Veo submit ${r.status}: ${(await r.text()).slice(0, 300)}` };
+        const json = await r.json();
+        if (!json.name) return { error: 'Veo submit returned no operation name' };
+        // Persist pending row.
+        const row = await sbInsert('mktg_generated_assets', {
+          user_id: userId,
+          creative_id: input.creative_id || null,
+          kind: 'video',
+          provider: 'gemini',
+          model: 'veo-2.0-generate-001',
+          prompt: input.prompt,
+          seed_asset_id: input.seed_asset_id || null,
+          provider_operation_id: json.name,
+          storage_path: '__pending__',
+          mime_type: 'video/mp4',
+          duration_sec: durationSec,
+          cost_usd: durationSec * 0.50,
+          status: 'pending',
+        });
+        const r1 = Array.isArray(row) ? row[0] : row;
+        return {
+          ok: true,
+          asset_id: r1?.asset_id,
+          status: 'pending',
+          eta_seconds: 30 + durationSec * 5,
+          cost_usd: durationSec * 0.50,
+          note: 'Video is generating in the background. The cron will finalise it within ~1-2 minutes; refresh the chat then.',
+        };
+      } catch (e) {
+        return { error: e.message || 'video gen failed' };
+      }
     }
 
     case 'generate_image': {
