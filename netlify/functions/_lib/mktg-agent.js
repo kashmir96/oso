@@ -37,7 +37,22 @@ const { SYSTEM_PROMPT, SYSTEM_PROMPT_VERSION, SYSTEM_PROMPT_HASH } = require('./
 // MKTG_GENERATION_MODEL or per-call via opts.model when willing to
 // trade latency for max quality.
 const DEFAULT_MODEL = process.env.MKTG_GENERATION_MODEL || 'claude-sonnet-4-6';
-const MAX_OUTPUT_TOKENS = 4000;
+// Per-stage output cap. Sonnet's wall time scales with output tokens, so
+// stages with bounded outputs (strategy, critique, feedback) fit easily,
+// while variants/draft/playbook_extract get more headroom. Lower caps
+// reduce 504s when ckf-chat chains 2 Sonnet calls + this one.
+const MAX_OUTPUT_TOKENS_DEFAULT = 4000;
+const STAGE_OUTPUT_CAPS = {
+  strategy:         900,    // ~angle + 2-3 alternatives + flags
+  variants_ad:     1800,    // 4 variants × ~200 tokens each + envelope
+  outline:          900,    // 5-8 beats × ~80 tokens
+  hooks:           1200,    // 4-6 hooks × ~150 tokens
+  draft:           2500,    // full script + section breakdown
+  critique:         600,    // verdict + scores + rationale
+  feedback:         900,    // diffs + edit_analysis + hypotheses
+  wrap_script:     1500,    // preserved script + timeline + broll
+  playbook_extract: 2500,   // proposed patterns + deprecations
+};
 
 // Anthropic Opus 4.7 list price (per Mtok). Update when Anthropic changes
 // the price card or the model id changes. Cost telemetry is a primary
@@ -137,11 +152,11 @@ function buildUserMessage(stage, envelope, extra) {
 }
 
 // ─── Single Anthropic call ────────────────────────────────────────────────
-async function callClaude({ c, model, userMessage }) {
+async function callClaude({ c, model, userMessage, maxTokens }) {
   const t0 = Date.now();
   const resp = await c.messages.create({
     model,
-    max_tokens: MAX_OUTPUT_TOKENS,
+    max_tokens: maxTokens || MAX_OUTPUT_TOKENS_DEFAULT,
     system: [
       { type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } },
     ],
@@ -173,8 +188,11 @@ async function runStage({ user_id = null, creative_id = null, stage, brief, opts
   const env_hash = envelopeHash(envelope);
   const env_summary = envelopeSummary(envelope);
 
-  // First attempt
-  let attempt = await callClaude({ c, model, userMessage: buildUserMessage(stage, envelope, opts.extra) });
+  // First attempt. Use the per-stage cap so heavy stages (variants, draft,
+  // playbook_extract) get headroom while light stages (critique, feedback)
+  // finish faster -- reduces 504 risk inside chained ckf-chat -> tool flows.
+  const maxTokens = STAGE_OUTPUT_CAPS[stage] || MAX_OUTPUT_TOKENS_DEFAULT;
+  let attempt = await callClaude({ c, model, userMessage: buildUserMessage(stage, envelope, opts.extra), maxTokens });
   let parsed;
   try { parsed = parseJSON(attempt.text); }
   catch (e) {
@@ -195,7 +213,7 @@ async function runStage({ user_id = null, creative_id = null, stage, brief, opts
     retried = true;
     const correction = `Your previous output failed validation: ${validation.error}\n\nOutput ONLY the JSON for stage="${stage}" matching the spec schema. No prose.`;
     secondAttempt = await callClaude({
-      c, model,
+      c, model, maxTokens,
       userMessage: buildUserMessage(stage, envelope, opts.extra) + '\n\n' + correction,
     });
     let parsed2;
