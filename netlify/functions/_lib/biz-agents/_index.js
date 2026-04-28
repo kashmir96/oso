@@ -16,6 +16,7 @@ const brandVoice         = require('./brand-voice.js');
 const creativeDirector   = require('./creative-director.js');
 const conceptStrategist  = require('./concept-strategist.js');
 const customerVoice      = require('./customer-voice.js');
+const customerRep        = require('./customer-rep.js');
 const audience           = require('./audience.js');
 const campaignPlanner    = require('./campaign-planner.js');
 const copywriter         = require('./copywriter.js');
@@ -31,7 +32,7 @@ const emailWriter        = require('./email-writer.js');
 const influencerBrief    = require('./influencer-brief.js');
 
 const AGENTS = [
-  brandVoice, creativeDirector, conceptStrategist, customerVoice, audience, campaignPlanner,
+  brandVoice, creativeDirector, conceptStrategist, customerVoice, customerRep, audience, campaignPlanner,
   copywriter, voiceoverStudio, captionGenerator, imageStudio, brollDirector, videoStudio,
   productVideo, productPage, labelDesigner, emailWriter, influencerBrief,
 ];

@@ -25,6 +25,7 @@ export const AGENTS = [
   { slug: 'creative-director',  name: 'Creative Director',     group: 'plan',   icon: '🎯',  blurb: 'Brief → strategy → angle. Picks the cut.' },
   { slug: 'concept-strategist', name: 'Concept Strategist',    group: 'plan',   icon: '🧭',  blurb: 'Brand-level concepts above individual ads.' },
   { slug: 'customer-voice',     name: 'Customer Voice',        group: 'plan',   icon: '👂',  blurb: 'Reviews, pain points, social proof. Verbatim extraction.' },
+  { slug: 'customer-rep',       name: 'Customer Rep',          group: 'plan',   icon: '🎧',  blurb: 'Intercom + email + reviews hub. Pre-answer questions; surface trends + product ideas.' },
   { slug: 'audience',           name: 'Audience Segmenter',    group: 'plan',   icon: '🎯',  blurb: 'Define + maintain audience cohorts.' },
   { slug: 'campaign-planner',   name: 'Campaign Planner',      group: 'plan',   icon: '📅',  blurb: 'What ships when, by funnel stage.' },
 
