@@ -504,13 +504,17 @@ async function recordScriptWrapAndSubmit({ user_id, creative_id }) {
 //   hooks:       { picked: { hook, hook_type, first_visual? } }
 //   draft:       { full_script }
 //   critique:    { /* read-only — accepting the verdict carries no edit */ }
+// Stage names are BARE (no 'run_' prefix) -- they map directly to the
+// dispatch keys in mktg-ads.js pipeline_run_stage_for_card. An earlier
+// version used 'run_*' which silently 400'd from the dispatcher because
+// no entry matched, leaving variants/outline/etc cards never appearing.
 const NEXT_STAGE_HINT = {
-  strategy:   (c) => c.creative_type === 'video_script' ? 'run_outline'    : 'run_variants_ad',
-  variants_ad:(_) => 'run_critique',
-  outline:    (_) => 'run_hooks',
-  hooks:      (_) => 'run_draft',
-  draft:      (_) => 'run_critique',
-  critique:   (_) => 'approve',   // operator decides; AI prompts approve / regen
+  strategy:   (c) => c.creative_type === 'video_script' ? 'outline'    : 'variants_ad',
+  variants_ad:(_) => 'critique',
+  outline:    (_) => 'hooks',
+  hooks:      (_) => 'draft',
+  draft:      (_) => 'critique',
+  critique:   (_) => null,   // null tells the client "we're done with slow stages -- back to AI for approve/voiceover/submit"
 };
 
 async function saveStageEdits({ user_id, creative_id, stage, edits }) {
