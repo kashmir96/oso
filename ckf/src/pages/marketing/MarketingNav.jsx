@@ -7,6 +7,7 @@ const TABS = [
   { to: '/business/marketing/drafts',   label: 'Drafts' },
   { to: '/business/marketing/assistant', label: 'Assistant' },
   { to: '/business/marketing/swipe',    label: 'Swipe' },
+  { to: '/business/marketing/products', label: 'Products' },
   { to: '/business/marketing/concepts', label: 'Concepts' },
   { to: '/business/marketing/ads',      label: 'Ads' },
   { to: '/business/marketing/scripts',  label: 'Scripts' },

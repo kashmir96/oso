@@ -18,6 +18,8 @@ import Drafts from './Drafts.jsx';
 import Assistant from './Assistant.jsx';
 import Creative from './Creative.jsx';
 import Health from './Health.jsx';
+import Products from './Products.jsx';
+import ProductDetail from './ProductDetail.jsx';
 
 // Lazy-loaded entry-point — everything in /pages/marketing/* lives in this
 // chunk and is only fetched when the user opens /business/marketing.
@@ -33,6 +35,8 @@ export default function Marketing() {
       <Route path="scripts" element={<Scripts />} />
       <Route path="scripts/:id" element={<ScriptDetail />} />
       <Route path="library" element={<Library />} />
+      <Route path="products" element={<Products />} />
+      <Route path="products/:id" element={<ProductDetail />} />
       <Route path="chat" element={<Chat />} />
       <Route path="chat/:id" element={<Chat />} />
       <Route path="memory" element={<Memory />} />
