@@ -43,15 +43,19 @@ const DEFAULT_MODEL = process.env.MKTG_GENERATION_MODEL || 'claude-sonnet-4-6';
 // reduce 504s when ckf-chat chains 2 Sonnet calls + this one.
 const MAX_OUTPUT_TOKENS_DEFAULT = 4000;
 const STAGE_OUTPUT_CAPS = {
-  strategy:         900,    // ~angle + 2-3 alternatives + flags
-  variants_ad:     1800,    // 4 variants × ~200 tokens each + envelope
-  outline:          900,    // 5-8 beats × ~80 tokens
-  hooks:           1200,    // 4-6 hooks × ~150 tokens
-  draft:           2500,    // full script + section breakdown
-  critique:         600,    // verdict + scores + rationale
-  feedback:         900,    // diffs + edit_analysis + hypotheses
-  wrap_script:     1500,    // preserved script + timeline + broll
-  playbook_extract: 2500,   // proposed patterns + deprecations
+  // Tightened down for reliability. Sonnet wall time scales ~linearly
+  // with output tokens; lower caps mean stages finish well inside the
+  // 26s Netlify sync budget. Was hitting timeouts on strategy + variants
+  // when a retry round added 12s to a 14s first attempt.
+  strategy:         500,    // angle + audience-fit + 2-3 alternatives
+  variants_ad:     1200,    // 3-4 variants
+  outline:          600,    // 5-8 beats
+  hooks:            800,    // 4-6 hooks
+  draft:           1800,    // full script
+  critique:         400,    // verdict + scores + rationale
+  feedback:         600,    // diffs + edit_analysis
+  wrap_script:     1200,    // preserved script + timeline + broll
+  playbook_extract: 2000,
 };
 
 // Anthropic Opus 4.7 list price (per Mtok). Update when Anthropic changes
