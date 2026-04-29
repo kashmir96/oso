@@ -196,6 +196,58 @@ export default function AgentChat({ agent }) {
     return () => clearInterval(t);
   }, [busy, conversation?.id]);
 
+  // Auto-fire pipeline stages CLIENT-DIRECT after intake_brief succeeds.
+  // The chat AI calls intake_brief (fast: just creates the row) but the
+  // SLOW stages (strategy / outline / hooks / draft / critique) run via
+  // the dedicated pipeline_run_stage_for_card endpoint with its own 26s
+  // budget — never inside the chat AI's tool loop (that's how /ckf
+  // avoided the 504s). This effect detects a fresh intake_brief result
+  // and fires strategy directly.
+  const autoFiredRef = useRef(new Set());
+  useEffect(() => {
+    if (!conversation?.id || busy) return;
+    const recent = messages.slice(-8);
+    let pendingCreativeId = null;
+    for (let i = 0; i < recent.length; i++) {
+      const m = recent[i];
+      if (m.role !== 'assistant') continue;
+      const blocks = Array.isArray(m.content_blocks) ? m.content_blocks : [];
+      const intakeBrief = blocks.find((b) =>
+        b?.type === 'tool_use' && b?.name === 'creative_pipeline' && b?.input?.action === 'intake_brief'
+      );
+      if (!intakeBrief) continue;
+      const next = recent[i + 1];
+      if (!next || next.role !== 'tool') continue;
+      const toolBlocks = Array.isArray(next.content_blocks) ? next.content_blocks : [];
+      const result = toolBlocks.find((b) => b?.type === 'tool_result' && b?.tool_use_id === intakeBrief.id);
+      if (!result) continue;
+      let parsed = null;
+      try { parsed = typeof result.content === 'string' ? JSON.parse(result.content) : result.content; } catch {}
+      const cid = parsed?.creative_id;
+      if (cid && parsed?.ok && !autoFiredRef.current.has(cid)) pendingCreativeId = cid;
+    }
+    if (!pendingCreativeId) return;
+    autoFiredRef.current.add(pendingCreativeId);
+    (async () => {
+      setBusy(true); setErr('');
+      try {
+        await call('mktg-ads', {
+          action: 'pipeline_run_stage_for_card',
+          conversation_id: conversation.id,
+          creative_id: pendingCreativeId,
+          stage: 'strategy',
+        });
+        const got = await call('biz-chat', { action: 'get_conversation', id: conversation.id });
+        if (Array.isArray(got.messages)) setMessages(got.messages);
+      } catch (e) {
+        const isTimeout = e.status === 504 || e.status === 502;
+        setErr(isTimeout
+          ? 'Strategy is still generating — card will appear in a moment. Click ↻ Refresh if it doesn\'t.'
+          : e.message);
+      } finally { setBusy(false); }
+    })();
+  }, [messages, conversation?.id, busy]);
+
   // Bootstrap a conversation per agent. Each agent gets its own thread
   // (scope = `biz_<slug>`); reuse the most recent if one exists. If the
   // thread is empty, fire auto_open so the AI greets immediately.
@@ -352,21 +404,36 @@ Bubble actions:
     setSubmittedCards((s) => new Set(s).add(msgKey));
     setBusy(true); setErr('');
     try {
-      // For now post a synthetic user message back to the chat so the AI
-      // sees the approval and runs the next stage. (Same pattern /ckf
-      // Chat.jsx uses; we can shift to client-direct stage runs later if
-      // 504s become a problem here too.)
-      const text = next_stage_hint
-        ? `Approved ${stage}. Run ${next_stage_hint} next.`
-        : `Approved ${stage}.`;
-      const r = await call('biz-chat', {
-        action: 'send', conversation_id: conversation.id, agent: agent.slug, text,
-      });
-      setMessages(r.messages);
-      notifyChanged();
+      if (next_stage_hint && creative_id) {
+        // Fire the next slow stage CLIENT-DIRECT (own 26s budget) — same
+        // pattern as /ckf split-execution. The endpoint inserts a new
+        // pipeline_card message into the conversation; we refresh after
+        // to surface it.
+        await call('mktg-ads', {
+          action: 'pipeline_run_stage_for_card',
+          conversation_id: conversation.id,
+          creative_id,
+          stage: next_stage_hint,
+        });
+        const got = await call('biz-chat', { action: 'get_conversation', id: conversation.id });
+        if (Array.isArray(got.messages)) setMessages(got.messages);
+        notifyChanged();
+      } else {
+        // No next stage (we're past critique) — let the AI take over for
+        // approve / voiceover / submit-to-Assistant by sending it a short
+        // ack so it knows the user accepted.
+        const r = await call('biz-chat', {
+          action: 'send', conversation_id: conversation.id, agent: agent.slug,
+          text: `Approved ${stage}. Ready for approval / voiceover / Assistant.`,
+        });
+        setMessages(r.messages);
+        notifyChanged();
+      }
     } catch (e) {
       const isTimeout = e.status === 504 || e.status === 502;
-      setErr(isTimeout ? 'Edits saved server-side. Type "next" to advance.' : e.message);
+      setErr(isTimeout
+        ? 'Stage is still running — card will appear shortly. Click ↻ Refresh if it doesn\'t.'
+        : e.message);
     } finally { setBusy(false); }
   }
 
