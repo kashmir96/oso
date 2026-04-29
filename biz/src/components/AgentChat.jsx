@@ -387,12 +387,16 @@ Bubble actions:
   }
 
   // ── Filter renderable messages ─────────────────────────────────────────
-  // Drop tool turns. Drop empty-assistant turns that have NO pipeline cards
-  // (those would be tool-only turns from the AI). Keep horizons + cards.
+  // Drop tool turns. Drop empty-assistant turns that have NO pipeline
+  // cards. Drop agent_progress notes (those surface in the busy bar's
+  // thinking log instead of cluttering the chat stream).
   const visible = messages.filter((m) => {
     if (m.role === 'tool') return false;
     if (isHorizon(m)) return true;
-    const hasCard = Array.isArray(m.content_blocks) && m.content_blocks.some((b) => b?.type === 'pipeline_card');
+    const blocks = Array.isArray(m.content_blocks) ? m.content_blocks : [];
+    const hasCard = blocks.some((b) => b?.type === 'pipeline_card');
+    const onlyProgress = blocks.length > 0 && blocks.every((b) => b?.type === 'agent_progress');
+    if (onlyProgress) return false;
     if (m.role === 'assistant' && !m.content_text?.trim() && !hasCard) return false;
     return true;
   });
@@ -744,7 +748,9 @@ function scanForAssetUrls(text) {
 // is fed by the live conversation poll).
 function BusyBubble({ startedAt, toolNames = [], thinkingLog = [], onRefresh, onCancel }) {
   const [tick, setTick] = useState(0);
-  const [expanded, setExpanded] = useState(false);
+  // Default expanded so Curtis can SEE what's happening without clicking.
+  // He can collapse if he wants the compact view.
+  const [expanded, setExpanded] = useState(true);
   useEffect(() => { const t = setInterval(() => setTick((s) => s + 1), 1000); return () => clearInterval(t); }, []);
   void tick;
   const elapsed = startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0;
@@ -804,6 +810,7 @@ function BusyBubble({ startedAt, toolNames = [], thinkingLog = [], onRefresh, on
 
 function logIcon(kind) {
   return ({
+    progress:    '⚙',
     text:        '💬',
     tool_use:    '🔧',
     tool_result: '✓',
@@ -813,11 +820,11 @@ function logIcon(kind) {
 
 // Build a list of recent activity from the messages array — what's
 // happened in the CURRENT turn (since the last user message). Each entry
-// summarises one block: an assistant text fragment, a tool call, or a
-// tool result. Used by the BusyBubble's expanded "thinking log" panel.
+// summarises one block: an assistant text fragment, a tool call, a
+// tool result, or a server-side agent_progress note from the stage runner.
+// Used by the BusyBubble's expanded "thinking log" panel.
 function buildThinkingLog(messages) {
   if (!Array.isArray(messages) || messages.length === 0) return [];
-  // Find the most recent user message — the current turn starts after it.
   let startIdx = -1;
   for (let i = messages.length - 1; i >= 0; i--) {
     if (messages[i].role === 'user') { startIdx = i; break; }
@@ -828,7 +835,9 @@ function buildThinkingLog(messages) {
     const m = messages[i];
     const blocks = Array.isArray(m.content_blocks) ? m.content_blocks : [];
     for (const b of blocks) {
-      if (b?.type === 'text' && b.text?.trim()) {
+      if (b?.type === 'agent_progress') {
+        out.push({ kind: 'progress', label: b.note || '(progress)', detail: null });
+      } else if (b?.type === 'text' && b.text?.trim()) {
         out.push({ kind: 'text', label: b.text.trim().slice(0, 200) });
       } else if (b?.type === 'tool_use') {
         const params = b.input ? Object.keys(b.input).slice(0, 3).join(', ') : '';
@@ -848,8 +857,7 @@ function buildThinkingLog(messages) {
       }
     }
   }
-  // Cap to the last 10 so the panel stays readable.
-  return out.slice(-10);
+  return out.slice(-15);
 }
 
 function prettyTool(name) {

@@ -72,7 +72,8 @@ function sanitiseBlocksForAnthropic(blocks) {
   for (const b of blocks) {
     if (!b || typeof b !== 'object') continue;
     if (ANTHROPIC_BLOCK_TYPES.has(b.type)) { out.push(b); continue; }
-    if (b.type === 'pipeline_card') { out.push({ type: 'text', text: `[ui:pipeline_card stage="${b.stage}"]` }); continue; }
+    if (b.type === 'pipeline_card')   { out.push({ type: 'text', text: `[ui:pipeline_card stage="${b.stage}"]` }); continue; }
+    if (b.type === 'agent_progress')  continue; // server-side progress notes; not for the model
     if (b.type === 'context_horizon') continue;
   }
   return out;

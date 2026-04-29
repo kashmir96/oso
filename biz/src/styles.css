@@ -400,8 +400,9 @@ body {
 .biz-busy-log-icon { width: 16px; flex-shrink: 0; }
 .biz-busy-log-text { flex: 1; color: var(--text); word-break: break-word; }
 .biz-busy-log-detail { color: var(--text-muted); font-size: 11px; flex-shrink: 0; }
-.biz-busy-log-error .biz-busy-log-text { color: var(--warn, #d2891f); }
+.biz-busy-log-error .biz-busy-log-text    { color: var(--warn, #d2891f); }
 .biz-busy-log-tool_use .biz-busy-log-text { color: var(--accent, #4a90e2); }
+.biz-busy-log-progress .biz-busy-log-text { color: #b9c5d2; font-style: italic; }
 
 .biz-busy-actions {
   margin-top: 10px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap;

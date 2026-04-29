@@ -351,6 +351,8 @@ function sanitiseBlocksForAnthropic(blocks, role) {
       out.push({ type: 'text', text: `[ui:pipeline_card stage="${b.stage}" status="emitted"]` });
       continue;
     }
+    if (b.type === 'agent_progress') continue; // server-side progress notes; not for the model
+    if (b.type === 'context_horizon') continue;
     // Unknown custom block -- drop silently.
   }
   return out;

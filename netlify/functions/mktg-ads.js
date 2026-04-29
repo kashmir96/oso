@@ -722,8 +722,40 @@ exports.handler = withGate(async (event, { user }) => {
       };
       if (!dispatch[stage]) return reply(400, { error: `unknown stage: ${stage}` });
 
-      const r = await dispatch[stage]();
-      if (!r?.ok) return reply(500, { error: r?.error || 'stage failed' });
+      // Progress writer: drops a one-line `agent_progress` block into the
+      // conversation so the client (which polls every 2s while busy) can
+      // surface "I'm doing X right now" inside the busy bar's expanded
+      // thinking log. Best-effort -- never blocks the stage.
+      const progress = async (note) => {
+        try {
+          await sbInsert('ckf_messages', {
+            conversation_id: body.conversation_id,
+            user_id: user.id,
+            role: 'assistant',
+            content_text: null,
+            content_blocks: [{ type: 'agent_progress', stage, note, ts: Date.now() }],
+          });
+        } catch (_) { /* swallow */ }
+      };
+
+      await progress(`${stage}: pulling exemplars from corpus`);
+      // Pre-flight: load creative + envelope happens inside pipeline.runX.
+      // We have no hooks into those at the moment, so the next progress
+      // ping fires right before dispatch.
+      await progress(`${stage}: calling Sonnet (this is the slow step — typically 5-15s)`);
+
+      let r;
+      try {
+        r = await dispatch[stage]();
+      } catch (e) {
+        await progress(`${stage}: errored — ${(e?.message || e).toString().slice(0, 120)}`);
+        return reply(500, { error: e?.message || 'stage failed' });
+      }
+      if (!r?.ok) {
+        await progress(`${stage}: validation failed — ${r?.error || 'unknown'}`);
+        return reply(500, { error: r?.error || 'stage failed' });
+      }
+      await progress(`${stage}: parsed + validated · ${r.latency_ms || '?'}ms · $${(r.cost_usd || 0).toFixed(4)}`);
 
       // Build the same payload shape emitCard used to insert. Client renders
       // the card from this payload via PipelineCard.
@@ -745,6 +777,7 @@ exports.handler = withGate(async (event, { user }) => {
         content_text:    null,
         content_blocks:  [{ type: 'pipeline_card', stage, creative_id: body.creative_id, payload }],
       });
+      await progress(`${stage}: card ready`);
       const msg = Array.isArray(inserted) ? inserted[0] : inserted;
       return reply(200, {
         ok: true, stage, message: msg,
