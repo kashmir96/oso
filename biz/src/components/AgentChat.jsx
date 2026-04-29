@@ -22,11 +22,23 @@ export default function AgentChat({ agent }) {
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
+  const [busyStartedAt, setBusyStartedAt] = useState(null);
+  const [busyTick, setBusyTick] = useState(0);     // forces re-render every second while busy
   const [err, setErr] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editingDraft, setEditingDraft] = useState('');
   const scrollRef = useRef(null);
   const taRef = useRef(null);
+
+  // Tick the elapsed counter every second while busy so the visible
+  // timer + "longer than usual" hint update without touching state.
+  useEffect(() => {
+    if (!busy) { setBusyStartedAt(null); return; }
+    setBusyStartedAt(Date.now());
+    const t = setInterval(() => setBusyTick((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [busy]);
+  void busyTick;
 
   // Bootstrap a conversation per agent. Each agent gets its own thread
   // (scope = `biz_<slug>`); reuse the most recent if one exists.
@@ -187,13 +199,17 @@ Bubble actions:
             </div>
           </div>
         )}
-        {visible.map((m) => (
-          isHorizon(m) ? (
-            <HorizonDivider key={m.id} m={m} />
-          ) : (
+        {visible.map((m, idx) => {
+          if (isHorizon(m)) return <HorizonDivider key={m.id} m={m} />;
+          // Look for tool_result blocks in the NEXT message (which would be
+          // the tool turn after this assistant's tool_use). Pluck any asset
+          // URLs out for inline preview.
+          const previews = collectAssetPreviews(messages, idx, m);
+          return (
             <Bubble
               key={m.id}
               m={m}
+              previews={previews}
               isEditing={editingId === m.id}
               editingDraft={editingDraft}
               setEditingDraft={setEditingDraft}
@@ -202,12 +218,21 @@ Bubble actions:
               onCancel={cancelEdit}
               busy={busy}
             />
-          )
-        ))}
+          );
+        })}
         {busy && (
-          <div className="biz-bubble assistant ghost">
-            <span className="biz-dots"><span/><span/><span/></span>
-          </div>
+          <BusyBubble
+            startedAt={busyStartedAt}
+            onRefresh={async () => {
+              if (!conversation) return;
+              try {
+                const got = await call('biz-chat', { action: 'get_conversation', id: conversation.id });
+                setMessages(got.messages || []);
+                setBusy(false);
+              } catch (e) { setErr(e.message); }
+            }}
+            onCancel={() => { setBusy(false); setErr(''); }}
+          />
         )}
       </div>
 
@@ -246,7 +271,7 @@ function HorizonDivider({ m }) {
   );
 }
 
-function Bubble({ m, isEditing, editingDraft, setEditingDraft, onStart, onSave, onCancel, busy }) {
+function Bubble({ m, previews, isEditing, editingDraft, setEditingDraft, onStart, onSave, onCancel, busy }) {
   if (isEditing) {
     return (
       <div className={`biz-bubble ${m.role} biz-bubble-editing`}>
@@ -268,7 +293,111 @@ function Bubble({ m, isEditing, editingDraft, setEditingDraft, onStart, onSave, 
   return (
     <div className={`biz-bubble ${m.role}`} onClick={onStart} title="Click to edit">
       <div className="biz-bubble-text">{m.content_text}</div>
+      {previews && previews.length > 0 && (
+        <div className="biz-bubble-previews">
+          {previews.map((p, i) => (
+            <AssetPreview key={i} asset={p} />
+          ))}
+        </div>
+      )}
       <div className="biz-bubble-meta">{fmtRelative(m.created_at)} · click to edit</div>
+    </div>
+  );
+}
+
+// Inline preview for images / videos surfaced by the previous tool turn.
+// Anything that looks like a public mktg-assets / mktg-vo URL gets rendered.
+function AssetPreview({ asset }) {
+  const url = asset.public_url || asset.url || asset;
+  if (typeof url !== 'string') return null;
+  const isVideo = /\.(mp4|webm|mov)(\?|$)/i.test(url) || /mktg-vo/.test(url) === false && /mktg-assets/.test(url) && asset.kind === 'video';
+  const isAudio = /\.(mp3|m4a|wav)(\?|$)/i.test(url) || /mktg-vo/.test(url);
+  const isImage = /\.(png|jpe?g|webp|gif)(\?|$)/i.test(url) || (!isVideo && !isAudio && /mktg-assets/.test(url));
+  return (
+    <div className="biz-preview" onClick={(e) => e.stopPropagation()}>
+      {isImage && <img src={url} alt="" loading="lazy" />}
+      {isVideo && <video src={url} controls preload="metadata" />}
+      {isAudio && <audio src={url} controls preload="metadata" />}
+      <div className="biz-preview-actions">
+        <a href={url} target="_blank" rel="noreferrer">Open</a>
+        <button onClick={() => navigator.clipboard.writeText(url)}>Copy URL</button>
+      </div>
+    </div>
+  );
+}
+
+// Pull asset URLs out of the IMMEDIATE NEXT message's tool_result blocks.
+// This covers the common pattern: assistant calls tool → tool returns JSON
+// with public_url(s) → next assistant text mentions them. We surface the
+// URLs as inline media right under the assistant's text bubble.
+function collectAssetPreviews(messages, currentIdx, currentMsg) {
+  if (currentMsg.role !== 'assistant') return [];
+  // Walk forward looking for the next 'tool' role with tool_result blocks.
+  // Stop if we hit another assistant or user.
+  const out = [];
+  for (let i = currentIdx + 1; i < messages.length && i < currentIdx + 4; i++) {
+    const m = messages[i];
+    if (m.role === 'tool') {
+      const blocks = Array.isArray(m.content_blocks) ? m.content_blocks : [];
+      for (const b of blocks) {
+        if (b?.type !== 'tool_result') continue;
+        const c = typeof b.content === 'string' ? b.content : JSON.stringify(b.content);
+        const found = scanForAssetUrls(c);
+        for (const a of found) out.push(a);
+      }
+      break;
+    }
+    if (m.role === 'assistant' || m.role === 'user') break;
+  }
+  // Also scan the assistant's OWN text for any direct asset URLs (fallback).
+  const inText = scanForAssetUrls(currentMsg.content_text || '');
+  for (const a of inText) {
+    if (!out.find((x) => x.public_url === a.public_url)) out.push(a);
+  }
+  return out.slice(0, 8);
+}
+
+function scanForAssetUrls(text) {
+  if (!text) return [];
+  const urls = [];
+  // Match https://...mktg-assets/... or mktg-vo/...
+  const re = /https?:\/\/[^\s"'<>)]+(?:mktg-assets|mktg-vo)[^\s"'<>)]+/g;
+  let m;
+  while ((m = re.exec(text))) {
+    const url = m[0].replace(/[.,;:)]+$/, '');
+    if (urls.find((u) => u.public_url === url)) continue;
+    let kind = 'asset';
+    if (/\.(mp4|webm|mov)(\?|$)/i.test(url)) kind = 'video';
+    else if (/\.(mp3|m4a|wav)(\?|$)/i.test(url) || /mktg-vo/.test(url)) kind = 'audio';
+    else if (/\.(png|jpe?g|webp|gif)(\?|$)/i.test(url)) kind = 'image';
+    else if (/mktg-assets/.test(url)) kind = 'image';
+    urls.push({ public_url: url, kind });
+  }
+  return urls;
+}
+
+// Activity-aware busy bubble. Shows elapsed seconds; after 20s offers
+// kick-start buttons (refresh from server / cancel local spinner).
+function BusyBubble({ startedAt, onRefresh, onCancel }) {
+  const [tick, setTick] = useState(0);
+  useEffect(() => { const t = setInterval(() => setTick((s) => s + 1), 1000); return () => clearInterval(t); }, []);
+  void tick;
+  const elapsed = startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0;
+  const isLong  = elapsed > 12;
+  const showKickstart = elapsed > 20;
+  return (
+    <div className="biz-bubble assistant ghost">
+      <span className="biz-dots"><span/><span/><span/></span>
+      <span className="biz-busy-label">
+        {' '}working… {elapsed}s
+        {isLong && !showKickstart && <span style={{ marginLeft: 6, color: 'var(--warn,#d2891f)', fontSize: 11 }}>(longer than usual)</span>}
+      </span>
+      {showKickstart && (
+        <div style={{ marginTop: 8, display: 'flex', gap: 6 }}>
+          <button onClick={onRefresh} className="primary" style={{ fontSize: 11, padding: '4px 10px' }}>↻ Refresh</button>
+          <button onClick={onCancel} style={{ fontSize: 11, padding: '4px 10px' }}>Cancel</button>
+        </div>
+      )}
     </div>
   );
 }
