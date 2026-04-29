@@ -559,6 +559,19 @@ Don't create vague goals. For numeric, ask one question if target is missing.`,
     },
   },
 
+  // ─── Fetch landing page (URL → readable text for context) ────────────────
+  {
+    name: 'fetch_landing_page',
+    description: "Fetch a URL and return its readable text content (HTML stripped). Use when Curtis pastes a landing-page URL early in a creative conversation so you can ground the script / ad copy in what the page actually says. Caps content at ~6000 chars to fit in the context envelope.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'full https URL' },
+      },
+      required: ['url'],
+    },
+  },
+
   // ─── Customer conversation hub (Intercom + email + reviews) ──────────────
   {
     name: 'search_customer_conversations',
@@ -1420,6 +1433,26 @@ async function execute(name, input, ctx) {
       return { days, metrics: rows };
     }
 
+    case 'fetch_landing_page': {
+      const url = (input?.url || '').trim();
+      if (!url || !/^https?:\/\//i.test(url)) return { error: 'valid http(s) URL required' };
+      try {
+        const res = await fetch(url, {
+          headers: { 'User-Agent': 'oso-biz/1.0 (+https://oso.nz)' },
+          redirect: 'follow',
+        });
+        if (!res.ok) return { error: `fetch failed: ${res.status}` };
+        const html = await res.text();
+        const text = stripHtml(html).slice(0, 6000);
+        // Pull the title separately for nicer surfacing.
+        const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+        const title = titleMatch ? titleMatch[1].trim().slice(0, 200) : null;
+        return { ok: true, url, title, text, chars: text.length };
+      } catch (e) {
+        return { error: `fetch error: ${e.message || e}` };
+      }
+    }
+
     // ── Customer conversation hub tools ─────────────────────────────────
     case 'search_customer_conversations': {
       const filters = ['select=conversation_id,source,customer_name,customer_handle,started_at,topic_tags,product_refs,sentiment,outcome,summary,question_asked,resolution', `user_id=eq.${userId}`];
@@ -1918,6 +1951,32 @@ function renderInfluencerContract({ influencer, kind, deliverables, fee_nzd, usa
 }
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+// Cheap HTML → readable text. Good enough for landing-page context; avoid
+// pulling in a real parser so the function stays light.
+function stripHtml(html) {
+  if (typeof html !== 'string') return '';
+  return html
+    // Drop <script>, <style>, <noscript>, <svg> blocks entirely.
+    .replace(/<(script|style|noscript|svg)[^>]*>[\s\S]*?<\/\1>/gi, ' ')
+    // Replace block-ish closing tags with newline so paragraphs read.
+    .replace(/<\/(p|div|section|article|h[1-6]|li|tr|br)>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    // Strip remaining tags.
+    .replace(/<[^>]+>/g, ' ')
+    // Decode the most common entities.
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&[a-z]+;/gi, ' ')
+    // Collapse whitespace.
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 module.exports = { TOOLS, execute, clip, nzToday };
