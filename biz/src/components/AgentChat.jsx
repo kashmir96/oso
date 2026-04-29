@@ -180,6 +180,22 @@ export default function AgentChat({ agent }) {
   }, [busy]);
   void busyTick;
 
+  // Live poll while busy — every 2s re-fetch the conversation. Tool-loop
+  // iterations that happen mid-call (assistant emits tool_use → tool
+  // executes → tool_result lands → next iteration) will land in
+  // ckf_messages as they happen, so polling lets Curtis SEE the AI's
+  // intermediate steps in the expanded "thinking" panel.
+  useEffect(() => {
+    if (!busy || !conversation?.id) return;
+    const t = setInterval(async () => {
+      try {
+        const got = await call('biz-chat', { action: 'get_conversation', id: conversation.id });
+        if (Array.isArray(got.messages)) setMessages(got.messages);
+      } catch { /* swallow */ }
+    }, 2000);
+    return () => clearInterval(t);
+  }, [busy, conversation?.id]);
+
   // Bootstrap a conversation per agent. Each agent gets its own thread
   // (scope = `biz_<slug>`); reuse the most recent if one exists. If the
   // thread is empty, fire auto_open so the AI greets immediately.
@@ -447,6 +463,13 @@ Bubble actions:
         {busy && (
           <BusyBubble
             startedAt={busyStartedAt}
+            toolNames={(() => {
+              const lastAsst = [...messages].reverse().find((m) => m.role === 'assistant');
+              const blocks = lastAsst?.content_blocks;
+              if (!Array.isArray(blocks)) return [];
+              return blocks.filter((b) => b?.type === 'tool_use').map((b) => b.name);
+            })()}
+            thinkingLog={buildThinkingLog(messages)}
             onRefresh={async () => {
               if (!conversation) return;
               try {
@@ -520,6 +543,7 @@ function HorizonDivider({ m }) {
 }
 
 function Bubble({ m, previews, isEditing, editingDraft, setEditingDraft, onStart, onSave, onCancel, busy }) {
+  const [copied, setCopied] = useState(false);
   if (isEditing) {
     return (
       <div className={`biz-bubble ${m.role} biz-bubble-editing`}>
@@ -538,8 +562,32 @@ function Bubble({ m, previews, isEditing, editingDraft, setEditingDraft, onStart
       </div>
     );
   }
+  // Build a "copy all" payload: bubble text + any inline asset URLs.
+  function fullText() {
+    const lines = [m.content_text || ''];
+    if (previews && previews.length) {
+      lines.push('');
+      for (const p of previews) lines.push(p.public_url || p.url || '');
+    }
+    return lines.join('\n').trim();
+  }
+  function copyAll(e) {
+    e.stopPropagation();
+    const text = fullText();
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1400);
+  }
   return (
     <div className={`biz-bubble ${m.role}`} onClick={onStart} title="Click to edit">
+      {m.role === 'assistant' && (
+        <button
+          className={`biz-bubble-copy ${copied ? 'copied' : ''}`}
+          onClick={copyAll}
+          title="Copy this reply (and any asset URLs) to clipboard"
+        >{copied ? '✓ Copied' : '📋 Copy all'}</button>
+      )}
       <div className="biz-bubble-text">{m.content_text}</div>
       {previews && previews.length > 0 && (
         <div className="biz-bubble-previews">
@@ -624,28 +672,131 @@ function scanForAssetUrls(text) {
   return urls;
 }
 
-// Activity-aware busy bubble. Shows elapsed seconds; after 20s offers
-// kick-start buttons (refresh from server / cancel local spinner).
-function BusyBubble({ startedAt, onRefresh, onCancel }) {
+// Activity-aware busy bubble. Big, obvious, animated. Click to expand
+// and see the AI's actual tool-call chain in real-time (the thinking log
+// is fed by the live conversation poll).
+function BusyBubble({ startedAt, toolNames = [], thinkingLog = [], onRefresh, onCancel }) {
   const [tick, setTick] = useState(0);
+  const [expanded, setExpanded] = useState(false);
   useEffect(() => { const t = setInterval(() => setTick((s) => s + 1), 1000); return () => clearInterval(t); }, []);
   void tick;
   const elapsed = startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0;
   const isLong  = elapsed > 12;
   const showKickstart = elapsed > 20;
+  const toolLabel = toolNames.length > 0 ? prettyTool(toolNames[0]) : null;
+  const hasLog = thinkingLog && thinkingLog.length > 0;
+
   return (
-    <div className="biz-bubble assistant ghost">
-      <span className="biz-dots"><span/><span/><span/></span>
-      <span className="biz-busy-label">
-        {' '}working… {elapsed}s
-        {isLong && !showKickstart && <span style={{ marginLeft: 6, color: 'var(--warn,#d2891f)', fontSize: 11 }}>(longer than usual)</span>}
-      </span>
+    <div className="biz-busy-bar">
+      <div className="biz-busy-shimmer" />
+      <div
+        className={`biz-busy-row ${hasLog ? 'biz-busy-clickable' : ''}`}
+        onClick={hasLog ? () => setExpanded((v) => !v) : undefined}
+        role={hasLog ? 'button' : undefined}
+        title={hasLog ? 'Click to see what the AI is doing' : undefined}
+      >
+        <span className="biz-busy-spinner" />
+        <span className="biz-busy-headline">
+          {toolLabel ? `${toolLabel}…` : 'Generating reply…'}
+        </span>
+        <span className="biz-busy-elapsed">{elapsed}s</span>
+        {isLong && !showKickstart && (
+          <span className="biz-busy-warn">— longer than usual, still working</span>
+        )}
+        {hasLog && (
+          <span className="biz-busy-chevron">{expanded ? '▾' : '▸'}</span>
+        )}
+      </div>
+      {toolNames.length > 1 && (
+        <div className="biz-busy-sub">+ {toolNames.slice(1, 4).map(prettyTool).join(', ')}</div>
+      )}
+      {expanded && hasLog && (
+        <div className="biz-busy-log">
+          <div className="biz-busy-log-head">Thinking log (this turn)</div>
+          {thinkingLog.map((entry, i) => (
+            <div key={i} className={`biz-busy-log-row biz-busy-log-${entry.kind}`}>
+              <span className="biz-busy-log-icon">{logIcon(entry.kind)}</span>
+              <span className="biz-busy-log-text">{entry.label}</span>
+              {entry.detail && <span className="biz-busy-log-detail">{entry.detail}</span>}
+            </div>
+          ))}
+        </div>
+      )}
       {showKickstart && (
-        <div style={{ marginTop: 8, display: 'flex', gap: 6 }}>
-          <button onClick={onRefresh} className="primary" style={{ fontSize: 11, padding: '4px 10px' }}>↻ Refresh</button>
-          <button onClick={onCancel} style={{ fontSize: 11, padding: '4px 10px' }}>Cancel</button>
+        <div className="biz-busy-actions">
+          <button onClick={onRefresh} className="primary">↻ Refresh from server</button>
+          <button onClick={onCancel}>Cancel</button>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+            Server may have already finished — refresh picks it up.
+          </span>
         </div>
       )}
     </div>
   );
+}
+
+function logIcon(kind) {
+  return ({
+    text:        '💬',
+    tool_use:    '🔧',
+    tool_result: '✓',
+    error:       '⚠',
+  }[kind]) || '·';
+}
+
+// Build a list of recent activity from the messages array — what's
+// happened in the CURRENT turn (since the last user message). Each entry
+// summarises one block: an assistant text fragment, a tool call, or a
+// tool result. Used by the BusyBubble's expanded "thinking log" panel.
+function buildThinkingLog(messages) {
+  if (!Array.isArray(messages) || messages.length === 0) return [];
+  // Find the most recent user message — the current turn starts after it.
+  let startIdx = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'user') { startIdx = i; break; }
+  }
+  if (startIdx === -1) startIdx = 0;
+  const out = [];
+  for (let i = startIdx + 1; i < messages.length; i++) {
+    const m = messages[i];
+    const blocks = Array.isArray(m.content_blocks) ? m.content_blocks : [];
+    for (const b of blocks) {
+      if (b?.type === 'text' && b.text?.trim()) {
+        out.push({ kind: 'text', label: b.text.trim().slice(0, 200) });
+      } else if (b?.type === 'tool_use') {
+        const params = b.input ? Object.keys(b.input).slice(0, 3).join(', ') : '';
+        out.push({
+          kind: 'tool_use',
+          label: prettyTool(b.name) || `Calling ${b.name}`,
+          detail: params ? `(${params})` : null,
+        });
+      } else if (b?.type === 'tool_result') {
+        const c = typeof b.content === 'string' ? b.content : JSON.stringify(b.content);
+        const isErr = /"error"\s*:/.test(c);
+        out.push({
+          kind: isErr ? 'error' : 'tool_result',
+          label: isErr ? 'Tool returned an error' : 'Tool result received',
+          detail: `${c.length} bytes`,
+        });
+      }
+    }
+  }
+  // Cap to the last 10 so the panel stays readable.
+  return out.slice(-10);
+}
+
+function prettyTool(name) {
+  if (!name) return null;
+  return ({
+    creative_pipeline:           'Running pipeline stage',
+    fetch_landing_page:          'Reading landing page',
+    generate_image:              'Generating image',
+    generate_video:              'Submitting video to Veo',
+    generate_captions:           'Generating captions',
+    generate_broll_for_creative: 'Generating B-roll batch',
+    list_locked_decisions:       'Reading brand decisions',
+    search_swipefile:            'Searching swipefile',
+    get_memory_facts:            'Reading memory',
+    remember:                    'Saving to memory',
+  }[name] || `Calling ${name}`);
 }

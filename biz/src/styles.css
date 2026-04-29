@@ -327,6 +327,120 @@ body {
 
 .biz-busy-label { font-size: 12px; color: var(--text-muted); }
 
+/* ── Big busy bar (replaces the dots-only bubble) ── */
+.biz-busy-bar {
+  position: relative;
+  align-self: stretch;
+  background: linear-gradient(135deg, rgba(74,144,226,0.18), rgba(74,144,226,0.06));
+  border: 1px solid rgba(74,144,226,0.4);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin: 8px 0;
+  overflow: hidden;
+}
+.biz-busy-shimmer {
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+  background-size: 200% 100%;
+  animation: biz-shimmer 1.6s linear infinite;
+  pointer-events: none;
+}
+@keyframes biz-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.biz-busy-row {
+  display: flex; align-items: center; gap: 10px;
+  position: relative;
+  font-size: 14px;
+}
+.biz-busy-spinner {
+  width: 16px; height: 16px;
+  border: 2px solid rgba(74,144,226,0.3);
+  border-top-color: var(--accent, #4a90e2);
+  border-radius: 50%;
+  animation: biz-spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes biz-spin { to { transform: rotate(360deg); } }
+.biz-busy-headline { font-weight: 500; color: var(--text); }
+.biz-busy-elapsed {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px; color: var(--text-muted);
+}
+.biz-busy-warn {
+  color: var(--warn, #d2891f);
+  font-size: 12px;
+}
+.biz-busy-sub {
+  font-size: 11px; color: var(--text-muted);
+  margin-top: 6px; padding-left: 26px;
+}
+.biz-busy-clickable { cursor: pointer; user-select: none; }
+.biz-busy-clickable:hover { background: rgba(74,144,226,0.06); border-radius: 6px; padding-left: 4px; padding-right: 4px; margin-left: -4px; margin-right: -4px; }
+.biz-busy-chevron { font-size: 12px; color: var(--text-muted); margin-left: 4px; }
+
+/* Thinking log (expanded view of the busy bubble) */
+.biz-busy-log {
+  margin-top: 10px; padding-top: 10px;
+  border-top: 1px solid rgba(74,144,226,0.25);
+  position: relative;
+}
+.biz-busy-log-head {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px;
+  color: var(--text-muted); margin-bottom: 6px;
+}
+.biz-busy-log-row {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 4px 0; font-size: 12px;
+  border-bottom: 1px dashed rgba(255,255,255,0.04);
+}
+.biz-busy-log-row:last-child { border-bottom: none; }
+.biz-busy-log-icon { width: 16px; flex-shrink: 0; }
+.biz-busy-log-text { flex: 1; color: var(--text); word-break: break-word; }
+.biz-busy-log-detail { color: var(--text-muted); font-size: 11px; flex-shrink: 0; }
+.biz-busy-log-error .biz-busy-log-text { color: var(--warn, #d2891f); }
+.biz-busy-log-tool_use .biz-busy-log-text { color: var(--accent, #4a90e2); }
+
+.biz-busy-actions {
+  margin-top: 10px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+  position: relative;
+}
+.biz-busy-actions button {
+  background: none; border: 1px solid var(--biz-border);
+  color: var(--text); font-size: 11px; padding: 4px 12px;
+  border-radius: 6px; cursor: pointer;
+}
+.biz-busy-actions .primary {
+  background: var(--accent, #4a90e2);
+  border-color: var(--accent, #4a90e2);
+  color: white;
+}
+
+/* ── Copy-all button on assistant bubbles ── */
+.biz-bubble.assistant {
+  position: relative;
+}
+.biz-bubble-copy {
+  position: absolute;
+  top: 6px; right: 6px;
+  background: rgba(0,0,0,0.4);
+  border: 1px solid var(--biz-border);
+  color: var(--text);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+.biz-bubble.assistant:hover .biz-bubble-copy { opacity: 1; }
+.biz-bubble-copy:hover { background: rgba(0,0,0,0.7); }
+.biz-bubble-copy.copied {
+  background: #4ad24a; border-color: #4ad24a; color: white; opacity: 1;
+}
+
 .biz-dots span {
   display: inline-block; width: 6px; height: 6px;
   border-radius: 50%; background: currentColor;
