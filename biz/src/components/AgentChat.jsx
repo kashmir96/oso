@@ -230,20 +230,31 @@ export default function AgentChat({ agent }) {
     autoFiredRef.current.add(pendingCreativeId);
     (async () => {
       setBusy(true); setErr('');
+      const cidForWatch = pendingCreativeId;
+      const cardCountBefore = countCardsForCreative(messages, cidForWatch, 'strategy');
       try {
+        // Fire the stage. May 504 from the gateway past 26s -- doesn't
+        // matter; the work continues server-side and we'll pick up the
+        // card via the poll.
         await call('mktg-ads', {
           action: 'pipeline_run_stage_for_card',
           conversation_id: conversation.id,
           creative_id: pendingCreativeId,
           stage: 'strategy',
+        }).catch(() => null);
+        // Wait for the card to actually land. Poll up to 120s -- gives
+        // Opus generous headroom. Existing 2s busy-poll already updates
+        // messages in-place; we just watch.
+        await waitForCard({
+          getMessages: () => messages,
+          conversationId: conversation.id,
+          creativeId: cidForWatch, stage: 'strategy',
+          baselineCount: cardCountBefore,
+          onMessages: (m) => setMessages(m),
+          maxMs: 120_000,
         });
-        const got = await call('biz-chat', { action: 'get_conversation', id: conversation.id });
-        if (Array.isArray(got.messages)) setMessages(got.messages);
       } catch (e) {
-        const isTimeout = e.status === 504 || e.status === 502;
-        setErr(isTimeout
-          ? 'Strategy is still generating — card will appear in a moment. Click ↻ Refresh if it doesn\'t.'
-          : e.message);
+        setErr(e.message || 'Stage failed.');
       } finally { setBusy(false); }
     })();
   }, [messages, conversation?.id, busy]);
@@ -409,23 +420,25 @@ Bubble actions:
     setBusy(true); setErr('');
     try {
       if (next_stage_hint && creative_id) {
-        // Fire the next slow stage CLIENT-DIRECT (own 26s budget) — same
-        // pattern as /ckf split-execution. The endpoint inserts a new
-        // pipeline_card message into the conversation; we refresh after
-        // to surface it.
+        const baseline = countCardsForCreative(messages, creative_id, next_stage_hint);
+        // Fire-and-poll. The fetch may 504 past Netlify's gateway; the
+        // work continues server-side and the poll picks up the card.
         await call('mktg-ads', {
           action: 'pipeline_run_stage_for_card',
           conversation_id: conversation.id,
           creative_id,
           stage: next_stage_hint,
+        }).catch(() => null);
+        await waitForCard({
+          getMessages: () => messages,
+          conversationId: conversation.id,
+          creativeId: creative_id, stage: next_stage_hint,
+          baselineCount: baseline,
+          onMessages: (m) => setMessages(m),
+          maxMs: 120_000,
         });
-        const got = await call('biz-chat', { action: 'get_conversation', id: conversation.id });
-        if (Array.isArray(got.messages)) setMessages(got.messages);
         notifyChanged();
       } else {
-        // No next stage (we're past critique) — let the AI take over for
-        // approve / voiceover / submit-to-Assistant by sending it a short
-        // ack so it knows the user accepted.
         const r = await call('biz-chat', {
           action: 'send', conversation_id: conversation.id, agent: agent.slug,
           text: `Approved ${stage}. Ready for approval / voiceover / Assistant.`,
@@ -434,10 +447,7 @@ Bubble actions:
         notifyChanged();
       }
     } catch (e) {
-      const isTimeout = e.status === 504 || e.status === 502;
-      setErr(isTimeout
-        ? 'Stage is still running — card will appear shortly. Click ↻ Refresh if it doesn\'t.'
-        : e.message);
+      setErr(e.message);
     } finally { setBusy(false); }
   }
 
@@ -588,6 +598,43 @@ Bubble actions:
 
 function isHorizon(m) {
   return Array.isArray(m?.content_blocks) && m.content_blocks.some((b) => b?.type === 'context_horizon');
+}
+
+// Count pipeline_card messages matching a creative + stage. Used to detect
+// when a stage's card has actually landed in the conversation (vs the
+// fetch returning vs the work completing).
+function countCardsForCreative(messages, creativeId, stage) {
+  if (!Array.isArray(messages)) return 0;
+  let n = 0;
+  for (const m of messages) {
+    const blocks = Array.isArray(m.content_blocks) ? m.content_blocks : [];
+    for (const b of blocks) {
+      if (b?.type === 'pipeline_card' && b.creative_id === creativeId && b.stage === stage) n++;
+    }
+  }
+  return n;
+}
+
+// Poll the conversation every 2s until a new pipeline_card for
+// (creativeId, stage) shows up OR maxMs elapses. The 2s busy-poll
+// effect already updates `messages` in-place; this just watches for the
+// card-count to bump past the baseline taken before we fired the stage.
+async function waitForCard({ getMessages, conversationId, creativeId, stage, baselineCount, onMessages, maxMs = 120_000 }) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < maxMs) {
+    await new Promise((r) => setTimeout(r, 2000));
+    let latest = null;
+    try {
+      const got = await call('biz-chat', { action: 'get_conversation', id: conversationId });
+      latest = Array.isArray(got.messages) ? got.messages : null;
+    } catch { /* poll error -- swallow + retry */ }
+    if (latest) {
+      onMessages?.(latest);
+      const now = countCardsForCreative(latest, creativeId, stage);
+      if (now > baselineCount) return; // card landed
+    }
+  }
+  throw new Error(`Stage took longer than ${(maxMs / 1000) | 0}s. Server may still finish — refresh later if needed.`);
 }
 
 function voiceLabel(state) {
