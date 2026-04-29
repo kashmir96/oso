@@ -31,31 +31,26 @@ const { retrieve } = require('./mktg-retrieval.js');
 const { validateStageOutput, STAGE_NAMES } = require('./mktg-agent-stages.js');
 const { SYSTEM_PROMPT, SYSTEM_PROMPT_VERSION, SYSTEM_PROMPT_HASH } = require('./mktg-prompt.js');
 
-// Sonnet 4.6 as default. Opus 4.7 ran 15-30s per stage, blowing past
-// Netlify's 26s sync timeout (504). Sonnet finishes in 5-10s for the same
-// envelope + Zod validation pipeline. Flip to Opus per-deploy via
-// MKTG_GENERATION_MODEL or per-call via opts.model when willing to
-// trade latency for max quality.
-const DEFAULT_MODEL = process.env.MKTG_GENERATION_MODEL || 'claude-sonnet-4-6';
-// Per-stage output cap. Sonnet's wall time scales with output tokens, so
-// stages with bounded outputs (strategy, critique, feedback) fit easily,
-// while variants/draft/playbook_extract get more headroom. Lower caps
-// reduce 504s when ckf-chat chains 2 Sonnet calls + this one.
+// Opus by default — Curtis prefers quality + waiting over speed. Stages
+// run via the dedicated pipeline_run_stage_for_card endpoint with its
+// own budget (separate from the chat AI's tool loop) so longer Opus
+// calls don't bottleneck the chat. Override per-deploy via
+// MKTG_GENERATION_MODEL or per-call via opts.model.
+const DEFAULT_MODEL = process.env.MKTG_GENERATION_MODEL || 'claude-opus-4-7';
 const MAX_OUTPUT_TOKENS_DEFAULT = 4000;
+// Higher caps — let the model be thorough. The visibility (live thinking
+// log + auto-poll) means Curtis can SEE it working through a longer
+// generation rather than wondering if it's stuck.
 const STAGE_OUTPUT_CAPS = {
-  // Tightened down for reliability. Sonnet wall time scales ~linearly
-  // with output tokens; lower caps mean stages finish well inside the
-  // 26s Netlify sync budget. Was hitting timeouts on strategy + variants
-  // when a retry round added 12s to a 14s first attempt.
-  strategy:         500,    // angle + audience-fit + 2-3 alternatives
-  variants_ad:     1200,    // 3-4 variants
-  outline:          600,    // 5-8 beats
-  hooks:            800,    // 4-6 hooks
-  draft:           1800,    // full script
-  critique:         400,    // verdict + scores + rationale
-  feedback:         600,    // diffs + edit_analysis
-  wrap_script:     1200,    // preserved script + timeline + broll
-  playbook_extract: 2000,
+  strategy:        1200,   // angle + 4-5 alternatives + reasoning
+  variants_ad:     2400,   // 4-6 variants with full body copy
+  outline:         1200,   // 6-10 beats
+  hooks:           1500,   // 4-6 hooks with rationale + citations
+  draft:           3500,   // full script + section breakdown + b-roll cues
+  critique:        1000,   // verdict + scores + repair instructions
+  feedback:        1200,   // diffs + edit_analysis + hypotheses
+  wrap_script:     1800,   // preserved script + timeline + broll + cta_placement
+  playbook_extract: 3000,
 };
 
 // Anthropic Opus 4.7 list price (per Mtok). Update when Anthropic changes
