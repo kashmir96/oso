@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { call, notifyChanged } from '@ckf-lib/api.js';
 import { fmtRelative } from '@ckf-lib/format.js';
+import { isRecordingSupported, startRecording, transcribe, stopPlayback } from '@ckf-lib/voice.js';
 import PipelineCard from './PipelineCard.jsx';
 
 /**
@@ -30,6 +31,41 @@ export default function AgentChat({ agent }) {
   const [editingDraft, setEditingDraft] = useState('');
   const scrollRef = useRef(null);
   const taRef = useRef(null);
+
+  // ── Voice: tap mic to record, tap again to stop + transcribe ──
+  // Same pattern as /ckf Chat. Transcribed text is appended to the
+  // composer draft (NOT auto-sent) so Curtis can edit before sending.
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const recorderRef = useRef(null);
+
+  async function toggleMic() {
+    if (recording) {
+      const rec = recorderRef.current;
+      recorderRef.current = null;
+      setRecording(false);
+      if (!rec) return;
+      setTranscribing(true);
+      try {
+        const blob = await rec.stop();
+        if (!blob || blob.size < 200) { setTranscribing(false); return; }
+        const text = await transcribe(blob);
+        if (text) {
+          setDraft((d) => (d ? `${d} ${text}` : text));
+          setTimeout(() => taRef.current?.focus(), 0);
+        }
+      } catch (e) { setErr(e.message); }
+      finally { setTranscribing(false); }
+      return;
+    }
+    if (!isRecordingSupported()) { setErr('Voice not supported on this device.'); return; }
+    stopPlayback();
+    try {
+      const rec = await startRecording();
+      recorderRef.current = rec;
+      setRecording(true);
+    } catch (e) { setErr(e.message || 'Mic permission denied'); }
+  }
 
   // Tick the elapsed counter every second while busy so the visible
   // timer + "longer than usual" hint update without touching state.
@@ -303,6 +339,15 @@ Bubble actions:
 
       <div className="biz-composer">
         {err && <div className="biz-error">{err}</div>}
+        <button
+          className={`biz-mic ${recording ? 'biz-mic-recording' : ''}`}
+          onClick={toggleMic}
+          disabled={busy || transcribing}
+          aria-label={recording ? 'Stop recording' : 'Start voice recording'}
+          title={recording ? 'Stop & transcribe' : 'Voice → text'}
+        >
+          {transcribing ? '…' : (recording ? '⏹' : '🎙')}
+        </button>
         <textarea
           ref={taRef}
           value={draft}
@@ -310,7 +355,7 @@ Bubble actions:
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
           }}
-          placeholder={`Talk to ${agent.name.toLowerCase()}…`}
+          placeholder={recording ? 'Listening…' : `Talk to ${agent.name.toLowerCase()}…`}
           rows={1}
           disabled={busy}
         />
