@@ -246,6 +246,38 @@ exports.handler = withGate(async (event, { user }) => {
       return reply(200, { success: true });
     }
 
+    if (action === 'auto_open') {
+      // Fire ONCE on a fresh conversation: AI greets the user with a
+      // contextual opening. The kickoff "user message" is synthetic and
+      // NOT persisted -- only the AI's reply lands in ckf_messages.
+      const { conversation_id, agent: agentSlug } = body;
+      if (!conversation_id || !agentSlug) return reply(400, { error: 'conversation_id + agent required' });
+      const agent = getAgent(agentSlug);
+      if (!agent) return reply(404, { error: `unknown agent: ${agentSlug}` });
+      const conv = await getConversation(user.id, conversation_id);
+      if (!conv) return reply(404, { error: 'conversation not found' });
+      // Idempotency: if any message already exists, skip + return what's there.
+      const existing = await getMessages(conversation_id, user.id);
+      if (existing.length > 0) {
+        return reply(200, { skipped: true, messages: existing });
+      }
+      const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+      const kickoff = `[INTERNAL — do NOT echo this. The user just opened a fresh ${agent.name} chat. Greet them with ONE short opener (≤30 words) that names what you can do for them in this session AND asks the most useful first question to get started. Keep it warm but tight, peer-to-peer kiwi-coded. No filler, no emojis, no "Hello! How can I help today?". Examples of good openers: "What are we making? Drop a brief or paste a landing URL and I'll start." / "Tell me the objective + audience and I'll go straight to strategy."]`;
+      const resp = await client.messages.create({
+        model: agent.model || DEFAULT_MODEL,
+        max_tokens: 200,
+        system: [{ type: 'text', text: agent.system_prompt, cache_control: { type: 'ephemeral' } }],
+        messages: [{ role: 'user', content: [{ type: 'text', text: kickoff }] }],
+      });
+      const finalText = resp.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim()
+        || `Hey — what are we making? Drop a brief or paste a landing URL.`;
+      await saveMessage(conversation_id, user.id, 'assistant', finalText, resp.content, resp.usage);
+      logAnthropicUsage({ user_id: user.id, action: `biz:${agent.slug}:auto_open`, model: resp.model, usage: resp.usage });
+      await touchConversation(conversation_id);
+      const out = await getMessages(conversation_id, user.id);
+      return reply(200, { skipped: false, messages: out, text: finalText });
+    }
+
     if (action === 'send') {
       const { conversation_id, agent: agentSlug, text } = body;
       if (!conversation_id || !text || !agentSlug) return reply(400, { error: 'conversation_id + agent + text required' });
