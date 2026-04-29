@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { call, notifyChanged } from '@ckf-lib/api.js';
 import { fmtRelative } from '@ckf-lib/format.js';
-import { isRecordingSupported, startRecording, transcribe, stopPlayback } from '@ckf-lib/voice.js';
+import {
+  isRecordingSupported, startRecording,
+  transcribe, speak, stopPlayback,
+  isTtsOn, setTtsOn,
+  createVoiceSession,
+} from '@ckf-lib/voice.js';
 import PipelineCard from './PipelineCard.jsx';
 
 /**
@@ -66,6 +71,104 @@ export default function AgentChat({ agent }) {
       setRecording(true);
     } catch (e) { setErr(e.message || 'Mic permission denied'); }
   }
+
+  // ── TTS toggle: speak AI replies aloud ──
+  const [ttsOn, setTtsLocal] = useState(() => isTtsOn());
+  function flipTts() {
+    const next = !ttsOn;
+    setTtsLocal(next);
+    setTtsOn(next);
+    if (!next) stopPlayback();
+  }
+  // When TTS is on AND not in voice-mode, speak each new assistant reply.
+  // Voice-mode handles its own TTS inline (see startVoiceMode below).
+  const lastSpokenRef = useRef(null);
+  useEffect(() => {
+    if (!ttsOn) return;
+    const handler = (e) => {
+      const text = e.detail;
+      if (!text || text === lastSpokenRef.current) return;
+      lastSpokenRef.current = text;
+      speak(text).catch(() => {});
+    };
+    window.addEventListener('biz-assistant-text', handler);
+    return () => window.removeEventListener('biz-assistant-text', handler);
+  }, [ttsOn]);
+
+  // ── Hands-free voice mode ──
+  // Continuous loop: listen → silence detected → transcribe → send → speak
+  // reply → resume listening. Curtis just talks, no buttons.
+  const [voiceMode, setVoiceMode] = useState(false);
+  const [voiceState, setVoiceState] = useState('idle');
+  const voiceSessionRef = useRef(null);
+
+  // Reusable sender used by voice mode (skips the composer state).
+  async function sendTextDirect(text) {
+    if (!text?.trim() || !conversation) return;
+    setBusy(true); setErr('');
+    setMessages((m) => [...m, { id: `optimistic-${Date.now()}`, role: 'user', content_text: text, created_at: new Date().toISOString() }]);
+    try {
+      const r = await call('biz-chat', {
+        action: 'send', conversation_id: conversation.id, agent: agent.slug, text,
+      });
+      setMessages(r.messages);
+      notifyChanged();
+      // Tell the TTS listener (and any other consumers) about the new reply.
+      if (r.text) window.dispatchEvent(new CustomEvent('biz-assistant-text', { detail: r.text }));
+      return r.text;
+    } catch (e) { setErr(e.message); }
+    finally { setBusy(false); }
+  }
+
+  async function startVoiceMode() {
+    if (!ttsOn) { setTtsLocal(true); setTtsOn(true); }
+    stopPlayback();
+    setVoiceMode(true);
+    setVoiceState('processing');
+
+    // Speak a short opener so the AI starts the convo when mic goes live.
+    let opener = "What's up?";
+    try {
+      if (messages.length === 0 && conversation) {
+        const r = await call('biz-chat', { action: 'auto_open', conversation_id: conversation.id, agent: agent.slug });
+        if (r.messages) setMessages(r.messages);
+        opener = r.text || opener;
+      }
+    } catch { /* swallow; just speak the default */ }
+    try { await speak(opener); } catch {}
+
+    const session = createVoiceSession({
+      onState: (s) => setVoiceState(s),
+      onError: (e) => setErr(e?.message || String(e)),
+      onSpeech: async (text) => {
+        session.pause();
+        const reply = await sendTextDirect(text);
+        if (reply) { try { await speak(reply); } catch {} }
+        session.resume();
+      },
+    });
+    voiceSessionRef.current = session;
+    session.start();
+  }
+
+  function stopVoiceMode() {
+    const s = voiceSessionRef.current;
+    voiceSessionRef.current = null;
+    if (s) s.stop();
+    stopPlayback();
+    setVoiceMode(false);
+    setVoiceState('idle');
+  }
+
+  function flipVoiceMode() { if (voiceMode) stopVoiceMode(); else startVoiceMode(); }
+
+  // Cleanup on conversation change / unmount.
+  useEffect(() => {
+    return () => {
+      if (voiceSessionRef.current) { voiceSessionRef.current.stop(); voiceSessionRef.current = null; }
+      stopPlayback();
+    };
+  }, [conversation?.id]);
 
   // Tick the elapsed counter every second while busy so the visible
   // timer + "longer than usual" hint update without touching state.
@@ -134,6 +237,7 @@ export default function AgentChat({ agent }) {
       });
       setMessages(r.messages);
       notifyChanged();
+      if (r.text) window.dispatchEvent(new CustomEvent('biz-assistant-text', { detail: r.text }));
     } catch (e) {
       const isTimeout = e.status === 504 || e.status === 502;
       if (isTimeout) {
@@ -258,13 +362,32 @@ Bubble actions:
           <strong>{agent.name}</strong>
         </div>
         <div className="biz-chat-actions">
-          <button onClick={() => insertHorizon()} title="Forget context (keeps history)">
+          <button
+            onClick={flipTts}
+            disabled={voiceMode}
+            className={ttsOn ? 'on' : ''}
+            title={ttsOn ? 'Read replies aloud — on' : 'Read replies aloud — off'}
+          >{ttsOn ? '🔊' : '🔈'}</button>
+          <button
+            onClick={flipVoiceMode}
+            className={voiceMode ? 'on' : ''}
+            title={voiceMode ? 'Stop hands-free voice mode' : 'Start hands-free voice mode'}
+          >{voiceMode ? '⏹ voice' : '🎙 voice'}</button>
+          <button onClick={() => insertHorizon()} disabled={voiceMode} title="Forget context (keeps history)">
             forget
           </button>
-          <button onClick={() => newConversation()} title="New conversation">+</button>
-          <button onClick={() => { if (confirm('Delete this conversation?')) deleteConversation(); }} title="Delete + start fresh">↻</button>
+          <button onClick={() => newConversation()} disabled={voiceMode} title="New conversation">+</button>
+          <button onClick={() => { if (confirm('Delete this conversation?')) deleteConversation(); }} disabled={voiceMode} title="Delete + start fresh">↻</button>
         </div>
       </div>
+
+      {/* Voice-mode pill */}
+      {voiceMode && (
+        <div className="biz-voice-status">
+          <span className="biz-voice-dot" /> {voiceLabel(voiceState)}
+          <button onClick={flipVoiceMode} className="biz-voice-stop">stop</button>
+        </div>
+      )}
 
       <div className="biz-chat-stream" ref={scrollRef}>
         {/* Empty state only flashes briefly before auto_open fires.
@@ -342,9 +465,9 @@ Bubble actions:
         <button
           className={`biz-mic ${recording ? 'biz-mic-recording' : ''}`}
           onClick={toggleMic}
-          disabled={busy || transcribing}
+          disabled={busy || transcribing || voiceMode}
           aria-label={recording ? 'Stop recording' : 'Start voice recording'}
-          title={recording ? 'Stop & transcribe' : 'Voice → text'}
+          title={voiceMode ? 'Hands-free voice mode is on' : (recording ? 'Stop & transcribe' : 'Voice → text')}
         >
           {transcribing ? '…' : (recording ? '⏹' : '🎙')}
         </button>
@@ -355,11 +478,15 @@ Bubble actions:
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
           }}
-          placeholder={recording ? 'Listening…' : `Talk to ${agent.name.toLowerCase()}…`}
+          placeholder={
+            voiceMode ? 'Hands-free is on — just talk.'
+            : recording ? 'Listening…'
+            : `Talk to ${agent.name.toLowerCase()}…`
+          }
           rows={1}
-          disabled={busy}
+          disabled={busy || voiceMode}
         />
-        <button className="biz-send" onClick={send} disabled={busy || !draft.trim()}>Send</button>
+        <button className="biz-send" onClick={send} disabled={busy || voiceMode || !draft.trim()}>Send</button>
       </div>
     </div>
   );
@@ -367,6 +494,17 @@ Bubble actions:
 
 function isHorizon(m) {
   return Array.isArray(m?.content_blocks) && m.content_blocks.some((b) => b?.type === 'context_horizon');
+}
+
+function voiceLabel(state) {
+  switch (state) {
+    case 'listening':  return '🎙 Listening…';
+    case 'recording':  return '🔴 Hearing you';
+    case 'processing': return '… Thinking';
+    case 'paused':     return '⏸ Paused';
+    case 'stopped':    return 'Stopped';
+    default:           return '🎙 On';
+  }
 }
 
 function HorizonDivider({ m }) {
