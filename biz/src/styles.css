@@ -227,6 +227,35 @@ body {
   padding: 6px 8px; margin-bottom: 6px;
   background: rgba(210,137,31,0.08); border-radius: 6px;
 }
+/* Inline asset previews under assistant bubbles */
+.biz-bubble-previews {
+  margin-top: 8px;
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+.biz-preview {
+  background: rgba(0,0,0,0.25);
+  border: 1px solid var(--biz-border);
+  border-radius: 8px;
+  overflow: hidden;
+  max-width: 320px;
+}
+.biz-preview img, .biz-preview video {
+  width: 100%; max-height: 320px; object-fit: contain; display: block;
+  background: #000;
+}
+.biz-preview audio { width: 100%; padding: 6px; }
+.biz-preview-actions {
+  display: flex; gap: 6px; padding: 6px 8px; font-size: 11px;
+  border-top: 1px solid var(--biz-border);
+}
+.biz-preview-actions a, .biz-preview-actions button {
+  background: none; border: 1px solid var(--biz-border); color: var(--text);
+  padding: 2px 8px; border-radius: 4px; text-decoration: none; cursor: pointer;
+  font-size: 11px;
+}
+
+.biz-busy-label { font-size: 12px; color: var(--text-muted); }
+
 .biz-dots span {
   display: inline-block; width: 6px; height: 6px;
   border-radius: 50%; background: currentColor;
