@@ -42,7 +42,8 @@ export default function AgentChat({ agent }) {
   void busyTick;
 
   // Bootstrap a conversation per agent. Each agent gets its own thread
-  // (scope = `biz_<slug>`); reuse the most recent if one exists.
+  // (scope = `biz_<slug>`); reuse the most recent if one exists. If the
+  // thread is empty, fire auto_open so the AI greets immediately.
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -56,7 +57,17 @@ export default function AgentChat({ agent }) {
         if (!alive) return;
         setConversation(conv);
         const got = await call('biz-chat', { action: 'get_conversation', id: conv.id });
-        setMessages(got.messages || []);
+        const existing = got.messages || [];
+        setMessages(existing);
+        if (existing.length === 0) {
+          // Empty thread -- AI opens with a contextual greeting.
+          setBusy(true);
+          try {
+            const open = await call('biz-chat', { action: 'auto_open', conversation_id: conv.id, agent: agent.slug });
+            if (alive && !open.skipped) setMessages(open.messages || []);
+          } catch (e) { /* swallow; user can still type */ }
+          finally { if (alive) setBusy(false); }
+        }
       } catch (e) { if (alive) setErr(e.message); }
     })();
     return () => { alive = false; };
@@ -220,20 +231,18 @@ Bubble actions:
       </div>
 
       <div className="biz-chat-stream" ref={scrollRef}>
+        {/* Empty state only flashes briefly before auto_open fires.
+            No agent icon/name here -- the chat header above already
+            carries them. Just the elevator pitch + quick points so
+            Curtis knows what's possible while the AI greeting lands. */}
         {visible.length === 0 && !busy && (
           <div className="biz-empty biz-empty-card">
-            <div className="biz-empty-icon">{agent.icon}</div>
-            <div className="biz-empty-name">{agent.name}</div>
             <div className="biz-empty-blurb">{agent.blurb}</div>
             {Array.isArray(agent.quickPoints) && agent.quickPoints.length > 0 && (
               <ul className="biz-empty-points">
                 {agent.quickPoints.map((p, i) => <li key={i}>{p}</li>)}
               </ul>
             )}
-            <div className="biz-empty-tip">
-              Type to start. You can paste a landing-page URL anywhere in the conversation
-              and I'll read it for context. Click any bubble to edit. /help for more.
-            </div>
           </div>
         )}
         {visible.map((m, idx) => {

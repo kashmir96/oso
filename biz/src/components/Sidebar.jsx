@@ -18,10 +18,11 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Mobile-only top bar with hamburger. */}
+      {/* Mobile-only top bar with just the hamburger. The chat header
+          below already shows the active agent's name + icon, so we don't
+          duplicate the title here. */}
       <div className="biz-mobile-bar">
         <button className="biz-hamburger" aria-label="Open menu" onClick={() => setOpen(true)}>☰</button>
-        <div className="biz-mobile-title">{currentTitle(loc.pathname)}</div>
       </div>
 
       {/* Backdrop (mobile only when open). */}
