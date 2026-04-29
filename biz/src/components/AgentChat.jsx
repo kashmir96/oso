@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { call, notifyChanged } from '@ckf-lib/api.js';
 import { fmtRelative } from '@ckf-lib/format.js';
+import PipelineCard from './PipelineCard.jsx';
 
 /**
  * AgentChat — shared chat shell for every biz agent. The agent slug is
@@ -166,13 +167,41 @@ Bubble actions:
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
   }
 
-  // ── Filter renderable messages (drop tool turns + empty assistants) ─────
+  // ── Filter renderable messages ─────────────────────────────────────────
+  // Drop tool turns. Drop empty-assistant turns that have NO pipeline cards
+  // (those would be tool-only turns from the AI). Keep horizons + cards.
   const visible = messages.filter((m) => {
     if (m.role === 'tool') return false;
     if (isHorizon(m)) return true;
-    if (m.role === 'assistant' && !m.content_text?.trim()) return false;
+    const hasCard = Array.isArray(m.content_blocks) && m.content_blocks.some((b) => b?.type === 'pipeline_card');
+    if (m.role === 'assistant' && !m.content_text?.trim() && !hasCard) return false;
     return true;
   });
+
+  // Track which pipeline cards have been submitted so they lock to read-only.
+  const [submittedCards, setSubmittedCards] = useState(() => new Set());
+
+  async function onPipelineCardSubmit({ stage, next_stage_hint, creative_id, msgKey }) {
+    setSubmittedCards((s) => new Set(s).add(msgKey));
+    setBusy(true); setErr('');
+    try {
+      // For now post a synthetic user message back to the chat so the AI
+      // sees the approval and runs the next stage. (Same pattern /ckf
+      // Chat.jsx uses; we can shift to client-direct stage runs later if
+      // 504s become a problem here too.)
+      const text = next_stage_hint
+        ? `Approved ${stage}. Run ${next_stage_hint} next.`
+        : `Approved ${stage}.`;
+      const r = await call('biz-chat', {
+        action: 'send', conversation_id: conversation.id, agent: agent.slug, text,
+      });
+      setMessages(r.messages);
+      notifyChanged();
+    } catch (e) {
+      const isTimeout = e.status === 504 || e.status === 502;
+      setErr(isTimeout ? 'Edits saved server-side. Type "next" to advance.' : e.message);
+    } finally { setBusy(false); }
+  }
 
   return (
     <div className="biz-chat">
@@ -192,32 +221,59 @@ Bubble actions:
 
       <div className="biz-chat-stream" ref={scrollRef}>
         {visible.length === 0 && !busy && (
-          <div className="biz-empty">
-            {agent.blurb}
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
-              Type to start. Click any bubble to edit. /help for more.
+          <div className="biz-empty biz-empty-card">
+            <div className="biz-empty-icon">{agent.icon}</div>
+            <div className="biz-empty-name">{agent.name}</div>
+            <div className="biz-empty-blurb">{agent.blurb}</div>
+            {Array.isArray(agent.quickPoints) && agent.quickPoints.length > 0 && (
+              <ul className="biz-empty-points">
+                {agent.quickPoints.map((p, i) => <li key={i}>{p}</li>)}
+              </ul>
+            )}
+            <div className="biz-empty-tip">
+              Type to start. You can paste a landing-page URL anywhere in the conversation
+              and I'll read it for context. Click any bubble to edit. /help for more.
             </div>
           </div>
         )}
         {visible.map((m, idx) => {
           if (isHorizon(m)) return <HorizonDivider key={m.id} m={m} />;
-          // Look for tool_result blocks in the NEXT message (which would be
-          // the tool turn after this assistant's tool_use). Pluck any asset
-          // URLs out for inline preview.
+          // Detect pipeline_card blocks on this message and render them
+          // inline alongside the assistant's text bubble.
+          const blocks = Array.isArray(m.content_blocks) ? m.content_blocks : [];
+          const cards = blocks
+            .map((b, i) => ({ b, i }))
+            .filter(({ b }) => b?.type === 'pipeline_card');
           const previews = collectAssetPreviews(messages, idx, m);
           return (
-            <Bubble
-              key={m.id}
-              m={m}
-              previews={previews}
-              isEditing={editingId === m.id}
-              editingDraft={editingDraft}
-              setEditingDraft={setEditingDraft}
-              onStart={() => startEdit(m)}
-              onSave={() => saveEdit(m)}
-              onCancel={cancelEdit}
-              busy={busy}
-            />
+            <div key={m.id}>
+              {(m.content_text?.trim() || previews.length > 0) && (
+                <Bubble
+                  m={m}
+                  previews={previews}
+                  isEditing={editingId === m.id}
+                  editingDraft={editingDraft}
+                  setEditingDraft={setEditingDraft}
+                  onStart={() => startEdit(m)}
+                  onSave={() => saveEdit(m)}
+                  onCancel={cancelEdit}
+                  busy={busy}
+                />
+              )}
+              {cards.map(({ b, i }) => {
+                const msgKey = `${m.id}:${i}`;
+                return (
+                  <PipelineCard
+                    key={msgKey}
+                    stage={b.stage}
+                    creative_id={b.creative_id}
+                    payload={b.payload}
+                    locked={submittedCards.has(msgKey)}
+                    onSubmit={({ stage, next_stage_hint }) => onPipelineCardSubmit({ stage, next_stage_hint, creative_id: b.creative_id, msgKey })}
+                  />
+                );
+              })}
+            </div>
           );
         })}
         {busy && (

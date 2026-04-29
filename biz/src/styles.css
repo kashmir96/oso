@@ -141,6 +141,25 @@ body {
   display: flex; flex-direction: column; gap: 10px;
 }
 .biz-empty { color: var(--text-muted); padding: 12px; font-size: 13px; }
+.biz-empty-card {
+  max-width: 540px; margin: 24px auto;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--biz-border);
+  border-radius: 12px;
+  padding: 20px;
+  color: var(--text);
+}
+.biz-empty-icon { font-size: 32px; margin-bottom: 4px; }
+.biz-empty-name { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+.biz-empty-blurb { font-size: 13px; color: var(--text-muted); margin-bottom: 12px; }
+.biz-empty-points {
+  margin: 0 0 12px; padding-left: 18px; font-size: 13px; line-height: 1.55;
+}
+.biz-empty-points li { margin-bottom: 4px; }
+.biz-empty-tip {
+  font-size: 11px; color: var(--text-muted);
+  padding-top: 12px; border-top: 1px solid var(--biz-border);
+}
 
 /* Bubbles */
 .biz-bubble {

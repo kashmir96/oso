@@ -1,36 +1,28 @@
 /**
- * Agent registry for oso/biz.
+ * Agent registry for oso/biz — currently ONE agent only.
  *
- * Slim by design — Curtis was overwhelmed by 18 agents. Down to 3 focused
- * surfaces. Other agent files still exist in the backend (unregistered) so
- * we can re-enable them quickly when Curtis wants more.
+ * Other agent files in netlify/functions/_lib/biz-agents/ stay
+ * unregistered until we re-introduce them.
  */
 
 export const GROUPS = [
-  { id: 'create',  label: 'Create' },
+  { id: 'create', label: 'Create' },
 ];
 
 export const AGENTS = [
   {
-    slug: 'script-writer',
-    name: 'Script + Video',
+    slug: 'scripting',
+    name: 'Scripting',
     group: 'create',
-    icon: '🎬',
-    blurb: 'Script + timeline + voiceover + captions + B-roll stills + video. One agent end-to-end.',
-  },
-  {
-    slug: 'ads-copy',
-    name: 'Ads Copy',
-    group: 'create',
-    icon: '✍',
-    blurb: 'Ad text generator: 4-6 headline+body+CTA variants from a brief. Critique + ship.',
-  },
-  {
-    slug: 'image-studio',
-    name: 'Image Generator',
-    group: 'create',
-    icon: '🖼',
-    blurb: 'Generate images from text or seed off an existing photo for variations.',
+    icon: '📝',
+    blurb: 'Script writer + (optional) timeline + voiceover + b-roll + video.',
+    quickPoints: [
+      "Walk you through brief → strategy → outline → hooks → draft as editable cards",
+      "Pull context from a landing URL you paste (just drop the link)",
+      "Critique the draft for brand register + locked decisions before you ship",
+      "After approval, ask if you want a full timeline (VO + B-roll stills + Veo video clips)",
+      "Capture what you tweak so the next script generation learns from your taste",
+    ],
   },
 ];
 
