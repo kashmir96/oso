@@ -1,8 +1,8 @@
 [build]
   publish = "public"
-  # Build the CKF React app + the new /biz creative-agency app first, so
-  # Hugo passes both bundles through static/.
-  command = "cd ckf && npm ci && npm run build && cd ../biz && npm ci && npm run build && cd .. && hugo --minify"
+  # Build the CKF React app + /biz + /agent first, so Hugo passes the
+  # bundles through static/.
+  command = "cd ckf && npm ci && npm run build && cd ../biz && npm ci && npm run build && cd ../agent && npm ci && npm run build && cd .. && hugo --minify"
 
 # Coming soon cover page — hides the anti-retail store pitch until launch
 # Original homepage still accessible at /the-primalpantry-anti-retail-store.html
@@ -152,6 +152,12 @@
   to = "/biz/index.html"
   status = 200
 
+# ── AGENT SPA: any /agent/* request that isn't a real file falls back to /agent/index.html ──
+[[redirects]]
+  from = "/agent/*"
+  to = "/agent/index.html"
+  status = 200
+
 # ── CKF static asset cache ──
 [[headers]]
   for = "/ckf/assets/*"
@@ -161,6 +167,12 @@
 # ── BIZ static asset cache ──
 [[headers]]
   for = "/biz/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# ── AGENT static asset cache ──
+[[headers]]
+  for = "/agent/assets/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
