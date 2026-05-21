@@ -4,13 +4,20 @@
   # bundles through static/.
   command = "cd ckf && npm ci && npm run build && cd ../biz && npm ci && npm run build && cd ../agent && npm ci && npm run build && cd .. && hugo --minify"
 
-# Coming soon cover page — hides the anti-retail store pitch until launch
-# Original homepage still accessible at /the-primalpantry-anti-retail-store.html
+# The OSO homepage is now the manufacturing-overview landing (Skincare /
+# Haircare / Cosmetic Manufacturer NZ). The retail-brand cover page is
+# preserved at /coming-soon.html and direct-linkable via /retail.
+# The full anti-retail-store landing is still at
+# /the-primalpantry-anti-retail-store.html.
 [[redirects]]
-  from = "/"
+  from = "/retail"
   to = "/coming-soon.html"
   status = 200
-  force = true
+
+[[redirects]]
+  from = "/retail/"
+  to = "/coming-soon.html"
+  status = 200
 
 [build.environment]
   NODE_VERSION = "18"
@@ -139,6 +146,27 @@
 # Curtis doesn't have to keep the chat tab open while a video renders.
 [functions."mktg-job-poll-videos"]
   schedule = "* * * * *"
+
+# ── Intercom ingest (Customer Rep agent, phase 2) ───────────────────────────
+# Webhook: Intercom hits this on every conversation.* event. Re-fetches the
+# full conversation from the REST API and upserts into intercom_conversations
+# + intercom_messages. Keep at default 10s -- it makes one upstream REST call.
+[functions."intercom-webhook"]
+  timeout = 26
+
+# Backfill: caller-driven pagination via ?cursor=. Max 26s, processes one
+# page of up to 150 convos with per-row re-fetch.
+[functions."intercom-backfill"]
+  timeout = 26
+
+# Classifier: pulls next N unclassified convos, runs Claude (sonnet-4-6),
+# writes to intercom_classifications + bridges to mktg_customer_conversations.
+# Hourly cron picks up anything new -- the trigger on intercom_conversations
+# nulls classified_at when message_count grows, so re-classification of an
+# active thread happens automatically the next hour.
+[functions."intercom-classify"]
+  schedule = "29 * * * *"
+  timeout = 26
 
 # ── CKF SPA: any /ckf/* request that isn't a real file falls back to /ckf/index.html ──
 [[redirects]]

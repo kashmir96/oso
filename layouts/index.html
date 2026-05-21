@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en-nz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OSO — Contract manufacturing for indie beauty brands. Christchurch, NZ.</title>
+  <meta name="description" content="OSO is a Christchurch-based contract manufacturer making skincare, haircare and cosmetics for NZ's most exciting independent brands. 300,000+ units a year. Low MOQs, fast turnaround.">
+  <meta name="keywords" content="contract manufacturer Christchurch, contract manufacturer NZ, beauty manufacturer Christchurch, cosmetics manufacturer NZ, skincare manufacturer New Zealand, haircare manufacturer NZ">
+  <meta property="og:title" content="OSO — Contract manufacturing for indie beauty brands">
+  <meta property="og:description" content="Skincare, haircare and cosmetics manufacturing from Sydenham, Christchurch. 300,000+ units a year for NZ brands.">
+  <meta property="og:type" content="website">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.6;
+      color: #1a1612;
+      background: #faf6ef;
+      -webkit-font-smoothing: antialiased;
+    }
+    .container { max-width: 1180px; margin: 0 auto; padding: 0 1.5rem; }
+    a { color: inherit; text-decoration: none; }
+
+    /* Header */
+    header.site {
+      padding: 1.5rem 0; border-bottom: 1px solid rgba(26,22,18,0.08);
+    }
+    header.site .container { display: flex; justify-content: space-between; align-items: center; }
+    .brand-logo {
+      font-family: 'Fraunces', serif;
+      font-size: 1.5rem; font-weight: 500;
+      letter-spacing: 0.18em;
+    }
+    .brand-logo span { color: #c89546; }
+    header.site nav a {
+      font-size: 0.9rem; color: rgba(26,22,18,0.6);
+      margin-left: 1.5rem; transition: color 0.15s;
+    }
+    header.site nav a:hover { color: #1a1612; }
+    @media (max-width: 600px) {
+      header.site nav { display: none; }
+    }
+
+    /* Hero */
+    .hero {
+      padding: 6rem 0 5rem; text-align: center;
+      background: linear-gradient(180deg, #faf6ef 0%, #f5efde 100%);
+    }
+    .hero .eyebrow {
+      display: inline-block;
+      font-size: 0.75rem; letter-spacing: 0.25em; text-transform: uppercase;
+      color: #c89546; font-weight: 600; margin-bottom: 1.5rem;
+    }
+    .hero h1 {
+      font-family: 'Fraunces', serif;
+      font-size: clamp(2.5rem, 7vw, 5rem);
+      font-weight: 400; line-height: 1.05; letter-spacing: -0.02em;
+      margin: 0 0 1.5rem; max-width: 900px; margin-inline: auto;
+    }
+    .hero h1 em { font-style: italic; color: #c89546; }
+    .hero .lead {
+      font-size: clamp(1.05rem, 1.4vw, 1.2rem);
+      line-height: 1.65; color: rgba(26,22,18,0.7);
+      max-width: 620px; margin: 0 auto 2.5rem;
+      font-weight: 300;
+    }
+    .hero .stat {
+      display: inline-block;
+      background: rgba(200,149,70,0.1); color: #8a6526;
+      padding: 0.5rem 1rem; border-radius: 999px;
+      font-size: 0.9rem; font-weight: 500;
+    }
+    .hero .stat strong { font-weight: 700; color: #1a1612; }
+
+    /* Brand cards */
+    .brands { padding: 5rem 0; }
+    .brands-head { text-align: center; margin-bottom: 3.5rem; }
+    .brands-head h2 {
+      font-family: 'Fraunces', serif;
+      font-size: clamp(1.75rem, 3.5vw, 2.5rem);
+      font-weight: 400; letter-spacing: -0.02em;
+      margin: 0 0 0.75rem;
+    }
+    .brands-head p {
+      color: rgba(26,22,18,0.65); font-size: 1.05rem;
+      max-width: 580px; margin: 0 auto;
+    }
+    .brand-grid {
+      display: grid; gap: 1.75rem;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    }
+    .brand-card {
+      display: block; padding: 2.5rem 2rem;
+      border-radius: 24px;
+      transition: transform 0.25s, box-shadow 0.25s;
+      position: relative; overflow: hidden;
+    }
+    .brand-card:hover { transform: translateY(-4px); }
+    .brand-card .card-eyebrow {
+      display: inline-block;
+      font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase;
+      font-weight: 700; margin-bottom: 1.25rem;
+      padding: 0.3rem 0.7rem; border-radius: 999px;
+    }
+    .brand-card h3 {
+      font-size: 1.6rem; margin: 0 0 0.85rem;
+      letter-spacing: -0.015em; line-height: 1.15;
+    }
+    .brand-card p { font-size: 0.95rem; line-height: 1.6; margin: 0 0 2rem; opacity: 0.85; }
+    .brand-card .products {
+      display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 2rem;
+    }
+    .brand-card .products span {
+      font-size: 0.78rem; padding: 0.3rem 0.7rem;
+      border-radius: 999px; font-weight: 500;
+      background: rgba(255,255,255,0.55);
+    }
+    .brand-card .visit {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      font-weight: 600; font-size: 0.95rem;
+      padding: 0.7rem 1.3rem; border-radius: 999px;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    /* Skincare card — sage */
+    .brand-skincare {
+      background: #f1f6f2;
+      color: #1f2f28;
+      font-family: 'Inter', sans-serif;
+    }
+    .brand-skincare h3 { font-family: 'Inter', sans-serif; font-weight: 700; }
+    .brand-skincare .card-eyebrow { background: #d4e3d8; color: #3a6450; }
+    .brand-skincare .products span { color: #3a6450; }
+    .brand-skincare .visit { background: #5b8a72; color: #fff; }
+    .brand-skincare:hover .visit { background: #3a6450; }
+
+    /* Haircare card — terracotta + serif */
+    .brand-haircare {
+      background: #fbf0e6;
+      color: #2a1c14;
+      font-family: 'Fraunces', serif;
+    }
+    .brand-haircare h3 { font-family: 'Fraunces', serif; font-weight: 500; font-style: italic; }
+    .brand-haircare .card-eyebrow { background: #f3d6c1; color: #9c4d36; font-family: 'Inter', sans-serif; }
+    .brand-haircare .products span { color: #9c4d36; font-family: 'Inter', sans-serif; }
+    .brand-haircare p { font-family: 'Inter', sans-serif; }
+    .brand-haircare .visit { background: #c66b50; color: #fff; font-family: 'Inter', sans-serif; }
+    .brand-haircare:hover .visit { background: #9c4d36; }
+
+    /* Cosmetic card — rose + bold */
+    .brand-cosmetic {
+      background: linear-gradient(135deg, #fde6ec 0%, #f9d5df 100%);
+      color: #2a1620;
+      font-family: 'Inter', sans-serif;
+    }
+    .brand-cosmetic h3 {
+      font-weight: 800; text-transform: uppercase;
+      letter-spacing: -0.02em; font-size: 1.5rem;
+    }
+    .brand-cosmetic .card-eyebrow { background: #f7c4d0; color: #7a334a; }
+    .brand-cosmetic .products span { color: #7a334a; }
+    .brand-cosmetic .visit { background: #b54068; color: #fff; }
+    .brand-cosmetic:hover .visit { background: #7a334a; }
+
+    /* About strip */
+    .about {
+      padding: 5rem 0; background: #1a1612; color: rgba(250,246,239,0.85);
+    }
+    .about .container { max-width: 780px; }
+    .about .eyebrow {
+      font-size: 0.75rem; letter-spacing: 0.25em; text-transform: uppercase;
+      color: #c89546; font-weight: 600; margin-bottom: 1.25rem; display: inline-block;
+    }
+    .about h2 {
+      font-family: 'Fraunces', serif;
+      font-size: clamp(1.75rem, 3.5vw, 2.5rem);
+      font-weight: 400; color: #faf6ef;
+      margin: 0 0 1.5rem; letter-spacing: -0.01em;
+    }
+    .about p {
+      font-size: 1.05rem; line-height: 1.75;
+      margin: 0 0 1rem; font-weight: 300;
+    }
+    .about-grid {
+      display: grid; gap: 2rem; margin-top: 2.5rem;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+    .about-stat { border-left: 2px solid rgba(200,149,70,0.4); padding-left: 1.25rem; }
+    .about-stat .num {
+      font-family: 'Fraunces', serif;
+      font-size: 2rem; color: #c89546;
+      display: block; margin-bottom: 0.25rem; line-height: 1;
+    }
+    .about-stat .label {
+      font-size: 0.85rem; opacity: 0.7; line-height: 1.4;
+    }
+
+    /* Footer */
+    footer.site {
+      padding: 2.5rem 0; text-align: center;
+      font-size: 0.9rem; color: rgba(26,22,18,0.55);
+    }
+    footer.site p { margin: 0.25rem 0; }
+    footer.site a { color: rgba(26,22,18,0.7); }
+    footer.site a:hover { color: #c89546; }
+  </style>
+</head>
+<body>
+
+<header class="site">
+  <div class="container">
+    <a href="/" class="brand-logo">OS<span>O</span></a>
+    <nav>
+      <a href="#brands">Brands</a>
+      <a href="#about">About</a>
+      <a href="mailto:hello@primalpantry.co.nz">Contact</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="container">
+    <span class="eyebrow">Christchurch, New Zealand</span>
+    <h1>Manufacturing for <em>indie beauty brands</em>.</h1>
+    <p class="lead">From formulation to launch — OSO makes skincare, haircare and cosmetics for some of New Zealand's most exciting independent brands. Three product categories, one Sydenham team.</p>
+    <span class="stat"><strong>300,000+ units a year</strong> · 3 product verticals · Christchurch-based</span>
+  </div>
+</section>
+
+<section class="brands" id="brands">
+  <div class="container">
+    <div class="brands-head">
+      <h2>Three manufacturing lines, one team</h2>
+      <p>Each vertical has its own site, formulary, and packaging library. All built and shipped from the same Sydenham facility.</p>
+    </div>
+    <div class="brand-grid">
+
+      <a href="https://skincaremanufacturer.co.nz" class="brand-card brand-skincare">
+        <span class="card-eyebrow">Skincare</span>
+        <h3>Skincare Manufacturer NZ</h3>
+        <p>Cleansers, serums, day &amp; night creams, body care, balms — clean modern formulas for indie skincare brands.</p>
+        <div class="products">
+          <span>Cleansers</span><span>Serums</span><span>Creams</span><span>Body care</span><span>Balms</span>
+        </div>
+        <span class="visit">Visit skincare site →</span>
+      </a>
+
+      <a href="https://haircaremanufacturer.co.nz" class="brand-card brand-haircare">
+        <span class="card-eyebrow">Haircare</span>
+        <h3>Haircare Manufacturer NZ</h3>
+        <p>Shampoos, conditioners, treatments, oils, styling — built for brands that want salon-grade product without big-batch lock-in.</p>
+        <div class="products">
+          <span>Shampoo</span><span>Conditioner</span><span>Masks</span><span>Oils</span><span>Styling</span>
+        </div>
+        <span class="visit">Visit haircare site →</span>
+      </a>
+
+      <a href="https://cosmeticmanufacturer.co.nz" class="brand-card brand-cosmetic">
+        <span class="card-eyebrow">Cosmetics</span>
+        <h3>Cosmetic Manufacturer NZ</h3>
+        <p>Lipsticks, foundations, eyeshadows, palettes — colour-cosmetic manufacturing with shade development built in.</p>
+        <div class="products">
+          <span>Lip</span><span>Face</span><span>Eye</span><span>Cheek</span><span>Setting</span>
+        </div>
+        <span class="visit">Visit cosmetics site →</span>
+      </a>
+
+    </div>
+  </div>
+</section>
+
+<section class="about" id="about">
+  <div class="container">
+    <span class="eyebrow">About OSO</span>
+    <h2>Built for brands too small for the big factories and too ambitious for kitchen-bench production.</h2>
+    <p>OSO is a Christchurch-based contract manufacturer. We help NZ founders go from "what if we made..." to a finished, packaged, label-compliant product on a retail shelf — without the multi-quarter timelines and tens-of-thousands MOQs the established players insist on.</p>
+    <p>If you've outgrown your kitchen, your garage, or your last manufacturer — talk to us.</p>
+    <div class="about-grid">
+      <div class="about-stat">
+        <span class="num">300k+</span>
+        <span class="label">units produced per year for NZ consumer brands</span>
+      </div>
+      <div class="about-stat">
+        <span class="num">10k</span>
+        <span class="label">units per week production capacity</span>
+      </div>
+      <div class="about-stat">
+        <span class="num">3</span>
+        <span class="label">manufacturing verticals — skincare, haircare, cosmetics</span>
+      </div>
+      <div class="about-stat">
+        <span class="num">1</span>
+        <span class="label">Sydenham, Christchurch facility</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="site">
+  <div class="container">
+    <p><strong>OSO</strong> · Sydenham, Christchurch, New Zealand</p>
+    <p>
+      <a href="https://skincaremanufacturer.co.nz">Skincare</a> ·
+      <a href="https://haircaremanufacturer.co.nz">Haircare</a> ·
+      <a href="https://cosmeticmanufacturer.co.nz">Cosmetics</a>
+    </p>
+    <p style="margin-top: 0.75rem; font-size: 0.82rem;">&copy; {{ now.Year }} OSO. All rights reserved.</p>
+  </div>
+</footer>
+
+</body>
+</html>
